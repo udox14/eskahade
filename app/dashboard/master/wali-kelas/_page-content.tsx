@@ -74,6 +74,10 @@ function buildGabunganSignature(gabungan: GabunganMap) {
     .join('||')
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'Terjadi kesalahan saat menghubungi server.'
+}
+
 export default function ManajemenGuruPage() {
   const confirm = useConfirm()
   const [tab, setTab] = useState<'JADWAL' | 'MASTER'>('JADWAL')
@@ -288,38 +292,52 @@ export default function ManajemenGuruPage() {
     e.preventDefault()
     if (!newGuru.nama) return toast.warning('Nama wajib diisi')
     const toastId = toast.loading('Menambahkan...')
-    const res = await tambahGuruManual(newGuru.nama, newGuru.gelar, newGuru.kode)
-    toast.dismiss(toastId)
-    if ((res as any).success) {
+    try {
+      const res = await tambahGuruManual(newGuru.nama, newGuru.gelar, newGuru.kode)
+      if ('error' in res) return toast.error(res.error)
       toast.success('Guru ditambahkan')
       setNewGuru({ nama: '', gelar: '', kode: '' })
       await loadInitialData()
       if (selectedMarhalah) await loadKelasByFilter(selectedMarhalah)
-    } else toast.error((res as any).error)
+    } catch (error) {
+      toast.error('Gagal menambahkan guru', { description: getErrorMessage(error) })
+    } finally {
+      toast.dismiss(toastId)
+    }
   }
 
   const handleSimpanEditGuru = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editGuru?.nama) return toast.warning('Nama wajib diisi')
     const toastId = toast.loading('Menyimpan perubahan...')
-    const res = await editGuruManual(editGuru.id, editGuru.nama, editGuru.gelar, editGuru.kode)
-    toast.dismiss(toastId)
-    if ((res as any).success) {
+    try {
+      const res = await editGuruManual(editGuru.id, editGuru.nama, editGuru.gelar, editGuru.kode)
+      if ('error' in res) return toast.error(res.error)
       toast.success('Guru diperbarui')
       setEditGuru(null)
       await loadInitialData()
       if (selectedMarhalah) await loadKelasByFilter(selectedMarhalah)
-    } else toast.error((res as any).error)
+    } catch (error) {
+      toast.error('Gagal memperbarui guru', { description: getErrorMessage(error) })
+    } finally {
+      toast.dismiss(toastId)
+    }
   }
 
   const handleHapusGuru = async (id: number, nama: string) => {
     if (!await confirm(`Hapus guru ${nama}? Pastikan tidak sedang mengajar.`)) return
-    const res = await hapusGuru(id)
-    if ((res as any).success) {
+    const toastId = toast.loading('Menghapus guru...')
+    try {
+      const res = await hapusGuru(id)
+      if ('error' in res) return toast.error(res.error)
       toast.success('Guru dihapus')
       await loadInitialData()
       if (selectedMarhalah) await loadKelasByFilter(selectedMarhalah)
-    } else toast.error((res as any).error)
+    } catch (error) {
+      toast.error('Gagal menghapus guru', { description: getErrorMessage(error) })
+    } finally {
+      toast.dismiss(toastId)
+    }
   }
 
   const toggleSelectGuru = (id: number) => {
@@ -336,14 +354,18 @@ export default function ManajemenGuruPage() {
     if (!await confirm(`Yakin ingin menghapus ${selectedGuruIds.length} guru yang dipilih? Pastikan mereka tidak sedang terpasang di jadwal!`)) return
     setIsDeletingBatch(true)
     const toastId = toast.loading('Menghapus data...')
-    const res = await hapusGuruMassal(selectedGuruIds)
-    setIsDeletingBatch(false)
-    toast.dismiss(toastId)
-    if ((res as any).success) {
+    try {
+      const res = await hapusGuruMassal(selectedGuruIds)
+      if ('error' in res) return toast.error('Gagal Menghapus', { description: res.error })
       toast.success('Berhasil', { description: `${(res as any).count} guru dihapus.` })
       await loadInitialData()
       if (selectedMarhalah) await loadKelasByFilter(selectedMarhalah)
-    } else toast.error('Gagal Menghapus', { description: (res as any).error })
+    } catch (error) {
+      toast.error('Gagal Menghapus', { description: getErrorMessage(error) })
+    } finally {
+      setIsDeletingBatch(false)
+      toast.dismiss(toastId)
+    }
   }
 
   const handleDownloadTemplate = async () => {
@@ -378,17 +400,20 @@ export default function ManajemenGuruPage() {
     if (excelData.length === 0) return
     setIsProcessing(true)
     const toastId = toast.loading('Mengimport data guru...')
-    const res = await importGuruMassal(excelData)
-    setIsProcessing(false)
-    toast.dismiss(toastId)
-    if ('error' in res) toast.error('Gagal import', { description: (res as any).error })
-    else {
+    try {
+      const res = await importGuruMassal(excelData)
+      if ('error' in res) return toast.error('Gagal import', { description: res.error })
       const skippedMsg = ((res as any).skipped ?? 0) > 0 ? ` (${(res as any).skipped} duplikat dilewati)` : ''
       toast.success(`Berhasil import ${(res as any).count} guru${skippedMsg}`)
       setExcelData([])
       await loadInitialData()
       if (selectedMarhalah) await loadKelasByFilter(selectedMarhalah)
       setTab('JADWAL')
+    } catch (error) {
+      toast.error('Gagal import', { description: getErrorMessage(error) })
+    } finally {
+      setIsProcessing(false)
+      toast.dismiss(toastId)
     }
   }
 

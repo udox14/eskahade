@@ -51,8 +51,8 @@ export const getCachedBiayaSettings = unstable_cache(
 )
 
 // ─── DATA GURU ─────────────────────────────────────────────────────────────
-export const getCachedDataGuru = unstable_cache(
-  async () => query<any>('SELECT id, nama_lengkap, gelar, kode_guru FROM data_guru ORDER BY nama_lengkap'),
-  ['data-guru'],
-  { tags: ['data-guru'], revalidate: 3600 }
-)
+// Data ini dikelola lewat CRUD dan harus langsung konsisten setelah mutasi.
+// Jumlah barisnya kecil, jadi query langsung lebih aman daripada cache satu jam.
+export async function getCachedDataGuru() {
+  return query<any>('SELECT id, nama_lengkap, gelar, kode_guru FROM data_guru ORDER BY nama_lengkap')
+}

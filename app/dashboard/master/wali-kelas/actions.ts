@@ -4,7 +4,7 @@ import { query, queryOne, batch, execute } from '@/lib/db'
 import { hashPassword } from '@/lib/auth/password'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
-import { revalidatePath, revalidateTag } from 'next/cache'
+import { revalidatePath } from 'next/cache'
 import { getCachedDataGuru, getCachedMarhalahList, getCachedTahunAjaranAktif, getCachedTahunAjaranList } from '@/lib/cache/master'
 import {
   buildWeeklyGuruRuleMap,
@@ -555,7 +555,6 @@ export async function tambahGuruManual(nama: string, gelar: string, kode: string
     summary: `Menambahkan data guru ${nama}`,
     details: { gelar, kode_guru: kode || null },
   })
-  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
 }
@@ -568,11 +567,19 @@ export async function editGuruManual(id: number, nama: string, gelar: string, ko
     [nama, gelar, kode, id]
   )
 
-  // Sync to users
-  await execute(
-    `UPDATE users SET full_name = ? WHERE guru_id = ? OR (source_type = 'guru' AND source_ref_id = ?)`,
-    [nama, id, String(id)]
-  )
+  // Sinkronkan akun guru. Database lama mungkin belum memiliki kolom guru_id.
+  try {
+    await execute(
+      `UPDATE users SET full_name = ? WHERE guru_id = ? OR (source_type = 'guru' AND source_ref_id = ?)`,
+      [nama, id, String(id)]
+    )
+  } catch (error: any) {
+    if (!String(error?.message || '').toLowerCase().includes('no such column: guru_id')) throw error
+    await execute(
+      `UPDATE users SET full_name = ? WHERE source_type = 'guru' AND source_ref_id = ?`,
+      [nama, String(id)]
+    )
+  }
 
   await logActivity({
     actor: actorFromSession(session),
@@ -586,7 +593,6 @@ export async function editGuruManual(id: number, nama: string, gelar: string, ko
     summary: `Mengubah data guru ${nama}`,
     details: { gelar, kode_guru: kode || null },
   })
-  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   revalidatePath('/dashboard/pengaturan/users')
   return { success: true }
@@ -630,7 +636,6 @@ export async function hapusGuru(id: number): Promise<{ success: boolean } | { er
     summary: `Menghapus data guru ${guru.nama_lengkap || id}`,
     details: { gelar: guru.gelar, kode_guru: guru.kode_guru },
   })
-  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true }
 }
@@ -665,7 +670,6 @@ export async function hapusGuruMassal(ids: number[]): Promise<{ success: boolean
     summary: `Menghapus ${ids.length} data guru`,
     details: { count: ids.length },
   })
-  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true, count: ids.length }
 }
@@ -710,7 +714,6 @@ export async function importGuruMassal(dataExcel: ImportGuruRow[]): Promise<{ su
     details: { count: toInsert.length, skipped },
   })
 
-  revalidateTag('data-guru', 'everything')
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true, count: toInsert.length, skipped }
 }
