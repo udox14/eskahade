@@ -105,7 +105,8 @@ export type SumberOptionsPenempatan = {
   semuaRekomendasiBaru?: boolean
 }
 
-// Gabungan kandidat untuk marhalah tujuan terpilih:
+// Gabungan kandidat untuk marhalah tujuan terpilih. Semua kandidat wajib belum
+// memiliki kelas aktif pada tahun ajaran aktif:
 //  - "baru": santri aktif tanpa riwayat aktif, grade dari tes klasifikasi.
 //            Default hanya yang rekomendasinya cocok; bisa ditampilkan semua (opts.semuaRekomendasiBaru)
 //            karena santri baru boleh ditempatkan ke marhalah manapun.
@@ -149,6 +150,13 @@ export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?:
       )
       AND NOT EXISTS (
         SELECT 1 FROM penempatan_draft pd WHERE pd.santri_id = s.id
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM riwayat_pendidikan rpa
+        JOIN kelas ka ON ka.id = rpa.kelas_id
+        JOIN tahun_ajaran taa ON taa.id = ka.tahun_ajaran_id AND taa.is_active = 1
+        WHERE rpa.santri_id = s.id AND rpa.status_riwayat = 'aktif'
       )
     ORDER BY s.nama_lengkap
   `, baruParams)
@@ -198,6 +206,13 @@ export async function getPenempatanData(marhalahTargetId: string, jenisKelamin?:
         AND s.status_global = 'aktif'${lamaGender}
         AND NOT EXISTS (
           SELECT 1 FROM penempatan_draft pd WHERE pd.santri_id = s.id
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM riwayat_pendidikan rpa
+          JOIN kelas ka ON ka.id = rpa.kelas_id
+          JOIN tahun_ajaran taa ON taa.id = ka.tahun_ajaran_id AND taa.is_active = 1
+          WHERE rpa.santri_id = s.id AND rpa.status_riwayat = 'aktif'
         )
       ORDER BY (rp.grade_urutan IS NULL), rp.grade_urutan, s.nama_lengkap
     `, lamaParams)
