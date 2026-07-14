@@ -960,3 +960,236 @@ export async function buatAkunGuruOtomatis(guruId: number): Promise<{ success: b
   revalidatePath('/dashboard/master/wali-kelas')
   return { success: true, email }
 }
+
+// ---------------------------------------------------------------------------
+// Guru ↔ User sync utilities
+// ---------------------------------------------------------------------------
+
+export async function getGuruSyncStatus(): Promise<{
+  linked: { guru_id: number; guru_nama: string; user_id: string; user_name: string; user_email: string }[];
+  unlinked: { guru_id: number; guru_nama: string; suggested_user_id: string | null; suggested_user_name: string | null; suggested_user_email: string | null }[];
+}> {
+  // 1. All guru rows with their linked user (if any)
+  const rows = await query<{
+    guru_id: number
+    guru_nama: string
+    user_id: string | null
+    user_name: string | null
+    user_email: string | null
+  }>(
+    `SELECT
+       g.id          AS guru_id,
+       g.nama_lengkap AS guru_nama,
+       u.id          AS user_id,
+       u.full_name   AS user_name,
+       u.email       AS user_email
+     FROM data_guru g
+     LEFT JOIN users u
+       ON (u.source_type = 'guru' AND u.source_ref_id = CAST(g.id AS TEXT))
+       OR (u.guru_id = g.id)
+     ORDER BY g.nama_lengkap`,
+    []
+  )
+
+  const linked: { guru_id: number; guru_nama: string; user_id: string; user_name: string; user_email: string }[] = []
+  const unlinkedGuruIds: { guru_id: number; guru_nama: string }[] = []
+
+  for (const r of rows) {
+    if (r.user_id) {
+      linked.push({
+        guru_id: r.guru_id,
+        guru_nama: r.guru_nama,
+        user_id: r.user_id,
+        user_name: r.user_name ?? '',
+        user_email: r.user_email ?? '',
+      })
+    } else {
+      unlinkedGuruIds.push({ guru_id: r.guru_id, guru_nama: r.guru_nama })
+    }
+  }
+
+  // 2. For unlinked gurus, find suggested user matches (exact then LIKE)
+  //    We do a single query that attempts a fuzzy match for ALL unlinked gurus at once.
+  const unlinked: { guru_id: number; guru_nama: string; suggested_user_id: string | null; suggested_user_name: string | null; suggested_user_email: string | null }[] = []
+
+  if (unlinkedGuruIds.length > 0) {
+    // Build a CTE of unlinked guru ids/names, then LEFT JOIN against users for
+    // exact (case-insensitive trimmed) or LIKE partial match.
+    // To keep it efficient we query all candidate users that are not already
+    // linked to a guru and match at least one unlinked guru name.
+    const candidateUsers = await query<{
+      id: string
+      full_name: string
+      email: string
+      source_type: string | null
+      source_ref_id: string | null
+      guru_id: number | null
+    }>(
+      `SELECT id, full_name, email, source_type, source_ref_id, guru_id
+       FROM users
+       WHERE (source_type IS NULL OR source_type != 'guru')
+         AND guru_id IS NULL`,
+      []
+    )
+
+    for (const g of unlinkedGuruIds) {
+      const guruNameNorm = (g.guru_nama ?? '').trim().toLowerCase()
+      // Try exact match first
+      let match = candidateUsers.find(
+        (u) => (u.full_name ?? '').trim().toLowerCase() === guruNameNorm
+      )
+      // Fallback: partial LIKE-style match (guru name contained in user name or vice-versa)
+      if (!match && guruNameNorm.length > 0) {
+        match = candidateUsers.find((u) => {
+          const uName = (u.full_name ?? '').trim().toLowerCase()
+          return uName.includes(guruNameNorm) || guruNameNorm.includes(uName)
+        })
+      }
+      unlinked.push({
+        guru_id: g.guru_id,
+        guru_nama: g.guru_nama,
+        suggested_user_id: match?.id ?? null,
+        suggested_user_name: match?.full_name ?? null,
+        suggested_user_email: match?.email ?? null,
+      })
+    }
+  }
+
+  return { linked, unlinked }
+}
+
+export async function linkGuruToUser(
+  guruId: number,
+  userId: string,
+): Promise<{ success: boolean } | { error: string }> {
+  try {
+    // Fetch the guru record to get the canonical name
+    const guru = await queryOne<{ id: number; nama_lengkap: string }>(
+      `SELECT id, nama_lengkap FROM data_guru WHERE id = ?`,
+      [guruId]
+    )
+    if (!guru) return { error: 'Data guru tidak ditemukan' }
+
+    // Fetch the user record to read existing roles
+    const user = await queryOne<{ id: string; role: string; roles: string | null }>(
+      `SELECT id, role, roles FROM users WHERE id = ?`,
+      [userId]
+    )
+    if (!user) return { error: 'User tidak ditemukan' }
+
+    // Merge 'guru' into the roles JSON array (preserve existing roles)
+    let rolesArr: string[] = []
+    try {
+      rolesArr = user.roles ? JSON.parse(user.roles) : [user.role]
+    } catch {
+      rolesArr = [user.role]
+    }
+    if (!rolesArr.includes('guru')) {
+      rolesArr.push('guru')
+    }
+
+    // Update user record — keep existing primary role, only set link fields + sync name
+    await execute(
+      `UPDATE users
+       SET source_type   = 'guru',
+           source_ref_id = CAST(? AS TEXT),
+           guru_id       = ?,
+           full_name     = ?,
+           roles         = ?
+       WHERE id = ?`,
+      [guruId, guruId, guru.nama_lengkap, JSON.stringify(rolesArr), userId]
+    )
+
+    revalidatePath('/dashboard/master/wali-kelas')
+    return { success: true }
+  } catch (err) {
+    console.error('[linkGuruToUser]', err)
+    return { error: err instanceof Error ? err.message : 'Gagal menghubungkan guru ke user' }
+  }
+}
+
+export async function autoSyncGuruAccounts(): Promise<
+  { linked: number; skipped: number } | { error: string }
+> {
+  try {
+    // 1. Find all data_guru that are NOT yet linked to any user
+    const unlinkedGurus = await query<{ id: number; nama_lengkap: string }>(
+      `SELECT g.id, g.nama_lengkap
+       FROM data_guru g
+       WHERE NOT EXISTS (
+         SELECT 1 FROM users u
+         WHERE (u.source_type = 'guru' AND u.source_ref_id = CAST(g.id AS TEXT))
+            OR (u.guru_id = g.id)
+       )`,
+      []
+    )
+
+    // 2. Find all users that are not already linked to any guru
+    const availableUsers = await query<{ id: string; full_name: string; role: string; roles: string | null }>(
+      `SELECT id, full_name, role, roles
+       FROM users
+       WHERE (source_type IS NULL OR source_type != 'guru')
+         AND guru_id IS NULL`,
+      []
+    )
+
+    let linkedCount = 0
+    let skippedCount = 0
+
+    // Build a Set of already-consumed user ids to prevent double-linking
+    const consumedUserIds = new Set<string>()
+
+    const statements: { sql: string; params: unknown[] }[] = []
+
+    for (const guru of unlinkedGurus) {
+      const guruNameNorm = (guru.nama_lengkap ?? '').trim().toLowerCase()
+
+      // Find exact case-insensitive trimmed match among available (unconsumed) users
+      const match = availableUsers.find(
+        (u) =>
+          !consumedUserIds.has(u.id) &&
+          (u.full_name ?? '').trim().toLowerCase() === guruNameNorm
+      )
+
+      if (match) {
+        // Merge 'guru' into roles (preserve existing roles)
+        let rolesArr: string[] = []
+        try {
+          rolesArr = match.roles ? JSON.parse(match.roles) : [match.role]
+        } catch {
+          rolesArr = [match.role]
+        }
+        if (!rolesArr.includes('guru')) {
+          rolesArr.push('guru')
+        }
+
+        statements.push({
+          sql: `UPDATE users
+                SET source_type   = 'guru',
+                    source_ref_id = CAST(? AS TEXT),
+                    guru_id       = ?,
+                    full_name     = ?,
+                    roles         = ?
+                WHERE id = ?`,
+          params: [guru.id, guru.id, guru.nama_lengkap, JSON.stringify(rolesArr), match.id],
+        })
+
+        consumedUserIds.add(match.id)
+        linkedCount++
+      } else {
+        skippedCount++
+      }
+    }
+
+    // Execute all updates in a batch
+    if (statements.length > 0) {
+      await batch(statements)
+    }
+
+    revalidatePath('/dashboard/master/wali-kelas')
+    return { linked: linkedCount, skipped: skippedCount }
+  } catch (err) {
+    console.error('[autoSyncGuruAccounts]', err)
+    return { error: err instanceof Error ? err.message : 'Gagal auto-sync akun guru' }
+  }
+}

@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { getJadwalFilterOptions, getKelasJadwalByMarhalah, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch, getTahunAjaranList, copyGuruJadwalFromTahunAjaran, editGuruManual } from './actions'
-import { UserCheck, Save, Loader2, School, Search, Upload, Download, List, Plus, Trash2, CheckSquare, Square, Printer, Filter, CalendarDays, UsersRound, Settings2, X, Copy } from 'lucide-react'
+import { getJadwalFilterOptions, getKelasJadwalByMarhalah, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch, getTahunAjaranList, copyGuruJadwalFromTahunAjaran, editGuruManual, getGuruSyncStatus, linkGuruToUser, autoSyncGuruAccounts } from './actions'
+import { UserCheck, Save, Loader2, School, Search, Upload, Download, List, Plus, Trash2, CheckSquare, Square, Printer, Filter, CalendarDays, UsersRound, Settings2, X, Copy, Link2, Unlink, RefreshCw, Check, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -107,6 +107,9 @@ export default function ManajemenGuruPage() {
   const [editGuru, setEditGuru] = useState<{ id: number; nama: string; gelar: string; kode: string } | null>(null)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [importModalOpen, setImportModalOpen] = useState(false)
+  const [syncModalOpen, setSyncModalOpen] = useState(false)
+  const [syncData, setSyncData] = useState<{ linked: any[]; unlinked: any[] }>({ linked: [], unlinked: [] })
+  const [syncLoading, setSyncLoading] = useState(false)
   const [search, setSearch] = useState('')
 
   const [tahunAjaranList, setTahunAjaranList] = useState<any[]>([])
@@ -764,6 +767,9 @@ export default function ManajemenGuruPage() {
                 <button onClick={() => setImportModalOpen(true)} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-700 shadow-sm">
                   <Upload className="w-4 h-4" /> Import & Template
                 </button>
+                <button onClick={async () => { setSyncModalOpen(true); setSyncLoading(true); const data = await getGuruSyncStatus(); setSyncData(data); setSyncLoading(false) }} className="bg-amber-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-amber-700 shadow-sm">
+                  <Link2 className="w-4 h-4" /> Sinkronisasi Akun
+                </button>
                 {selectedGuruIds.length > 0 && (
                   <button onClick={handleHapusBatch} disabled={isDeletingBatch} className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-red-700 disabled:opacity-50 shadow-sm">
                     {isDeletingBatch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
@@ -1000,6 +1006,148 @@ export default function ManajemenGuruPage() {
                   </div>
                 )
               })()}
+            </div>
+          </div>
+        </div>
+      {syncModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="p-5 border-b flex items-center justify-between flex-shrink-0">
+              <div>
+                <h3 className="font-bold text-slate-800 flex items-center gap-2"><Link2 className="w-5 h-5 text-amber-600" /> Sinkronisasi Guru ↔ Akun User</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Hubungkan data guru di Master Guru dengan akun user login mereka.</p>
+              </div>
+              <button onClick={() => setSyncModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+
+            <div className="p-5 overflow-auto flex-1 space-y-6">
+              {syncLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+                  <p className="text-sm text-slate-500">Memuat status sinkronisasi...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold"><Check className="w-3 h-3" /> {syncData.linked.length} Terhubung</span>
+                        <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-2.5 py-1 rounded-full text-xs font-bold"><Unlink className="w-3 h-3" /> {syncData.unlinked.length} Belum</span>
+                      </div>
+                    </div>
+                    {syncData.unlinked.length > 0 && (
+                      <button
+                        onClick={async () => {
+                          setSyncLoading(true)
+                          const res = await autoSyncGuruAccounts()
+                          if ('error' in res) {
+                            toast.error(res.error)
+                          } else {
+                            toast.success(`${res.linked} guru berhasil di-link otomatis, ${res.skipped} dilewati (nama tidak cocok)`)
+                          }
+                          const data = await getGuruSyncStatus()
+                          setSyncData(data)
+                          setSyncLoading(false)
+                          await loadInitialData()
+                        }}
+                        className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-amber-700 shadow-sm"
+                      >
+                        <RefreshCw className="w-4 h-4" /> Auto-Sync Semua
+                      </button>
+                    )}
+                  </div>
+
+                  {syncData.unlinked.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-bold text-red-700 mb-2 flex items-center gap-2"><Unlink className="w-4 h-4" /> Guru Belum Terhubung ke Akun</h4>
+                      <div className="border rounded-xl overflow-hidden">
+                        <div className="max-h-64 overflow-auto">
+                          <table className="w-full text-sm text-left">
+                            <thead className="bg-red-50 sticky top-0">
+                              <tr>
+                                <th className="p-2.5 font-bold text-red-800 text-xs">Nama Guru (Master)</th>
+                                <th className="p-2.5 font-bold text-red-800 text-xs">Saran Akun User</th>
+                                <th className="p-2.5 font-bold text-red-800 text-xs text-center w-24">Aksi</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-red-100">
+                              {syncData.unlinked.map((g) => (
+                                <tr key={g.guru_id} className="hover:bg-red-50/50">
+                                  <td className="p-2.5 font-medium text-slate-800">{g.guru_nama}</td>
+                                  <td className="p-2.5">
+                                    {g.suggested_user_name ? (
+                                      <div>
+                                        <span className="text-slate-700 font-medium">{g.suggested_user_name}</span>
+                                        <span className="text-slate-400 text-xs ml-1">({g.suggested_user_email})</span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-400 text-xs italic">Tidak ada saran — link manual dari Manajemen User</span>
+                                    )}
+                                  </td>
+                                  <td className="p-2.5 text-center">
+                                    {g.suggested_user_id && (
+                                      <button
+                                        onClick={async () => {
+                                          const res = await linkGuruToUser(g.guru_id, g.suggested_user_id!)
+                                          if ('error' in res) return toast.error(res.error)
+                                          toast.success(`${g.guru_nama} berhasil di-link!`)
+                                          setSyncLoading(true)
+                                          const data = await getGuruSyncStatus()
+                                          setSyncData(data)
+                                          setSyncLoading(false)
+                                          await loadInitialData()
+                                        }}
+                                        className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 hover:bg-amber-200 px-3 py-1 rounded-lg text-xs font-bold transition-colors"
+                                      >
+                                        <ArrowRight className="w-3 h-3" /> Link
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {syncData.linked.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-bold text-green-700 mb-2 flex items-center gap-2"><Check className="w-4 h-4" /> Guru Sudah Terhubung ({syncData.linked.length})</h4>
+                      <div className="border rounded-xl overflow-hidden">
+                        <div className="max-h-48 overflow-auto">
+                          <table className="w-full text-sm text-left">
+                            <thead className="bg-green-50 sticky top-0">
+                              <tr>
+                                <th className="p-2.5 font-bold text-green-800 text-xs">Nama Guru</th>
+                                <th className="p-2.5 font-bold text-green-800 text-xs">Akun User</th>
+                                <th className="p-2.5 font-bold text-green-800 text-xs">Email</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-green-100">
+                              {syncData.linked.map((g) => (
+                                <tr key={g.guru_id} className="hover:bg-green-50/50">
+                                  <td className="p-2.5 font-medium text-slate-800">{g.guru_nama}</td>
+                                  <td className="p-2.5 text-slate-600">{g.user_name}</td>
+                                  <td className="p-2.5 text-slate-400 text-xs">{g.user_email}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {syncData.linked.length === 0 && syncData.unlinked.length === 0 && (
+                    <div className="text-center py-12 text-slate-400">
+                      <Unlink className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+                      <p className="font-medium">Tidak ada data guru</p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
