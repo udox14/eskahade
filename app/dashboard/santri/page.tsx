@@ -3,7 +3,7 @@ import { guardPage } from '@/lib/auth/guard'
 import { canCrud } from '@/lib/auth/crud'
 import { query } from '@/lib/db'
 import { getCachedMarhalahList } from '@/lib/cache/master'
-import { getSession, hasRole } from '@/lib/auth/session'
+import { getSession, hasRole, isAdmin } from '@/lib/auth/session'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { SearchInput, LimitSelector, SantriFilter } from './santri-client'
@@ -25,14 +25,12 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
     canCrud('/dashboard/santri', 'update'),
   ])
 
-  let userAsrama: string | null = null
-  if (session && hasRole(session, 'pengurus_asrama')) {
-    userAsrama = session.asrama_binaan ?? null
-  }
+  const isPengurusAsrama = Boolean(session && hasRole(session, 'pengurus_asrama') && !isAdmin(session))
+  const userAsrama = isPengurusAsrama ? session?.asrama_binaan ?? null : null
 
   // Data filter (dari cache — ringan, tidak blocking)
-  const scopedWhere = userAsrama ? 'WHERE asrama = ?' : ''
-  const scopedParams = userAsrama ? [userAsrama] : []
+  const scopedWhere = ''
+  const scopedParams: string[] = []
   const appendScopedWhere = (condition: string) => `${scopedWhere ? `${scopedWhere} AND` : 'WHERE'} ${condition}`
 
   const [
@@ -121,7 +119,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
   const rawLimit  = Number(searchParams.limit) || 10
   const limit     = rawLimit === 9999 ? 999999 : rawLimit
   const q             = (searchParams.q             as string) || ''
-  const asrama        = userAsrama || (searchParams.asrama        as string) || ''
+  const asrama        = (searchParams.asrama        as string) || ''
   const kamar         = (searchParams.kamar         as string) || ''
   const sekolah       = (searchParams.sekolah       as string) || ''
   const kelasSekolah  = (searchParams.kelas_sekolah as string) || ''
@@ -149,12 +147,12 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
       <DashboardPageHeader
         title="Data Santri"
         description={
-          userAsrama
-            ? `Data induk santri Pesantren Sukahideng untuk asrama ${userAsrama}.`
+          isPengurusAsrama
+            ? `Daftar seluruh santri. Detail hanya dapat dibuka untuk asrama binaan ${userAsrama || 'yang ditugaskan'}.`
             : 'Data induk santri Pesantren Sukahideng.'
         }
         action={
-          !userAsrama && canCreateSantri ? (
+          !isPengurusAsrama && canCreateSantri ? (
             <Link
               href="/dashboard/santri/input"
               className="bg-green-700 hover:bg-green-800 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 transition-colors shadow-sm text-sm font-semibold w-full sm:w-auto justify-center"
@@ -173,7 +171,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
             marhalahList={marhalahList}
             kelasList={kelasList}
             filterOptions={filterOptions}
-            userAsrama={userAsrama}
+            userAsrama={null}
           />
           <LimitSelector />
         </div>
@@ -210,6 +208,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
           jemaah={jemaah}
           alamat={alamat}
           userAsrama={userAsrama}
+          isPengurusAsrama={isPengurusAsrama}
           canUpdate={canUpdateSantri}
         />
       </Suspense>

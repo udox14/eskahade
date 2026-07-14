@@ -2,7 +2,7 @@
 
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { batch, query, queryOne } from '@/lib/db'
-import { getSession, hasRole } from '@/lib/auth/session'
+import { getSession, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
 import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 
 type ForeignKeyEdge = {
@@ -53,6 +53,18 @@ type RiwayatAkademikRow = {
 export type SantriDetail = SantriDetailBase & {
   riwayat_pendidikan: RiwayatPendidikanRow[]
   info_kelas: string
+}
+
+async function canViewSantriDetail(session: SessionUser | null, santriId: string) {
+  if (!session) return false
+  if (!hasRole(session, 'pengurus_asrama') || isAdmin(session)) return true
+  if (!session.asrama_binaan) return false
+
+  const santri = await queryOne<{ asrama: string | null }>(
+    'SELECT asrama FROM santri WHERE id = ?',
+    [santriId]
+  )
+  return santri?.asrama === session.asrama_binaan
 }
 
 function quoteIdentifier(identifier: string) {
@@ -201,6 +213,9 @@ async function buildRelatedDeleteStatements(rootSantriId: string) {
 }
 
 export async function getSantriDetail(id: string) {
+  const session = await getSession()
+  if (!(await canViewSantriDetail(session, id))) return null
+
   const kategoriEfektifSql = getKategoriSantriEfektifSql('s')
   const data = await queryOne<SantriDetailBase>(`SELECT s.*, ${kategoriEfektifSql} AS kategori_efektif FROM santri s WHERE s.id = ?`, [id])
   if (!data) return null
@@ -222,6 +237,9 @@ export async function getSantriDetail(id: string) {
 }
 
 export async function getRiwayatAkademik(santriId: string) {
+  const session = await getSession()
+  if (!(await canViewSantriDetail(session, santriId))) return []
+
   const riwayat = await query<RiwayatAkademikRow>(`
     SELECT rp.id, rp.status_riwayat,
       k.nama_kelas, m.nama as marhalah_nama, ta.nama as tahun_ajaran_nama,
@@ -262,6 +280,8 @@ export async function getRiwayatAkademik(santriId: string) {
 }
 
 export async function getRiwayatPelanggaran(santriId: string) {
+  const session = await getSession()
+  if (!(await canViewSantriDetail(session, santriId))) return []
   return await query(
     'SELECT id, tanggal, jenis, deskripsi, poin FROM pelanggaran WHERE santri_id = ? ORDER BY tanggal DESC',
     [santriId]
@@ -269,6 +289,8 @@ export async function getRiwayatPelanggaran(santriId: string) {
 }
 
 export async function getRiwayatPerizinan(santriId: string) {
+  const session = await getSession()
+  if (!(await canViewSantriDetail(session, santriId))) return []
   return await query(
     'SELECT id, created_at, status, jenis, alasan, tgl_mulai, tgl_selesai_rencana, tgl_kembali_aktual FROM perizinan WHERE santri_id = ? ORDER BY created_at DESC',
     [santriId]
@@ -276,6 +298,8 @@ export async function getRiwayatPerizinan(santriId: string) {
 }
 
 export async function getRiwayatSPP(santriId: string) {
+  const session = await getSession()
+  if (!(await canViewSantriDetail(session, santriId))) return []
   return await query<{
     id: string
     bulan: number
@@ -305,6 +329,8 @@ export async function getRiwayatSPP(santriId: string) {
 }
 
 export async function getRiwayatTabungan(santriId: string) {
+  const session = await getSession()
+  if (!(await canViewSantriDetail(session, santriId))) return []
   return await query(
     'SELECT * FROM tabungan_log WHERE santri_id = ? ORDER BY created_at DESC',
     [santriId]

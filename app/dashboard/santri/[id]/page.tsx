@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { guardPage } from '@/lib/auth/guard'
 import { canCrud } from '@/lib/auth/crud'
-import { hasRole } from '@/lib/auth/session'
+import { hasRole, isAdmin as isSessionAdmin } from '@/lib/auth/session'
 import { getSantriDetail } from './actions'
 import { SantriDetailContent } from './detail-content'
 import { notFound, redirect } from 'next/navigation'
@@ -29,7 +29,7 @@ export default async function SantriDetailPage({ params }: Props) {
   if (!santri) return notFound()
 
   // Pengurus asrama hanya boleh lihat santri asrama binaannya
-  if (hasRole(session, 'pengurus_asrama')) {
+  if (hasRole(session, 'pengurus_asrama') && !isSessionAdmin(session)) {
     if (!session.asrama_binaan || santri.asrama !== session.asrama_binaan) {
       redirect('/dashboard/santri')
     }
