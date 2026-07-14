@@ -391,8 +391,29 @@ export async function getDataMaster() {
 
 export async function getJadwalFilterOptions() {
   await ensureKelasCetakColumns()
+  
+  const guruQuery = `
+    WITH KelasTerhubung AS (
+      SELECT guru_shubuh_id AS guru_id, nama_kelas FROM kelas k JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id WHERE ta.is_active = 1 AND guru_shubuh_id IS NOT NULL
+      UNION
+      SELECT guru_ashar_id AS guru_id, nama_kelas FROM kelas k JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id WHERE ta.is_active = 1 AND guru_ashar_id IS NOT NULL
+      UNION
+      SELECT guru_maghrib_id AS guru_id, nama_kelas FROM kelas k JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id WHERE ta.is_active = 1 AND guru_maghrib_id IS NOT NULL
+      UNION
+      SELECT jm.guru_id, k.nama_kelas FROM kelas_jadwal_guru_mingguan jm JOIN kelas k ON k.id = jm.kelas_id JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id WHERE ta.is_active = 1
+    )
+    SELECT 
+      g.id, 
+      g.nama_lengkap, 
+      g.gelar, 
+      g.kode_guru,
+      (SELECT GROUP_CONCAT(DISTINCT nama_kelas) FROM KelasTerhubung kt WHERE kt.guru_id = g.id) AS assigned_classes
+    FROM data_guru g
+    ORDER BY g.nama_lengkap
+  `
+
   const [guru, marhalah, waliUsers] = await Promise.all([
-    getCachedDataGuru(),
+    query<any>(guruQuery),
     getCachedMarhalahList(),
     getUsersForWaliKelas(),
   ])
@@ -674,14 +695,15 @@ export async function hapusGuruMassal(ids: number[]): Promise<{ success: boolean
   return { success: true, count: ids.length }
 }
 
-export async function importGuruMassal(dataExcel: ImportGuruRow[]): Promise<{ success: boolean; count: number; skipped: number } | { error: string }> {
+export async function importGuruMassal(dataExcel: ImportGuruRow[]): Promise<{ success: boolean; count: number; updated: number; skipped: number } | { error: string }> {
   const session = await getSession()
   if (!dataExcel.length) return { error: 'Data kosong.' }
 
-  const existing = await query<{ nama_lengkap: string }>('SELECT nama_lengkap FROM data_guru')
-  const existingNames = new Set(existing.map(g => g.nama_lengkap.toLowerCase().trim()))
+  const existing = await query<{ id: number; nama_lengkap: string }>('SELECT id, nama_lengkap FROM data_guru')
+  const existingMap = new Map(existing.map(g => [g.nama_lengkap.toLowerCase().trim(), g.id]))
 
   const toInsert: [string, string, string][] = []
+  const toUpdate: [string, string, number][] = []
   let skipped = 0
 
   for (const row of dataExcel) {
@@ -689,33 +711,60 @@ export async function importGuruMassal(dataExcel: ImportGuruRow[]): Promise<{ su
     const gelar = String(row['GELAR'] || row['gelar'] || '').trim()
     const kode = String(row['KODE'] || row['kode'] || '').trim()
     if (!nama) { skipped += 1; continue }
-    if (existingNames.has(nama.toLowerCase())) { skipped += 1; continue }
-    toInsert.push([nama, gelar, kode])
-    existingNames.add(nama.toLowerCase())
+    
+    const lowerName = nama.toLowerCase()
+    const id = existingMap.get(lowerName)
+    
+    if (id !== undefined) {
+      if (id !== -1) {
+        toUpdate.push([gelar, kode, id])
+        existingMap.set(lowerName, -1) // Prevent duplicate processing in same import
+      } else {
+        skipped += 1
+      }
+    } else {
+      toInsert.push([nama, gelar, kode])
+      existingMap.set(lowerName, -1)
+    }
   }
 
-  if (!toInsert.length) return { error: `Semua data dilewati (${skipped} duplikat atau kosong).` }
+  if (!toInsert.length && !toUpdate.length) return { error: `Semua data dilewati (${skipped} duplikat atau kosong).` }
 
-  await batch(toInsert.map(row => ({
-    sql: 'INSERT INTO data_guru (nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?)',
-    params: row,
-  })))
+  const batchQueries: { sql: string; params: any[] }[] = []
+  
+  for (const row of toInsert) {
+    batchQueries.push({
+      sql: 'INSERT INTO data_guru (nama_lengkap, gelar, kode_guru) VALUES (?, ?, ?)',
+      params: row,
+    })
+  }
+
+  for (const row of toUpdate) {
+    batchQueries.push({
+      sql: 'UPDATE data_guru SET gelar = ?, kode_guru = ? WHERE id = ?',
+      params: row,
+    })
+  }
+
+  if (batchQueries.length > 0) {
+    await batch(batchQueries)
+  }
 
   await logActivity({
     actor: actorFromSession(session),
     module: 'master_wali_kelas',
-    action: 'create',
+    action: toInsert.length > 0 ? 'create' : 'update',
     fiturHref: '/dashboard/master/wali-kelas',
-    logKind: 'create',
+    logKind: toInsert.length > 0 ? 'create' : 'update',
     entityType: 'data_guru_batch',
     entityId: 'import',
     entityLabel: 'Import guru massal',
-    summary: `Import guru massal: ${toInsert.length} ditambahkan`,
-    details: { count: toInsert.length, skipped },
+    summary: `Import guru massal: ${toInsert.length} ditambahkan, ${toUpdate.length} diperbarui`,
+    details: { count: toInsert.length, updated: toUpdate.length, skipped },
   })
 
   revalidatePath('/dashboard/master/wali-kelas')
-  return { success: true, count: toInsert.length, skipped }
+  return { success: true, count: toInsert.length, updated: toUpdate.length, skipped }
 }
 
 export async function simpanJadwalBatch(
@@ -846,15 +895,16 @@ export async function setGuruKelas(
 
 export async function getUsersForWaliKelas() {
   return query<{ id: string; full_name: string | null }>(`
-    SELECT id, full_name
-    FROM users
-    WHERE role IN ('wali_kelas', 'sekpen')
+    SELECT u.id, u.full_name
+    FROM users u
+    JOIN data_guru g ON u.source_ref_id = CAST(g.id AS TEXT) AND u.source_type = 'guru'
+    WHERE u.role IN ('wali_kelas', 'sekpen')
        OR EXISTS (
          SELECT 1
-         FROM json_each(COALESCE(users.roles, '[]'))
+         FROM json_each(COALESCE(u.roles, '[]'))
          WHERE value IN ('wali_kelas', 'sekpen')
        )
-    ORDER BY full_name
+    ORDER BY u.full_name
   `)
 }
 

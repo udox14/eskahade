@@ -3,12 +3,12 @@
 > next dev
 
 ▲ Next.js 16.1.6 (Turbopack)
-- Local:         http://localhost:3001
-- Network:       http://172.25.45.67:3001
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.7:3000
 - Environments: .env.local
 - Experiments (use with caution):
   · optimizePackageImports
 
 ✓ Starting...
 ⎔ Establishing remote connection...
-✓ Ready in 4.9s
+✓ Ready in 2.4s

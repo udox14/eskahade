@@ -105,6 +105,8 @@ export default function ManajemenGuruPage() {
 
   const [newGuru, setNewGuru] = useState({ nama: '', gelar: '', kode: '' })
   const [editGuru, setEditGuru] = useState<{ id: number; nama: string; gelar: string; kode: string } | null>(null)
+  const [addModalOpen, setAddModalOpen] = useState(false)
+  const [importModalOpen, setImportModalOpen] = useState(false)
   const [search, setSearch] = useState('')
 
   const [tahunAjaranList, setTahunAjaranList] = useState<any[]>([])
@@ -749,101 +751,18 @@ export default function ManajemenGuruPage() {
 
       {tab === 'MASTER' && (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b pb-2">
-              <Plus className="w-5 h-5 text-green-600" /> Tambah Guru Baru (Manual)
-            </h3>
-            <form onSubmit={handleTambahGuru} className="flex flex-col md:flex-row gap-4 items-end">
-              <div className="w-full md:flex-1">
-                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nama Lengkap</label>
-                <input value={newGuru.nama} onChange={e => setNewGuru({ ...newGuru, nama: e.target.value })} className="w-full p-2 border rounded" placeholder="Contoh: Ahmad" required />
-              </div>
-              <div className="w-full md:w-1/4">
-                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Gelar (Opsional)</label>
-                <input value={newGuru.gelar} onChange={e => setNewGuru({ ...newGuru, gelar: e.target.value })} className="w-full p-2 border rounded" placeholder="S.Pd." />
-              </div>
-              <div className="w-full md:w-1/4">
-                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Kode (Opsional)</label>
-                <input value={newGuru.kode} onChange={e => setNewGuru({ ...newGuru, kode: e.target.value })} className="w-full p-2 border rounded" placeholder="AHM" />
-              </div>
-              <button className="bg-green-600 text-white px-6 py-2 rounded font-bold shadow hover:bg-green-700 w-full md:w-auto">Simpan</button>
-            </form>
-          </div>
-
-          <hr className="border-dashed" />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 flex flex-col items-center text-center space-y-3">
-              <Download className="w-8 h-8 text-blue-600" />
-              <h3 className="font-bold text-blue-900">1. Template Data Guru</h3>
-              <button onClick={handleDownloadTemplate} className="bg-white text-blue-700 px-4 py-2 rounded shadow-sm font-bold text-xs border hover:bg-blue-50">Download .xlsx</button>
-            </div>
-            <div className="bg-green-50 p-6 rounded-xl border border-green-100 flex flex-col items-center text-center space-y-3">
-              <Upload className="w-8 h-8 text-green-600" />
-              <h3 className="font-bold text-green-900">2. Upload Excel</h3>
-              <div className="relative">
-                <input type="file" accept=".xlsx" onChange={handleUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                <button className="bg-green-600 text-white px-4 py-2 rounded shadow-sm font-bold text-xs hover:bg-green-700">Pilih File</button>
-              </div>
-            </div>
-          </div>
-
-          {excelData.length > 0 && (() => {
-            const previewRows = excelData.map(d => {
-              const nama = String(d['NAMA LENGKAP'] || d['NAMA'] || d['nama'] || '').trim()
-              const isDuplikat = guruList.some(g => g.nama_lengkap.toLowerCase() === nama.toLowerCase())
-              return { nama, gelar: d['GELAR'] || d['gelar'] || '-', isDuplikat }
-            })
-            const dupCount = previewRows.filter(r => r.isDuplikat).length
-            const newCount = previewRows.length - dupCount
-            return (
-              <div className="bg-white border rounded-xl p-4">
-                <div className="flex justify-between items-center mb-3">
-                  <div>
-                    <h3 className="font-bold text-slate-700 flex items-center gap-2"><List className="w-4 h-4" /> Preview ({excelData.length} baris)</h3>
-                    <p className="text-xs mt-0.5">
-                      <span className="text-green-600 font-bold">{newCount} baru</span>
-                      {dupCount > 0 && <span className="text-red-500 font-bold ml-2">{dupCount} duplikat (dilewati)</span>}
-                    </p>
-                  </div>
-                  <button onClick={handleSimpanGuru} disabled={isProcessing || newCount === 0} className="bg-green-700 text-white px-6 py-2 rounded-lg font-bold text-sm shadow hover:bg-green-800 disabled:opacity-50">
-                    {isProcessing ? 'Menyimpan...' : `Simpan ${newCount} Guru Baru`}
-                  </button>
-                </div>
-                <div className="max-h-64 overflow-auto border rounded">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-100 sticky top-0">
-                      <tr><th className="p-2">Nama</th><th className="p-2">Gelar</th><th className="p-2 text-center">Status</th></tr>
-                    </thead>
-                    <tbody>
-                      {previewRows.map((r, i) => (
-                        <tr key={i} className={`border-b ${r.isDuplikat ? 'bg-red-50' : ''}`}>
-                          <td className={`p-2 font-medium ${r.isDuplikat ? 'text-red-400 line-through' : 'text-slate-800'}`}>{r.nama}</td>
-                          <td className="p-2 text-slate-500">{r.gelar}</td>
-                          <td className="p-2 text-center">
-                            {r.isDuplikat
-                              ? <span className="text-xs font-bold text-red-500 bg-red-100 px-2 py-0.5 rounded-full">Duplikat</span>
-                              : <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Baru</span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )
-          })()}
-
           <div className="bg-white border rounded-xl p-4 shadow-sm">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 border-b pb-3">
               <div>
                 <h3 className="font-bold text-slate-700">Daftar Guru Terdaftar ({guruList.length})</h3>
                 <p className="text-xs text-slate-500">Pilih kotak centang untuk menghapus banyak data sekaligus.</p>
               </div>
-              <div className="flex items-center gap-3">
-                <button onClick={toggleSelectAllGuru} className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition">
-                  {selectedGuruIds.length === guruList.length && guruList.length > 0 ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                  Pilih Semua
+              <div className="flex items-center gap-3 flex-wrap">
+                <button onClick={() => setAddModalOpen(true)} className="bg-green-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-green-700 shadow-sm">
+                  <Plus className="w-4 h-4" /> Tambah Guru
+                </button>
+                <button onClick={() => setImportModalOpen(true)} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-700 shadow-sm">
+                  <Upload className="w-4 h-4" /> Import & Template
                 </button>
                 {selectedGuruIds.length > 0 && (
                   <button onClick={handleHapusBatch} disabled={isDeletingBatch} className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-red-700 disabled:opacity-50 shadow-sm">
@@ -853,37 +772,72 @@ export default function ManajemenGuruPage() {
                 )}
               </div>
             </div>
-            <div className="max-h-96 overflow-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {pagedGuruList.map(g => (
-                <div key={g.id} onClick={() => toggleSelectGuru(g.id)}
-                  className={`p-3 border border-slate-200 rounded-xl flex justify-between items-center cursor-pointer transition-all ${selectedGuruIds.includes(g.id) ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-slate-50 hover:bg-white hover:shadow-sm'}`}>
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    {selectedGuruIds.includes(g.id) ? <CheckSquare className="w-5 h-5 text-red-500 flex-shrink-0" /> : <Square className="w-5 h-5 text-slate-300 flex-shrink-0" />}
-                    <div className="truncate">
-                      <p className={`font-bold text-sm truncate ${selectedGuruIds.includes(g.id) ? 'text-red-700' : 'text-slate-800'}`}>{g.nama_lengkap}</p>
-                      <p className="text-xs text-slate-500">{g.gelar || '-'}</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <button onClick={(e) => { e.stopPropagation(); setEditGuru({ id: g.id, nama: g.nama_lengkap, gelar: g.gelar || '', kode: g.kode_guru || '' }) }} className="text-slate-300 hover:text-blue-600 p-2 transition-opacity" title="Edit Guru Ini">
-                      <Settings2 className="w-4 h-4" />
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); handleHapusGuru(g.id, g.nama_lengkap) }} className="text-slate-300 hover:text-red-500 p-2 transition-opacity" title="Hapus Guru Ini">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left border-collapse">
+                <thead className="bg-slate-50 border-y border-slate-200">
+                  <tr>
+                    <th className="p-3 w-10 text-center">
+                      <button onClick={toggleSelectAllGuru} className="text-slate-400 hover:text-indigo-600">
+                        {selectedGuruIds.length === guruList.length && guruList.length > 0 ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                      </button>
+                    </th>
+                    <th className="p-3 font-bold text-slate-600 uppercase text-xs">Nama Lengkap</th>
+                    <th className="p-3 font-bold text-slate-600 uppercase text-xs">Gelar</th>
+                    <th className="p-3 font-bold text-slate-600 uppercase text-xs">Ditugaskan di Kelas</th>
+                    <th className="p-3 font-bold text-slate-600 uppercase text-xs text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {pagedGuruList.map(g => (
+                    <tr key={g.id} className={`hover:bg-slate-50 transition-colors ${selectedGuruIds.includes(g.id) ? 'bg-red-50' : ''}`}>
+                      <td className="p-3 text-center">
+                        <button onClick={() => toggleSelectGuru(g.id)} className={selectedGuruIds.includes(g.id) ? 'text-red-500' : 'text-slate-300'}>
+                          {selectedGuruIds.includes(g.id) ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                        </button>
+                      </td>
+                      <td className="p-3 font-medium text-slate-800">{g.nama_lengkap}</td>
+                      <td className="p-3 text-slate-500">{g.gelar || '-'}</td>
+                      <td className="p-3">
+                        <div className="flex flex-wrap gap-1">
+                          {g.assigned_classes ? g.assigned_classes.split(',').map((kelasName: string, i: number) => (
+                            <span key={i} className="inline-block bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-100">
+                              {kelasName}
+                            </span>
+                          )) : <span className="text-xs text-slate-400 italic">Belum ada kelas</span>}
+                        </div>
+                      </td>
+                      <td className="p-3 text-right">
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => setEditGuru({ id: g.id, nama: g.nama_lengkap, gelar: g.gelar || '', kode: g.kode_guru || '' })} className="text-slate-400 hover:text-blue-600 transition-colors p-1" title="Edit Guru">
+                            <Settings2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleHapusGuru(g.id, g.nama_lengkap)} className="text-slate-400 hover:text-red-500 transition-colors p-1" title="Hapus Guru">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {pagedGuruList.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-slate-500 text-sm">Belum ada data guru.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
 
-            <Pagination
-              currentPage={safePageGuruList}
-              totalPages={totalPagesGuruList}
-              pageSize={pageSize}
-              total={guruList.length}
-              onPageChange={setPage}
-              onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
-            />
+            <div className="mt-4">
+              <Pagination
+                currentPage={safePageGuruList}
+                totalPages={totalPagesGuruList}
+                pageSize={pageSize}
+                total={guruList.length}
+                onPageChange={setPage}
+                onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -935,15 +889,9 @@ export default function ManajemenGuruPage() {
                 <label className="text-xs font-bold text-slate-500">Nama Lengkap *</label>
                 <input required value={editGuru.nama} onChange={e => setEditGuru({...editGuru, nama: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:border-indigo-500 outline-none" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-500">Gelar</label>
-                  <input value={editGuru.gelar} onChange={e => setEditGuru({...editGuru, gelar: e.target.value})} placeholder="S.Pd.I" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:border-indigo-500 outline-none" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500">Kode (opsional)</label>
-                  <input value={editGuru.kode} onChange={e => setEditGuru({...editGuru, kode: e.target.value})} placeholder="XYZ" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:border-indigo-500 outline-none" />
-                </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500">Gelar</label>
+                <input value={editGuru.gelar} onChange={e => setEditGuru({...editGuru, gelar: e.target.value})} placeholder="S.Pd.I" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:border-indigo-500 outline-none" />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setEditGuru(null)} className="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100">Batal</button>
@@ -952,6 +900,107 @@ export default function ManajemenGuruPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {addModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2"><Plus className="w-5 h-5 text-green-600" /> Tambah Guru Baru</h3>
+              <button onClick={() => setAddModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+            <form onSubmit={(e) => { handleTambahGuru(e); setAddModalOpen(false); }} className="p-5 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nama Lengkap *</label>
+                <input value={newGuru.nama} onChange={e => setNewGuru({ ...newGuru, nama: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="Contoh: Ahmad" required />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Gelar (Opsional)</label>
+                <input value={newGuru.gelar} onChange={e => setNewGuru({ ...newGuru, gelar: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm focus:border-indigo-500 outline-none" placeholder="S.Pd." />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setAddModalOpen(false)} className="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100">Batal</button>
+                <button type="submit" className="px-4 py-2 rounded-lg text-sm font-bold bg-green-600 text-white hover:bg-green-700 shadow-sm flex items-center gap-2">
+                  <Save className="w-4 h-4"/> Simpan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {importModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div className="p-5 border-b flex items-center justify-between flex-shrink-0">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2"><Upload className="w-5 h-5 text-blue-600" /> Import & Template Data Guru</h3>
+              <button onClick={() => { setImportModalOpen(false); setExcelData([]); }} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+            
+            <div className="p-5 overflow-auto flex-1 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-blue-50 p-5 rounded-xl border border-blue-100 flex flex-col items-center text-center space-y-3">
+                  <Download className="w-8 h-8 text-blue-600" />
+                  <h3 className="font-bold text-blue-900">1. Template Data Guru</h3>
+                  <button onClick={handleDownloadTemplate} className="bg-white text-blue-700 px-4 py-2 rounded shadow-sm font-bold text-xs border hover:bg-blue-50">Download .xlsx</button>
+                </div>
+                <div className="bg-green-50 p-5 rounded-xl border border-green-100 flex flex-col items-center text-center space-y-3">
+                  <Upload className="w-8 h-8 text-green-600" />
+                  <h3 className="font-bold text-green-900">2. Upload Excel</h3>
+                  <div className="relative">
+                    <input type="file" accept=".xlsx" onChange={handleUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                    <button className="bg-green-600 text-white px-4 py-2 rounded shadow-sm font-bold text-xs hover:bg-green-700">Pilih File</button>
+                  </div>
+                </div>
+              </div>
+
+              {excelData.length > 0 && (() => {
+                const previewRows = excelData.map(d => {
+                  const nama = String(d['NAMA LENGKAP'] || d['NAMA'] || d['nama'] || '').trim()
+                  const isDuplikat = guruList.some(g => g.nama_lengkap.toLowerCase() === nama.toLowerCase())
+                  return { nama, gelar: d['GELAR'] || d['gelar'] || '-', isDuplikat }
+                })
+                const dupCount = previewRows.filter(r => r.isDuplikat).length
+                const newCount = previewRows.length - dupCount
+                return (
+                  <div className="border rounded-xl p-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <div>
+                        <h3 className="font-bold text-slate-700 flex items-center gap-2"><List className="w-4 h-4" /> Preview ({excelData.length} baris)</h3>
+                        <p className="text-xs mt-0.5">
+                          <span className="text-green-600 font-bold">{newCount} baru/update</span>
+                        </p>
+                      </div>
+                      <button onClick={async () => { await handleSimpanGuru(); setImportModalOpen(false); }} disabled={isProcessing || newCount === 0} className="bg-green-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow hover:bg-green-800 disabled:opacity-50">
+                        {isProcessing ? 'Menyimpan...' : `Simpan ${newCount} Guru`}
+                      </button>
+                    </div>
+                    <div className="max-h-48 overflow-auto border rounded">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-100 sticky top-0">
+                          <tr><th className="p-2">Nama</th><th className="p-2">Gelar</th><th className="p-2 text-center">Status</th></tr>
+                        </thead>
+                        <tbody>
+                          {previewRows.map((r, i) => (
+                            <tr key={i} className={`border-b ${r.isDuplikat ? 'bg-blue-50' : ''}`}>
+                              <td className={`p-2 font-medium text-slate-800`}>{r.nama}</td>
+                              <td className="p-2 text-slate-500">{r.gelar}</td>
+                              <td className="p-2 text-center">
+                                {r.isDuplikat
+                                  ? <span className="text-xs font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Update Data Lama</span>
+                                  : <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Baru</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
           </div>
         </div>
       )}
