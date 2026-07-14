@@ -40,7 +40,7 @@ import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
-import { PriceListPrintButton } from './_price-list-print'
+import { PriceListExportButton } from './_price-list-export'
 
 type MarhalahSel = { marhalah_id: number; is_default: boolean }
 
@@ -1317,7 +1317,7 @@ function DaftarKitabMarhalah({
   return (
     <section className="mx-auto w-full max-w-2xl" aria-label="Daftar kitab per marhalah">
       <div className="mb-4 flex justify-center sm:justify-end">
-        <PriceListPrintButton marhalah={marhalah} />
+        <PriceListExportButton marhalah={marhalah} />
       </div>
       <div className="mb-3 flex items-center justify-between gap-3">
         <button
