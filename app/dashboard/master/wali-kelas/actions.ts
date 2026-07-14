@@ -556,7 +556,27 @@ export async function getPembagianTugasMengajarData() {
         bl_label: row.baru_lama || '-',
       }
     })
-    .sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' }))
+    .sort((a, b) => {
+      const getSortWeight = (nama: string) => {
+        const lower = (nama || '').toLowerCase()
+        if (lower.includes('tamhidiyyah 1')) return 1
+        if (lower.includes('tamhidiyyah 2')) return 2
+        if (lower.includes('tamhidiyyah')) return 2 // Fallback
+        if (lower.includes('ibtidaiyyah')) return 3
+        if (lower.includes('mutawassithah')) return 4
+        if (lower.includes('mutaqaddimah')) return 5
+        return 99
+      }
+      
+      const weightA = getSortWeight(a.nama_kelas)
+      const weightB = getSortWeight(b.nama_kelas)
+      
+      if (weightA !== weightB) {
+        return weightA - weightB
+      }
+      
+      return a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+    })
 }
 
 export async function tambahGuruManual(nama: string, gelar: string, kode: string): Promise<{ success: boolean } | { error: string }> {
