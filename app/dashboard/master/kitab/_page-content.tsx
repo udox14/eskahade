@@ -3,8 +3,8 @@
 import React from 'react'
 
 import { useState, useEffect } from 'react'
-import { getMarhalahList, getMapelList, getKitabList, tambahKitab, hapusKitab, importKitabMassal, getTahunAjaranAktif, getTahunAjaranList, copyKitabFromTahunAjaran } from './actions'
-import { Book, Plus, Trash2, FileSpreadsheet, Download, Upload, CheckCircle, Loader2, List, CalendarDays, AlertTriangle, Copy, X } from 'lucide-react'
+import { getMarhalahList, getMapelList, getKitabList, tambahKitab, hapusKitab, importKitabMassal, getTahunAjaranAktif, getTahunAjaranList, copyKitabFromTahunAjaran, editKitab } from './actions'
+import { Book, Plus, Trash2, FileSpreadsheet, Download, Upload, CheckCircle, Loader2, List, CalendarDays, AlertTriangle, Copy, X, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import Pagination, { usePagination } from '@/components/ui/pagination'
 import Link from 'next/link'
@@ -36,6 +36,11 @@ export default function MasterKitabPage() {
   const [copyModalOpen, setCopyModalOpen] = useState(false)
   const [copySourceId, setCopySourceId] = useState<number | ''>('')
   const [isCopying, setIsCopying] = useState(false)
+
+  // State Edit
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingKitab, setEditingKitab] = useState<any>(null)
+  const [isEditing, setIsEditing] = useState(false)
 
   useEffect(() => {
     initData()
@@ -95,6 +100,23 @@ export default function MasterKitabPage() {
     await hapusKitab(id)
     toast.success("Dihapus")
     loadKitab()
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!editingKitab) return
+    const formData = new FormData(e.currentTarget)
+    setIsEditing(true)
+    const res = await editKitab(editingKitab.id, formData)
+    setIsEditing(false)
+    if ('error' in res) {
+        toast.error(res.error)
+    } else {
+        toast.success("Kitab berhasil diperbarui")
+        setEditModalOpen(false)
+        setEditingKitab(null)
+        loadKitab()
+    }
   }
 
   // --- HANDLER EXCEL ---
@@ -271,6 +293,7 @@ export default function MasterKitabPage() {
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             <div className="flex justify-center gap-1">
+                                                <button onClick={() => { setEditingKitab(k); setEditModalOpen(true) }} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded"><Pencil className="w-4 h-4"/></button>
                                                 <button onClick={() => handleHapus(k.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4"/></button>
                                             </div>
                                         </td>
@@ -373,6 +396,48 @@ export default function MasterKitabPage() {
                 {isCopying ? <Loader2 className="w-4 h-4 animate-spin"/> : <Copy className="w-4 h-4"/>} Copy Sekarang
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {editModalOpen && editingKitab && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-5 border-b flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-800">Edit Kitab</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Ubah informasi kitab.</p>
+              </div>
+              <button onClick={() => { setEditModalOpen(false); setEditingKitab(null) }} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+            </div>
+            <form onSubmit={handleEditSubmit}>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">Nama Kitab</label>
+                  <input name="nama_kitab" defaultValue={editingKitab.nama_kitab} required className="w-full p-2 border border-slate-200 rounded-xl text-sm" placeholder="Contoh: Jurumiyah"/>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">Tingkat (Marhalah)</label>
+                  <select name="marhalah_id" defaultValue={editingKitab.marhalah_id} required className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white">
+                    <option value="">-- Pilih --</option>
+                    {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">Mata Pelajaran</label>
+                  <select name="mapel_id" defaultValue={editingKitab.mapel_id} required className="w-full p-2 border border-slate-200 rounded-xl text-sm bg-white">
+                    <option value="">-- Pilih --</option>
+                    {mapelList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="p-5 border-t flex justify-end gap-2">
+                <button type="button" onClick={() => { setEditModalOpen(false); setEditingKitab(null) }} className="px-4 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100">Batal</button>
+                <button type="submit" disabled={isEditing} className="px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+                  {isEditing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Pencil className="w-4 h-4"/>} Simpan Perubahan
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

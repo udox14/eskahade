@@ -76,6 +76,43 @@ export async function tambahKitab(formData: FormData): Promise<{ success: boolea
   return { success: true }
 }
 
+export async function editKitab(id: string, formData: FormData): Promise<{ success: boolean } | { error: string }> {
+  const session = await getSession()
+  const nama = formData.get('nama_kitab') as string
+  const marhalah = formData.get('marhalah_id') as string
+  const mapel = formData.get('mapel_id') as string
+
+  const targetKitab = await queryOne<{ nama_kitab: string }>('SELECT nama_kitab FROM kitab WHERE id = ?', [id])
+  if (!targetKitab) return { error: 'Kitab tidak ditemukan.' }
+
+  const marhalahRow = await queryOne<{ nama: string }>('SELECT nama FROM marhalah WHERE id = ?', [marhalah])
+  const mapelRow = await queryOne<{ nama: string }>('SELECT nama FROM mapel WHERE id = ?', [mapel])
+
+  await query(
+    'UPDATE kitab SET nama_kitab = ?, marhalah_id = ?, mapel_id = ? WHERE id = ?',
+    [nama, marhalah, mapel, id]
+  )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'master_kitab',
+    action: 'update',
+    fiturHref: '/dashboard/master/kitab',
+    logKind: 'update',
+    entityType: 'kitab',
+    entityId: id,
+    entityLabel: nama,
+    summary: `Mengubah kitab dari ${targetKitab.nama_kitab} menjadi ${nama}`,
+    details: {
+      marhalah: marhalahRow?.nama || marhalah,
+      mapel: mapelRow?.nama || mapel,
+    },
+  })
+
+  revalidatePath('/dashboard/master/kitab')
+  return { success: true }
+}
+
 export async function hapusKitab(id: string): Promise<{ success: boolean } | { error: string }> {
   const session = await getSession()
   const targetKitab = await queryOne<{
