@@ -113,7 +113,7 @@ function PrintDocument({
         </div>
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
         <colgroup>
           <col style={{ width: '8mm' }} />
           <col />
@@ -155,7 +155,7 @@ function PrintDocument({
           {rows.map((row, index) => (
             <tr key={row.id}>
               <td style={bodyCellStyle({ textAlign: 'center' })}>{index + 1}</td>
-              <td style={bodyCellStyle({ textAlign: 'left' })}>{row.nama_kelas}</td>
+              <td style={bodyCellStyle({ textAlign: 'left', whiteSpace: 'nowrap' })}>{row.nama_kelas}</td>
               <td style={bodyCellSingleLine({ textAlign: 'center' })}>{row.tingkat_label}</td>
               <td style={bodyCellSingleLine({ textAlign: 'center' })}>{row.lp_label}</td>
               <td style={bodyCellSingleLine({ textAlign: 'center' })}>{row.bl_label}</td>
