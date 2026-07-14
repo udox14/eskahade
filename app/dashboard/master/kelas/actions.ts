@@ -57,6 +57,28 @@ async function ensureKelasExtraColumns() {
   }
 }
 
+function sortKelasByMarhalahPriority(a: any, b: any) {
+  const getSortWeight = (nama: string) => {
+    const lower = (nama || '').toLowerCase()
+    if (lower.includes('tamhidiyyah 1')) return 1
+    if (lower.includes('tamhidiyyah 2')) return 2
+    if (lower.includes('tamhidiyyah')) return 2 // Fallback
+    if (lower.includes('ibtidaiyyah')) return 3
+    if (lower.includes('mutawassithah')) return 4
+    if (lower.includes('mutaqaddimah')) return 5
+    return 99
+  }
+  
+  const weightA = getSortWeight(a.nama_kelas)
+  const weightB = getSortWeight(b.nama_kelas)
+  
+  if (weightA !== weightB) {
+    return weightA - weightB
+  }
+  
+  return a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
+}
+
 export async function getKelasList() {
   await ensureKelasExtraColumns()
   const data = await query<any>(`
@@ -65,9 +87,7 @@ export async function getKelasList() {
     LEFT JOIN marhalah m ON k.marhalah_id = m.id
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
   `)
-  return data.sort((a: any, b: any) =>
-    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
-  )
+  return data.sort(sortKelasByMarhalahPriority)
 }
 
 export type TempelanKelasItem = {
@@ -97,9 +117,7 @@ export async function getKelasTempelanList() {
     ORDER BY k.nama_kelas COLLATE NOCASE
   `)
 
-  return data.sort((a, b) =>
-    a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
-  )
+  return data.sort(sortKelasByMarhalahPriority)
 }
 
 export async function getTempelanKelasData(kelasId: string) {
