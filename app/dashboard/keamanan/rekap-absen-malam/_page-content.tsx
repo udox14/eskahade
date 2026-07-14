@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { getSessionRekap, getRekapAbsenMalam, getKamarList, getRiwayatAlfaAbsenMalam, deleteAbsenMalamRecord } from '../rekap-asrama/actions'
-import { CalendarDays, History, Moon, Home, Loader2, ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
+import { CalendarDays, History, Moon, Home, Loader2, ChevronLeft, ChevronRight, Search, X, FileSpreadsheet } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
+import { toast } from 'sonner'
 
 const ASRAMA_LIST = ROOM_REQUIRED_ASRAMA_LIST
 
@@ -40,6 +41,7 @@ export default function RekapAbsenMalamPage() {
   const [filterKamar, setFilterKamar] = useState('Semua')
   const [searchQuery, setSearchQuery] = useState('')
   const [availableKamars, setAvailableKamars] = useState<string[]>([])
+  const [exporting, setExporting] = useState(false)
 
   const [malamSantri, setMalamSantri] = useState<any[]>([])
   const [malamAlfa, setMalamAlfa] = useState<Record<string, number>>({})
@@ -116,6 +118,56 @@ export default function RekapAbsenMalamPage() {
       alert("Gagal membatalkan alfa: " + (e?.message || e))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleExportExcel = async () => {
+    if (filteredSantri.length === 0) {
+      toast.info('Tidak ada data absen malam untuk diexport.')
+      return
+    }
+
+    setExporting(true)
+    const exportToast = toast.loading('Menyiapkan file Excel...')
+    try {
+      const XLSX = await import('xlsx')
+      const headers = [
+        'Nama Santri',
+        'NIS',
+        'Asrama',
+        'Kamar',
+        'Total Alfa',
+        ...daysArr.map(tanggalItem => formatTanggal(tanggalItem)),
+      ]
+      const rows = filteredSantri.map(s => {
+        const detail = malamDetail[s.id] || {}
+        return [
+          s.nama_lengkap,
+          s.nis || '-',
+          asrama,
+          s.kamar ? `Kamar ${s.kamar}` : 'Tanpa Kamar',
+          malamAlfa[s.id] || 0,
+          ...daysArr.map(tanggalItem => detail[tanggalItem] === 'ALFA' ? 'A' : ''),
+        ]
+      })
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+      ws['!cols'] = headers.map((header, index) => ({
+        wch: Math.min(Math.max(header.length, ...rows.map(row => String(row[index] || '').length)) + 2, index < 5 ? 32 : 16),
+      }))
+
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Rekap Absen Malam')
+      const namaAsrama = asrama.replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '')
+      const periode = tanggal || bulan
+      XLSX.writeFile(wb, `Rekap_Absen_Malam_${namaAsrama}_${periode}.xlsx`)
+      toast.success('Berhasil export ke Excel')
+    } catch (error) {
+      console.error(error)
+      toast.error('Gagal export ke Excel')
+    } finally {
+      toast.dismiss(exportToast)
+      setExporting(false)
     }
   }
 
@@ -260,15 +312,29 @@ export default function RekapAbsenMalamPage() {
               Riwayat Semua Alfa
             </button>
           </div>
-          <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Cari nama santri..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+          <div className="flex w-full gap-2 sm:w-auto">
+            {activeTab === 'bulan' && (
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                disabled={exporting || filteredSantri.length === 0}
+                className="flex shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 shadow-sm transition hover:bg-emerald-100 active:scale-95 disabled:opacity-50"
+                title="Export Excel Rekap Absen Malam"
+              >
+                {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
+                <span className="hidden lg:block">Export Excel</span>
+              </button>
+            )}
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Cari nama santri..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
           </div>
         </div>
       )}
