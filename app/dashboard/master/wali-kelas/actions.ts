@@ -895,15 +895,26 @@ export async function setGuruKelas(
 
 export async function getUsersForWaliKelas() {
   return query<{ id: string; full_name: string | null }>(`
-    SELECT u.id, u.full_name
+    SELECT DISTINCT u.id, u.full_name
     FROM users u
-    JOIN data_guru g ON u.source_ref_id = CAST(g.id AS TEXT) AND u.source_type = 'guru'
-    WHERE u.role IN ('wali_kelas', 'sekpen')
-       OR EXISTS (
-         SELECT 1
-         FROM json_each(COALESCE(u.roles, '[]'))
-         WHERE value IN ('wali_kelas', 'sekpen')
-       )
+    WHERE (
+      u.role IN ('wali_kelas', 'sekpen')
+      OR EXISTS (
+        SELECT 1
+        FROM json_each(COALESCE(u.roles, '[]'))
+        WHERE value IN ('wali_kelas', 'sekpen')
+      )
+    )
+    AND (
+      (u.source_type = 'guru' AND u.source_ref_id IS NOT NULL)
+      OR EXISTS (
+        SELECT 1 
+        FROM data_guru g 
+        WHERE LOWER(TRIM(g.nama_lengkap)) = LOWER(TRIM(u.full_name))
+           OR LOWER(TRIM(u.full_name)) LIKE LOWER(TRIM(g.nama_lengkap)) || '%'
+           OR LOWER(TRIM(g.nama_lengkap)) LIKE LOWER(TRIM(u.full_name)) || '%'
+      )
+    )
     ORDER BY u.full_name
   `)
 }
