@@ -216,8 +216,8 @@ export async function getPenjadwalanData() {
     queryOne<any>(`
       SELECT e.*, ta.nama AS tahun_ajaran_nama
       FROM tes_klasifikasi_event e
-      LEFT JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
-      WHERE e.is_active = 1
+      JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
+      WHERE e.is_active = 1 AND ta.is_active = 1
       ORDER BY e.id DESC
       LIMIT 1
     `),
@@ -701,12 +701,14 @@ export async function getCetakNahwuData(eventId: number, filters?: { asrama?: st
   const event = await queryOne<any>(`
     SELECT e.*, ta.nama AS tahun_ajaran_nama
     FROM tes_klasifikasi_event e
-    LEFT JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
-    WHERE e.id = ?
+    JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
+    WHERE e.id = ? AND ta.is_active = 1
   `, [eventId])
 
+  if (!event) return { event: null, rows: [] }
+
   let filterClause = ''
-  const params: any[] = []
+  const params: any[] = [event.tahun_ajaran_id]
 
   if (filters?.asrama) {
     filterClause += ' AND s.asrama = ?'
@@ -718,11 +720,11 @@ export async function getCetakNahwuData(eventId: number, filters?: { asrama?: st
     FROM santri s
     JOIN hasil_tes_klasifikasi h ON h.santri_id = s.id
     WHERE s.status_global = 'aktif'
-      AND h.nahwu_pengalaman = 1
-      AND NOT EXISTS (
-        SELECT 1 FROM riwayat_pendidikan rp
-        WHERE rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+      AND (
+        h.nahwu_pengalaman = 1
+        OR UPPER(COALESCE(h.catatan_grade, '')) LIKE '%REKOMENDASI TES NAHWU%'
       )
+      AND h.tahun_ajaran_id = ?
       ${filterClause}
     ORDER BY s.asrama, s.nama_lengkap
   `, params)

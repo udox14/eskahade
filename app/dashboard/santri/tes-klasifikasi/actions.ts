@@ -125,6 +125,11 @@ export async function simpanTes(formData: FormData): Promise<{ success: boolean 
   const user = await getSession()
   const testerId = user?.id || null
   const now = new Date().toISOString()
+  const tahunAjaran = await queryOne<{ id: number }>(
+    'SELECT id FROM tahun_ajaran WHERE is_active = 1 ORDER BY id DESC LIMIT 1'
+  )
+
+  if (!tahunAjaran) return { error: 'Tahun ajaran aktif belum tersedia.' }
 
   const existing = await queryOne<{ id: string }>(
     'SELECT id FROM hasil_tes_klasifikasi WHERE santri_id = ?', [santriId]
@@ -135,19 +140,20 @@ export async function simpanTes(formData: FormData): Promise<{ success: boolean 
       `UPDATE hasil_tes_klasifikasi SET
         hari_tes = ?, sesi_tes = ?, tulis_arab = ?, baca_kelancaran = ?, baca_tajwid = ?,
         hafalan_juz = ?, nahwu_pengalaman = ?, rekomendasi_marhalah = ?, catatan_grade = ?,
-        tester_id = ?, updated_at = ?
+        tester_id = ?, tahun_ajaran_id = ?, updated_at = ?
        WHERE santri_id = ?`,
       [hari, sesi, tulis, kelancaran, tajwid, hafalan, nahwu ? 1 : 0,
-       rekomendasi, grade, testerId, now, santriId]
+       rekomendasi, grade, testerId, tahunAjaran.id, now, santriId]
     )
   } else {
     await query(
       `INSERT INTO hasil_tes_klasifikasi
         (id, santri_id, hari_tes, sesi_tes, tulis_arab, baca_kelancaran, baca_tajwid,
-         hafalan_juz, nahwu_pengalaman, rekomendasi_marhalah, catatan_grade, tester_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         hafalan_juz, nahwu_pengalaman, rekomendasi_marhalah, catatan_grade, tester_id,
+         tahun_ajaran_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [crypto.randomUUID(), santriId, hari, sesi, tulis, kelancaran, tajwid,
-       hafalan, nahwu ? 1 : 0, rekomendasi, grade, testerId, now, now]
+       hafalan, nahwu ? 1 : 0, rekomendasi, grade, testerId, tahunAjaran.id, now, now]
     )
   }
 
@@ -165,6 +171,7 @@ export async function simpanTes(formData: FormData): Promise<{ success: boolean 
     details: {
       rekomendasi_marhalah: rekomendasi,
       catatan_grade: grade,
+      tahun_ajaran_id: tahunAjaran.id,
       hari_tes: hari,
       sesi_tes: sesi,
     },
