@@ -97,9 +97,16 @@ export default function MasterKitabPage() {
 
   const handleHapus = async (id: string) => {
     if(!await confirm("Hapus kitab ini?")) return
-    await hapusKitab(id)
-    toast.success("Dihapus")
-    loadKitab()
+    const toastId = toast.loading("Menghapus...")
+    const res = await hapusKitab(id)
+    toast.dismiss(toastId)
+    
+    if (res && 'error' in res) {
+        toast.error(res.error)
+    } else {
+        toast.success("Kitab berhasil dihapus")
+        loadKitab()
+    }
   }
 
   const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
