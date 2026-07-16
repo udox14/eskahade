@@ -40,6 +40,7 @@ export type CartItem = KatalogItem & {
 
 export type Antrian = {
   id: string
+  tanggal: string
   nomor: number
   nama_santri: string
   nis: string | null

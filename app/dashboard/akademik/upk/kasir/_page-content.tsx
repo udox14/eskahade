@@ -60,6 +60,7 @@ export default function KasirUPKPage() {
 
   // Kasir
   const [searchAntrian, setSearchAntrian] = useState('')
+  const [tanggalAntrian, setTanggalAntrian] = useState('')
   const [antrianList, setAntrianList] = useState<Antrian[]>([])
   const [selectedAntrian, setSelectedAntrian] = useState<AntrianDetail | null>(null)
   const [finalItems, setFinalItems] = useState<FinalItem[]>([])
@@ -205,12 +206,17 @@ export default function KasirUPKPage() {
     setLastNomor(null)
   }
 
-  const loadAntrian = async () => {
+  const loadAntrian = async (tanggal = tanggalAntrian) => {
     if (!unit) return
     setLoading(true)
-    const data = await getAntrianAktif(unit, searchAntrian)
+    const data = await getAntrianAktif(unit, searchAntrian, tanggal)
     setAntrianList(data)
     setLoading(false)
+  }
+
+  const filterTanggalAntrian = (tanggal: string) => {
+    setTanggalAntrian(tanggal)
+    void loadAntrian(tanggal)
   }
 
   const pilihAntrian = async (id: string) => {
@@ -611,6 +617,8 @@ export default function KasirUPKPage() {
                 <AntrianList
                   search={searchAntrian}
                   onSearchChange={setSearchAntrian}
+                  tanggal={tanggalAntrian}
+                  onTanggalChange={filterTanggalAntrian}
                   onSearch={loadAntrian}
                   list={antrianList}
                   selectedId={selectedAntrian?.id ?? null}
@@ -640,6 +648,8 @@ export default function KasirUPKPage() {
               <AntrianList
                 search={searchAntrian}
                 onSearchChange={setSearchAntrian}
+                tanggal={tanggalAntrian}
+                onTanggalChange={filterTanggalAntrian}
                 onSearch={loadAntrian}
                 list={antrianList}
                 selectedId={selectedAntrian?.id ?? null}

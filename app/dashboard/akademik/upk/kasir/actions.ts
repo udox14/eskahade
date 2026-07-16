@@ -459,9 +459,13 @@ export async function buatAntrianUPK(payload: {
   return { success: true, id: antrianId, nomor }
 }
 
-export async function getAntrianAktif(unit: UnitUPK, search = '') {
-  const params: unknown[] = [today(), unit]
-  let where = 'WHERE a.tanggal = ? AND a.unit = ? AND a.status = \'ANTRIAN\''
+export async function getAntrianAktif(unit: UnitUPK, search = '', tanggal = '') {
+  const params: unknown[] = [unit]
+  let where = 'WHERE a.unit = ? AND a.status = \'ANTRIAN\''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) {
+    where += ' AND a.tanggal = ?'
+    params.push(tanggal)
+  }
   if (search.trim()) {
     where += ' AND (a.nama_santri LIKE ? OR a.nis LIKE ? OR CAST(a.nomor AS TEXT) LIKE ?)'
     const like = `%${search.trim()}%`
@@ -474,8 +478,7 @@ export async function getAntrianAktif(unit: UnitUPK, search = '') {
     LEFT JOIN upk_antrian_item ai ON ai.antrian_id = a.id
     ${where}
     GROUP BY a.id
-    ORDER BY a.nomor ASC
-    LIMIT 50
+    ORDER BY a.tanggal DESC, a.nomor ASC
   `, params)
   return rows
 }
@@ -560,13 +563,14 @@ export async function selesaikanAntrianUPK(payload: {
   const diff = totalBayar - totalTagihan
   const sisaKembalian = diff > 0 && payload.kembalianDitahan ? diff : 0
   const sisaTunggakan = diff < 0 ? Math.abs(diff) : 0
+  const actualBayar = diff > 0 && !payload.kembalianDitahan ? totalTagihan : totalBayar
 
   await execute(`
     UPDATE upk_antrian
     SET total_tagihan = ?, total_bayar = ?, sisa_kembalian = ?, kembalian_ditahan = ?,
         sisa_tunggakan = ?, status = 'SELESAI', cashier_by = ?, paid_at = ?, updated_at = ?
     WHERE id = ?
-  `, [totalTagihan, totalBayar, sisaKembalian, payload.kembalianDitahan ? 1 : 0,
+  `, [totalTagihan, actualBayar, sisaKembalian, payload.kembalianDitahan ? 1 : 0,
       sisaTunggakan, session?.id ?? null, now(), now(), payload.antrianId])
 
   await logActivity({
@@ -583,7 +587,7 @@ export async function selesaikanAntrianUPK(payload: {
       unit: payload.unit,
       total_item: itemRows.length,
       total_tagihan: totalTagihan,
-      total_bayar: totalBayar,
+      total_bayar: actualBayar,
       sisa_tunggakan: sisaTunggakan,
       sisa_kembalian: sisaKembalian,
       kembalian_ditahan: payload.kembalianDitahan,
