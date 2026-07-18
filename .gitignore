@@ -17,18 +17,36 @@
 /.next/
 /out/
 
+# OpenNext / Cloudflare build output
+/.open-next/
+
 # production
 /build
 
 # misc
 .DS_Store
 *.pem
+*.bak
+*.orig
+*.rej
+*.swp
+*.swo
+*.tmp
 
 # debug
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+
+# local databases and repository-root database dumps
+*.sqlite
+*.sqlite3
+*.db
+/backup-*.sql
+/*-backup-*.sql
+/*snapshot*.sql
 
 # env files (can opt-in for committing if needed)
 .env*
@@ -47,4 +65,4 @@ next-env.d.ts
 /.commandcode
 
 # cloudflare wrangler
-.wrangler
+/.wrangler/
