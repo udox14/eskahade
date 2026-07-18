@@ -137,7 +137,7 @@ export default function StatistikUPKPage() {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
           <StatCard label="User Aktif" value={number(userRows.length)} icon={UserRoundCheck} tone="text-slate-900" />
           <StatCard label="Pesanan Selesai" value={number(userTotals.selesai)} icon={ClipboardCheck} tone="text-emerald-700" />
-          <StatCard label="Pesanan Dibuat" value={number(userTotals.dibuat)} icon={FileText} tone="text-blue-700" />
+          <StatCard label="Transaksi Dicatat" value={number(userTotals.dibuat)} icon={FileText} tone="text-blue-700" />
           <StatCard label="Catatan Dibuat" value={number(userTotals.catatan)} icon={FileText} tone="text-violet-700" />
           <StatCard label="Kitab Diserahkan" value={number(userTotals.serah)} icon={PackageCheck} tone="text-amber-700" />
           <StatCard label="Nilai Ditangani" value={rupiah(userTotals.nilai)} icon={HandCoins} tone="text-emerald-700" />
@@ -190,7 +190,7 @@ export default function StatistikUPKPage() {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
           <p>{activeTab === 'kitab'
             ? (tanggalDari || tanggalSampai ? 'Statistik transaksi mengikuti periode; stok selalu posisi terkini.' : 'Menampilkan seluruh transaksi selesai; stok adalah posisi terkini.')
-            : 'Performa dihitung dari transaksi dan jejak aktivitas UPK pada periode terpilih.'}</p>
+            : 'Performa mencakup transaksi yang dicatat, transaksi selesai, dan jejak aktivitas UPK pada periode terpilih.'}</p>
           {activeTab === 'kitab' && (
             <label className="flex cursor-pointer items-center gap-2 font-semibold">
               <input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} />
@@ -276,7 +276,7 @@ export default function StatistikUPKPage() {
       <p className="px-1 text-xs leading-relaxed text-slate-400">
         {activeTab === 'kitab'
           ? 'Terjual dan omzet hanya menghitung transaksi penjualan berstatus selesai; transaksi void dan item batal tidak dihitung. Kitab gratis dipisahkan agar angka omzet tidak tercampur.'
-          : 'Pesanan selesai dan nilai ditangani mengikuti user kasir saat pembayaran. Catatan dihitung dari catatan pesanan yang dibuat user; penyerahan dan aktivitas lain mengikuti log aktivitas UPK.'}
+          : 'Transaksi dicatat mengikuti user pembuat (created_by), termasuk transaksi biasa dan gratis. Pesanan selesai serta nilai ditangani mengikuti user kasir saat pembayaran.'}
       </p>
     </div>
   )
@@ -288,9 +288,10 @@ function UserPerformanceCharts({ rows, loading }: { rows: PerformaUserUPK[]; loa
     .slice(0, 8)
   const maxSelesai = Math.max(1, ...ranking.map((row) => row.pesanan_selesai))
   const composition = [
+    { label: 'Transaksi dicatat', value: rows.reduce((sum, row) => sum + row.pesanan_dibuat, 0), color: '#0ea5e9' },
     { label: 'Kasir selesai', value: rows.reduce((sum, row) => sum + row.pesanan_selesai, 0), color: '#10b981' },
     { label: 'Kitab diserahkan', value: rows.reduce((sum, row) => sum + row.kitab_diserahkan, 0), color: '#f59e0b' },
-    { label: 'Tindak lanjut', value: rows.reduce((sum, row) => sum + row.tindak_lanjut, 0), color: '#3b82f6' },
+    { label: 'Tindak lanjut', value: rows.reduce((sum, row) => sum + row.tindak_lanjut, 0), color: '#ec4899' },
     { label: 'Operasional', value: rows.reduce((sum, row) => sum + row.entri_operasional, 0), color: '#8b5cf6' },
   ]
   const totalComposition = composition.reduce((sum, item) => sum + item.value, 0)
@@ -414,7 +415,7 @@ function UserPerformanceTable({ rows, loading }: { rows: PerformaUserUPK[]; load
                 <th className="px-4 py-3 text-center">#</th>
                 <th className="sticky left-0 z-10 bg-slate-50 px-4 py-3">User</th>
                 <th className="px-3 py-3 text-right">Selesai</th>
-                <th className="px-3 py-3 text-right">Dibuat</th>
+                <th className="px-3 py-3 text-right">Transaksi Dicatat</th>
                 <th className="px-3 py-3 text-right">Catatan</th>
                 <th className="px-3 py-3 text-right">Kitab Diserah</th>
                 <th className="px-3 py-3 text-right">Tindak Lanjut</th>
