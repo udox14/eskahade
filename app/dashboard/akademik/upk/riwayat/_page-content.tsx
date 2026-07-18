@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Eye,
   Loader2,
+  Pencil,
   RefreshCw,
   RotateCcw,
   Search,
@@ -18,6 +19,7 @@ import {
   getDetailTransaksiUPK,
   getRiwayatTransaksiUPK,
   voidTransaksiUPK,
+  editTransaksiUPK,
 } from './actions'
 
 type UnitUPK = 'PUTRA' | 'PUTRI'
@@ -95,6 +97,9 @@ export default function RiwayatTransaksiUPKPage() {
   const [voidTarget, setVoidTarget] = useState<RiwayatItem | null>(null)
   const [voidReason, setVoidReason] = useState('')
   const [voiding, setVoiding] = useState(false)
+  const [editTarget, setEditTarget] = useState<RiwayatItem | null>(null)
+  const [editForm, setEditForm] = useState({ tanggal: '', catatan: '', totalBayar: '', kembalianDitahan: false })
+  const [editing, setEditing] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -168,6 +173,37 @@ export default function RiwayatTransaksiUPKPage() {
     toast.success('Transaksi berhasil di-void')
     setVoidTarget(null)
     setVoidReason('')
+    loadData()
+  }
+
+  const openEdit = (row: RiwayatItem) => {
+    setEditTarget(row)
+    setEditForm({
+      tanggal: row.tanggal.split('T')[0],
+      catatan: row.catatan || '',
+      totalBayar: row.total_bayar.toString(),
+      kembalianDitahan: !!row.kembalian_ditahan
+    })
+  }
+
+  const submitEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editTarget) return
+    setEditing(true)
+    const result = await editTransaksiUPK({
+      id: editTarget.id,
+      tanggal: editForm.tanggal,
+      catatan: editForm.catatan,
+      totalBayar: parseInt(editForm.totalBayar || '0', 10),
+      kembalianDitahan: editForm.kembalianDitahan
+    })
+    setEditing(false)
+    if ('error' in result) {
+      toast.error(result.error)
+      return
+    }
+    toast.success('Transaksi berhasil diperbarui')
+    setEditTarget(null)
     loadData()
   }
 
@@ -320,6 +356,14 @@ export default function RiwayatTransaksiUPKPage() {
                         <Eye className="h-4 w-4" />
                       </button>
                       <button
+                        onClick={() => openEdit(row)}
+                        disabled={row.status === 'VOID' || row.jenis_transaksi !== 'PENJUALAN'}
+                        className="rounded p-1.5 text-amber-600 hover:bg-amber-50 disabled:text-slate-300 disabled:hover:bg-transparent"
+                        title="Edit transaksi"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
                         onClick={() => openVoid(row)}
                         disabled={row.status === 'VOID'}
                         className="rounded p-1.5 text-red-600 hover:bg-red-50 disabled:text-slate-300 disabled:hover:bg-transparent"
@@ -432,6 +476,97 @@ export default function RiwayatTransaksiUPKPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="border-b bg-amber-50 px-5 py-4">
+              <h2 className="flex items-center gap-2 font-bold text-amber-900">
+                <Pencil className="h-5 w-5" /> Edit Transaksi {nomorAntrian(editTarget.nomor)}
+              </h2>
+              <p className="mt-1 text-sm text-amber-700">{editTarget.nama_santri} · Tagihan: {rupiah(editTarget.total_tagihan)}</p>
+            </div>
+            <form onSubmit={submitEdit} className="space-y-4 p-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold uppercase text-slate-500">Tanggal Transaksi</label>
+                  <input
+                    type="date"
+                    required
+                    value={editForm.tanggal}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, tanggal: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-amber-200"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase text-slate-500">Uang Diterima (Rp)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={editForm.totalBayar}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, totalBayar: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-amber-200"
+                  />
+                </div>
+              </div>
+              
+              <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 cursor-pointer hover:bg-slate-100">
+                <input 
+                  type="checkbox" 
+                  checked={editForm.kembalianDitahan}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, kembalianDitahan: e.target.checked }))}
+                  className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-600"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-slate-700">Kembalian Ditahan</p>
+                  <p className="text-xs text-slate-500">Centang jika sisa uang disimpan (tidak dikembalikan ke santri).</p>
+                </div>
+              </label>
+
+              <div>
+                <label className="text-xs font-bold uppercase text-slate-500">Catatan</label>
+                <textarea
+                  value={editForm.catatan}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, catatan: e.target.value }))}
+                  className="mt-1 min-h-20 w-full rounded-lg border border-slate-200 p-3 text-sm outline-none focus:ring-2 focus:ring-amber-200"
+                  placeholder="Tambahkan catatan jika perlu..."
+                />
+              </div>
+
+              {(() => {
+                const bayar = parseInt(editForm.totalBayar || '0', 10)
+                const tagihan = editTarget.total_tagihan
+                const diff = bayar - tagihan
+                const tunggakan = diff < 0 ? Math.abs(diff) : 0
+                const kembalian = diff > 0 && editForm.kembalianDitahan ? diff : 0
+                return (
+                  <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+                    <div>
+                      <p className="text-xs font-bold text-slate-500">Sisa Tunggakan</p>
+                      <p className="font-mono font-extrabold text-amber-700">{rupiah(tunggakan)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-500">Sisa Kembalian</p>
+                      <p className="font-mono font-extrabold text-blue-700">{rupiah(kembalian)}</p>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              <div className="flex flex-col justify-end gap-2 border-t pt-4 sm:flex-row">
+                <button type="button" onClick={() => setEditTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50">
+                  Batal
+                </button>
+                <button type="submit" disabled={editing} className="flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-amber-700 disabled:opacity-50">
+                  {editing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

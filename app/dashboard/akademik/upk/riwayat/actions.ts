@@ -253,3 +253,83 @@ export async function voidTransaksiUPK(payload: {
   revalidatePath('/dashboard/akademik/upk/pemasukan')
   return { success: true }
 }
+
+export async function editTransaksiUPK(payload: {
+  id: string
+  tanggal: string
+  catatan: string
+  totalBayar: number
+  kembalianDitahan: boolean
+}): Promise<{ success: true } | { error: string }> {
+  const session = await getSession()
+  if (!payload.id) return { error: 'Transaksi tidak valid.' }
+  if (!payload.tanggal) return { error: 'Tanggal tidak boleh kosong.' }
+
+  const transaksi = await queryOne<RiwayatRow>('SELECT * FROM upk_antrian WHERE id = ?', [payload.id])
+  if (!transaksi) return { error: 'Transaksi tidak ditemukan.' }
+  if (transaksi.status === 'VOID') return { error: 'Transaksi VOID tidak bisa diedit.' }
+  if (transaksi.status !== 'SELESAI') return { error: 'Hanya transaksi selesai yang bisa diedit.' }
+
+  const totalTagihan = toInt(transaksi.total_tagihan)
+  let totalBayar = Math.max(0, toInt(payload.totalBayar))
+  const diff = totalBayar - totalTagihan
+  
+  // Jika kembalian tidak ditahan dan pembeli memberikan lebih, simpan uang pas
+  if (diff > 0 && !payload.kembalianDitahan) {
+    totalBayar = totalTagihan
+  }
+
+  const newDiff = totalBayar - totalTagihan
+  const sisaKembalian = newDiff > 0 && payload.kembalianDitahan ? newDiff : 0
+  const sisaTunggakan = newDiff < 0 ? Math.abs(newDiff) : 0
+
+  await execute(`
+    UPDATE upk_antrian
+    SET tanggal = ?, catatan = ?, total_bayar = ?, sisa_kembalian = ?, kembalian_ditahan = ?,
+        sisa_tunggakan = ?, updated_at = ?
+    WHERE id = ?
+  `, [
+    payload.tanggal,
+    payload.catatan.trim() || null,
+    totalBayar,
+    sisaKembalian,
+    payload.kembalianDitahan ? 1 : 0,
+    sisaTunggakan,
+    now(),
+    payload.id
+  ])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_upk_riwayat',
+    action: 'update',
+    fiturHref: RIWAYAT_PATH,
+    logKind: 'update',
+    entityType: 'upk_antrian',
+    entityId: payload.id,
+    entityLabel: transaksi.nama_santri,
+    summary: `Edit transaksi UPK ${String(transaksi.nomor).padStart(3, '0')} - ${transaksi.nama_santri}`,
+    details: {
+      unit: transaksi.unit,
+      old: {
+        tanggal: transaksi.tanggal,
+        catatan: transaksi.catatan,
+        total_bayar: transaksi.total_bayar,
+        kembalian_ditahan: transaksi.kembalian_ditahan,
+      },
+      new: {
+        tanggal: payload.tanggal,
+        catatan: payload.catatan,
+        total_bayar: totalBayar,
+        kembalian_ditahan: payload.kembalianDitahan,
+        sisa_tunggakan: sisaTunggakan,
+        sisa_kembalian: sisaKembalian,
+      }
+    },
+  })
+
+  revalidatePath(RIWAYAT_PATH)
+  revalidatePath(KASIR_PATH)
+  revalidatePath('/dashboard/akademik/upk/pemasukan')
+  return { success: true }
+}

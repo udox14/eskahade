@@ -43,6 +43,7 @@ next-env.d.ts
 #dll
 /.claude
 /.codex
+/.codex-temp/
 /.commandcode
 
 # cloudflare wrangler
