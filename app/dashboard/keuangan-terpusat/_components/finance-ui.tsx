@@ -53,9 +53,9 @@ export function FinanceGuide({ title = 'Cara menggunakan halaman ini', purpose, 
     </summary>
     <div className="grid gap-4 border-t border-blue-100 px-4 py-4 text-xs leading-relaxed text-slate-600 md:grid-cols-2 xl:grid-cols-4">
       <div><p className="mb-1 font-bold uppercase tracking-wide text-slate-800">Tujuan</p><p>{purpose}</p></div>
-      <div><p className="mb-1 font-bold uppercase tracking-wide text-slate-800">Sebelum mulai</p>{prerequisites.length ? <ul className="list-disc space-y-1 pl-4">{prerequisites.map(item => <li key={item}>{item}</li>)}</ul> : <p>Tidak ada persiapan khusus.</p>}</div>
+      <div className="hidden sm:block"><p className="mb-1 font-bold uppercase tracking-wide text-slate-800">Sebelum mulai</p>{prerequisites.length ? <ul className="list-disc space-y-1 pl-4">{prerequisites.map(item => <li key={item}>{item}</li>)}</ul> : <p>Tidak ada persiapan khusus.</p>}</div>
       <div><p className="mb-1 font-bold uppercase tracking-wide text-slate-800">Alur kerja</p><ol className="list-decimal space-y-1 pl-4">{steps.map(item => <li key={item}>{item}</li>)}</ol></div>
-      <div><p className="mb-1 flex items-center gap-1 font-bold uppercase tracking-wide text-amber-800"><AlertTriangle className="h-3.5 w-3.5" />Catatan penting</p>{notes.length ? <ul className="list-disc space-y-1 pl-4">{notes.map(item => <li key={item}>{item}</li>)}</ul> : <p>Periksa kembali sebelum menyimpan.</p>}</div>
+      <div className="hidden sm:block"><p className="mb-1 flex items-center gap-1 font-bold uppercase tracking-wide text-amber-800"><AlertTriangle className="h-3.5 w-3.5" />Catatan penting</p>{notes.length ? <ul className="list-disc space-y-1 pl-4">{notes.map(item => <li key={item}>{item}</li>)}</ul> : <p>Periksa kembali sebelum menyimpan.</p>}</div>
     </div>
   </details>
 }

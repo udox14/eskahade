@@ -29,6 +29,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false); 
   const pathname = usePathname();
+  const isFinanceRoute = pathname?.startsWith('/dashboard/keuangan-terpusat');
   const searchParams = useSearchParams();
   const returnTo = searchParams.get('returnTo');
   const showSetupReturn = returnTo === '/dashboard/setup-tahun-ajaran' && pathname !== '/dashboard/setup-tahun-ajaran';
@@ -41,7 +42,10 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
 
   return (
     <IconContext.Provider value={{ weight: "duotone" }}>
-      <div className="relative flex h-[100dvh] w-full bg-slate-50 font-sans text-slate-900 antialiased overflow-hidden selection:bg-green-100 selection:text-green-900">
+      <div className={cn(
+        "relative flex h-[100dvh] w-full overflow-hidden bg-slate-50 font-sans text-slate-900 antialiased selection:bg-green-100 selection:text-green-900",
+        isFinanceRoute && "font-['Plus_Jakarta_Sans'] sm:font-sans"
+      )}>
       
       {/* 1. SIDEBAR DESKTOP (FIXED) */}
       <div 
