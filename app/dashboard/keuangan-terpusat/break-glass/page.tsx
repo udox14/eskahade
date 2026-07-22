@@ -1,4 +1,4 @@
-import { ShieldWarning as ShieldAlert } from '@phosphor-icons/react'
+import { ShieldWarning as ShieldAlert } from '@phosphor-icons/react/dist/ssr'
 import { guardPage } from '@/lib/auth/guard'
 import { activateBreakGlass, getBreakGlassRows } from './actions'
 import { FinanceGuide, FinanceNav, FinancePageHeader, SectionPanel, StatusBadge } from '../_components/finance-ui'

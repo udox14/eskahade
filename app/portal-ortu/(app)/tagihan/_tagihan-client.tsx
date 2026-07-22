@@ -5,9 +5,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  Banknote, Building2, CheckCircle2, ChevronRight, Clock3, Copy, Landmark, Loader2,
+  Bank, Buildings, CaretRight, CheckCircle, CircleNotch, Clock, Copy, Money,
   QrCode, X,
-} from 'lucide-react'
+} from '@phosphor-icons/react'
 import type { PortalPaymentChannels } from '@/lib/portal/data'
 import { formatRupiah } from '@/lib/portal/format'
 import { createSubmission } from './actions'
@@ -40,7 +40,7 @@ export function TagihanClient(props: {
       {props.tampilkanSpp && (
         <BillCard
           rise="portal-rise-1"
-          icon={<Banknote className="w-5 h-5 text-[var(--p-emerald)]" />}
+          icon={<Money className="w-5 h-5 text-[var(--p-emerald)]" />}
           title="SPP Bulanan"
           subtitle="Syahriah pengajian & asrama"
           items={props.sppItems}
@@ -53,7 +53,7 @@ export function TagihanClient(props: {
 
       <BillCard
         rise="portal-rise-2"
-        icon={<Building2 className="w-5 h-5 text-[var(--p-gold)]" />}
+        icon={<Buildings className="w-5 h-5 text-[var(--p-gold)]" />}
         title="Biaya Tahunan (Non-SPP)"
         subtitle="Bangunan, kesehatan, EHB, ekskul"
         items={props.nonSppItems}
@@ -127,7 +127,7 @@ function BillCard(props: {
                 href="/portal-ortu/riwayat"
                 className="flex items-center gap-1.5 rounded-2xl bg-amber-100 border border-amber-300 px-4 py-2.5 text-xs font-bold text-amber-800"
               >
-                <Clock3 className="w-3.5 h-3.5" />
+                <Clock className="w-3.5 h-3.5" />
                 {props.pendingSudahUpload ? 'Menunggu konfirmasi' : 'Lanjutkan upload'}
               </Link>
             ) : (
@@ -135,7 +135,7 @@ function BillCard(props: {
                 onClick={props.onPay}
                 className="flex items-center gap-1 rounded-2xl bg-[var(--p-emerald)] px-5 py-3 text-xs font-bold text-white shadow-md shadow-emerald-900/15 active:scale-[0.97] transition"
               >
-                Bayar <ChevronRight className="w-3.5 h-3.5" />
+                Bayar <CaretRight className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -279,7 +279,7 @@ function WizardModal({
                         active ? 'border-[var(--p-emerald)] bg-[var(--p-emerald)]' : 'border-[var(--p-line)]'
                       }`}
                     >
-                      {active && <CheckCircle2 className="w-4 h-4 text-white" />}
+                      {active && <CheckCircle className="w-4 h-4 text-white" />}
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-bold text-[var(--p-ink)]">{item.label}</span>
@@ -315,7 +315,7 @@ function WizardModal({
                   metode === 'TRANSFER' ? 'border-[var(--p-emerald)] bg-white shadow-sm' : 'border-[var(--p-line)] bg-white/60'
                 }`}
               >
-                <Landmark className="w-5 h-5 text-[var(--p-emerald)]" />
+                <Bank className="w-5 h-5 text-[var(--p-emerald)]" />
                 <p className="mt-2 text-sm font-bold text-[var(--p-ink)]">Transfer Bank</p>
                 <p className="text-[10px] text-[var(--p-muted)]">Ke rekening pesantren</p>
               </button>
@@ -374,7 +374,7 @@ function WizardModal({
                 onClick={handleCreate}
                 className="flex-1 rounded-2xl bg-[var(--p-emerald)] py-4 text-sm font-bold text-white active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {creating && <Loader2 className="w-4 h-4 animate-spin" />}
+                {creating && <CircleNotch className="w-4 h-4 animate-spin" />}
                 {creating ? 'Membuat pengajuan…' : 'Buat Pengajuan & Bayar'}
               </button>
             </div>
@@ -430,7 +430,7 @@ function WizardModal({
         {done && (
           <div className="mt-8 text-center pb-4">
             <span className="mx-auto flex w-16 h-16 items-center justify-center rounded-full bg-emerald-100">
-              <CheckCircle2 className="w-8 h-8 text-[var(--p-emerald)]" />
+              <CheckCircle className="w-8 h-8 text-[var(--p-emerald)]" />
             </span>
             <h3 className="portal-display mt-4 text-xl text-[var(--p-emerald-deep)]">Bukti terkirim</h3>
             <p className="mt-1.5 text-xs text-[var(--p-muted)] max-w-[17rem] mx-auto leading-relaxed">

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { KeyRound, Loader2, LogOut, ShieldAlert } from 'lucide-react'
+import { CircleNotch, Key, ShieldWarning, SignOut } from '@phosphor-icons/react'
 import { gantiPasswordPortal } from './actions'
 
 export function AkunClient({ mustChangePassword }: { mustChangePassword: boolean }) {
@@ -51,7 +51,7 @@ export function AkunClient({ mustChangePassword }: { mustChangePassword: boolean
     <div className="space-y-4">
       {mustChangePassword && (
         <div className="portal-rise flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3.5">
-          <ShieldAlert className="mt-0.5 w-4 h-4 shrink-0 text-amber-600" />
+          <ShieldWarning className="mt-0.5 w-4 h-4 shrink-0 text-amber-600" />
           <p className="text-xs leading-relaxed text-amber-800">
             <span className="font-bold">Demi keamanan, ganti password default Anda</span> sebelum
             menggunakan fitur portal lainnya.
@@ -64,7 +64,7 @@ export function AkunClient({ mustChangePassword }: { mustChangePassword: boolean
         className="portal-rise portal-rise-1 rounded-3xl border border-[var(--p-line)] bg-[var(--p-card)] p-5 shadow-sm"
       >
         <div className="flex items-center gap-2">
-          <KeyRound className="w-4 h-4 text-[var(--p-emerald)]" />
+          <Key className="w-4 h-4 text-[var(--p-emerald)]" />
           <h2 className="portal-display text-lg text-[var(--p-emerald-deep)]">Ganti Password</h2>
         </div>
 
@@ -109,7 +109,7 @@ export function AkunClient({ mustChangePassword }: { mustChangePassword: boolean
           disabled={saving}
           className="mt-5 w-full rounded-2xl bg-[var(--p-emerald)] py-3.5 text-sm font-bold text-white active:scale-[0.98] transition disabled:opacity-60 flex items-center justify-center gap-2"
         >
-          {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+          {saving && <CircleNotch className="w-4 h-4 animate-spin" />}
           {saving ? 'Menyimpan…' : 'Simpan Password Baru'}
         </button>
       </form>
@@ -119,7 +119,7 @@ export function AkunClient({ mustChangePassword }: { mustChangePassword: boolean
         disabled={loggingOut}
         className="portal-rise portal-rise-2 w-full rounded-2xl border border-rose-200 bg-rose-50 py-3.5 text-sm font-bold text-rose-700 active:scale-[0.98] transition disabled:opacity-60 flex items-center justify-center gap-2"
       >
-        <LogOut className="w-4 h-4" />
+        <SignOut className="w-4 h-4" />
         {loggingOut ? 'Keluar…' : 'Keluar dari Portal'}
       </button>
     </div>

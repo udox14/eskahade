@@ -2,15 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarCheck2, House, Landmark, ReceiptText, ShieldAlert, UserRound } from 'lucide-react'
+import { Bank, CalendarCheck, House, Receipt, ShieldWarning, User } from '@phosphor-icons/react'
 
 const TABS = [
   { href: '/portal-ortu/beranda', label: 'Beranda', icon: House },
-  { href: '/portal-ortu/absensi', label: 'Pengajian', icon: CalendarCheck2 },
-  { href: '/portal-ortu/tagihan', label: 'Tagihan', icon: ReceiptText },
-  { href: '/portal-ortu/keuangan', label: 'Saldo', icon: Landmark },
-  { href: '/portal-ortu/pelanggaran', label: 'Keamanan', icon: ShieldAlert },
-  { href: '/portal-ortu/akun', label: 'Akun', icon: UserRound },
+  { href: '/portal-ortu/absensi', label: 'Pengajian', icon: CalendarCheck },
+  { href: '/portal-ortu/tagihan', label: 'Tagihan', icon: Receipt },
+  { href: '/portal-ortu/keuangan', label: 'Saldo', icon: Bank },
+  { href: '/portal-ortu/pelanggaran', label: 'Keamanan', icon: ShieldWarning },
+  { href: '/portal-ortu/akun', label: 'Akun', icon: User },
 ]
 
 export function BottomNav() {
@@ -30,7 +30,7 @@ export function BottomNav() {
                 active ? 'bg-white/10 text-white' : 'text-emerald-100/60 active:text-white'
               }`}
             >
-              <Icon className="w-5 h-5" strokeWidth={active ? 2.4 : 2} />
+              <Icon className="w-5 h-5" weight={active ? 'bold' : 'regular'} />
               <span className={`text-[10px] leading-none ${active ? 'font-bold' : 'font-medium'}`}>
                 {tab.label}
               </span>

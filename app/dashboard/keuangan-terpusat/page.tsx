@@ -1,4 +1,4 @@
-import { ArrowDown as ArrowDownToLine, ArrowUp as ArrowUpFromLine, Warning as AlertTriangle } from '@phosphor-icons/react'
+import { ArrowDown as ArrowDownToLine, ArrowUp as ArrowUpFromLine, Warning as AlertTriangle } from '@phosphor-icons/react/dist/ssr'
 import { guardPage } from '@/lib/auth/guard'
 import { financeAsramaScope, requireFinanceAccess } from '@/lib/finance/access'
 import { getFinanceDashboard } from '@/lib/finance/dashboard'

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { CheckCircle2, Clock3, FileQuestion, Loader2, XCircle } from 'lucide-react'
+import { CheckCircle, CircleNotch, Clock, Question, XCircle } from '@phosphor-icons/react'
 import { formatRupiah, formatTanggalId } from '@/lib/portal/format'
 import { cancelSubmission } from '../tagihan/actions'
 import { UploadBukti } from '../tagihan/_upload-bukti'
@@ -25,12 +25,12 @@ const STATUS_META = {
   menunggu_konfirmasi: {
     label: 'Menunggu Konfirmasi',
     cls: 'bg-amber-100 text-amber-800 border-amber-200',
-    icon: Clock3,
+    icon: Clock,
   },
   terkonfirmasi: {
     label: 'Terkonfirmasi',
     cls: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    icon: CheckCircle2,
+    icon: CheckCircle,
   },
   ditolak: {
     label: 'Ditolak',
@@ -66,7 +66,7 @@ export function RiwayatClient({ items }: { items: RiwayatItem[] }) {
   if (items.length === 0) {
     return (
       <div className="portal-rise portal-rise-1 flex items-center gap-3 rounded-3xl bg-[var(--p-card)] border border-[var(--p-line)] px-5 py-6 shadow-sm">
-        <FileQuestion className="w-6 h-6 shrink-0 text-[var(--p-muted)]" />
+        <Question className="w-6 h-6 shrink-0 text-[var(--p-muted)]" />
         <p className="text-xs font-semibold text-[var(--p-muted)]">
           Belum ada pengajuan pembayaran. Buka menu Tagihan untuk mulai membayar.
         </p>
@@ -149,7 +149,7 @@ export function RiwayatClient({ items }: { items: RiwayatItem[] }) {
                         disabled={cancelling === item.id}
                         className="flex-1 rounded-2xl border border-rose-200 bg-rose-50 py-3 text-xs font-bold text-rose-700 active:scale-[0.98] transition disabled:opacity-60 flex items-center justify-center gap-1.5"
                       >
-                        {cancelling === item.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        {cancelling === item.id && <CircleNotch className="w-3.5 h-3.5 animate-spin" />}
                         Batalkan
                       </button>
                     )}

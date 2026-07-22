@@ -1,10 +1,12 @@
 'use client'
 /* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 
-import { useMemo, useState, useTransition } from 'react'
+import { useCallback, useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { identifyStudent, openCashShift, submitWithdrawal } from './actions'
 import type { CredentialKind } from '@/lib/finance/types'
+import { credentialKindFromToken, useKeyboardWedgeScanner } from '@/lib/finance/scanner-client'
+import { QrCameraScanner } from '@/components/finance/qr-camera-scanner'
 
 type Props = {
   units: Array<{ id: string; name: string }>
@@ -26,6 +28,13 @@ export function CashierClient({ units, shift: initialShift }: Props) {
     localStorage.setItem('finance-terminal-id', current); return current
   }, [])
 
+  const scanCredential = useCallback((rawToken:string) => {
+    const value=rawToken.trim();if(!value)return
+    const detectedKind=credentialKindFromToken(value);setKind(detectedKind);setToken(value)
+    startTransition(async()=>{const result=await identifyStudent(detectedKind,value);if('error'in result)toast.error(result.error);else setStudent(result.student)})
+  },[])
+  useKeyboardWedgeScanner(scanCredential,Boolean(shift))
+
   if (!shift) return <section className="max-w-lg rounded-xl border border-slate-200 bg-white p-4 sm:rounded-2xl sm:p-5">
     <h2 className="font-bold">Buka shift kas</h2><p className="mt-1 text-sm text-slate-500">Hitung kas fisik sebelum melayani pencairan.</p>
     {units.length === 0 ? <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Unit kas belum dibuat oleh bendahara pusat.</p> : <form className="mt-4 grid gap-3" action={form => startTransition(async () => {
@@ -40,10 +49,10 @@ export function CashierClient({ units, shift: initialShift }: Props) {
 
   return <div className="grid gap-5 lg:grid-cols-[1fr_1.2fr]">
     <section className="rounded-xl border border-slate-200 bg-white p-4 sm:rounded-2xl sm:p-5">
-      <div className="grid grid-cols-2 gap-2 sm:flex"><button onClick={() => setKind('RFID_UID')} className={`min-h-11 rounded-lg px-3 py-2 text-sm sm:min-h-0 ${kind === 'RFID_UID' ? 'bg-emerald-700 text-white' : 'bg-slate-100'}`}>RFID</button><button onClick={() => setKind('QR_STATIC')} className={`min-h-11 rounded-lg px-3 py-2 text-sm sm:min-h-0 ${kind === 'QR_STATIC' ? 'bg-emerald-700 text-white' : 'bg-slate-100'}`}>QR</button></div>
-      <label className="mt-4 block text-sm font-medium">Scan credential</label>
-      <input autoFocus value={token} onChange={e => setToken(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') startTransition(async () => { const result = await identifyStudent(kind, token); if ('error' in result) toast.error(result.error); else setStudent(result.student) }) }} className="mt-1 w-full rounded-xl border px-3 py-3 font-mono" placeholder="Reader/scanner mengetik di sini lalu Enter" />
-      <button disabled={pending || !token} onClick={() => startTransition(async () => { const result = await identifyStudent(kind, token); if ('error' in result) toast.error(result.error); else setStudent(result.student) })} className="mt-3 min-h-11 w-full rounded-xl border border-emerald-700 px-4 py-2 font-semibold text-emerald-800 sm:min-h-0">Tampilkan identitas</button>
+      <div className="flex items-center justify-between gap-3"><div><h2 className="font-bold">Scan RFID / QR</h2><p className="text-xs text-slate-500">Jenis credential dikenali otomatis.</p></div><span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">READER SIAP</span></div>
+      <label className="mt-4 block text-sm font-medium">Credential</label>
+      <input autoFocus data-scanner-input value={token} onChange={e => setToken(e.target.value)} onKeyDown={e => {if(e.key==='Enter'){e.preventDefault();scanCredential(token)}}} className="mt-1 w-full rounded-xl border px-3 py-3 font-mono" placeholder="Tempel kartu atau scan QR lalu Enter" />
+      <div className="mt-3 grid gap-2"><button disabled={pending || !token} onClick={()=>scanCredential(token)} className="min-h-11 w-full rounded-xl border border-emerald-700 px-4 py-2 font-semibold text-emerald-800 sm:min-h-0">Tampilkan identitas</button><QrCameraScanner onScan={scanCredential}/></div>
     </section>
 
     <section className="rounded-xl border border-slate-200 bg-white p-4 sm:rounded-2xl sm:p-5">

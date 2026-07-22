@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import {
-  CalendarCheck2, ChevronRight, Clock3, ReceiptText, ShieldAlert, Sparkles, XCircle,
-} from 'lucide-react'
+  CalendarCheck, CaretRight, Clock, Receipt, ShieldWarning, Sparkle, XCircle,
+} from '@phosphor-icons/react/dist/ssr'
 import { requirePortalSessionStrict } from '@/lib/portal/session'
 import { getTunggakanSppSantri } from '@/lib/spp/tunggakan'
 import { getNonSppOutstandingSantri } from '@/lib/keuangan/non-spp-outstanding'
@@ -92,7 +92,7 @@ export default async function BerandaPage() {
               </p>
             </div>
             <span className="flex items-center gap-1 rounded-full bg-[var(--p-gold-soft)] px-3 py-1.5 text-[11px] font-bold text-[#7a5a17]">
-              Bayar <ChevronRight className="w-3.5 h-3.5" />
+              Bayar <CaretRight className="w-3.5 h-3.5" />
             </span>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3">
@@ -121,12 +121,12 @@ export default async function BerandaPage() {
             href="/portal-ortu/riwayat"
             className="portal-rise portal-rise-2 flex items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3.5"
           >
-            <Clock3 className="w-4 h-4 shrink-0 text-amber-600" />
+            <Clock className="w-4 h-4 shrink-0 text-amber-600" />
             <p className="flex-1 text-xs leading-relaxed text-amber-800">
               <span className="font-bold">{pendingCount} pengajuan pembayaran</span> sedang menunggu
               pemeriksaan bukti oleh petugas.
             </p>
-            <ChevronRight className="w-4 h-4 text-amber-500" />
+            <CaretRight className="w-4 h-4 text-amber-500" />
           </Link>
         )}
 
@@ -142,7 +142,7 @@ export default async function BerandaPage() {
               {rejected.reject_reason ? `Alasan: ${rejected.reject_reason}. ` : ''}Buka riwayat untuk
               upload ulang bukti.
             </p>
-            <ChevronRight className="w-4 h-4 text-rose-500" />
+            <CaretRight className="w-4 h-4 text-rose-500" />
           </Link>
         )}
 
@@ -152,7 +152,7 @@ export default async function BerandaPage() {
             href="/portal-ortu/absensi"
             className="rounded-3xl bg-[var(--p-emerald)] p-4 text-white shadow-lg shadow-emerald-900/15"
           >
-            <CalendarCheck2 className="w-5 h-5 opacity-80" />
+            <CalendarCheck className="w-5 h-5 opacity-80" />
             <p className="portal-display mt-3 text-2xl leading-none">
               {absen.totalSesi > 0 ? `${absen.hadir}/${absen.totalSesi}` : '—'}
             </p>
@@ -171,7 +171,7 @@ export default async function BerandaPage() {
             href="/portal-ortu/pelanggaran"
             className="rounded-3xl bg-[var(--p-card)] border border-[var(--p-line)] p-4 shadow-sm"
           >
-            <ShieldAlert className="w-5 h-5 text-[var(--p-gold)]" />
+            <ShieldWarning className="w-5 h-5 text-[var(--p-gold)]" />
             <p className="portal-display mt-3 text-2xl leading-none text-[var(--p-ink)]">{totalPoin}</p>
             <p className="mt-1 text-[11px] font-semibold text-[var(--p-muted)]">
               Poin pelanggaran ({pelanggaran.length} catatan)
@@ -185,18 +185,18 @@ export default async function BerandaPage() {
           className="portal-rise portal-rise-4 flex items-center gap-3 rounded-3xl bg-[var(--p-card)] border border-[var(--p-line)] px-5 py-4 shadow-sm"
         >
           <span className="flex w-10 h-10 items-center justify-center rounded-2xl bg-[var(--p-gold-soft)]">
-            <ReceiptText className="w-5 h-5 text-[var(--p-gold)]" />
+            <Receipt className="w-5 h-5 text-[var(--p-gold)]" />
           </span>
           <div className="flex-1">
             <p className="text-sm font-bold text-[var(--p-ink)]">Riwayat Pengajuan</p>
             <p className="text-[11px] text-[var(--p-muted)]">Status pembayaran transfer &amp; QRIS Anda</p>
           </div>
-          <ChevronRight className="w-4 h-4 text-[var(--p-muted)]" />
+          <CaretRight className="w-4 h-4 text-[var(--p-muted)]" />
         </Link>
 
         {pelanggaran.length === 0 && absen.alfa === 0 && (
           <div className="flex items-center gap-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3">
-            <Sparkles className="w-4 h-4 text-[var(--p-emerald)]" />
+            <Sparkle className="w-4 h-4 text-[var(--p-emerald)]" />
             <p className="text-xs font-semibold text-emerald-800">
               Alhamdulillah, tidak ada catatan pelanggaran maupun alfa bulan ini.
             </p>

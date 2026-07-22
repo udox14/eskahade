@@ -69,6 +69,8 @@ interface CloudflareEnv {
 
   // Environment variables
   JWT_SECRET: string
+  FINANCE_ENCRYPTION_KEY: string
+  CLOUDFLARE_BROWSER_RENDERING_API_TOKEN: string
   R2_PUBLIC_URL: string
   NEXT_PUBLIC_SUPABASE_URL?: string      // hapus setelah migrasi selesai
   NEXT_PUBLIC_SUPABASE_ANON_KEY?: string // hapus setelah migrasi selesai

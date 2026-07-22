@@ -6,7 +6,7 @@ export type FinanceAccountCode =
 
 export type WalletKind = 'TITIPAN' | 'SPP' | 'USPP' | 'NON_SPP' | 'MAKAN' | 'LAUNDRY' | 'JAJAN'
 export type CredentialKind = 'RFID_UID' | 'QR_STATIC'
-export type CredentialMode = 'RFID' | 'QR' | 'BOTH_TRANSITION'
+export type CredentialMode = 'RFID' | 'QR' | 'HYBRID' | 'BOTH_TRANSITION'
 
 export type JournalEntryInput = {
   accountCode: FinanceAccountCode

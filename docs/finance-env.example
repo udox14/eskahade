@@ -16,4 +16,5 @@ DUITKU_DISBURSEMENT_SECRET=
 # Wajib berupa secret acak panjang dan berbeda satu sama lain.
 CREDENTIAL_HMAC_SECRET=
 FINANCE_ENCRYPTION_KEY=
+CLOUDFLARE_BROWSER_RENDERING_API_TOKEN=
 # JWT_SECRET sudah dipakai aplikasi utama.

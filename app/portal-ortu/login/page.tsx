@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { ArrowLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, CaretRight } from '@phosphor-icons/react/dist/ssr'
 import { redirect } from 'next/navigation'
 import { getPortalSession } from '@/lib/portal/session'
 import { LoginForm } from './_login-form'
@@ -33,7 +33,7 @@ export default async function PortalLoginPage() {
         {/* Footer Navigation */}
         <div className="mt-8 flex flex-col items-center gap-4 text-sm">
           <Link href="/login" className="group flex items-center gap-1 text-[var(--public-leaf)] font-medium hover:text-[var(--public-forest)] transition-colors">
-            Login sebagai Pengurus <ChevronRight aria-hidden className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            Login sebagai Pengurus <CaretRight aria-hidden className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
           <Link href="/" className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors text-xs">
             <ArrowLeft aria-hidden className="h-3.5 w-3.5" /> Kembali ke Beranda

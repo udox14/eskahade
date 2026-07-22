@@ -18,6 +18,7 @@ function wrangler(args,expectError){
 // Gunakan storage lokal terisolasi. Nama binding hanya kendaraan Wrangler;
 // migrasi keuangan harus berhasil tanpa satu pun tabel dari DB utama.
 wrangler(['--file','migrations-finance/0001_finance_centralized_core.sql'])
+wrangler(['--file','migrations-finance/0002_credential_fast_enrollment.sql'])
 
 const positive=wrangler(['--command',`INSERT INTO finance_journals(id,idempotency_key,effective_date,description,source_type,actor_type,status) VALUES('t-j1','t-key-1','2026-08-01','Topup test','TEST','SYSTEM','DRAFT');
 INSERT INTO finance_journal_entries(id,journal_id,account_id,side,amount_rupiah) VALUES('t-e1','t-j1','fa-gateway-clearing','DEBIT',100000),('t-e2','t-j1','fa-guardian-float','CREDIT',100000);
@@ -44,4 +45,33 @@ wrangler(['--command',`INSERT INTO finance_recipients(id,recipient_type,name,usa
 INSERT INTO finance_payouts(id,idempotency_key,recipient_id,payout_type,amount_rupiah,method,status,maker_id) VALUES('t-p1','t-p-key','t-r1','OTHER',50000,'CASH','SUBMITTED','staff-1');
 UPDATE finance_payouts SET status='CHECKED',checker_id='staff-1' WHERE id='t-p1';`],'FINANCE_SELF_APPROVAL_FORBIDDEN')
 
-process.stdout.write('finance invariants: 6 scenarios passed\n')
+const hybrid=wrangler(['--command',`SELECT mode FROM finance_credential_policy WHERE singleton_id=1;`])
+if(!/"mode"\s*:\s*"HYBRID"/.test(hybrid))throw new Error('Credential policy migration did not enable HYBRID mode.')
+
+wrangler(['--command',`INSERT INTO student_credentials(id,santri_id,credential_kind,token_hmac,token_version,status,card_number) VALUES('cred-1','student-1','QR_STATIC','hash-1',1,'ACTIVE','SKH-QR-1');`])
+wrangler(['--command',`INSERT INTO student_credentials(id,santri_id,credential_kind,token_hmac,token_version,status,card_number) VALUES('cred-2','student-1','QR_STATIC','hash-2',1,'ACTIVE','SKH-QR-2');`],'UNIQUE constraint failed')
+
+const bulk=wrangler(['--command',`INSERT INTO finance_credential_batches(id,credential_kind,status,total_count,created_by) VALUES('batch-1000','QR_STATIC','PROCESSING',1000,'staff-1');
+WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM seq WHERE n<1000)
+INSERT INTO finance_credential_batch_items(batch_id,santri_id,position) SELECT 'batch-1000','bulk-student-'||n,n-1 FROM seq;
+WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM seq WHERE n<500)
+INSERT INTO student_credentials(id,santri_id,credential_kind,token_hmac,token_version,status,card_number)
+SELECT 'bulk-cred-'||n,'bulk-student-'||n,'QR_STATIC','bulk-hash-'||n,1,'ACTIVE','SKH-QR-BULK-'||n FROM seq;
+UPDATE finance_credential_batch_items SET status='SUCCESS',credential_id='bulk-cred-'||(position+1),processed_at=datetime('now') WHERE batch_id='batch-1000' AND position<500;
+SELECT COUNT(*) pending FROM finance_credential_batch_items WHERE batch_id='batch-1000' AND status='PENDING';`])
+if(!/"pending"\s*:\s*500/.test(bulk))throw new Error('Credential batch resume did not preserve 500 pending rows.')
+
+const resumed=wrangler(['--command',`WITH RECURSIVE seq(n) AS (SELECT 501 UNION ALL SELECT n+1 FROM seq WHERE n<1000)
+INSERT INTO student_credentials(id,santri_id,credential_kind,token_hmac,token_version,status,card_number)
+SELECT 'bulk-cred-'||n,'bulk-student-'||n,'QR_STATIC','bulk-hash-'||n,1,'ACTIVE','SKH-QR-BULK-'||n FROM seq;
+UPDATE finance_credential_batch_items SET status='SUCCESS',credential_id='bulk-cred-'||(position+1),processed_at=datetime('now') WHERE batch_id='batch-1000' AND status='PENDING';
+UPDATE finance_credential_batches SET processed_count=1000,success_count=1000,failed_count=0,status='COMPLETED',completed_at=datetime('now') WHERE id='batch-1000';
+WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM seq WHERE n<1000)
+INSERT OR IGNORE INTO student_credentials(id,santri_id,credential_kind,token_hmac,token_version,status,card_number)
+SELECT 'bulk-cred-'||n,'bulk-student-'||n,'QR_STATIC','bulk-hash-'||n,1,'ACTIVE','SKH-QR-BULK-'||n FROM seq;
+SELECT (SELECT COUNT(*) FROM student_credentials WHERE id LIKE 'bulk-cred-%') credentials,
+  (SELECT processed_count FROM finance_credential_batches WHERE id='batch-1000') processed,
+  (SELECT COUNT(*) FROM (SELECT santri_id,credential_kind FROM student_credentials WHERE id LIKE 'bulk-cred-%' GROUP BY santri_id,credential_kind HAVING COUNT(*)>1)) duplicates;`])
+if(!/"credentials"\s*:\s*1000/.test(resumed)||!/"processed"\s*:\s*1000/.test(resumed)||!/"duplicates"\s*:\s*0/.test(resumed))throw new Error('Credential batch resume produced incomplete or duplicate credentials.')
+
+process.stdout.write('finance invariants: 10 scenarios passed\n')

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { CircleNotch, Eye, EyeSlash } from '@phosphor-icons/react'
 
 export function LoginForm() {
   const router = useRouter()
@@ -62,7 +62,7 @@ export function LoginForm() {
               className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 transition hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[var(--public-leaf)]" 
               aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
             >
-              {showPassword ? <EyeOff aria-hidden className="h-4 w-4" /> : <Eye aria-hidden className="h-4 w-4" />}
+              {showPassword ? <EyeSlash aria-hidden className="h-4 w-4" /> : <Eye aria-hidden className="h-4 w-4" />}
             </button>
           </div>
         </div>
@@ -71,7 +71,7 @@ export function LoginForm() {
         
         <div className="pt-2">
           <button type="submit" disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--public-leaf)] py-2.5 text-sm font-semibold text-white transition hover:bg-[#1d6345] focus:outline-none focus:ring-2 focus:ring-[var(--public-leaf)] focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed">
-            {loading ? <><Loader2 aria-hidden className="h-4 w-4 animate-spin" /> Memeriksa...</> : 'Masuk'}
+            {loading ? <><CircleNotch aria-hidden className="h-4 w-4 animate-spin" /> Memeriksa...</> : 'Masuk'}
           </button>
         </div>
       </form>

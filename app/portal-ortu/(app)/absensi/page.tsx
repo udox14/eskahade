@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CalendarX2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarX, CaretLeft, CaretRight } from '@phosphor-icons/react/dist/ssr'
 import { requirePortalSessionStrict } from '@/lib/portal/session'
 import { getRekapAbsensiAnak } from '@/lib/portal/data'
 import { formatTanggalId, namaBulanId } from '@/lib/portal/format'
@@ -57,7 +57,7 @@ export default async function AbsensiPage({
             className="p-2 rounded-xl active:bg-white/10"
             aria-label="Bulan sebelumnya"
           >
-            <ChevronLeft className="w-4 h-4 text-white" />
+            <CaretLeft className="w-4 h-4 text-white" />
           </Link>
           <p className="text-sm font-bold text-white">{namaBulanId(bulan)} {tahun}</p>
           <Link
@@ -65,7 +65,7 @@ export default async function AbsensiPage({
             className="p-2 rounded-xl active:bg-white/10"
             aria-label="Bulan berikutnya"
           >
-            <ChevronRight className="w-4 h-4 text-white" />
+            <CaretRight className="w-4 h-4 text-white" />
           </Link>
         </div>
       </PortalPageHeader>
@@ -156,7 +156,7 @@ function EmptyNote({ text, positive }: { text: string; positive?: boolean }) {
         positive ? 'bg-emerald-50 border-emerald-200' : 'bg-[var(--p-card)] border-[var(--p-line)]'
       }`}
     >
-      <CalendarX2 className={`w-4 h-4 ${positive ? 'text-[var(--p-emerald)]' : 'text-[var(--p-muted)]'}`} />
+      <CalendarX className={`w-4 h-4 ${positive ? 'text-[var(--p-emerald)]' : 'text-[var(--p-muted)]'}`} />
       <p className={`text-xs font-semibold ${positive ? 'text-emerald-800' : 'text-[var(--p-muted)]'}`}>{text}</p>
     </div>
   )

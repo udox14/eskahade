@@ -49,10 +49,12 @@ npx.cmd tsc --noEmit --pretty false
 npm.cmd run build
 ```
 
-`test:finance` membuat D1 lokal terisolasi dan menguji posting seimbang, rollback saldo negatif, jurnal tidak seimbang, idempotensi, periode tertutup, serta larangan self-approval.
+`test:finance` membuat D1 lokal terisolasi dan menguji posting seimbang, rollback saldo negatif, jurnal tidak seimbang, idempotensi, periode tertutup, larangan self-approval, mode `HYBRID`, constraint credential aktif, dan resume batch 1.000 santri tanpa duplikasi.
 
 ## Peralihan RFID dan QR
 
-Mode dapat diubah dari panel Kredensial menjadi `RFID`, `QR`, atau `BOTH_TRANSITION`. Mode transisi wajib mempunyai metode asal, tujuan, dan batas waktu. Scan pertama setelah batas waktu akan menyelesaikan transisi secara atomik: metode lama menjadi `SUSPENDED_BY_POLICY`; saldo, limit, PIN, foto, dan histori santri tidak berubah.
+Mode dapat diubah dari panel Kredensial menjadi `RFID`, `QR`, `HYBRID`, atau `BOTH_TRANSITION`. `HYBRID` mengaktifkan RFID dan QR permanen secara bersamaan. Mode transisi wajib mempunyai metode asal, tujuan, dan batas waktu. Scan pertama setelah batas waktu akan menyelesaikan transisi secara atomik: metode lama menjadi `SUSPENDED_BY_POLICY`; saldo, limit, PIN, foto, dan histori santri tidak berubah.
 
-Credential berstatus `LOST` atau `REVOKED` tidak pernah diaktifkan kembali. Token QR hanya ditampilkan sekali saat penerbitan dan harus langsung dicetak/disimpan secara aman; database hanya menyimpan HMAC.
+Credential berstatus `LOST` atau `REVOKED` tidak pernah diaktifkan kembali. Token QR disimpan terenkripsi memakai `FINANCE_ENCRYPTION_KEY`, sedangkan resolver tetap membandingkan HMAC. Token mentah tidak pernah dikirim dari client saat export kartu.
+
+Sebelum migrasi `0002_credential_fast_enrollment.sql` dan deploy Worker, pastikan secret `FINANCE_ENCRYPTION_KEY` serta `CLOUDFLARE_BROWSER_RENDERING_API_TOKEN` sudah tersedia. Terapkan migrasi ke `FINANCE_DB` dan `DEMO_FINANCE_DB`; jangan menerapkannya ke DB utama. PDF kartu memakai A4 portrait, delapan kartu CR80 per lembar, serta pasangan halaman belakang yang dicerminkan untuk duplex long-edge.

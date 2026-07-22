@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Camera, Loader2, UploadCloud } from 'lucide-react'
+import { Camera, CircleNotch, CloudArrowUp } from '@phosphor-icons/react'
 import { uploadBukti } from './actions'
 
 // Kompresi client-side: resize maks 1280px, encode WebP, turunkan kualitas
@@ -126,7 +126,7 @@ export function UploadBukti({
         onClick={handleSubmit}
         className="mt-4 w-full rounded-2xl bg-[var(--p-emerald)] py-3.5 text-sm font-bold text-white active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2"
       >
-        {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+        {sending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <CloudArrowUp className="w-4 h-4" />}
         {sending ? 'Mengunggah…' : buttonLabel}
       </button>
     </div>

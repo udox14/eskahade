@@ -1,4 +1,4 @@
-import { ShieldCheck } from 'lucide-react'
+import { ShieldCheck } from '@phosphor-icons/react/dist/ssr'
 import { requirePortalSessionStrict } from '@/lib/portal/session'
 import { getPelanggaranAnak } from '@/lib/portal/data'
 import { formatTanggalId } from '@/lib/portal/format'
