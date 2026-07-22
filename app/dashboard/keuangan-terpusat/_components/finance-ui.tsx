@@ -2,8 +2,24 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import type { LucideIcon } from 'lucide-react'
-import { AlertTriangle, BadgeDollarSign, ChevronDown, CircleHelp, CreditCard, Landmark, ScanLine, SendHorizontal, Settings2 } from 'lucide-react'
+import {
+  Bank as Landmark,
+  CaretDown as ChevronDown,
+  CheckCircle as CheckCircle2,
+  CreditCard,
+  CurrencyDollar as BadgeDollarSign,
+  FileXls as FileSpreadsheet,
+  Gear as Settings2,
+  ListChecks,
+  LockKey as LockKeyhole,
+  PaperPlaneTilt as SendHorizontal,
+  Question as CircleHelp,
+  Receipt as ReceiptText,
+  Scan as ScanLine,
+  Stack as Layers3,
+  Wallet as WalletCards,
+  Warning as AlertTriangle,
+} from '@phosphor-icons/react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { cn } from '@/lib/utils'
 
@@ -60,9 +76,23 @@ export function FinanceGuide({ title = 'Cara menggunakan halaman ini', purpose, 
   </details>
 }
 
-export function MetricCard({ label, value, detail, icon: Icon, tone = 'emerald' }: {
-  label: string; value: string; detail: string; icon: LucideIcon; tone?: 'emerald' | 'blue' | 'amber' | 'slate'
+const metricIcons = {
+  checkCircle: CheckCircle2,
+  fileSpreadsheet: FileSpreadsheet,
+  landmark: Landmark,
+  layers: Layers3,
+  listChecks: ListChecks,
+  lock: LockKeyhole,
+  receipt: ReceiptText,
+  wallet: WalletCards,
+} as const
+
+export type MetricIcon = keyof typeof metricIcons
+
+export function MetricCard({ label, value, detail, icon, tone = 'emerald' }: {
+  label: string; value: string; detail: string; icon: MetricIcon; tone?: 'emerald' | 'blue' | 'amber' | 'slate'
 }) {
+  const Icon = metricIcons[icon]
   const toneClass = { emerald: 'bg-emerald-50 text-emerald-700', blue: 'bg-blue-50 text-blue-700', amber: 'bg-amber-50 text-amber-700', slate: 'bg-slate-100 text-slate-700' }[tone]
   return <div className="flex min-h-[108px] min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:block sm:min-h-0 sm:p-4">
     <div className="flex items-start justify-between gap-3"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p><span className={cn('grid h-8 w-8 place-items-center rounded-lg', toneClass)}><Icon className="h-4 w-4" /></span></div>

@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, Landmark, LockKeyhole, ReceiptText } from 'lucide-react'
 import { guardPage } from '@/lib/auth/guard'
 import { approveReopenAction,closePeriodAction,createBillAction,getOperationsData,importBankAction,reopenPeriodAction,settlementAction } from './actions'
 import { FinanceGuide, FinanceNav, FinancePageHeader, MetricCard, SectionPanel, StatusBadge } from '../_components/finance-ui'
@@ -16,10 +15,10 @@ export default async function OperationsPage(){
     <FinanceNav/>
     <FinanceGuide purpose="Menjaga kesesuaian catatan aplikasi, settlement gateway, mutasi rekening, dan periode pembukuan." prerequisites={["Unduh mutasi resmi dari rekening utama.","Siapkan referensi dan tanggal settlement.","Pastikan payout gagal sudah ditindaklanjuti."]} steps={["Impor mutasi dan periksa hasil matching.","Posting settlement gateway yang sudah diterima.","Tinjau readiness lalu tutup periode bulanan."]} notes={["Jangan menutup periode jika masih ada selisih.","Reopen membutuhkan dua persetujuan berbeda.","Tagihan SPP/non-SPP wajib dibayar penuh."]}/>
     <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-      <MetricCard label="Impor mutasi" value={String(data.imports.length)} detail="20 impor terbaru tersedia" icon={FileSpreadsheet} tone="blue"/>
-      <MetricCard label="Tagihan terbaru" value={String(data.bills.length)} detail="Ditampilkan untuk pengecekan cepat" icon={ReceiptText}/>
-      <MetricCard label="Periode ditutup" value={String(closed)} detail="Riwayat 24 periode terakhir" icon={LockKeyhole} tone="slate"/>
-      <MetricCard label="Readiness" value={closed || data.periods.length ? 'Pantau' : 'Belum ada data'} detail="Periksa exception sebelum tutup buku" icon={closed?CheckCircle2:AlertTriangle} tone={closed?'emerald':'amber'}/>
+      <MetricCard label="Impor mutasi" value={String(data.imports.length)} detail="20 impor terbaru tersedia" icon="fileSpreadsheet" tone="blue"/>
+      <MetricCard label="Tagihan terbaru" value={String(data.bills.length)} detail="Ditampilkan untuk pengecekan cepat" icon="receipt"/>
+      <MetricCard label="Periode ditutup" value={String(closed)} detail="Riwayat 24 periode terakhir" icon="lock" tone="slate"/>
+      <MetricCard label="Readiness" value={closed || data.periods.length ? 'Pantau' : 'Belum ada data'} detail="Periksa exception sebelum tutup buku" icon="checkCircle" tone={closed?'emerald':'amber'}/>
     </section>
 
     <SectionPanel title="Tindakan operasional" description="Buka hanya formulir yang sedang dikerjakan agar halaman tetap mudah dipindai.">

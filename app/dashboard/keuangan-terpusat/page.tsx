@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Landmark, Layers3, ListChecks, WalletCards } from 'lucide-react'
+import { ArrowDown as ArrowDownToLine, ArrowUp as ArrowUpFromLine, Warning as AlertTriangle } from '@phosphor-icons/react'
 import { guardPage } from '@/lib/auth/guard'
 import { financeAsramaScope, requireFinanceAccess } from '@/lib/finance/access'
 import { getFinanceDashboard } from '@/lib/finance/dashboard'
@@ -83,9 +83,9 @@ export default async function CentralFinancePage() {
       <FinanceGuide title="Cara menggunakan" purpose="Memberi gambaran cepat tentang posisi keuangan dan mengarahkan bendahara ke pekerjaan yang paling mendesak." prerequisites={["Pastikan settlement gateway dan mutasi bank sudah diimpor."]} steps={["Periksa kartu ringkasan.", "Tindak lanjuti mutasi bermasalah.", "Gunakan jurnal untuk penelusuran."]} notes={["Angka hanya berasal dari jurnal terposting."]} />
 
       <section className="grid grid-cols-2 gap-3">
-        <MetricCard label="Posisi bank & clearing" value={rupiah(bankPosition)} detail="Rekening utama + settlement" icon={Landmark} />
-        <MetricCard label="Titipan wali" value={rupiah(guardianFloat)} detail="Dana belum dialokasikan" icon={WalletCards} tone="blue" />
-        <MetricCard label="Butuh tindakan" value={String(totalAlerts)} detail="Pengecualian menunggu" icon={ListChecks} tone={totalAlerts ? 'amber' : 'emerald'} />
+        <MetricCard label="Posisi bank & clearing" value={rupiah(bankPosition)} detail="Rekening utama + settlement" icon="landmark" />
+        <MetricCard label="Titipan wali" value={rupiah(guardianFloat)} detail="Dana belum dialokasikan" icon="wallet" tone="blue" />
+        <MetricCard label="Butuh tindakan" value={String(totalAlerts)} detail="Pengecualian menunggu" icon="listChecks" tone={totalAlerts ? 'amber' : 'emerald'} />
       </section>
 
       <CashTrendPanel data={data} maxTrend={maxTrend} />
@@ -100,10 +100,10 @@ export default async function CentralFinancePage() {
       <FinanceGuide purpose="Memberi gambaran cepat tentang posisi keuangan dan mengarahkan bendahara ke pekerjaan yang paling mendesak." prerequisites={["Pastikan settlement gateway dan mutasi bank sudah diimpor.", "Perhatikan scope global atau asrama yang tampil di header."]} steps={["Periksa kartu ringkasan dan antrean pengecualian.", "Tindak lanjuti mutasi, top-up, atau payout bermasalah.", "Gunakan jurnal dan chart of accounts untuk penelusuran audit."]} notes={["Angka hanya berasal dari jurnal terposting.", "Jurnal posted tidak dihapus; koreksi memakai reversal."]} />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Posisi bank & clearing" value={rupiah(bankPosition)} detail="Rekening utama + dana dalam settlement" icon={Landmark} />
-        <MetricCard label="Titipan wali" value={rupiah(guardianFloat)} detail="Dana belum dialokasikan oleh wali" icon={WalletCards} tone="blue" />
-        <MetricCard label="Saldo wallet santri" value={rupiah(walletTotal)} detail={`${data.walletTotals.length} jenis wallet terisi`} icon={Layers3} tone="slate" />
-        <MetricCard label="Butuh tindakan" value={String(totalAlerts)} detail="Pengecualian belum diselesaikan" icon={ListChecks} tone={totalAlerts ? 'amber' : 'emerald'} />
+        <MetricCard label="Posisi bank & clearing" value={rupiah(bankPosition)} detail="Rekening utama + dana dalam settlement" icon="landmark" />
+        <MetricCard label="Titipan wali" value={rupiah(guardianFloat)} detail="Dana belum dialokasikan oleh wali" icon="wallet" tone="blue" />
+        <MetricCard label="Saldo wallet santri" value={rupiah(walletTotal)} detail={`${data.walletTotals.length} jenis wallet terisi`} icon="layers" tone="slate" />
+        <MetricCard label="Butuh tindakan" value={String(totalAlerts)} detail="Pengecualian belum diselesaikan" icon="listChecks" tone={totalAlerts ? 'amber' : 'emerald'} />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.35fr_.9fr]">
