@@ -9,16 +9,20 @@ export async function requireFinanceAccess(permission: FinancePermission): Promi
   const roles = getEffectiveRoles(session)
   if (roles.includes('demo')) throw new Error('Akun demo tidak boleh memproses transaksi keuangan nyata.')
 
-  if (roles.includes('admin')) {
+  const isCentral = roles.includes('bendahara')
+  const isCouncilChecker = roles.includes('dewan_santri') && roles.includes('jabatan:bendahara')
+  const isDorm = roles.includes('pengurus_asrama') && roles.includes('jabatan:bendahara')
+  const hasNativeFinanceRole = isCentral || isCouncilChecker || isDorm
+
+  // Break-glass hanya untuk admin teknis yang tidak mempunyai role operasional
+  // keuangan. Pengguna multi-role admin+bendahara masuk sebagai bendahara biasa.
+  if (roles.includes('admin') && !hasNativeFinanceRole) {
     const breakGlass = await financeQueryOne<{ id: string }>(`SELECT id FROM finance_break_glass
       WHERE user_id=? AND revoked_at IS NULL AND datetime(expires_at)>datetime('now') ORDER BY starts_at DESC LIMIT 1`, [session.id])
     if (!breakGlass) throw new Error('Admin teknis memerlukan akses break-glass yang masih aktif.')
     return session
   }
 
-  const isCentral = roles.includes('bendahara')
-  const isCouncilChecker = roles.includes('dewan_santri') && roles.includes('jabatan:bendahara')
-  const isDorm = roles.includes('pengurus_asrama') && roles.includes('jabatan:bendahara')
   const allowed = permission === 'VIEW'
     ? isCentral || isCouncilChecker || isDorm
     : permission === 'CREATE'

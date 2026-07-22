@@ -8,6 +8,7 @@ export type FinanceDashboard = {
     id: string; effective_date: string; description: string; source_type: string; external_reference: string | null; created_at: string
   }>
   alerts: Array<{ kind: string; count: number; amount_rupiah: number }>
+  cashTrend: Array<{ day: string; inflow_rupiah: number; outflow_rupiah: number }>
 }
 
 export async function getFinanceDashboard(asramaScope: string | null): Promise<FinanceDashboard> {
@@ -27,7 +28,7 @@ export async function getFinanceDashboard(asramaScope: string | null): Promise<F
         for (const row of chunks.flat()) totals.set(row.wallet_kind, (totals.get(row.wallet_kind) || 0) + Number(row.balance_rupiah))
         return [...totals].map(([wallet_kind,balance_rupiah]) => ({ wallet_kind,balance_rupiah })).sort((a,b) => a.wallet_kind.localeCompare(b.wallet_kind))
       })
-  const [accountBalances, walletTotals, recentTransactions, alerts] = await Promise.all([
+  const [accountBalances, walletTotals, recentTransactions, alerts, cashTrend] = await Promise.all([
     financeQuery<{ code: string; name: string; account_type: string; balance_rupiah: number }>(`SELECT a.code,a.name,a.account_type,COALESCE(b.balance_rupiah,0) balance_rupiah
       FROM finance_accounts a LEFT JOIN finance_account_balances b ON b.account_id=a.id
       WHERE a.is_active=1 ORDER BY a.code`),
@@ -38,6 +39,15 @@ export async function getFinanceDashboard(asramaScope: string | null): Promise<F
       FROM finance_payment_intents WHERE review_status='REQUIRED'
       UNION ALL SELECT 'UNMATCHED_BANK',COUNT(*),COALESCE(SUM(ABS(amount_rupiah)),0) FROM finance_bank_transactions WHERE match_status='UNMATCHED'
       UNION ALL SELECT 'PAYOUT_FAILED',COUNT(*),COALESCE(SUM(amount_rupiah),0) FROM finance_payouts WHERE status='FAILED'`),
+    financeQuery<{ day: string; inflow_rupiah: number; outflow_rupiah: number }>(`SELECT j.effective_date day,
+      COALESCE(SUM(CASE WHEN e.side='DEBIT' THEN e.amount_rupiah ELSE 0 END),0) inflow_rupiah,
+      COALESCE(SUM(CASE WHEN e.side='CREDIT' THEN e.amount_rupiah ELSE 0 END),0) outflow_rupiah
+      FROM finance_journal_entries e
+      JOIN finance_journals j ON j.id=e.journal_id AND j.status='POSTED'
+      JOIN finance_accounts a ON a.id=e.account_id AND a.code IN ('1101','1102')
+      WHERE date(j.effective_date)>=date('now','-29 days')
+      ${asramaScope ? `AND e.asrama_scope=?` : ''}
+      GROUP BY j.effective_date ORDER BY j.effective_date`, asramaScope ? [asramaScope] : []),
   ])
-  return { accountBalances, walletTotals, recentTransactions, alerts }
+  return { accountBalances, walletTotals, recentTransactions, alerts, cashTrend }
 }
