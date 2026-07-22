@@ -43,6 +43,21 @@
 			"database_name": "eskahade-demo-db",
 			"database_id": "677f05ba-9b52-4534-9542-96cc785f25e4",
 			"remote": true
+		},
+		{
+			// Ledger dan seluruh data finansial produksi. Jangan menjalankan
+			// migrasi aplikasi umum pada database ini.
+			"binding": "FINANCE_DB",
+			"database_name": "eskahade-finance",
+			"database_id": "8388b81f-c5c7-4523-9a72-437f947331a1",
+			"remote": true
+		},
+		{
+			// Sandbox finansial untuk role demo.
+			"binding": "DEMO_FINANCE_DB",
+			"database_name": "eskahade-demo-finance",
+			"database_id": "c610762b-dec7-4b83-b5f4-5d5ab3036f43",
+			"remote": true
 		}
 	],
 	"r2_buckets": [

@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarCheck2, House, ReceiptText, ShieldAlert, UserRound } from 'lucide-react'
+import { CalendarCheck2, House, Landmark, ReceiptText, ShieldAlert, UserRound } from 'lucide-react'
 
 const TABS = [
   { href: '/portal-ortu/beranda', label: 'Beranda', icon: House },
   { href: '/portal-ortu/absensi', label: 'Pengajian', icon: CalendarCheck2 },
   { href: '/portal-ortu/tagihan', label: 'Tagihan', icon: ReceiptText },
+  { href: '/portal-ortu/keuangan', label: 'Saldo', icon: Landmark },
   { href: '/portal-ortu/pelanggaran', label: 'Keamanan', icon: ShieldAlert },
   { href: '/portal-ortu/akun', label: 'Akun', icon: UserRound },
 ]

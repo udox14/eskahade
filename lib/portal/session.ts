@@ -13,7 +13,7 @@
 
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { queryOne } from '@/lib/db'
+import { financeQueryOne, queryOne } from '@/lib/db'
 import { createJWTToken, verifyJWTToken } from '@/lib/auth/session'
 
 export const PORTAL_COOKIE = 'eskahade_portal_session'
@@ -21,6 +21,7 @@ const PORTAL_MAX_AGE = 60 * 60 * 24 * 30 // 30 hari (cookie yang membatasi umur 
 
 export type PortalTokenPayload = {
   kind: 'portal_ortu'
+  guardian_id?: string
   santri_id: string
   nis: string
   nama: string
@@ -36,7 +37,7 @@ export type PortalSession = PortalTokenPayload & {
 }
 
 export async function createPortalToken(payload: PortalTokenPayload): Promise<string> {
-  return createJWTToken(payload)
+  return createJWTToken(payload, PORTAL_MAX_AGE)
 }
 
 export function portalCookieOptions() {
@@ -58,6 +59,11 @@ export async function getPortalSession(): Promise<PortalSession | null> {
 
     const payload = await verifyJWTToken<Partial<PortalTokenPayload>>(token)
     if (!payload || payload.kind !== 'portal_ortu' || typeof payload.santri_id !== 'string') return null
+
+    if (typeof payload.guardian_id === 'string') {
+      const link = await financeQueryOne<{ guardian_id: string }>(`SELECT guardian_id FROM finance_guardian_students WHERE guardian_id=? AND santri_id=?`, [payload.guardian_id, payload.santri_id])
+      if (!link) return null
+    }
 
     const santri = await queryOne<{
       id: string
@@ -87,6 +93,7 @@ export async function getPortalSession(): Promise<PortalSession | null> {
 
     return {
       kind: 'portal_ortu',
+      ...(typeof payload.guardian_id === 'string' ? { guardian_id: payload.guardian_id } : {}),
       santri_id: santri.id,
       nis: santri.nis,
       nama: santri.nama_lengkap,

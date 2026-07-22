@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:finance": "node scripts/test-finance-invariants.mjs",
     "build:cf": "next build --webpack && opennextjs-cloudflare build --skipNextBuild",
     "preview:cf": "next build --webpack && opennextjs-cloudflare build --skipNextBuild && opennextjs-cloudflare preview",
     "deploy:cf": "next build --webpack && opennextjs-cloudflare build --skipNextBuild && opennextjs-cloudflare deploy",

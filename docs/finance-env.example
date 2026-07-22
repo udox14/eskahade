@@ -1,0 +1,19 @@
+# Cash-in Duitku
+NEXT_PUBLIC_APP_URL=https://app.example.sch.id
+DUITKU_PRODUCTION=false
+DUITKU_MERCHANT_CODE=
+DUITKU_API_KEY=
+DUITKU_PAYMENT_METHODS=
+DUITKU_QRIS_METHOD=
+DUITKU_QRIS_FEE_RUPIAH=0
+DUITKU_VA_FEE_RUPIAH=0
+
+# Disbursement Duitku (credential berbeda dari payment gateway)
+DUITKU_DISBURSEMENT_USER_ID=
+DUITKU_DISBURSEMENT_EMAIL=
+DUITKU_DISBURSEMENT_SECRET=
+
+# Wajib berupa secret acak panjang dan berbeda satu sama lain.
+CREDENTIAL_HMAC_SECRET=
+FINANCE_ENCRYPTION_KEY=
+# JWT_SECRET sudah dipakai aplikasi utama.

@@ -1,0 +1,3 @@
+import { NextRequest,NextResponse } from 'next/server'
+import { processDuitkuPayoutCallback } from '@/lib/finance/payouts'
+export async function POST(request:NextRequest){const contentType=request.headers.get('content-type')||'';let payload:Record<string,string>;if(contentType.includes('json')){const raw=await request.json().catch(()=>({})) as Record<string,unknown>;payload=Object.fromEntries(Object.entries(raw).map(([k,v])=>[k,String(v??'')]))}else{const form=await request.formData();payload=Object.fromEntries(Array.from(form.entries()).map(([k,v])=>[k,String(v)]))}const result=await processDuitkuPayoutCallback(payload);if(!result.success)return NextResponse.json({error:result.error},{status:result.status});return NextResponse.json({success:true})}

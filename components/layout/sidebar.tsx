@@ -113,7 +113,14 @@ const ICON_MAP: Record<string, React.ElementType> = {
   IdentificationBadge, Notebook, ChartLine, ShieldCheck, UserCirclePlus,
   PresentationChart, Table, Sun, Bed, UsersThree, IdentificationCard,
   Columns, HandCoins, Cardholder, Wrench, CalendarBlank, ListDashes,
-  Bank, PiggyBank, PlusCircle, MinusCircle, Bookmark, Books, CalendarDots
+  Bank, PiggyBank, PlusCircle, MinusCircle, Bookmark, Books, CalendarDots,
+  // Alias nama icon Lucide yang dipakai oleh modul keuangan baru.
+  Landmark: Bank,
+  ScanLine: IdentificationCard,
+  SendHorizontal: ArrowUpCircle,
+  BadgeDollarSign: Coins,
+  Settings2: Wrench,
+  ReceiptText: FileText,
 };
 
 function getIcon(name: string): React.ElementType {
@@ -132,6 +139,7 @@ const GROUP_ICON: Record<string, React.ElementType> = {
   'Absensi Akademik': CalendarCheck,
   'Absensi': CalendarCheck,
   'Keuangan Pusat': Coins,
+  'Keuangan Terpusat': Bank,
   'Keuangan Santri': Wallet,
   'Keuangan': Coins,
   'Operasional': Wallet,
@@ -417,6 +425,7 @@ const GROUP_ORDER = [
   'Absensi Akademik',
   'Absensi',
   'Keuangan Pusat',
+  'Keuangan Terpusat',
   'Keuangan Santri',
   'Keuangan',
   'Operasional',

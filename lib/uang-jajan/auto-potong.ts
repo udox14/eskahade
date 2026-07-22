@@ -96,6 +96,26 @@ async function runBatch(db: D1Database, statements: Statement[]) {
 
 export async function runUangJajanAutoPotong(db: D1Database, now = new Date(), options: AutoPotongOptions = {}): Promise<AutoPotongResult> {
   const wib = getWibSnapshot(now)
+  let disabledAsramas = new Set<string>()
+  let disableAllLegacyWrites = false
+  try {
+    const legacy = await db.prepare(`SELECT value FROM app_settings WHERE key='finance_legacy_mode'`).first<{ value: string }>()
+    const parsed = JSON.parse(legacy?.value || '{}') as {
+      new_system_enabled?: boolean
+      pilot_asrama?: string | null
+      legacy_new_writes_disabled?: boolean
+      auto_wallet_worker_disabled_cohorts?: string[]
+    }
+    if (parsed.new_system_enabled) {
+      disabledAsramas = new Set([parsed.pilot_asrama, ...(parsed.auto_wallet_worker_disabled_cohorts || [])].filter((value): value is string => Boolean(value)))
+      disableAllLegacyWrites = Boolean(parsed.legacy_new_writes_disabled)
+    }
+  } catch {
+    // Sebelum migration 0120, worker tetap memakai perilaku legacy.
+  }
+  if (disableAllLegacyWrites) {
+    return { date: wib.date, checkedRules: 0, eligibleSantri: 0, skipped: 0, deducted: 0, totalNominal: 0 }
+  }
   const asramaFilter = Array.isArray(options.asrama)
     ? options.asrama.filter(Boolean)
     : options.asrama
@@ -111,7 +131,7 @@ export async function runUangJajanAutoPotong(db: D1Database, now = new Date(), o
     [wib.time, ...asramaFilter]
   )
 
-  const activeSettings = settings.filter(setting => parseDays(setting.days).includes(wib.day))
+  const activeSettings = settings.filter(setting => parseDays(setting.days).includes(wib.day) && !disabledAsramas.has(setting.asrama))
   const activeAsramas = new Set(activeSettings.map(setting => setting.asrama))
 
   if (!activeAsramas.size) {
