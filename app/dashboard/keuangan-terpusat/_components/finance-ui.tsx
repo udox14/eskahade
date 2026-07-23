@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils'
 const financeNav = [
   { href: '/dashboard/keuangan-terpusat', label: 'Ringkasan', icon: Landmark },
   { href: '/dashboard/keuangan-terpusat/loket', label: 'Loket', icon: ScanLine },
-  { href: '/dashboard/keuangan-terpusat/kredensial', label: 'RFID / QR', icon: CreditCard },
+  { href: '/dashboard/keuangan-terpusat/kredensial', label: 'Keredensial', icon: CreditCard },
   { href: '/dashboard/keuangan-terpusat/payout', label: 'Payout', icon: SendHorizontal },
   { href: '/dashboard/keuangan-terpusat/payroll', label: 'Payroll', icon: BadgeDollarSign },
   { href: '/dashboard/keuangan-terpusat/operasi', label: 'Operasi', icon: Settings2 },
