@@ -13,6 +13,7 @@ const VALID_USER_ROLES = [
   'demo',
   'tester',
   'bendahara',
+  'operator_loket',
   'sekpen',
   'keamanan',
   'dewan_santri',

@@ -108,7 +108,8 @@ const ICON_MAP: Record<string, React.ElementType> = {
   IdentificationBadge, Notebook, ChartLine, ShieldCheck, UserCirclePlus,
   PresentationChart, Table, Sun, Bed, UsersThree, IdentificationCard,
   Columns, HandCoins, Cardholder, Wrench, CalendarBlank, ListDashes,
-  Bank, PiggyBank, PlusCircle, MinusCircle, Bookmark, Books
+  Bank, PiggyBank, PlusCircle, MinusCircle, Bookmark, Books,
+  CashRegister: Wallet
 }
 
 function getIcon(name: string): React.ElementType {
@@ -118,6 +119,7 @@ function getIcon(name: string): React.ElementType {
 // ── Deskripsi tiap fitur ──────────────────────────────────────────────────────
 const FITUR_DESC: Record<string, string> = {
   '/dashboard/santri':                               'Lihat dan kelola seluruh data induk santri yang aktif.',
+  '/dashboard/keuangan-terpusat/unit-kas':          'Atur Unit Kas, saldo tetap, penugasan operator, dan review selisih shift.',
   '/dashboard/dewan-santri/sensus':                  'Input dan kelola data sensus penduduk santri per asrama.',
   '/dashboard/dewan-santri/sensus/laporan':          'Cetak laporan hasil sensus penduduk dalam format yang rapi.',
   '/dashboard/santri/input':                         'Input data santri baru beserta identitas awalnya.',
@@ -263,13 +265,13 @@ const THEME_STYLES: Record<string, { shades: string[]; text: string; border: str
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrator', keamanan: 'Petugas Keamanan', sekpen: 'Sekretaris Pendidikan',
-  dewan_santri: 'Dewan Santri', pengurus_asrama: 'Pengurus Asrama',
+  dewan_santri: 'Dewan Santri', pengurus_asrama: 'Pengurus Asrama', operator_loket: 'Operator Loket',
   wali_kelas: 'Wali Kelas', guru: 'Guru', bendahara: 'Bendahara',
 }
 
 const ROLE_EMOJI: Record<string, string> = {
   admin: '🛡️', keamanan: '🔐', sekpen: '📋',
-  dewan_santri: '🏛️', pengurus_asrama: '🏠', wali_kelas: '📚', bendahara: '💰',
+  dewan_santri: '🏛️', pengurus_asrama: '🏠', wali_kelas: '📚', bendahara: '💰', operator_loket: '🏧',
 }
 
 const GROUP_ORDER = [

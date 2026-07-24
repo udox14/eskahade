@@ -19,6 +19,7 @@ function wrangler(args,expectError){
 // migrasi keuangan harus berhasil tanpa satu pun tabel dari DB utama.
 wrangler(['--file','migrations-finance/0001_finance_centralized_core.sql'])
 wrangler(['--file','migrations-finance/0002_credential_fast_enrollment.sql'])
+wrangler(['--file','migrations-finance/0003_cash_unit_operators.sql'])
 
 const positive=wrangler(['--command',`INSERT INTO finance_journals(id,idempotency_key,effective_date,description,source_type,actor_type,status) VALUES('t-j1','t-key-1','2026-08-01','Topup test','TEST','SYSTEM','DRAFT');
 INSERT INTO finance_journal_entries(id,journal_id,account_id,side,amount_rupiah) VALUES('t-e1','t-j1','fa-gateway-clearing','DEBIT',100000),('t-e2','t-j1','fa-guardian-float','CREDIT',100000);

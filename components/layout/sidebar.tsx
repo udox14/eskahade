@@ -121,6 +121,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   BadgeDollarSign: Coins,
   Settings2: Wrench,
   ReceiptText: FileText,
+  CashRegister: Wallet,
 };
 
 function getIcon(name: string): React.ElementType {
@@ -411,6 +412,7 @@ const ROLE_LABEL: Record<string, string> = {
   wali_kelas: 'Wali Kelas',
   guru: 'Guru',
   bendahara: 'Bendahara',
+  operator_loket: 'Operator Loket',
 };
 
 const GROUP_ORDER = [

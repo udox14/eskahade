@@ -3,6 +3,21 @@ import { financeQueryOne } from '@/lib/db'
 
 export type FinancePermission = 'VIEW' | 'CREATE' | 'CHECK' | 'EXECUTE' | 'CONFIGURE' | 'AUDIT'
 
+export async function requireCashierOperator(): Promise<SessionUser> {
+  const session = await getSession()
+  if (!session) throw new Error('Sesi tidak valid.')
+  const roles = getEffectiveRoles(session)
+  if (roles.includes('demo')) throw new Error('Akun demo tidak boleh memproses transaksi keuangan nyata.')
+  if (!roles.includes('operator_loket')) {
+    throw new Error('Akun belum memiliki role Operator Loket.')
+  }
+  return session
+}
+
+export function canConfigureCashUnits(session: SessionUser): boolean {
+  return getEffectiveRoles(session).includes('bendahara')
+}
+
 export async function requireFinanceAccess(permission: FinancePermission): Promise<SessionUser> {
   const session = await getSession()
   if (!session) throw new Error('Sesi tidak valid.')

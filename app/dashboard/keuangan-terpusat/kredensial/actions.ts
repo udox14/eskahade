@@ -53,7 +53,7 @@ export async function searchCredentialStudents(input:{q?:string;asrama?:string;k
   if(status==='MISSING_RFID')rows=rows.filter(row=>!row.rfid_id)
   if(status==='HAS_QR')rows=rows.filter(row=>Boolean(row.qr_id))
   if(status==='HAS_RFID')rows=rows.filter(row=>Boolean(row.rfid_id))
-  const pageSize=Math.max(10,Math.min(100,Number(input.pageSize)||50)),page=Math.max(1,Number(input.page)||1),total=rows.length
+  const pageSize=Math.max(10,Math.min(5000,Number(input.pageSize)||50)),page=Math.max(1,Number(input.page)||1),total=rows.length
   return {rows:rows.slice((page-1)*pageSize,page*pageSize),allSelectable:rows.map(row=>({id:row.id,qr_id:row.qr_id,rfid_id:row.rfid_id})),total,page,pageSize,totalPages:Math.max(1,Math.ceil(total/pageSize))}
 }
 

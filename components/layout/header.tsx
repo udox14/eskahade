@@ -23,6 +23,7 @@ const ROLE_LABEL: Record<string, string> = {
   keamanan: 'Keamanan',
   dewan_santri: 'Dewan Santri',
   bendahara: 'Bendahara',
+  operator_loket: 'Operator Loket',
   sekpen: 'Sekretaris Pendidikan',
 }
 
@@ -34,6 +35,7 @@ const ROLE_COLOR: Record<string, string> = {
   keamanan: 'text-red-600',
   dewan_santri: 'text-violet-600',
   bendahara: 'text-emerald-600',
+  operator_loket: 'text-cyan-600',
   sekpen: 'text-cyan-600',
 }
 

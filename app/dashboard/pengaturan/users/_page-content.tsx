@@ -19,6 +19,7 @@ const ROLES = [
   { value: 'demo', label: 'Akun Demo' }, // sandbox: akses penuh, data dummy
   { value: 'tester', label: 'Tester' },
   { value: 'bendahara', label: 'Bendahara Umum' }, // BARU
+  { value: 'operator_loket', label: 'Operator Loket' },
   { value: 'sekpen', label: 'Sekpen' },
   { value: 'keamanan', label: 'Keamanan' },
   { value: 'dewan_santri', label: 'Dewan Santri' },

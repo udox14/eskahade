@@ -26,7 +26,8 @@ import { cn } from '@/lib/utils'
 const financeNav = [
   { href: '/dashboard/keuangan-terpusat', label: 'Ringkasan', icon: Landmark },
   { href: '/dashboard/keuangan-terpusat/loket', label: 'Loket', icon: ScanLine },
-  { href: '/dashboard/keuangan-terpusat/kredensial', label: 'Keredensial', icon: CreditCard },
+  { href: '/dashboard/keuangan-terpusat/unit-kas', label: 'Unit Kas', icon: WalletCards },
+  { href: '/dashboard/keuangan-terpusat/kredensial', label: 'Kredensial', icon: CreditCard },
   { href: '/dashboard/keuangan-terpusat/payout', label: 'Payout', icon: SendHorizontal },
   { href: '/dashboard/keuangan-terpusat/payroll', label: 'Payroll', icon: BadgeDollarSign },
   { href: '/dashboard/keuangan-terpusat/operasi', label: 'Operasi', icon: Settings2 },
@@ -44,11 +45,15 @@ export function FinancePageHeader({ title, description, eyebrow, meta, action }:
   </div>
 }
 
-export function FinanceNav() {
+export function FinanceNav({ cashierOnly = false, showCashUnits = false }: { cashierOnly?: boolean; showCashUnits?: boolean }) {
   const pathname = usePathname()
   return <nav aria-label="Navigasi keuangan terpusat" className="-mx-4 overflow-x-auto border-b border-slate-200 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
     <div className="flex min-w-max gap-1">
-      {financeNav.map(item => {
+      {financeNav.filter(item => {
+        if (cashierOnly) return item.href === '/dashboard/keuangan-terpusat/loket'
+        if (!showCashUnits && item.href === '/dashboard/keuangan-terpusat/unit-kas') return false
+        return true
+      }).map(item => {
         const active = item.href === '/dashboard/keuangan-terpusat' ? pathname === item.href : pathname.startsWith(item.href)
         return <Link key={item.href} href={item.href} className={cn(
           'flex min-h-11 items-center gap-1.5 border-b-2 px-3 py-3 text-xs font-bold transition-colors sm:min-h-0 sm:py-2.5',

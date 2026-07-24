@@ -58,7 +58,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   ImageIcon, School, Palette, Archive, Utensils, CalendarDays: Calendar, ArrowLeftRight,
-  Flame, ClipboardList, CalendarDots
+  Flame, ClipboardList, CalendarDots, CashRegister: Wallet
 }
 
 function getIcon(name: string): React.ElementType {
@@ -75,6 +75,7 @@ const ALL_ROLES = [
   'wali_kelas',
   'guru',
   'bendahara',
+  'operator_loket',
   'jabatan:anggota',
   'jabatan:ketua',
   'jabatan:sekretaris',
@@ -91,6 +92,7 @@ const ROLE_LABEL: Record<string, string> = {
   wali_kelas:      'Wali Kelas',
   guru:            'Guru',
   bendahara:       'Bendahara',
+  operator_loket:  'Operator Loket',
   'jabatan:anggota':   'Anggota',
   'jabatan:ketua':      'Ketua',
   'jabatan:sekretaris': 'Sekretaris',
@@ -107,6 +109,7 @@ const ROLE_LABEL_FULL: Record<string, string> = {
   wali_kelas:      'Wali Kelas',
   guru:            'Guru',
   bendahara:       'Bendahara',
+  operator_loket:  'Operator Loket',
   'jabatan:anggota':   'Jabatan Anggota',
   'jabatan:ketua':      'Jabatan Ketua',
   'jabatan:sekretaris': 'Jabatan Sekretaris',
@@ -123,6 +126,7 @@ const ROLE_COLOR: Record<string, string> = {
   wali_kelas:      'bg-teal-100 text-teal-700 border-teal-200',
   guru:            'bg-indigo-100 text-indigo-700 border-indigo-200',
   bendahara:       'bg-yellow-100 text-yellow-700 border-yellow-200',
+  operator_loket:  'bg-cyan-100 text-cyan-700 border-cyan-200',
   'jabatan:anggota':   'bg-zinc-100 text-zinc-700 border-zinc-200',
   'jabatan:ketua':      'bg-slate-900 text-white border-slate-900',
   'jabatan:sekretaris': 'bg-sky-100 text-sky-700 border-sky-200',
@@ -139,6 +143,7 @@ const ROLE_BG_SOFT: Record<string, string> = {
   wali_kelas:      'bg-teal-50 border-teal-200',
   guru:            'bg-indigo-50 border-indigo-200',
   bendahara:       'bg-yellow-50 border-yellow-200',
+  operator_loket:  'bg-cyan-50 border-cyan-200',
   'jabatan:anggota':   'bg-zinc-50 border-zinc-200',
   'jabatan:ketua':      'bg-slate-50 border-slate-300',
   'jabatan:sekretaris': 'bg-sky-50 border-sky-200',
@@ -155,6 +160,7 @@ const ROLE_HEADER: Record<string, string> = {
   wali_kelas:      'from-teal-600 to-teal-700',
   guru:            'from-indigo-600 to-indigo-700',
   bendahara:       'from-yellow-500 to-yellow-600',
+  operator_loket:  'from-cyan-600 to-cyan-700',
   'jabatan:anggota':   'from-zinc-500 to-zinc-600',
   'jabatan:ketua':      'from-slate-700 to-slate-900',
   'jabatan:sekretaris': 'from-sky-500 to-sky-600',
