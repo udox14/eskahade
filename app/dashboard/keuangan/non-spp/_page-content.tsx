@@ -107,6 +107,7 @@ function PembayaranTab({ tahunAjaranId, tahunAjaranNama }: { tahunAjaranId: numb
   const [asrama, setAsrama] = useState('SEMUA')
   const [kamar, setKamar] = useState('SEMUA')
   const [search, setSearch] = useState('')
+  const [statusSantri, setStatusSantri] = useState<'SEMUA' | 'BARU' | 'LAMA'>('SEMUA')
   const [rows, setRows] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -118,7 +119,7 @@ function PembayaranTab({ tahunAjaranId, tahunAjaranNama }: { tahunAjaranId: numb
 
   const load = async () => {
     setLoading(true)
-    const data = await getMonitoringNonSpp({ tahunAjaranId, asrama, kamar, search })
+    const data = await getMonitoringNonSpp({ tahunAjaranId, asrama, kamar, search, statusSantri })
     setRows(data)
     setSelected(new Set())
     setPage(1)
@@ -179,8 +180,16 @@ function PembayaranTab({ tahunAjaranId, tahunAjaranNama }: { tahunAjaranId: numb
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_120px_auto] md:items-end">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_140px_100px_auto] md:items-end">
           <FilterInput search={search} setSearch={setSearch} load={load} />
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Status Santri</label>
+            <select value={statusSantri} onChange={(event) => setStatusSantri(event.target.value as any)} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="SEMUA">Semua Status</option>
+              <option value="BARU">Santri Baru</option>
+              <option value="LAMA">Santri Lama</option>
+            </select>
+          </div>
           <div>
             <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Asrama</label>
             <select value={asrama} onChange={(event) => { setAsrama(event.target.value); setKamar('SEMUA') }} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
@@ -247,7 +256,12 @@ function PembayaranTab({ tahunAjaranId, tahunAjaranNama }: { tahunAjaranId: numb
                   <tr className="hover:bg-slate-50">
                     <td className="px-4 py-3"><input type="checkbox" checked={selected.has(row.id)} onChange={() => toggleSelected(row.id)} /></td>
                     <td className="px-4 py-3">
-                      <p className="font-extrabold text-slate-800">{row.nama_lengkap}</p>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="font-extrabold text-slate-800">{row.nama_lengkap}</p>
+                        <span className={`rounded border px-1.5 py-0.5 text-[10px] font-black ${row.status_santri === 'BARU' ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-slate-100 text-slate-600'}`}>
+                          {row.status_santri === 'BARU' ? 'BARU' : 'LAMA'}
+                        </span>
+                      </div>
                       <p className="text-xs text-slate-500">{row.nis || '-'} - {row.asrama || '-'} Kamar {row.kamar || '-'} - Angkatan {row.tahun_masuk_fix}</p>
                       {row.is_legacy_settled && <p className="mt-1 text-[11px] font-bold text-indigo-700">Saldo awal migrasi lunas per {row.legacy_cutoff_tanggal}</p>}
                     </td>

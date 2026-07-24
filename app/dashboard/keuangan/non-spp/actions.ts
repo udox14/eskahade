@@ -4,6 +4,7 @@ import { execute, generateId, now, query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath, revalidateTag } from 'next/cache'
+import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 
 const PATH = '/dashboard/keuangan/non-spp'
 const JENIS_TAHUNAN = ['KESEHATAN', 'EHB', 'EKSKUL'] as const
@@ -299,11 +300,13 @@ async function loadMonitoringRows(filters: {
   asrama: string
   kamar: string
   search: string
+  statusSantri?: string
 }) {
   const cutoffTanggal = await getLegacyCutoffTanggal()
+  const kategoriEfektifSql = getKategoriSantriEfektifSql('s')
   let santriSql = `
     SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.tahun_masuk, s.tanggal_masuk, s.created_at,
-           pf.id AS psb_flow_id
+           pf.id AS psb_flow_id, ${kategoriEfektifSql} AS kategori_efektif
     FROM santri s
     LEFT JOIN psb_flow pf ON pf.santri_id = s.id
     WHERE s.status_global = 'aktif'
@@ -324,7 +327,16 @@ async function loadMonitoringRows(filters: {
   }
   santriSql += ' ORDER BY s.nama_lengkap'
 
-  const santri = await query<SantriRow>(santriSql, santriParams)
+  let santri = await query<SantriRow & { kategori_efektif?: string }>(santriSql, santriParams)
+
+  if (filters.statusSantri && filters.statusSantri !== 'SEMUA') {
+    santri = santri.filter((s) => {
+      const year = effectiveYear(s)
+      const isBaru = s.kategori_efektif === 'BARU' || year === filters.tahunTagihan || !!s.psb_flow_id
+      return filters.statusSantri === 'BARU' ? isBaru : !isBaru
+    })
+  }
+
   const tarifMap = await loadTarifMap(filters.tahunAjaranId)
   const openingRows = await query<OpeningBalanceRow>(`
     SELECT ob.*, u.full_name AS penerima_nama
@@ -370,6 +382,8 @@ async function loadMonitoringRows(filters: {
 
   return santri.map((s) => {
     const tahunMasuk = effectiveYear(s)
+    const isBaru = (s as any).kategori_efektif === 'BARU' || tahunMasuk === filters.tahunTagihan || !!s.psb_flow_id
+    const statusSantri = isBaru ? 'BARU' : 'LAMA'
     const legacySettled = isLegacySettledSantri(s, cutoffTanggal)
     const rows = bySantri.get(s.id) ?? []
     const openingRowsSantri = openingBySantri.get(s.id) ?? []
@@ -408,6 +422,7 @@ async function loadMonitoringRows(filters: {
     return {
       ...s,
       tahun_masuk_fix: tahunMasuk,
+      status_santri: statusSantri,
       is_legacy_settled: legacySettled,
       legacy_cutoff_tanggal: cutoffTanggal,
       opening_balance: opening,
@@ -432,6 +447,7 @@ export async function getMonitoringNonSpp(filters: {
   asrama?: string
   kamar?: string
   search?: string
+  statusSantri?: string
 }) {
   const tahunAjaran = await queryOne<TahunAjaran>('SELECT id, nama, is_active FROM tahun_ajaran WHERE id = ?', [filters.tahunAjaranId])
   const tahunTagihan = inferTahunTagihan(tahunAjaran)
@@ -441,6 +457,7 @@ export async function getMonitoringNonSpp(filters: {
     asrama: filters.asrama || 'SEMUA',
     kamar: filters.kamar || 'SEMUA',
     search: filters.search || '',
+    statusSantri: filters.statusSantri || 'SEMUA',
   })
 }
 
