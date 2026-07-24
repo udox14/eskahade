@@ -85,7 +85,8 @@ async function ensureFiturAksesReady() {
       ('Master Data', 'Manajemen Fitur', '/dashboard/pengaturan/fitur-akses', 'ToggleRight', '["admin"]', 1, 8),
       ('Master Data', 'Tim & Kepengurusan', '/dashboard/pengaturan/kepanitiaan', 'Users', '["admin"]', 1, 9),
       ('Master Data', 'Master Hafalan', '/dashboard/master/hafalan', 'Database', '["admin"]', 1, 11),
-      ('Akademik', 'Kalender Pendidikan', '/dashboard/akademik/kalender-pendidikan', 'CalendarDots', '["admin"]', 1, 10)
+      ('Akademik', 'Kalender Pendidikan', '/dashboard/akademik/kalender-pendidikan', 'CalendarDots', '["admin"]', 1, 10),
+      ('UPK', 'Cetak', '/dashboard/akademik/upk/cetak', 'Printer', '["admin","sekpen","panitia_upk"]', 1, 8)
   `)
 
   // Catatan: Seed awal diisi lewat migrasi database. Programmatic UPDATE dihapus agar kustomisasi admin tidak tertimpa saat startup.

@@ -17,6 +17,7 @@ import {
   simpanPengaturanTampilanKatalog,
   simpanTokoUPK,
 } from './actions'
+import Link from 'next/link'
 import {
   BookOpen,
   CheckCircle,
@@ -28,6 +29,7 @@ import {
   Loader2,
   PackagePlus,
   Plus,
+  Printer,
   RefreshCw,
   Search,
   Settings2,
@@ -1316,7 +1318,14 @@ function DaftarKitabMarhalah({
 
   return (
     <section className="mx-auto w-full max-w-2xl" aria-label="Daftar kitab per marhalah">
-      <div className="mb-4 flex justify-center sm:justify-end">
+      <div className="mb-4 flex flex-wrap items-center justify-center sm:justify-end gap-2">
+        <Link
+          href="/dashboard/akademik/upk/cetak"
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-extrabold text-slate-700 shadow-sm transition hover:bg-slate-50"
+        >
+          <Printer className="h-4 w-4 text-emerald-600" />
+          Modul Cetak UPK
+        </Link>
         <PriceListExportButton marhalah={marhalah} />
       </div>
       <div className="mb-3 flex items-center justify-between gap-3">
