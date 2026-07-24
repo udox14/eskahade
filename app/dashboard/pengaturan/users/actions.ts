@@ -121,11 +121,15 @@ function normalizeUserRoles(roles: unknown[]) {
     .filter(role => VALID_USER_ROLES.includes(role))))
 }
 
+let isUserManagementColumnsEnsured = false
+
 async function ensureUserSourceColumns() {
   await ensureUserManagementColumns()
 }
 
 async function ensureUserManagementColumns() {
+  if (isUserManagementColumnsEnsured) return
+
   try {
     await execute('ALTER TABLE users ADD COLUMN source_type TEXT')
   } catch (error: any) {
@@ -169,6 +173,8 @@ async function ensureUserManagementColumns() {
       }
     }
   }
+
+  isUserManagementColumnsEnsured = true
 }
 
 async function getSourceProfile(sourceType: UserSourceType, sourceRefId: string) {
@@ -505,70 +511,74 @@ export async function setUserPsbAkses(id: string, field: string, granted: boolea
 export async function getUserCreationCandidates(): Promise<UserCreationCandidate[]> {
   await ensureUserSourceColumns()
 
-  const guruRows = await query<{ id: number; nama_lengkap: string }>(
-    'SELECT id, nama_lengkap FROM data_guru ORDER BY nama_lengkap ASC'
-  )
+  const [guruRows, sadesaRows, userRows] = await Promise.all([
+    query<{ id: number; nama_lengkap: string }>(
+      'SELECT id, nama_lengkap FROM data_guru ORDER BY nama_lengkap ASC'
+    ),
+    query<{
+      id: string
+      nama_lengkap: string
+      asrama: string | null
+      kamar: string | null
+    }>(
+      `SELECT id, nama_lengkap, asrama, kamar
+       FROM santri
+       WHERE status_global = 'aktif'
+         AND kategori_santri = 'SADESA'
+       ORDER BY nama_lengkap ASC`
+    ),
+    query<{
+      source_type: string | null
+      source_ref_id: string | null
+      email: string | null
+    }>('SELECT source_type, source_ref_id, email FROM users'),
+  ])
 
-  const sadesaRows = await query<{
-    id: string
-    nama_lengkap: string
-    asrama: string | null
-    kamar: string | null
-  }>(
-    `SELECT id, nama_lengkap, asrama, kamar
-     FROM santri
-     WHERE status_global = 'aktif'
-       AND kategori_santri = 'SADESA'
-     ORDER BY nama_lengkap ASC`
-  )
+  const existingSources = new Set<string>()
+  const existingEmails = new Set<string>()
 
-  const guruCandidates = await Promise.all(
-    guruRows.map(async (row) => {
-      const email = generateEmail(row.nama_lengkap)
-      const existing = await queryOne<{ id: string }>(
-        `SELECT id
-         FROM users
-         WHERE (source_type = 'guru' AND source_ref_id = ?)
-            OR lower(trim(email)) = lower(trim(?))
-         LIMIT 1`,
-        [String(row.id), email]
-      )
+  for (const u of userRows) {
+    if (u.source_type && u.source_ref_id) {
+      existingSources.add(`${u.source_type}:${u.source_ref_id}`)
+    }
+    if (u.email) {
+      existingEmails.add(u.email.toLowerCase().trim())
+    }
+  }
 
-      return {
-        source_type: 'guru' as const,
-        source_ref_id: String(row.id),
-        label: row.nama_lengkap,
-        full_name: row.nama_lengkap,
-        email,
-        meta: 'Data Guru',
-        has_account: Boolean(existing),
-      }
-    })
-  )
+  const guruCandidates: UserCreationCandidate[] = guruRows.map((row) => {
+    const email = generateEmail(row.nama_lengkap)
+    const hasAccount =
+      existingSources.has(`guru:${row.id}`) ||
+      (email ? existingEmails.has(email.toLowerCase().trim()) : false)
 
-  const sadesaCandidates = await Promise.all(
-    sadesaRows.map(async (row) => {
-      const email = generateEmail(row.nama_lengkap)
-      const existing = await queryOne<{ id: string }>(
-        `SELECT id
-         FROM users
-         WHERE (source_type = 'sadesa' AND source_ref_id = ?)
-            OR lower(trim(email)) = lower(trim(?))
-         LIMIT 1`,
-        [row.id, email]
-      )
+    return {
+      source_type: 'guru' as const,
+      source_ref_id: String(row.id),
+      label: row.nama_lengkap,
+      full_name: row.nama_lengkap,
+      email,
+      meta: 'Data Guru',
+      has_account: hasAccount,
+    }
+  })
 
-      return {
-        source_type: 'sadesa' as const,
-        source_ref_id: row.id,
-        label: row.nama_lengkap,
-        full_name: row.nama_lengkap,
-        email,
-        meta: [row.asrama, row.kamar].filter(Boolean).join(' • ') || 'Santri SADESA',
-        has_account: Boolean(existing),
-      }
-    })
-  )
+  const sadesaCandidates: UserCreationCandidate[] = sadesaRows.map((row) => {
+    const email = generateEmail(row.nama_lengkap)
+    const hasAccount =
+      existingSources.has(`sadesa:${row.id}`) ||
+      (email ? existingEmails.has(email.toLowerCase().trim()) : false)
+
+    return {
+      source_type: 'sadesa' as const,
+      source_ref_id: row.id,
+      label: row.nama_lengkap,
+      full_name: row.nama_lengkap,
+      email,
+      meta: [row.asrama, row.kamar].filter(Boolean).join(' • ') || 'Santri SADESA',
+      has_account: hasAccount,
+    }
+  })
 
   return [...guruCandidates, ...sadesaCandidates]
 }
