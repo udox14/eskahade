@@ -331,8 +331,7 @@ async function loadMonitoringRows(filters: {
 
   if (filters.statusSantri && filters.statusSantri !== 'SEMUA') {
     santri = santri.filter((s) => {
-      const year = effectiveYear(s)
-      const isBaru = s.kategori_efektif === 'BARU' || year === filters.tahunTagihan || !!s.psb_flow_id
+      const isBaru = s.kategori_efektif === 'BARU'
       return filters.statusSantri === 'BARU' ? isBaru : !isBaru
     })
   }
@@ -382,7 +381,7 @@ async function loadMonitoringRows(filters: {
 
   return santri.map((s) => {
     const tahunMasuk = effectiveYear(s)
-    const isBaru = (s as any).kategori_efektif === 'BARU' || tahunMasuk === filters.tahunTagihan || !!s.psb_flow_id
+    const isBaru = (s as any).kategori_efektif === 'BARU'
     const statusSantri = isBaru ? 'BARU' : 'LAMA'
     const legacySettled = isLegacySettledSantri(s, cutoffTanggal)
     const rows = bySantri.get(s.id) ?? []
