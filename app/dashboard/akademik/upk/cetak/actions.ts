@@ -32,6 +32,15 @@ export type RekapTidakTerjualItem = {
   nilai_asset_jual: number  // stok_total * harga_jual
 }
 
+async function hasColumn(table: string, column: string): Promise<boolean> {
+  try {
+    const cols = await query<{ name: string }>(`PRAGMA table_info(${table})`)
+    return cols.some(c => c.name === column)
+  } catch {
+    return false
+  }
+}
+
 export async function ensureFiturAksesCetakUPK() {
   try {
     await execute(`
@@ -51,8 +60,15 @@ export async function getRekapKitabTerjualData(filters?: {
 }): Promise<RekapTerjualItem[]> {
   await ensureFiturAksesCetakUPK()
 
+  const hasJenisTransaksi = await hasColumn('upk_antrian', 'jenis_transaksi')
+  const hasPrioritasStok = await hasColumn('upk_katalog', 'prioritas_stok')
+
   const params: unknown[] = []
-  const conditions: string[] = ["a.status = 'SELESAI'", "COALESCE(a.jenis_transaksi, 'PENJUALAN') = 'PENJUALAN'"]
+  const conditions: string[] = ["a.status = 'SELESAI'"]
+
+  if (hasJenisTransaksi) {
+    conditions.push("COALESCE(a.jenis_transaksi, 'PENJUALAN') = 'PENJUALAN'")
+  }
 
   if (filters?.unit) {
     conditions.push('a.unit = ?')
@@ -68,41 +84,94 @@ export async function getRekapKitabTerjualData(filters?: {
   }
 
   const isStokBaru = filters?.tipeStok === 'BARU'
-  const qtyColumn = isStokBaru ? 'sm.qty_baru' : 'sm.qty_lama'
+  const qtyColumn = isStokBaru ? 'qty_baru' : 'qty_lama'
 
-  // Query SQL valid (tanpa ai.harga_modal yang tidak ada di schema)
-  const rows = await query<{
+  // 1. Coba ambil dari upk_stok_mutasi (penelusuran presisi stok baru vs lama)
+  let rows: {
     katalog_id: number | null
     nama_kitab: string
     toko_nama: string | null
     harga_beli: number
     harga_jual: number
     qty_terjual: number
-  }>(`
-    WITH mutasi_terfilter AS (
+  }[] = []
+
+  try {
+    rows = await query<{
+      katalog_id: number | null
+      nama_kitab: string
+      toko_nama: string | null
+      harga_beli: number
+      harga_jual: number
+      qty_terjual: number
+    }>(`
+      WITH mutasi_terfilter AS (
+        SELECT
+          sm.katalog_id,
+          ai.nama_kitab AS alt_nama_kitab,
+          ai.harga_jual AS alt_harga_jual,
+          SUM(sm.${qtyColumn}) AS total_qty
+        FROM upk_stok_mutasi sm
+        JOIN upk_antrian a ON a.id = sm.antrian_id
+        LEFT JOIN upk_antrian_item ai ON ai.id = sm.antrian_item_id
+        WHERE ${conditions.join(' AND ')} AND sm.${qtyColumn} > 0
+        GROUP BY sm.katalog_id, ai.nama_kitab, ai.harga_jual
+      )
       SELECT
-        sm.katalog_id,
-        ai.nama_kitab AS alt_nama_kitab,
-        ai.harga_jual AS alt_harga_jual,
-        SUM(sm.${qtyColumn}) AS total_qty
-      FROM upk_stok_mutasi sm
-      JOIN upk_antrian a ON a.id = sm.antrian_id
-      LEFT JOIN upk_antrian_item ai ON ai.id = sm.antrian_item_id
-      WHERE ${conditions.join(' AND ')} AND sm.${qtyColumn} > 0
-      GROUP BY sm.katalog_id, ai.nama_kitab, ai.harga_jual
-    )
-    SELECT
-      mf.katalog_id,
-      COALESCE(uk.nama_kitab, mf.alt_nama_kitab) AS nama_kitab,
-      t.nama AS toko_nama,
-      COALESCE(uk.harga_beli, 0) AS harga_beli,
-      COALESCE(uk.harga_jual, mf.alt_harga_jual, 0) AS harga_jual,
-      mf.total_qty AS qty_terjual
-    FROM mutasi_terfilter mf
-    LEFT JOIN upk_katalog uk ON uk.id = mf.katalog_id
-    LEFT JOIN upk_toko t ON t.id = uk.toko_id
-    WHERE mf.total_qty > 0
-  `, params)
+        mf.katalog_id,
+        COALESCE(uk.nama_kitab, mf.alt_nama_kitab) AS nama_kitab,
+        t.nama AS toko_nama,
+        COALESCE(uk.harga_beli, 0) AS harga_beli,
+        COALESCE(uk.harga_jual, mf.alt_harga_jual, 0) AS harga_jual,
+        mf.total_qty AS qty_terjual
+      FROM mutasi_terfilter mf
+      LEFT JOIN upk_katalog uk ON uk.id = mf.katalog_id
+      LEFT JOIN upk_toko t ON t.id = uk.toko_id
+      WHERE mf.total_qty > 0
+    `, params)
+  } catch (err) {
+    console.warn('[Cetak UPK] Query stok mutasi tidak menghasilkan data atau gagal, menggunakan fallback antrian_item:', err)
+  }
+
+  // 2. Fallback: jika stok mutasi belum pernah terisi di DB, ambil dari upk_antrian_item langsung
+  if (!rows || rows.length === 0) {
+    const fallbackConditions = [...conditions]
+    if (hasPrioritasStok) {
+      if (isStokBaru) {
+        fallbackConditions.push("uk.prioritas_stok = 'BARU'")
+      } else {
+        fallbackConditions.push("COALESCE(uk.prioritas_stok, 'LAMA') <> 'BARU'")
+      }
+    }
+
+    try {
+      rows = await query<{
+        katalog_id: number | null
+        nama_kitab: string
+        toko_nama: string | null
+        harga_beli: number
+        harga_jual: number
+        qty_terjual: number
+      }>(`
+        SELECT
+          ai.katalog_id,
+          COALESCE(uk.nama_kitab, ai.nama_kitab) AS nama_kitab,
+          t.nama AS toko_nama,
+          COALESCE(uk.harga_beli, 0) AS harga_beli,
+          COALESCE(uk.harga_jual, ai.harga_jual, 0) AS harga_jual,
+          SUM(ai.qty) AS qty_terjual
+        FROM upk_antrian a
+        JOIN upk_antrian_item ai ON ai.antrian_id = a.id
+        LEFT JOIN upk_katalog uk ON uk.id = ai.katalog_id
+        LEFT JOIN upk_toko t ON t.id = uk.toko_id
+        WHERE ${fallbackConditions.join(' AND ')} AND ai.qty > 0
+        GROUP BY ai.katalog_id, ai.nama_kitab, ai.harga_jual
+      `, params)
+    } catch (err) {
+      console.error('[Cetak UPK] Fallback query antrian_item gagal:', err)
+      rows = []
+    }
+  }
 
   // Agregasi di JS berdasarkan nama_kitab agar tidak ada baris ganda
   const mapByName = new Map<string, RekapTerjualItem>()
@@ -160,7 +229,7 @@ export async function getRekapKitabTidakTerjualData(filters?: {
     params.push(filters.marhalahId)
   }
 
-  const rows = await query<{
+  let rows: {
     katalog_id: number
     nama_kitab: string
     toko_nama: string | null
@@ -168,20 +237,35 @@ export async function getRekapKitabTidakTerjualData(filters?: {
     stok_baru: number
     harga_beli: number
     harga_jual: number
-  }>(`
-    SELECT
-      uk.id AS katalog_id,
-      uk.nama_kitab,
-      t.nama AS toko_nama,
-      uk.stok_lama,
-      uk.stok_baru,
-      uk.harga_beli,
-      uk.harga_jual
-    FROM upk_katalog uk
-    LEFT JOIN upk_toko t ON t.id = uk.toko_id
-    ${joinKm}
-    WHERE ${conditions.join(' AND ')}
-  `, params)
+  }[] = []
+
+  try {
+    rows = await query<{
+      katalog_id: number
+      nama_kitab: string
+      toko_nama: string | null
+      stok_lama: number
+      stok_baru: number
+      harga_beli: number
+      harga_jual: number
+    }>(`
+      SELECT
+        uk.id AS katalog_id,
+        uk.nama_kitab,
+        t.nama AS toko_nama,
+        uk.stok_lama,
+        uk.stok_baru,
+        uk.harga_beli,
+        uk.harga_jual
+      FROM upk_katalog uk
+      LEFT JOIN upk_toko t ON t.id = uk.toko_id
+      ${joinKm}
+      WHERE ${conditions.join(' AND ')}
+    `, params)
+  } catch (err) {
+    console.error('[Cetak UPK] Gagal query rekap kitab tidak terjual:', err)
+    return []
+  }
 
   // Agregasi di JS berdasarkan nama_kitab agar tidak ada baris ganda
   const mapByName = new Map<string, RekapTidakTerjualItem>()
