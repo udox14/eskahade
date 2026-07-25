@@ -49,7 +49,10 @@ function normalizeKategori(value: unknown): KategoriPemasukan {
   return 'SETORAN_PENJUALAN'
 }
 
-export async function getRingkasanPenjualanUPK(tanggal = today()) {
+export async function getRingkasanPenjualanUPK(tanggalDari = today(), tanggalSampai = tanggalDari) {
+  const dari = tanggalDari || today()
+  const sampai = tanggalSampai || dari
+
   const row = await queryOne<PenjualanRow>(`
     SELECT
       COUNT(*) AS total_transaksi,
@@ -58,8 +61,8 @@ export async function getRingkasanPenjualanUPK(tanggal = today()) {
       COALESCE(SUM(sisa_tunggakan), 0) AS total_tunggakan,
       COALESCE(SUM(sisa_kembalian), 0) AS total_kembalian_ditahan
     FROM upk_antrian
-    WHERE tanggal = ? AND status = 'SELESAI' AND COALESCE(jenis_transaksi, 'PENJUALAN') = 'PENJUALAN'
-  `, [tanggal])
+    WHERE tanggal >= ? AND tanggal <= ? AND status = 'SELESAI' AND COALESCE(jenis_transaksi, 'PENJUALAN') = 'PENJUALAN'
+  `, [dari, sampai])
 
   const pemasukan = await queryOne<{
     total_setoran: number
@@ -71,14 +74,16 @@ export async function getRingkasanPenjualanUPK(tanggal = today()) {
       COALESCE(SUM(CASE WHEN kategori = 'PINJAMAN_MODAL' THEN nominal ELSE 0 END), 0) AS total_pinjaman,
       COALESCE(SUM(CASE WHEN kategori = 'LAINNYA' THEN nominal ELSE 0 END), 0) AS total_lainnya
     FROM upk_pemasukan
-    WHERE tanggal = ?
-  `, [tanggal])
+    WHERE tanggal >= ? AND tanggal <= ?
+  `, [dari, sampai])
 
   const penjualanSeharusnya = toInt(row?.total_bayar)
   const totalSetoran = toInt(pemasukan?.total_setoran)
 
   return {
-    tanggal,
+    tanggal: dari === sampai ? dari : `${dari} s.d ${sampai}`,
+    tanggalDari: dari,
+    tanggalSampai: sampai,
     total_transaksi: toInt(row?.total_transaksi),
     total_tagihan: toInt(row?.total_tagihan),
     total_bayar: penjualanSeharusnya,
@@ -92,14 +97,23 @@ export async function getRingkasanPenjualanUPK(tanggal = today()) {
   }
 }
 
-export async function getPemasukanUPK(tanggal = today()) {
+export async function getPemasukanUPK(tanggalDari = today(), tanggalSampai = tanggalDari, kategori?: string) {
+  const dari = tanggalDari || today()
+  const sampai = tanggalSampai || dari
+  const params: unknown[] = [dari, sampai]
+  let katClause = ''
+  if (kategori && kategori !== 'SEMUA') {
+    katClause = ' AND p.kategori = ?'
+    params.push(kategori)
+  }
+
   return query<PemasukanRow>(`
     SELECT p.*, u.full_name AS user_name
     FROM upk_pemasukan p
     LEFT JOIN users u ON u.id = p.created_by
-    WHERE p.tanggal = ?
-    ORDER BY p.waktu_catat DESC, p.created_at DESC
-  `, [tanggal])
+    WHERE p.tanggal >= ? AND p.tanggal <= ?${katClause}
+    ORDER BY p.tanggal DESC, p.waktu_catat DESC, p.created_at DESC
+  `, params)
 }
 
 export async function simpanPemasukanUPK(payload: PemasukanPayload): Promise<{ success: true } | { error: string }> {

@@ -1,20 +1,26 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   ShoppingBag,
   PackageCheck,
   Boxes,
   FileSpreadsheet,
-  Printer,
+  Wallet,
+  CreditCard,
 } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { RekapTerjualView } from './_view-rekap-terjual'
 import { RekapTidakTerjualView } from './_view-rekap-tidak-terjual'
 import { DaftarHargaView } from './_view-daftar-harga'
+import { RekapPemasukanView } from './_view-rekap-pemasukan'
+import { RekapPengeluaranView } from './_view-rekap-pengeluaran'
 
 type View =
   | 'menu'
+  | 'rekap-pemasukan'
+  | 'rekap-pengeluaran'
   | 'rekap-terjual-baru'
   | 'rekap-terjual-lama'
   | 'rekap-tidak-terjual'
@@ -27,6 +33,20 @@ const MENU_ITEMS: {
   icon: React.ElementType
   badge?: string
 }[] = [
+  {
+    view: 'rekap-pemasukan',
+    label: 'Laporan Pemasukan UPK',
+    desc: 'Dokumen rekapitulasi setoran kasir, pinjaman modal, dan kas masuk UPK.',
+    icon: Wallet,
+    badge: 'Baru',
+  },
+  {
+    view: 'rekap-pengeluaran',
+    label: 'Laporan Pengeluaran UPK',
+    desc: 'Dokumen rekapitulasi kas keluar, operasional, hutang toko, dan royalti.',
+    icon: CreditCard,
+    badge: 'Baru',
+  },
   {
     view: 'rekap-terjual-baru',
     label: 'Rekap Kitab Terjual (Stok Baru)',
@@ -56,7 +76,34 @@ const MENU_ITEMS: {
 ]
 
 export default function CetakUpkPageContent() {
-  const [view, setView] = useState<View>('menu')
+  const searchParams = useSearchParams()
+  const initialTab = searchParams.get('tab') as View | null
+  const [view, setView] = useState<View>(
+    initialTab && MENU_ITEMS.some(i => i.view === initialTab) ? initialTab : 'menu'
+  )
+
+  useEffect(() => {
+    const tab = searchParams.get('tab') as View | null
+    if (tab && MENU_ITEMS.some(i => i.view === tab)) {
+      setView(tab)
+    }
+  }, [searchParams])
+
+  if (view === 'rekap-pemasukan') {
+    return (
+      <div className="max-w-7xl mx-auto pb-20 space-y-6">
+        <RekapPemasukanView onBack={() => setView('menu')} />
+      </div>
+    )
+  }
+
+  if (view === 'rekap-pengeluaran') {
+    return (
+      <div className="max-w-7xl mx-auto pb-20 space-y-6">
+        <RekapPengeluaranView onBack={() => setView('menu')} />
+      </div>
+    )
+  }
 
   if (view === 'rekap-terjual-baru') {
     return (
@@ -131,3 +178,4 @@ export default function CetakUpkPageContent() {
     </div>
   )
 }
+

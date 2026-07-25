@@ -307,4 +307,102 @@ export async function getRekapKitabTidakTerjualData(filters?: {
     .sort((a, b) => a.nama_kitab.localeCompare(b.nama_kitab, 'id'))
 }
 
+export type RekapPemasukanItem = {
+  id: string
+  tanggal: string
+  waktu_catat: string
+  kategori: string
+  sumber: string | null
+  nominal: number
+  penjualan_seharusnya: number
+  selisih: number
+  catatan: string | null
+  user_name: string | null
+}
+
+export type RekapPengeluaranItem = {
+  id: string
+  tanggal: string
+  waktu_catat: string
+  kategori: string
+  penerima: string | null
+  nominal: number
+  belanja_id: string | null
+  katalog_id: number | null
+  nama_kitab: string | null
+  catatan: string | null
+  user_name: string | null
+}
+
+export async function getRekapPemasukanData(filters?: {
+  tanggalDari?: string
+  tanggalSampai?: string
+  kategori?: string
+}): Promise<RekapPemasukanItem[]> {
+  await ensureFiturAksesCetakUPK()
+
+  const params: unknown[] = []
+  const conditions: string[] = []
+
+  if (filters?.tanggalDari) {
+    conditions.push('p.tanggal >= ?')
+    params.push(filters.tanggalDari)
+  }
+  if (filters?.tanggalSampai) {
+    conditions.push('p.tanggal <= ?')
+    params.push(filters.tanggalSampai)
+  }
+  if (filters?.kategori && filters.kategori !== 'SEMUA') {
+    conditions.push('p.kategori = ?')
+    params.push(filters.kategori)
+  }
+
+  const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+
+  return query<RekapPemasukanItem>(`
+    SELECT p.id, p.tanggal, p.waktu_catat, p.kategori, p.sumber, p.nominal,
+           p.penjualan_seharusnya, p.selisih, p.catatan, u.full_name AS user_name
+    FROM upk_pemasukan p
+    LEFT JOIN users u ON u.id = p.created_by
+    ${whereSql}
+    ORDER BY p.tanggal DESC, p.waktu_catat DESC
+  `, params)
+}
+
+export async function getRekapPengeluaranData(filters?: {
+  tanggalDari?: string
+  tanggalSampai?: string
+  kategori?: string
+}): Promise<RekapPengeluaranItem[]> {
+  await ensureFiturAksesCetakUPK()
+
+  const params: unknown[] = []
+  const conditions: string[] = []
+
+  if (filters?.tanggalDari) {
+    conditions.push('p.tanggal >= ?')
+    params.push(filters.tanggalDari)
+  }
+  if (filters?.tanggalSampai) {
+    conditions.push('p.tanggal <= ?')
+    params.push(filters.tanggalSampai)
+  }
+  if (filters?.kategori && filters.kategori !== 'SEMUA') {
+    conditions.push('p.kategori = ?')
+    params.push(filters.kategori)
+  }
+
+  const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+
+  return query<RekapPengeluaranItem>(`
+    SELECT p.id, p.tanggal, p.waktu_catat, p.kategori, p.penerima, p.nominal,
+           p.belanja_id, p.katalog_id, p.nama_kitab, p.catatan, u.full_name AS user_name
+    FROM upk_pengeluaran p
+    LEFT JOIN users u ON u.id = p.created_by
+    ${whereSql}
+    ORDER BY p.tanggal DESC, p.waktu_catat DESC
+  `, params)
+}
+
 export { getDaftarKitabPerMarhalah }
+

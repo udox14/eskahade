@@ -99,7 +99,10 @@ async function ubahPembayaranHutangBelanja(belanjaId: string, delta: number): Pr
   return { success: true }
 }
 
-export async function getRingkasanPengeluaranUPK(tanggal = today()) {
+export async function getRingkasanPengeluaranUPK(tanggalDari = today(), tanggalSampai = tanggalDari) {
+  const dari = tanggalDari || today()
+  const sampai = tanggalSampai || dari
+
   const harian = await queryOne<{
     total: number
     konsumsi: number
@@ -118,8 +121,8 @@ export async function getRingkasanPengeluaranUPK(tanggal = today()) {
       COALESCE(SUM(CASE WHEN kategori = 'ROYALTI_PENULIS' THEN nominal ELSE 0 END), 0) AS royalti,
       COALESCE(SUM(CASE WHEN kategori = 'KITAB_GRATIS' THEN nominal ELSE 0 END), 0) AS kitab_gratis
     FROM upk_pengeluaran
-    WHERE tanggal = ?
-  `, [tanggal])
+    WHERE tanggal >= ? AND tanggal <= ?
+  `, [dari, sampai])
 
   const hutangToko = await queryOne<{ total: number }>(
     'SELECT COALESCE(SUM(sisa_hutang), 0) AS total FROM upk_belanja WHERE sisa_hutang > 0',
@@ -134,7 +137,9 @@ export async function getRingkasanPengeluaranUPK(tanggal = today()) {
   `, [])
 
   return {
-    tanggal,
+    tanggal: dari === sampai ? dari : `${dari} s.d ${sampai}`,
+    tanggalDari: dari,
+    tanggalSampai: sampai,
     total: toInt(harian?.total),
     konsumsi: toInt(harian?.konsumsi),
     transport: toInt(harian?.transport),
@@ -147,14 +152,23 @@ export async function getRingkasanPengeluaranUPK(tanggal = today()) {
   }
 }
 
-export async function getPengeluaranUPK(tanggal = today()) {
+export async function getPengeluaranUPK(tanggalDari = today(), tanggalSampai = tanggalDari, kategori?: string) {
+  const dari = tanggalDari || today()
+  const sampai = tanggalSampai || dari
+  const params: unknown[] = [dari, sampai]
+  let katClause = ''
+  if (kategori && kategori !== 'SEMUA') {
+    katClause = ' AND p.kategori = ?'
+    params.push(kategori)
+  }
+
   return query<PengeluaranRow>(`
     SELECT p.*, u.full_name AS user_name
     FROM upk_pengeluaran p
     LEFT JOIN users u ON u.id = p.created_by
-    WHERE p.tanggal = ?
-    ORDER BY p.waktu_catat DESC, p.created_at DESC
-  `, [tanggal])
+    WHERE p.tanggal >= ? AND p.tanggal <= ?${katClause}
+    ORDER BY p.tanggal DESC, p.waktu_catat DESC, p.created_at DESC
+  `, params)
 }
 
 export async function getHutangTokoOptions() {

@@ -2,6 +2,7 @@
 
 import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import {
   Banknote,
   CalendarDays,
@@ -10,6 +11,7 @@ import {
   HandCoins,
   Loader2,
   Plus,
+  Printer,
   RefreshCw,
   Trash2,
   Wallet,
@@ -57,6 +59,7 @@ type PemasukanItem = {
 
 type FormState = {
   id: string
+  tanggal: string
   kategori: KategoriPemasukan
   sumber: string
   nominal: string
@@ -64,19 +67,19 @@ type FormState = {
   catatan: string
 }
 
+function todayInput() {
+  return new Date().toISOString().slice(0, 10)
+}
+
 const emptyForm: FormState = {
   id: '',
+  tanggal: todayInput(),
   kategori: 'SETORAN_PENJUALAN',
   sumber: '',
   nominal: '0',
   penjualanSeharusnya: '0',
   catatan: '',
 }
-
-function todayInput() {
-  return new Date().toISOString().slice(0, 10)
-}
-
 
 function kategoriLabel(kategori: KategoriPemasukan) {
   if (kategori === 'PINJAMAN_MODAL') return 'Pinjaman Modal'
@@ -86,7 +89,8 @@ function kategoriLabel(kategori: KategoriPemasukan) {
 
 export default function PemasukanUPKPage() {
   const confirm = useConfirm()
-  const [tanggal, setTanggal] = useState(todayInput())
+  const [tanggalDari, setTanggalDari] = useState(todayInput())
+  const [tanggalSampai, setTanggalSampai] = useState(todayInput())
   const [ringkasan, setRingkasan] = useState<Ringkasan | null>(null)
   const [pemasukan, setPemasukan] = useState<PemasukanItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -101,20 +105,20 @@ export default function PemasukanUPKPage() {
     await Promise.resolve()
     setLoading(true)
     const [summary, rows] = await Promise.all([
-      getRingkasanPenjualanUPK(tanggal),
-      getPemasukanUPK(tanggal),
+      getRingkasanPenjualanUPK(tanggalDari, tanggalSampai),
+      getPemasukanUPK(tanggalDari, tanggalSampai),
     ])
     setRingkasan(summary)
     setPemasukan(rows)
     setLoading(false)
-  }, [tanggal])
+  }, [tanggalDari, tanggalSampai])
 
   useEffect(() => {
     let ignore = false
     async function run() {
       const [summary, rows] = await Promise.all([
-        getRingkasanPenjualanUPK(tanggal),
-        getPemasukanUPK(tanggal),
+        getRingkasanPenjualanUPK(tanggalDari, tanggalSampai),
+        getPemasukanUPK(tanggalDari, tanggalSampai),
       ])
       if (ignore) return
       setRingkasan(summary)
@@ -125,7 +129,7 @@ export default function PemasukanUPKPage() {
     return () => {
       ignore = true
     }
-  }, [tanggal])
+  }, [tanggalDari, tanggalSampai])
 
   const setField = (key: keyof FormState, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -134,6 +138,7 @@ export default function PemasukanUPKPage() {
   const openTambah = (kategori: KategoriPemasukan = 'SETORAN_PENJUALAN') => {
     setForm({
       ...emptyForm,
+      tanggal: tanggalDari || todayInput(),
       kategori,
       penjualanSeharusnya: kategori === 'SETORAN_PENJUALAN' ? String(ringkasan?.total_bayar ?? 0) : '0',
     })
@@ -143,6 +148,7 @@ export default function PemasukanUPKPage() {
   const handleEdit = (item: PemasukanItem) => {
     setForm({
       id: item.id,
+      tanggal: item.tanggal || todayInput(),
       kategori: item.kategori,
       sumber: item.sumber ?? '',
       nominal: String(item.nominal ?? 0),
@@ -157,7 +163,7 @@ export default function PemasukanUPKPage() {
     setSaving(true)
     const result = await simpanPemasukanUPK({
       id: form.id || undefined,
-      tanggal,
+      tanggal: form.tanggal || todayInput(),
       kategori: form.kategori,
       sumber: form.sumber,
       nominal: toInt(form.nominal),
@@ -199,21 +205,37 @@ export default function PemasukanUPKPage() {
         description="Catatan uang fisik, setoran harian, dan pinjaman modal UPK."
         className="border-b pb-4"
         action={(
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative">
-              <CalendarDays className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="date"
-                value={tanggal}
-                onChange={e => setTanggal(e.target.value)}
-                className="pl-9 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm font-bold bg-white"
-              />
+          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2 py-1">
+              <CalendarDays className="w-4 h-4 text-slate-400 shrink-0" />
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-slate-400 font-medium">Dari:</span>
+                <input
+                  type="date"
+                  value={tanggalDari}
+                  onChange={e => setTanggalDari(e.target.value)}
+                  className="py-1 px-1 text-xs font-bold text-slate-800 bg-transparent focus:outline-none"
+                />
+                <span className="text-slate-400 font-medium">s.d</span>
+                <input
+                  type="date"
+                  value={tanggalSampai}
+                  onChange={e => setTanggalSampai(e.target.value)}
+                  className="py-1 px-1 text-xs font-bold text-slate-800 bg-transparent focus:outline-none"
+                />
+              </div>
             </div>
-            <button onClick={loadData} className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center gap-2 text-sm font-bold text-slate-700">
-              <RefreshCw className="w-4 h-4" /> Muat
+            <button onClick={loadData} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700">
+              <RefreshCw className="w-3.5 h-3.5" /> Muat
             </button>
-            <button onClick={() => openTambah('SETORAN_PENJUALAN')} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold">
-              <Plus className="w-4 h-4" /> Catat Pemasukan
+            <Link
+              href="/dashboard/akademik/upk/cetak?tab=rekap-pemasukan"
+              className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg flex items-center justify-center gap-1.5 text-xs font-bold transition"
+            >
+              <Printer className="w-3.5 h-3.5" /> Cetak Laporan
+            </Link>
+            <button onClick={() => openTambah('SETORAN_PENJUALAN')} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center gap-1.5 text-xs font-bold">
+              <Plus className="w-3.5 h-3.5" /> Catat Pemasukan
             </button>
           </div>
         )}
@@ -267,14 +289,16 @@ export default function PemasukanUPKPage() {
 
       <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b bg-slate-50 flex items-center justify-between gap-2">
-          <p className="font-bold text-slate-800">Riwayat Pemasukan</p>
+          <p className="font-bold text-slate-800">
+            Riwayat Pemasukan {tanggalDari === tanggalSampai ? `(${tanggalDari})` : `(${tanggalDari} s.d ${tanggalSampai})`}
+          </p>
           <p className="text-xs font-semibold text-slate-500">{pemasukan.length} catatan</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[950px] text-sm text-left">
             <thead className="bg-slate-50 text-slate-600 font-bold border-b">
               <tr>
-                <th className="px-4 py-3">Waktu</th>
+                <th className="px-4 py-3">Waktu / Tanggal</th>
                 <th className="px-4 py-3">Kategori</th>
                 <th className="px-4 py-3 text-right">Nominal</th>
                 <th className="px-4 py-3 text-right">Penjualan</th>
@@ -287,12 +311,12 @@ export default function PemasukanUPKPage() {
               {loading ? (
                 <tr><td colSpan={7} className="py-16 text-center"><Loader2 className="w-7 h-7 animate-spin mx-auto text-emerald-600" /></td></tr>
               ) : pemasukan.length === 0 ? (
-                <tr><td colSpan={7} className="py-16 text-center text-slate-400">Belum ada pemasukan pada tanggal ini.</td></tr>
+                <tr><td colSpan={7} className="py-16 text-center text-slate-400">Belum ada pemasukan pada rentang tanggal ini.</td></tr>
               ) : pemasukan.map(item => (
                 <tr key={item.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <p className="font-bold text-slate-700">{tanggalWaktu(item.waktu_catat)}</p>
-                    <p className="text-[11px] text-slate-400">{item.user_name || '-'}</p>
+                    <p className="text-[11px] text-slate-400">Tgl: {item.tanggal} • {item.user_name || '-'}</p>
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-bold text-slate-800">{kategoriLabel(item.kategori)}</p>
@@ -337,7 +361,16 @@ export default function PemasukanUPKPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase">Tanggal</label>
+                  <input
+                    type="date"
+                    value={form.tanggal}
+                    onChange={e => setField('tanggal', e.target.value)}
+                    className="w-full mt-1 p-2.5 border border-slate-200 rounded-lg text-sm bg-white font-bold"
+                  />
+                </div>
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase">Kategori</label>
                   <select
@@ -431,3 +464,4 @@ export default function PemasukanUPKPage() {
     </div>
   )
 }
+
