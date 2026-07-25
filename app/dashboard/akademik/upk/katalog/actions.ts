@@ -331,7 +331,6 @@ export async function simpanKatalog(payload: {
   const marhalahList = Array.from(marhalahMap.entries()).map(([marhalah_id, is_default]) => ({ marhalah_id, is_default }))
 
   if (!namaKitab) return { error: 'Nama kitab wajib diisi.' }
-  if (!marhalahList.length) return { error: 'Pilih minimal satu marhalah.' }
   if (stokLama < 0) return { error: 'Stok tidak boleh minus.' }
   if (hargaBeli < 0 || hargaJual < 0) return { error: 'Harga tidak boleh minus.' }
 

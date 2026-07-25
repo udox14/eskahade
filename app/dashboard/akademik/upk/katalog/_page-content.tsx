@@ -421,10 +421,6 @@ export default function KatalogUPKPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!form.marhalah.length) {
-      toast.warning('Pilih minimal satu marhalah.')
-      return
-    }
     setSaving(true)
     const result = await simpanKatalogUPK({
       id: form.id ? Number(form.id) : null,
@@ -659,8 +655,11 @@ export default function KatalogUPKPage() {
             </div>
           </div>
           <div className="bg-white p-4 rounded-xl border flex flex-col lg:flex-row gap-3">
-            <button onClick={openBatchModal} className="px-4 py-2.5 bg-amber-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-amber-700">
-              <Plus className="w-4 h-4" /> Tambah Kitab
+            <button onClick={() => { resetForm(); setIsKatalogModalOpen(true) }} className="px-4 py-2.5 bg-amber-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-amber-700">
+              <Plus className="w-4 h-4" /> Tambah Kitab Manual
+            </button>
+            <button onClick={openBatchModal} className="px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-slate-200">
+              <PackagePlus className="w-4 h-4 text-amber-600" /> Batch dari Master
             </button>
             <button onClick={() => setIsImportModalOpen(true)} className="px-4 py-2.5 bg-emerald-600 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-bold hover:bg-emerald-700">
               <FileSpreadsheet className="w-4 h-4" /> Import Excel
@@ -823,8 +822,8 @@ export default function KatalogUPKPage() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Marhalah & Default Kasir</label>
-                <p className="text-[11px] text-slate-400 mb-2">Ceklis marhalah tempat kitab ini dijual. Centang ★ kalau mau auto-terpilih di kasir untuk marhalah itu. Stok tetap satu pool.</p>
+                <label className="text-xs font-bold text-slate-500 uppercase">Marhalah & Default Kasir (Opsional)</label>
+                <p className="text-[11px] text-slate-400 mb-2">(Opsional) Ceklis marhalah tempat kitab ini dijual. Centang ★ jika mau auto-terpilih di kasir. Biarkan kosong untuk kitab bebas / umum (tidak terikat marhalah).</p>
                 <div className="border border-slate-200 rounded-lg divide-y max-h-56 overflow-y-auto">
                   {marhalahList.map(m => {
                     const sel = form.marhalah.find(x => x.marhalah_id === m.id)
@@ -969,6 +968,13 @@ export default function KatalogUPKPage() {
                   {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
                 </select>
               </div>
+              <button
+                type="button"
+                onClick={() => { setIsBatchModalOpen(false); resetForm(); setIsKatalogModalOpen(true) }}
+                className="px-3 py-2.5 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg text-xs font-bold transition whitespace-nowrap"
+              >
+                + Input Kitab Manual (Di Luar Marhalah)
+              </button>
               {batchMarhalah && (
                 <div className="text-sm font-bold text-slate-500 pb-2.5">
                   {batchSelectedCount} dipilih dari {batchKitabList.length} kitab
