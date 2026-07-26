@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { guardPage } from '@/lib/auth/guard'
 import { getPayoutData } from './actions'
 import { PayoutClient } from './_payout-client'
-import { FinanceGuide, FinanceNav, FinancePageHeader, StatusBadge } from '../_components/finance-ui'
+import { FinanceGuide, FinancePageHeader, StatusBadge } from '../_components/finance-ui'
+import { FinanceNav } from '../_components/finance-nav'
 
 export const dynamic = 'force-dynamic'
 

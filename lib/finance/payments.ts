@@ -121,3 +121,36 @@ export async function processDuitkuCallback(payload: Record<string, string>) {
     return { success: false as const, status: 500, ...financeError(error) }
   }
 }
+
+export async function reviewLateTopup(input: { paymentIntentId: string; actorId: string; note: string }) {
+  try {
+    const note = input.note.trim()
+    if (note.length < 10) throw new Error('Catatan review minimal 10 karakter.')
+    const current = await queryOne<{
+      id: string
+      merchant_order_id: string
+      amount_rupiah: number
+      paid_at: string | null
+      review_status: string
+    }>(`SELECT id,merchant_order_id,amount_rupiah,paid_at,review_status
+      FROM finance_payment_intents WHERE id=? AND status='PAID'`, [input.paymentIntentId])
+    if (!current) throw new Error('Top-up berstatus PAID tidak ditemukan.')
+    if (current.review_status !== 'REQUIRED') throw new Error('Top-up ini tidak lagi menunggu review.')
+
+    const db = await getDB()
+    const result = await db.prepare(`UPDATE finance_payment_intents
+      SET review_status='CLEARED',updated_at=datetime('now')
+      WHERE id=? AND status='PAID' AND review_status='REQUIRED'`).bind(input.paymentIntentId).run()
+    if (!result.meta?.changes) throw new Error('Top-up ini sudah direview oleh pengguna lain.')
+    await db.prepare(`INSERT INTO finance_audit_log
+      (id,actor_type,actor_id,action,entity_type,entity_id,before_json,after_json)
+      VALUES(?,'STAFF',?,'REVIEW_LATE_TOPUP','PAYMENT_INTENT',?,?,?)`).bind(
+        generateId(), input.actorId, input.paymentIntentId,
+        JSON.stringify({ reviewStatus: current.review_status }),
+        JSON.stringify({ reviewStatus: 'CLEARED', note }),
+      ).run()
+    return { success: true as const }
+  } catch (error) {
+    return { success: false as const, ...financeError(error) }
+  }
+}

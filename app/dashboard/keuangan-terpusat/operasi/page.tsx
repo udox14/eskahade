@@ -1,38 +1,29 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { guardPage } from '@/lib/auth/guard'
-import { approveReopenAction,closePeriodAction,createBillAction,getOperationsData,importBankAction,reopenPeriodAction,settlementAction } from './actions'
-import { FinanceGuide, FinanceNav, FinancePageHeader, MetricCard, SectionPanel, StatusBadge } from '../_components/finance-ui'
-export const dynamic='force-dynamic'
-const wrap=(action:(form:FormData)=>Promise<unknown>)=>async(form:FormData)=>{'use server';await action(form)}
-const field='rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500'
+import { FinanceGuide, FinancePageHeader } from '../_components/finance-ui'
+import { FinanceNav } from '../_components/finance-nav'
+import { getOperationsData } from './actions'
+import { OperationsClient } from './_operations-client'
 
-export default async function OperationsPage(){
+export const dynamic = 'force-dynamic'
+
+export default async function OperationsPage() {
   await guardPage('/dashboard/keuangan-terpusat/operasi')
-  const data=await getOperationsData()
-  const closed=data.periods.filter((p:any)=>p.status==='CLOSED').length
+  const data = await getOperationsData()
+
   return <main className="space-y-4 sm:space-y-5">
-    <FinancePageHeader title="Operasi & Rekonsiliasi" description="Kendalikan tagihan, mutasi bank, settlement gateway, dan tutup buku dari satu workspace." eyebrow="Bendahara pusat" meta="Selesaikan pengecualian sebelum menutup periode"/>
-    <FinanceNav/>
-    <FinanceGuide purpose="Menjaga kesesuaian catatan aplikasi, settlement gateway, mutasi rekening, dan periode pembukuan." prerequisites={["Unduh mutasi resmi dari rekening utama.","Siapkan referensi dan tanggal settlement.","Pastikan payout gagal sudah ditindaklanjuti."]} steps={["Impor mutasi dan periksa hasil matching.","Posting settlement gateway yang sudah diterima.","Tinjau readiness lalu tutup periode bulanan."]} notes={["Jangan menutup periode jika masih ada selisih.","Reopen membutuhkan dua persetujuan berbeda.","Tagihan SPP/non-SPP wajib dibayar penuh."]}/>
-    <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-      <MetricCard label="Impor mutasi" value={String(data.imports.length)} detail="20 impor terbaru tersedia" icon="fileSpreadsheet" tone="blue"/>
-      <MetricCard label="Tagihan terbaru" value={String(data.bills.length)} detail="Ditampilkan untuk pengecekan cepat" icon="receipt"/>
-      <MetricCard label="Periode ditutup" value={String(closed)} detail="Riwayat 24 periode terakhir" icon="lock" tone="slate"/>
-      <MetricCard label="Readiness" value={closed || data.periods.length ? 'Pantau' : 'Belum ada data'} detail="Periksa exception sebelum tutup buku" icon="checkCircle" tone={closed?'emerald':'amber'}/>
-    </section>
-
-    <SectionPanel title="Tindakan operasional" description="Buka hanya formulir yang sedang dikerjakan agar halaman tetap mudah dipindai.">
-      <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4 [&_button]:min-h-11 [&_input]:min-h-11 [&_select]:min-h-11 sm:[&_button]:min-h-0 sm:[&_input]:min-h-0 sm:[&_select]:min-h-0">
-        <details className="rounded-lg border border-slate-200 bg-slate-50 open:bg-white"><summary className="cursor-pointer p-3 text-sm font-bold">Buat tagihan</summary><form action={wrap(createBillAction)} className="grid gap-2 border-t p-3"><label className="text-xs font-bold">NIS<input name="nis" required placeholder="NIS santri" className={`mt-1 w-full ${field}`}/></label><label className="text-xs font-bold">Jenis<select name="kind" className={`mt-1 w-full ${field}`}><option value="SPP">SPP — wajib lunas</option><option value="NON_SPP">Non-SPP — wajib lunas</option><option value="USPP">USPP — boleh dicicil</option></select></label><input name="title" required placeholder="Nama tagihan" className={field}/><input name="period" placeholder="Periode YYYY-MM" className={field}/><input name="amount" type="number" required min={1} placeholder="Nominal rupiah" className={field}/><input name="dueDate" type="date" className={field}/><button className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-bold text-white">Buat tagihan</button></form></details>
-        <details className="rounded-lg border border-slate-200 bg-slate-50 open:bg-white"><summary className="cursor-pointer p-3 text-sm font-bold">Impor mutasi bank</summary><form action={wrap(importBankAction)} className="grid gap-2 border-t p-3"><input name="bankLabel" required defaultValue="Rekening Utama" className={field}/><input name="file" type="file" accept=".csv,.xls,.xlsx" required className={`${field} p-1.5`}/><p className="text-xs text-slate-500">CSV/XLS/XLSX akan dideduplikasi berdasarkan hash file dan dicoba auto-match.</p><button className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-bold text-white">Impor & auto-match</button></form></details>
-        <details className="rounded-lg border border-slate-200 bg-slate-50 open:bg-white"><summary className="cursor-pointer p-3 text-sm font-bold">Posting settlement</summary><form action={wrap(settlementAction)} className="grid gap-2 border-t p-3"><input name="reference" required placeholder="Referensi settlement" className={field}/><input name="date" type="date" required className={field}/><input name="gross" type="number" required placeholder="Bruto" className={field}/><input name="fee" type="number" required placeholder="Biaya provider" className={field}/><input name="net" type="number" required placeholder="Neto" className={field}/><button className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-bold text-white">Posting settlement</button></form></details>
-        <details className="rounded-lg border border-amber-200 bg-amber-50 open:bg-white"><summary className="cursor-pointer p-3 text-sm font-bold text-amber-900">Tutup buku bulanan</summary><form action={wrap(closePeriodAction)} className="grid gap-2 border-t border-amber-100 p-3"><input name="period" type="month" required className={field}/><p className="text-xs text-amber-800">Pastikan semua mutasi cocok, payout selesai, dan suspense telah direview.</p><button className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white">Tutup periode</button></form></details>
-      </div>
-    </SectionPanel>
-
-    <section className="grid gap-4 xl:grid-cols-2">
-      <SectionPanel title="Periode pembukuan" description="Status close dan jumlah persetujuan untuk pembukaan kembali."><div className="divide-y divide-slate-100">{data.periods.length?data.periods.map((p:any)=><div key={p.period_key} className="px-4 py-3 text-xs"><div className="flex items-center justify-between"><strong>{p.period_key}</strong><StatusBadge tone={p.status==='CLOSED'?'slate':'emerald'}>{p.status}</StatusBadge></div><p className="mt-1 text-slate-500">{p.approval_count} persetujuan reopen</p>{p.status==='CLOSED'&&<div className="mt-3 grid gap-3 sm:grid-cols-2 sm:gap-2"><form action={wrap(approveReopenAction)} className="grid gap-2 sm:flex sm:gap-1"><input type="hidden" name="period" value={p.period_key}/><input name="reason" required minLength={10} placeholder="Alasan persetujuan" className={`min-h-11 min-w-0 flex-1 sm:min-h-0 ${field}`}/><button className="min-h-11 rounded-lg border px-3 font-bold sm:min-h-0 sm:px-2">Setujui</button></form><form action={wrap(reopenPeriodAction)} className="grid gap-2 sm:flex sm:gap-1"><input type="hidden" name="period" value={p.period_key}/><input name="reason" required minLength={10} placeholder="Alasan final" className={`min-h-11 min-w-0 flex-1 sm:min-h-0 ${field}`}/><button className="min-h-11 rounded-lg bg-amber-600 px-3 font-bold text-white sm:min-h-0 sm:px-2">Reopen</button></form></div>}</div>):<p className="p-10 text-center text-sm text-slate-500">Belum ada periode pembukuan.</p>}</div></SectionPanel>
-      <SectionPanel title="Tagihan terbaru" description="Gunakan daftar ini sebagai validasi setelah pembuatan tagihan."><div className="divide-y divide-slate-100 sm:hidden">{data.bills.length?data.bills.map((b:any)=><article key={b.id} className="space-y-2 px-4 py-3 text-xs"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="break-words font-semibold text-slate-800">{b.nama_lengkap}</p><p className="mt-0.5 break-words text-slate-500">{b.title}</p></div><StatusBadge tone={b.status==='PAID'?'emerald':'amber'}>{b.status}</StatusBadge></div><p className="font-bold tabular-nums">Rp {Number(b.amount_rupiah).toLocaleString('id-ID')}</p></article>):<p className="px-4 py-10 text-center text-sm text-slate-500">Belum ada tagihan baru.</p>}</div><div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[520px] text-xs"><thead className="bg-slate-50 text-left uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-2.5">Santri</th><th className="px-4 py-2.5">Tagihan</th><th className="px-4 py-2.5 text-right">Nominal</th><th className="px-4 py-2.5">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{data.bills.length?data.bills.map((b:any)=><tr key={b.id}><td className="px-4 py-3 font-semibold">{b.nama_lengkap}</td><td className="px-4 py-3">{b.title}</td><td className="px-4 py-3 text-right font-bold tabular-nums">Rp {Number(b.amount_rupiah).toLocaleString('id-ID')}</td><td className="px-4 py-3"><StatusBadge tone={b.status==='PAID'?'emerald':'amber'}>{b.status}</StatusBadge></td></tr>):<tr><td colSpan={4} className="p-10 text-center text-sm text-slate-500">Belum ada tagihan baru.</td></tr>}</tbody></table></div></SectionPanel>
-    </section>
+    <FinancePageHeader
+      title="Operasi & Rekonsiliasi"
+      description="Kendalikan tagihan, mutasi bank, settlement gateway, dan tutup buku dari satu workspace."
+      eyebrow="Bendahara pusat"
+      meta="Selesaikan pengecualian sebelum menutup periode"
+    />
+    <FinanceNav />
+    <FinanceGuide
+      purpose="Menjaga kesesuaian catatan aplikasi, settlement gateway, mutasi rekening, dan periode pembukuan."
+      prerequisites={['Unduh mutasi resmi dari rekening utama.', 'Siapkan referensi dan tanggal settlement.', 'Pastikan payout gagal sudah ditindaklanjuti.']}
+      steps={['Impor mutasi dan periksa hasil matching.', 'Review top-up terlambat dan cocokkan mutasi manual.', 'Tinjau readiness lalu tutup periode bulanan.']}
+      notes={['Jangan menutup periode jika masih ada selisih.', 'Reopen membutuhkan dua persetujuan berbeda.', 'Semua review manual masuk audit log.']}
+    />
+    <OperationsClient data={data} />
   </main>
 }

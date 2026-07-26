@@ -1,0 +1,91 @@
+'use client'
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+import { useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { ArrowCounterClockwise, CheckCircle, MagnifyingGlass } from '@phosphor-icons/react'
+import { MetricCard, SectionPanel, StatusBadge } from '../_components/finance-ui'
+import { returnAllocationAction } from './actions'
+
+const field = 'min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500'
+const rupiah = (value: number) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`
+const returnableKinds = new Set(['MAKAN', 'LAUNDRY', 'JAJAN'])
+
+export function AllocationClient({ data }: { data: any }) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('ALL')
+  const [destination, setDestination] = useState('ALL')
+  const now = Number(data.nowMs)
+  const filtered = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    return data.allocations.filter((row: any) => {
+      if (status !== 'ALL' && row.status !== status) return false
+      if (destination !== 'ALL' && row.destination_kind !== destination) return false
+      return !needle || [row.student_name, row.nis, row.billing_reference, row.id].some(value => String(value || '').toLowerCase().includes(needle))
+    })
+  }, [data.allocations, destination, search, status])
+  const totals = data.allocations.reduce((result: Record<string, number>, row: any) => {
+    result[row.status] = (result[row.status] || 0) + Number(row.amount_rupiah)
+    return result
+  }, {})
+
+  function returnAllocation(id: string) {
+    const form = new FormData()
+    form.set('allocationId', id)
+    startTransition(async () => {
+      try {
+        const result = await returnAllocationAction(form)
+        if (!result?.success) { toast.error(result?.error || 'Alokasi tidak dapat dikembalikan.'); return }
+        toast.success('Dana alokasi dikembalikan ke Titipan.')
+        router.refresh()
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Alokasi tidak dapat dikembalikan.')
+      }
+    })
+  }
+
+  return <div className="space-y-4 sm:space-y-5">
+    <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <MetricCard label="Riwayat dimuat" value={String(data.allocations.length)} detail="300 alokasi terbaru" icon="layers" tone="blue" />
+      <MetricCard label="Reserved" value={rupiah(totals.RESERVED || 0)} detail="Belum dicairkan / dikomit" icon="listChecks" tone={totals.RESERVED ? 'amber' : 'slate'} />
+      <MetricCard label="Committed" value={rupiah(totals.COMMITTED || 0)} detail="Sudah dialokasikan ke tujuan" icon="checkCircle" tone="emerald" />
+      <MetricCard label="Returned" value={rupiah(totals.RETURNED || 0)} detail="Kembali ke wallet Titipan" icon="wallet" tone="slate" />
+    </section>
+
+    <SectionPanel title="Riwayat & pengembalian alokasi" description="Pengembalian hanya tersedia untuk Makan, Laundry, atau Jajan sebelum cutoff dan sebelum dana dicairkan.">
+      <div className="grid gap-2 border-b border-slate-100 p-3 md:grid-cols-[1fr_180px_180px]">
+        <label className="relative"><MagnifyingGlass className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Cari santri, NIS, referensi, atau ID" className={`${field} pl-9`} /></label>
+        <select value={status} onChange={event => setStatus(event.target.value)} className={field}><option value="ALL">Semua status</option><option value="RESERVED">RESERVED</option><option value="COMMITTED">COMMITTED</option><option value="DISBURSED">DISBURSED</option><option value="RETURNED">RETURNED</option></select>
+        <select value={destination} onChange={event => setDestination(event.target.value)} className={field}><option value="ALL">Semua tujuan</option>{['SPP', 'USPP', 'NON_SPP', 'MAKAN', 'LAUNDRY', 'JAJAN'].map(item => <option key={item}>{item}</option>)}</select>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {filtered.length ? filtered.map((row: any) => {
+          const cutoffOpen = !row.cutoff_at || new Date(row.cutoff_at).getTime() > now
+          const canReturn = data.canReturn && returnableKinds.has(row.destination_kind) && ['RESERVED', 'COMMITTED'].includes(row.status) && cutoffOpen
+          const balanceEnough = Number(row.destination_balance_rupiah) >= Number(row.amount_rupiah)
+          return <details key={row.id}>
+            <summary className="grid cursor-pointer list-none gap-2 px-4 py-3 text-xs hover:bg-slate-50 sm:grid-cols-[1fr_120px_150px_130px_110px] sm:items-center">
+              <span className="min-w-0"><strong className="block truncate text-slate-800">{row.student_name || 'Santri tidak tersinkron'}</strong><span className="text-slate-500">{row.nis || 'NIS —'} · {row.asrama || 'Tanpa asrama'}</span></span>
+              <span><StatusBadge tone="blue">{row.destination_kind}</StatusBadge></span>
+              <strong className="tabular-nums sm:text-right">{rupiah(row.amount_rupiah)}</strong>
+              <span className="tabular-nums text-slate-500 sm:text-right">{row.created_at}</span>
+              <span className="sm:text-right"><StatusBadge tone={row.status === 'RETURNED' ? 'slate' : row.status === 'DISBURSED' ? 'blue' : row.status === 'RESERVED' ? 'amber' : 'emerald'}>{row.status}</StatusBadge></span>
+            </summary>
+            <div className="space-y-3 border-t border-slate-100 bg-slate-50/60 p-4">
+              <div className="grid gap-3 text-xs sm:grid-cols-4">
+                <p><span className="text-slate-500">Referensi billing</span><strong className="mt-1 block">{row.billing_reference || '—'}</strong></p>
+                <p><span className="text-slate-500">Tagihan terkait</span><strong className="mt-1 block">{row.bill_titles || '—'}</strong></p>
+                <p><span className="text-slate-500">Cutoff return</span><strong className="mt-1 block">{row.cutoff_at || 'Tidak dibatasi'}</strong></p>
+                <p><span className="text-slate-500">Saldo tujuan saat ini</span><strong className="mt-1 block">{rupiah(row.destination_balance_rupiah)}</strong></p>
+              </div>
+              {canReturn ? <div className="flex flex-col items-start justify-between gap-3 rounded-lg border border-amber-200 bg-white p-3 sm:flex-row sm:items-center"><p className="text-xs text-amber-900">{balanceEnough ? 'Dana akan dipindahkan kembali ke wallet Titipan dan jurnal reversal alokasi diposting.' : 'Saldo tujuan lebih kecil dari nilai alokasi; backend akan menolak return untuk mencegah saldo negatif.'}</p><button disabled={pending || !balanceEnough} onClick={() => returnAllocation(row.id)} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg bg-amber-600 px-4 text-xs font-bold text-white disabled:opacity-50"><ArrowCounterClockwise />Kembalikan alokasi</button></div> : null}
+            </div>
+          </details>
+        }) : <div className="p-12 text-center text-sm text-slate-500"><CheckCircle className="mx-auto mb-2 h-8 w-8 text-emerald-500" />Tidak ada alokasi yang sesuai filter.</div>}
+      </div>
+    </SectionPanel>
+  </div>
+}

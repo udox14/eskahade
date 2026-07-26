@@ -7,6 +7,26 @@ const DESTINATION_ACCOUNT = {
   SPP: '4101', USPP: '4102', NON_SPP: '4103', MAKAN: '2102', LAUNDRY: '2103', JAJAN: '2105',
 } as const
 
+async function configuredCutoff(destination:'MAKAN'|'LAUNDRY'):Promise<string|null>{
+  const key=destination==='MAKAN'?'finance_meal_cutoff':'finance_laundry_cutoff'
+  const setting=await queryOne<{value:string}>(`SELECT value FROM finance_settings WHERE key=?`,[key])
+  if(!setting)return null
+  try{
+    const parsed=JSON.parse(setting.value) as {day:number;time:string}
+    const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date())
+    const part=(type:string)=>Number(parts.find(item=>item.type===type)?.value||0)
+    let year=part('year'),month=part('month')
+    const make=()=>{
+      const lastDay=new Date(Date.UTC(year,month,0)).getUTCDate()
+      const day=Math.min(Number(parsed.day),lastDay)
+      return new Date(`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}T${parsed.time}:00+07:00`)
+    }
+    let cutoff=make()
+    if(cutoff.getTime()<=Date.now()){month+=1;if(month>12){month=1;year+=1}cutoff=make()}
+    return cutoff.toISOString()
+  }catch{return null}
+}
+
 export async function allocateStudentFunds(input: {
   idempotencyKey: string
   santriId: string
@@ -34,6 +54,7 @@ export async function allocateStudentFunds(input: {
     }
 
     const db = await getDB()
+    const cutoffAt=input.cutoffAt||(['MAKAN','LAUNDRY'].includes(input.destination)?await configuredCutoff(input.destination as 'MAKAN'|'LAUNDRY'):null)
     const allocationId = generateId()
     const journal = prepareJournalStatements(db, {
       idempotencyKey: `allocation:${input.idempotencyKey}`,
@@ -58,7 +79,7 @@ export async function allocateStudentFunds(input: {
         (id,idempotency_key,santri_id,destination_kind,amount_rupiah,billing_reference,status,cutoff_at,journal_id,created_by_type,created_by_id,committed_at)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,CASE WHEN ?='COMMITTED' THEN datetime('now') ELSE NULL END)`).bind(
           allocationId, input.idempotencyKey, input.santriId, input.destination, input.amountRupiah,
-          input.billingReference || null, initialStatus, input.cutoffAt || null, journal.journalId,
+          input.billingReference || null, initialStatus, cutoffAt, journal.journalId,
           input.actorType, input.actorId || null, initialStatus,
         ),
       ...(input.billItems||[]).flatMap(item=>[
@@ -86,8 +107,10 @@ export async function returnUnusedAllocation(input: {
   try {
     const allocation = await queryOne<{
       id: string; santri_id: string; destination_kind: 'MAKAN' | 'LAUNDRY' | 'JAJAN'; amount_rupiah: number
-      status: string; cutoff_at: string | null
-    }>(`SELECT id,santri_id,destination_kind,amount_rupiah,status,cutoff_at FROM finance_allocations WHERE id=?`, [input.allocationId])
+      status: string; cutoff_at: string | null; asrama_scope: string | null
+    }>(`SELECT a.id,a.santri_id,a.destination_kind,a.amount_rupiah,a.status,a.cutoff_at,
+      (SELECT e.asrama_scope FROM finance_journal_entries e WHERE e.journal_id=a.journal_id AND e.asrama_scope IS NOT NULL LIMIT 1) asrama_scope
+      FROM finance_allocations a WHERE a.id=?`, [input.allocationId])
     if (!allocation || !['MAKAN','LAUNDRY','JAJAN'].includes(allocation.destination_kind)) throw new Error('Alokasi tidak dapat dikembalikan.')
     if (!['RESERVED','COMMITTED'].includes(allocation.status)) throw new Error('Alokasi sudah dicairkan atau pernah dikembalikan.')
     if (allocation.cutoff_at && new Date(allocation.cutoff_at).getTime() <= Date.now()) throw new Error('Cutoff pengembalian sudah lewat.')
@@ -100,8 +123,8 @@ export async function returnUnusedAllocation(input: {
       sourceType: 'ALLOCATION_RETURN', sourceId: allocation.id,
       actorType: input.actorType, actorId: input.actorId,
       entries: [
-        { accountCode: account, side: 'DEBIT', amountRupiah: allocation.amount_rupiah, santriId: allocation.santri_id },
-        { accountCode: '2101', side: 'CREDIT', amountRupiah: allocation.amount_rupiah, santriId: allocation.santri_id },
+        { accountCode: account, side: 'DEBIT', amountRupiah: allocation.amount_rupiah, santriId: allocation.santri_id, asramaScope: allocation.asrama_scope },
+        { accountCode: '2101', side: 'CREDIT', amountRupiah: allocation.amount_rupiah, santriId: allocation.santri_id, asramaScope: allocation.asrama_scope },
       ],
     })
     await db.batch([
@@ -112,6 +135,8 @@ export async function returnUnusedAllocation(input: {
         { idempotencyKey: `${input.idempotencyKey}:in`, santriId: allocation.santri_id, walletKind: 'TITIPAN', amountRupiah: allocation.amount_rupiah, movementType: 'RETURN_IN', referenceType: 'ALLOCATION', referenceId: allocation.id },
       ]),
       db.prepare(`UPDATE finance_journals SET status='POSTED',posted_at=datetime('now') WHERE id=? AND status='DRAFT'`).bind(journal.journalId),
+      db.prepare(`INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,after_json)
+        VALUES(?,?,?,?,?,?,?)`).bind(generateId(),input.actorType,input.actorId||null,'RETURN_UNUSED_ALLOCATION','ALLOCATION',allocation.id,JSON.stringify({amountRupiah:allocation.amount_rupiah,destination:allocation.destination_kind})),
     ])
     return { success: true as const, journalId: journal.journalId }
   } catch (error) {

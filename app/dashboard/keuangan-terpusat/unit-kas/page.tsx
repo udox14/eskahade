@@ -1,5 +1,6 @@
 import { guardPage } from '@/lib/auth/guard'
-import { FinanceGuide, FinanceNav, FinancePageHeader, MetricCard } from '../_components/finance-ui'
+import { FinanceGuide, FinancePageHeader, MetricCard } from '../_components/finance-ui'
+import { FinanceNav } from '../_components/finance-nav'
 import { getCashUnitManagementData } from './actions'
 import { CashUnitClient } from './_cash-unit-client'
 
@@ -13,7 +14,7 @@ export default async function CashUnitPage() {
   const pendingReview = data.shifts.filter(shift => shift.status === 'CLOSED_REVIEW' && !shift.supervisor_id).length
   return <main className="space-y-4 sm:space-y-5">
     <FinancePageHeader title="Unit Kas" description="Atur lokasi kas, saldo tetap, operator, dan review penutupan shift." eyebrow="Khusus bendahara" meta="Operator hanya dapat memakai unit yang ditugaskan" />
-    <FinanceNav showCashUnits />
+    <FinanceNav />
     <FinanceGuide purpose="Menentukan siapa yang boleh memegang kas fisik dan memastikan setiap shift dapat dipertanggungjawabkan." prerequisites={["Tambahkan role Operator Loket pada akun petugas.","Tentukan scope asrama untuk unit lokal.","Tetapkan saldo kas tetap sebagai acuan pembukaan."]} steps={["Buat Unit Kas.","Tugaskan operator yang berwenang.","Pantau shift dan review setiap selisih."]} notes={["Unit dan assignment dengan shift aktif tidak dapat dinonaktifkan.","Operator tetap wajib menghitung kas fisik.","Review bendahara tidak mengubah nilai selisih."]} />
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <MetricCard label="Unit aktif" value={String(activeUnits)} detail={`${data.units.length} total Unit Kas`} icon="wallet" />

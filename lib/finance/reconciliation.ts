@@ -55,5 +55,18 @@ export async function importBankStatement(input:{file:File;bankAccountLabel:stri
 }
 
 export async function manuallyMatchBankTransaction(input:{bankTransactionId:string;matchedType:string;matchedId:string;actorId:string}){
-  try{const result=await (await getDB()).prepare(`UPDATE finance_bank_transactions SET match_status='MANUAL_MATCHED',matched_type=?,matched_id=?,matched_by=?,matched_at=datetime('now') WHERE id=? AND match_status='UNMATCHED'`).bind(input.matchedType,input.matchedId,input.actorId,input.bankTransactionId).run();if(!result.meta?.changes)throw new Error('Mutasi sudah dicocokkan.');return{success:true as const}}catch(error){return{success:false as const,...financeError(error)}}
+  try{
+    if(input.matchedType!=='JOURNAL')throw new Error('Jenis target rekonsiliasi tidak didukung.')
+    const target=await queryOne<{id:string}>(`SELECT id FROM finance_journals WHERE id=? AND status='POSTED'`,[input.matchedId])
+    if(!target)throw new Error('Jurnal terposting tidak ditemukan.')
+    const duplicate=await queryOne<{id:string}>(`SELECT id FROM finance_bank_transactions WHERE matched_type='JOURNAL' AND matched_id=? AND match_status IN ('AUTO_MATCHED','MANUAL_MATCHED') AND id<>?`,[input.matchedId,input.bankTransactionId])
+    if(duplicate)throw new Error('Jurnal tersebut sudah dipakai untuk mutasi bank lain.')
+    const db=await getDB()
+    const result=await db.prepare(`UPDATE finance_bank_transactions SET match_status='MANUAL_MATCHED',matched_type='JOURNAL',matched_id=?,matched_by=?,matched_at=datetime('now') WHERE id=? AND match_status='UNMATCHED'`).bind(input.matchedId,input.actorId,input.bankTransactionId).run()
+    if(!result.meta?.changes)throw new Error('Mutasi sudah dicocokkan atau tidak lagi tersedia.')
+    await db.prepare(`INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,after_json) VALUES(?,'STAFF',?,'MANUAL_MATCH','BANK_TRANSACTION',?,?)`).bind(
+      generateId(),input.actorId,input.bankTransactionId,JSON.stringify({matchedType:'JOURNAL',matchedId:input.matchedId}),
+    ).run()
+    return{success:true as const}
+  }catch(error){return{success:false as const,...financeError(error)}}
 }

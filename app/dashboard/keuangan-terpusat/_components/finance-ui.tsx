@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Bank as Landmark,
+  BookOpenText,
+  ArrowsLeftRight,
   CaretDown as ChevronDown,
   CheckCircle as CheckCircle2,
   CreditCard,
@@ -19,6 +21,8 @@ import {
   Stack as Layers3,
   Wallet as WalletCards,
   Warning as AlertTriangle,
+  ShieldWarning,
+  ShieldCheck,
 } from '@phosphor-icons/react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { cn } from '@/lib/utils'
@@ -30,6 +34,11 @@ const financeNav = [
   { href: '/dashboard/keuangan-terpusat/kredensial', label: 'Kredensial', icon: CreditCard },
   { href: '/dashboard/keuangan-terpusat/payout', label: 'Payout', icon: SendHorizontal },
   { href: '/dashboard/keuangan-terpusat/payroll', label: 'Payroll', icon: BadgeDollarSign },
+  { href: '/dashboard/keuangan-terpusat/ledger', label: 'Ledger', icon: BookOpenText },
+  { href: '/dashboard/keuangan-terpusat/alokasi', label: 'Alokasi', icon: ArrowsLeftRight },
+  { href: '/dashboard/keuangan-terpusat/insiden', label: 'Insiden', icon: ShieldWarning },
+  { href: '/dashboard/keuangan-terpusat/kontrol', label: 'Kontrol', icon: ShieldCheck },
+  { href: '/dashboard/keuangan-terpusat/break-glass', label: 'Break-glass', icon: ShieldWarning },
   { href: '/dashboard/keuangan-terpusat/operasi', label: 'Operasi', icon: Settings2 },
 ]
 
@@ -45,15 +54,11 @@ export function FinancePageHeader({ title, description, eyebrow, meta, action }:
   </div>
 }
 
-export function FinanceNav({ cashierOnly = false, showCashUnits = false }: { cashierOnly?: boolean; showCashUnits?: boolean }) {
+export function FinanceNavClient({ allowedHrefs }: { allowedHrefs: string[] }) {
   const pathname = usePathname()
   return <nav aria-label="Navigasi keuangan terpusat" className="-mx-4 overflow-x-auto border-b border-slate-200 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
     <div className="flex min-w-max gap-1">
-      {financeNav.filter(item => {
-        if (cashierOnly) return item.href === '/dashboard/keuangan-terpusat/loket'
-        if (!showCashUnits && item.href === '/dashboard/keuangan-terpusat/unit-kas') return false
-        return true
-      }).map(item => {
+      {financeNav.filter(item => allowedHrefs.includes(item.href)).map(item => {
         const active = item.href === '/dashboard/keuangan-terpusat' ? pathname === item.href : pathname.startsWith(item.href)
         return <Link key={item.href} href={item.href} className={cn(
           'flex min-h-11 items-center gap-1.5 border-b-2 px-3 py-3 text-xs font-bold transition-colors sm:min-h-0 sm:py-2.5',

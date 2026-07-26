@@ -4,7 +4,8 @@ import { guardPage } from '@/lib/auth/guard'
 import { getEffectiveRoles } from '@/lib/auth/session'
 import { getCashierBootstrap } from './actions'
 import { CashierClient } from './_cashier-client'
-import { FinanceGuide, FinanceNav, FinancePageHeader, SectionPanel, StatusBadge } from '../_components/finance-ui'
+import { FinanceGuide, FinancePageHeader, SectionPanel, StatusBadge } from '../_components/finance-ui'
+import { FinanceNav } from '../_components/finance-nav'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +16,7 @@ export default async function CashierPage() {
 
   if (!isOperator) return <main className="space-y-4 sm:space-y-5">
     <FinancePageHeader title="Loket Pencairan" description="Layani pencairan uang jajan melalui shift kas yang terkontrol." eyebrow="Role operator wajib" meta="Akun ini belum dapat menjalankan transaksi loket" />
-    <FinanceNav showCashUnits={roles.includes('bendahara')} />
+    <FinanceNav />
     <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-950">
       <h2 className="font-bold">Tambahkan role Operator Loket terlebih dahulu</h2>
       <p className="mt-1 max-w-2xl leading-6">Role bendahara memberi akses pengaturan, tetapi transaksi kas tetap membutuhkan role <strong>Operator Loket</strong> dan penugasan pada Unit Kas tertentu.</p>
@@ -26,7 +27,7 @@ export default async function CashierPage() {
   const data = await getCashierBootstrap()
   return <main className="space-y-4 sm:space-y-5">
     <FinancePageHeader title="Loket Pencairan" description="Buka shift, verifikasi santri, cairkan uang, lalu tutup dan cocokkan kas." eyebrow="Online · PIN wajib" meta={data.shift ? `${data.shift.unit_name} sedang aktif` : 'Buka shift sebelum melayani santri'} />
-    <FinanceNav cashierOnly={!data.capabilities.canConfigure} showCashUnits={data.capabilities.canConfigure} />
+    <FinanceNav />
     <FinanceGuide purpose="Memastikan uang hanya dicairkan kepada santri yang benar dan setiap rupiah tercatat pada shift kas." prerequisites={["Pastikan Anda sudah ditugaskan ke Unit Kas.","Hitung uang fisik sebelum membuka shift.","Siapkan scanner RFID/QR dan keypad PIN."]} steps={["Pilih Unit Kas dan buka shift.","Scan, cocokkan identitas, lalu proses pencairan.","Hitung ulang kas dan tutup shift."]} notes={["PIN dan konfirmasi identitas tidak dapat dilewati.","Scope santri mengikuti Unit Kas aktif.","Selisih penutupan otomatis masuk review bendahara."]} />
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs shadow-sm"><span className="font-bold text-slate-700">Status loket</span><StatusBadge tone={data.shift ? 'emerald' : 'amber'}>{data.shift ? 'Shift aktif' : 'Shift belum dibuka'}</StatusBadge><span className="text-slate-500">{data.shift ? `${data.shift.unit_name} · ${data.operator.name}` : `${data.units.length} Unit Kas ditugaskan`}</span></div>
     <CashierClient units={data.units} shift={data.shift} operatorName={data.operator.name} canConfigure={data.capabilities.canConfigure} />

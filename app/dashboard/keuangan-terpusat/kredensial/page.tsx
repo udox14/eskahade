@@ -2,7 +2,8 @@ import { guardPage } from '@/lib/auth/guard'
 import type { CredentialMode } from '@/lib/finance/types'
 import { CredentialClient,type CredentialInventoryRow } from './_credential-client'
 import { getCredentialData } from './actions'
-import { FinanceGuide,FinanceNav,FinancePageHeader } from '../_components/finance-ui'
+import { FinanceGuide,FinancePageHeader } from '../_components/finance-ui'
+import { FinanceNav } from '../_components/finance-nav'
 
 export const dynamic='force-dynamic'
 

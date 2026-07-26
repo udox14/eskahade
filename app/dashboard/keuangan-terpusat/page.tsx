@@ -1,8 +1,10 @@
 import { ArrowDown as ArrowDownToLine, ArrowUp as ArrowUpFromLine, Warning as AlertTriangle } from '@phosphor-icons/react/dist/ssr'
+import Link from 'next/link'
 import { guardPage } from '@/lib/auth/guard'
 import { financeAsramaScope, requireFinanceAccess } from '@/lib/finance/access'
 import { getFinanceDashboard } from '@/lib/finance/dashboard'
-import { FinanceGuide, FinanceNav, FinancePageHeader, MetricCard, SectionPanel, StatusBadge } from './_components/finance-ui'
+import { FinanceGuide, FinancePageHeader, MetricCard, SectionPanel, StatusBadge } from './_components/finance-ui'
+import { FinanceNav } from './_components/finance-nav'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +12,18 @@ type DashboardData = Awaited<ReturnType<typeof getFinanceDashboard>>
 
 const rupiah = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
 const alertLabel: Record<string, string> = { LATE_TOPUP: 'Top-up terlambat', UNMATCHED_BANK: 'Mutasi belum cocok', PAYOUT_FAILED: 'Payout gagal' }
+const softAlertLabel: Record<string, string> = { LARGE_TOPUP: 'Top-up besar (30 hari)', HIGH_STUDENT_BALANCE: 'Saldo santri tinggi', HIGH_FLOAT: 'Float wali tinggi' }
+const alertHref: Record<string, string> = {
+  LATE_TOPUP: '/dashboard/keuangan-terpusat/operasi#review',
+  UNMATCHED_BANK: '/dashboard/keuangan-terpusat/operasi#reconciliation',
+  PAYOUT_FAILED: '/dashboard/keuangan-terpusat/payout',
+}
+
+function SoftAlertPanel({ data }: { data: DashboardData }) {
+  return <SectionPanel title="Monitoring batas lunak" description="Indikator pemantauan dari pengaturan runtime; bukan error transaksi.">
+    <div className="divide-y divide-slate-100">{data.softAlerts.map(row => <Link href={row.kind === 'LARGE_TOPUP' ? '/dashboard/keuangan-terpusat/ledger?q=TOPUP' : '/dashboard/keuangan-terpusat/alokasi'} key={row.kind} className="flex items-center justify-between gap-3 px-4 py-3 text-xs hover:bg-slate-50"><span className="font-medium text-slate-700">{softAlertLabel[row.kind] || row.kind}</span><span className="text-right"><StatusBadge tone={Number(row.count) ? 'blue' : 'slate'}>{row.count} indikator</StatusBadge><small className="mt-1 block tabular-nums text-slate-500">{rupiah(Number(row.amount_rupiah))}</small></span></Link>)}</div>
+  </SectionPanel>
+}
 
 function CashTrendPanel({ data, maxTrend }: { data: DashboardData; maxTrend: number }) {
   return <SectionPanel title="Tren arus kas 30 hari" description="Debit dan kredit pada rekening bank/clearing; untuk membaca pola, bukan menggantikan rekonsiliasi.">
@@ -31,10 +45,10 @@ function CashTrendPanel({ data, maxTrend }: { data: DashboardData; maxTrend: num
 function AlertPanel({ data }: { data: DashboardData }) {
   return <SectionPanel title="Pengecualian butuh tindakan" description="Kerjakan dari dampak tertinggi; jangan menyembunyikan selisih.">
     <div className="divide-y divide-slate-100">
-      {data.alerts.map(row => <div key={row.kind} className="flex items-center justify-between gap-3 px-4 py-3 text-xs sm:gap-4 sm:text-sm">
+      {data.alerts.map(row => <Link href={alertHref[row.kind] || '/dashboard/keuangan-terpusat'} key={row.kind} className="flex items-center justify-between gap-3 px-4 py-3 text-xs transition hover:bg-slate-50 sm:gap-4 sm:text-sm">
         <div className="flex min-w-0 items-center gap-2"><AlertTriangle className={Number(row.count) ? 'h-4 w-4 shrink-0 text-amber-600' : 'h-4 w-4 shrink-0 text-slate-300'} /><span className="font-medium text-slate-700">{alertLabel[row.kind] || row.kind}</span></div>
         <div className="shrink-0 text-right"><StatusBadge tone={Number(row.count) ? 'amber' : 'emerald'}>{row.count} kasus</StatusBadge><p className="mt-1 text-[10px] tabular-nums text-slate-500 sm:text-xs">{rupiah(Number(row.amount_rupiah))}</p></div>
-      </div>)}
+      </Link>)}
     </div>
   </SectionPanel>
 }
@@ -43,13 +57,13 @@ function ActivityPanel({ data }: { data: DashboardData }) {
   return <SectionPanel title="Aktivitas jurnal terbaru" description="Urutan transaksi berdasarkan waktu posting paling baru.">
     <div className="divide-y divide-slate-100 sm:hidden">
       {data.recentTransactions.length ? data.recentTransactions.map(row => <article key={row.id} className="space-y-2 px-4 py-3 text-xs">
-        <div className="flex items-start justify-between gap-3"><p className="min-w-0 font-semibold text-slate-800">{row.description}</p><span className="shrink-0 tabular-nums text-slate-500">{row.effective_date}</span></div>
+        <div className="flex items-start justify-between gap-3"><Link href={`/dashboard/keuangan-terpusat/ledger?q=${encodeURIComponent(row.id)}`} className="min-w-0 font-semibold text-slate-800 hover:text-emerald-700">{row.description}</Link><span className="shrink-0 tabular-nums text-slate-500">{row.effective_date}</span></div>
         <div className="flex items-end justify-between gap-3"><StatusBadge>{row.source_type}</StatusBadge><span className="min-w-0 break-all text-right font-mono text-[10px] text-slate-400">{row.external_reference || '—'}</span></div>
       </article>) : <p className="px-4 py-10 text-center text-sm text-slate-500">Belum ada jurnal terposting.</p>}
     </div>
     <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[560px] text-xs">
       <thead className="bg-slate-50 text-left font-bold uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-2.5">Tanggal</th><th className="px-4 py-2.5">Keterangan</th><th className="px-4 py-2.5">Sumber</th><th className="px-4 py-2.5">Referensi</th></tr></thead>
-      <tbody className="divide-y divide-slate-100">{data.recentTransactions.length ? data.recentTransactions.map(row => <tr key={row.id} className="hover:bg-slate-50"><td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-500">{row.effective_date}</td><td className="px-4 py-3 font-medium text-slate-800">{row.description}</td><td className="px-4 py-3"><StatusBadge>{row.source_type}</StatusBadge></td><td className="px-4 py-3 font-mono text-slate-500">{row.external_reference || '—'}</td></tr>) : <tr><td colSpan={4} className="px-4 py-12 text-center text-sm text-slate-500">Belum ada jurnal terposting.</td></tr>}</tbody>
+      <tbody className="divide-y divide-slate-100">{data.recentTransactions.length ? data.recentTransactions.map(row => <tr key={row.id} className="hover:bg-slate-50"><td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-500">{row.effective_date}</td><td className="px-4 py-3 font-medium text-slate-800"><Link href={`/dashboard/keuangan-terpusat/ledger?q=${encodeURIComponent(row.id)}`} className="hover:text-emerald-700">{row.description}</Link></td><td className="px-4 py-3"><StatusBadge>{row.source_type}</StatusBadge></td><td className="px-4 py-3 font-mono text-slate-500">{row.external_reference || '—'}</td></tr>) : <tr><td colSpan={4} className="px-4 py-12 text-center text-sm text-slate-500">Belum ada jurnal terposting.</td></tr>}</tbody>
     </table></div>
   </SectionPanel>
 }
@@ -90,6 +104,7 @@ export default async function CentralFinancePage() {
 
       <CashTrendPanel data={data} maxTrend={maxTrend} />
       <AlertPanel data={data} />
+      <SoftAlertPanel data={data} />
       <ActivityPanel data={data} />
       <AccountsPanel data={data} />
     </div>
@@ -113,7 +128,7 @@ export default async function CentralFinancePage() {
         </SectionPanel>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[.8fr_1.2fr]"><AlertPanel data={data} /><ActivityPanel data={data} /></section>
+      <section className="grid gap-4 xl:grid-cols-[.8fr_1.2fr]"><div className="space-y-4"><AlertPanel data={data} /><SoftAlertPanel data={data} /></div><ActivityPanel data={data} /></section>
       <AccountsPanel data={data} />
     </div>
   </main>

@@ -91,11 +91,19 @@ export async function reverseJournal(input: {
   actorId?: string | null
   reason: string
 }) {
+  if (input.reason.trim().length < 10) return { success: false as const, error: 'Alasan reversal minimal 10 karakter.' }
   const original = await queryOne<{
-    id: string; effective_date: string; description: string; source_type: string; source_id: string | null
-  }>(`SELECT id,effective_date,description,source_type,source_id FROM finance_journals WHERE id=? AND status='POSTED'`, [input.journalId])
+    id: string; effective_date: string; description: string; source_type: string; source_id: string | null; reversal_of_id: string | null
+  }>(`SELECT id,effective_date,description,source_type,source_id,reversal_of_id FROM finance_journals WHERE id=? AND status='POSTED'`, [input.journalId])
   if (!original) return { success: false as const, error: 'Jurnal asal tidak ditemukan.' }
+  if (original.source_type !== 'MANUAL' || original.reversal_of_id) {
+    return { success: false as const, error: 'Hanya jurnal manual asli yang dapat direversal dari layar ledger.' }
+  }
+  const existingReversal = await queryOne<{ id: string }>(`SELECT id FROM finance_journals WHERE reversal_of_id=?`, [original.id])
+  if (existingReversal) return { success: false as const, error: 'Jurnal ini sudah memiliki reversal.' }
   const db = await getDB()
+  const walletMovement = await queryOne<{ id: string }>(`SELECT id FROM finance_wallet_movements WHERE journal_id=? LIMIT 1`, [original.id])
+  if (walletMovement) return { success: false as const, error: 'Jurnal yang memengaruhi wallet harus dikoreksi dari modul transaksi asal.' }
   const rows = await db.prepare(`SELECT a.code,e.side,e.amount_rupiah,e.santri_id,e.asrama_scope,e.counterparty_type,e.counterparty_id,e.memo
     FROM finance_journal_entries e JOIN finance_accounts a ON a.id=e.account_id WHERE e.journal_id=?`).bind(input.journalId).all()
   return postJournal({
