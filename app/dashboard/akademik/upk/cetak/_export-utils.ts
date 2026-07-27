@@ -128,63 +128,67 @@ export async function exportRekapTerjualExcel(
 
   // Row 1: Title
   setCell(1, 0, titleText, titleStyle)
-  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } })
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } })
 
   let startDataRow = 3
   if (subtitle) {
     setCell(2, 0, subtitle, subtitleStyle)
-    merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: 6 } })
+    merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: 7 } })
     startDataRow = 4
   }
 
   const headerRow = startDataRow
   const firstItemRow = headerRow + 1
 
-  // Headers (0-indexed cols: A=0, B=1, C=2, D=3, E=4, F=5, G=6)
+  // Headers (0-indexed cols: A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7)
   setCell(headerRow, 0, 'NO', headerStyle)
   setCell(headerRow, 1, 'NAMA KITAB', headerStyle)
-  setCell(headerRow, 2, 'TERJUAL', headerStyle)
-  setCell(headerRow, 3, 'HARGA BELI', headerStyle)
-  setCell(headerRow, 4, 'HARGA JUAL', headerStyle)
-  setCell(headerRow, 5, 'MODAL', headerStyle)
-  setCell(headerRow, 6, 'LABA KOTOR', headerStyle)
+  setCell(headerRow, 2, 'TOKO', headerStyle)
+  setCell(headerRow, 3, 'TERJUAL', headerStyle)
+  setCell(headerRow, 4, 'HARGA BELI', headerStyle)
+  setCell(headerRow, 5, 'HARGA JUAL', headerStyle)
+  setCell(headerRow, 6, 'MODAL', headerStyle)
+  setCell(headerRow, 7, 'LABA KOTOR', headerStyle)
 
   items.forEach((item, index) => {
     const row = firstItemRow + index
     setCell(row, 0, index + 1, centerStyle)
     setCell(row, 1, item.nama_kitab, leftStyle)
-    setCell(row, 2, item.qty_terjual, centerStyle)
-    setCell(row, 3, item.harga_beli, currencyStyle)
-    setCell(row, 4, item.harga_jual, currencyStyle)
-    setCell(row, 5, item.modal, currencyStyle, `C${row}*D${row}`)
-    setCell(row, 6, item.laba_kotor, currencyStyle, `C${row}*E${row}`)
+    setCell(row, 2, item.toko_nama || '-', leftStyle)
+    setCell(row, 3, item.qty_terjual, centerStyle)
+    setCell(row, 4, item.harga_beli, currencyStyle)
+    setCell(row, 5, item.harga_jual, currencyStyle)
+    setCell(row, 6, item.modal, currencyStyle, `D${row}*E${row}`)
+    setCell(row, 7, item.laba_kotor, currencyStyle, `D${row}*F${row}`)
   })
 
   const totalRow = firstItemRow + items.length
   setCell(totalRow, 0, 'JUMLAH TOTAL', totalLabelStyle)
   setCell(totalRow, 1, '', totalLabelStyle)
-  merges.push({ s: { r: totalRow - 1, c: 0 }, e: { r: totalRow - 1, c: 1 } })
+  setCell(totalRow, 2, '', totalLabelStyle)
+  merges.push({ s: { r: totalRow - 1, c: 0 }, e: { r: totalRow - 1, c: 2 } })
 
   const totalQty = items.reduce((acc, i) => acc + i.qty_terjual, 0)
   const totalModal = items.reduce((acc, i) => acc + i.modal, 0)
   const totalLabaKotor = items.reduce((acc, i) => acc + i.laba_kotor, 0)
 
-  setCell(totalRow, 2, totalQty, totalQtyStyle, `SUM(C${firstItemRow}:C${totalRow - 1})`)
-  setCell(totalRow, 3, '', totalLabelStyle)
+  setCell(totalRow, 3, totalQty, totalQtyStyle, `SUM(D${firstItemRow}:D${totalRow - 1})`)
   setCell(totalRow, 4, '', totalLabelStyle)
-  setCell(totalRow, 5, totalModal, totalValueStyle, `SUM(F${firstItemRow}:F${totalRow - 1})`)
-  setCell(totalRow, 6, totalLabaKotor, totalValueStyle, `SUM(G${firstItemRow}:G${totalRow - 1})`)
+  setCell(totalRow, 5, '', totalLabelStyle)
+  setCell(totalRow, 6, totalModal, totalValueStyle, `SUM(G${firstItemRow}:G${totalRow - 1})`)
+  setCell(totalRow, 7, totalLabaKotor, totalValueStyle, `SUM(H${firstItemRow}:H${totalRow - 1})`)
 
-  worksheet['!ref'] = `A1:G${maxRow}`
+  worksheet['!ref'] = `A1:H${maxRow}`
   worksheet['!merges'] = merges
   worksheet['!cols'] = [
     { wch: 6 },   // A: NO
     { wch: 36 },  // B: NAMA KITAB
-    { wch: 12 },  // C: TERJUAL
-    { wch: 16 },  // D: HARGA BELI
-    { wch: 16 },  // E: HARGA JUAL
-    { wch: 20 },  // F: MODAL
-    { wch: 20 },  // G: LABA KOTOR
+     { wch: 22 },  // C: TOKO
+     { wch: 12 },  // D: TERJUAL
+     { wch: 16 },  // E: HARGA BELI
+     { wch: 16 },  // F: HARGA JUAL
+     { wch: 20 },  // G: MODAL
+     { wch: 20 },  // H: LABA KOTOR
   ]
   worksheet['!rows'] = Array.from({ length: maxRow }, (_, i) => ({
     hpt: i === 0 ? 24 : i === headerRow - 1 ? 22 : 20,
@@ -215,6 +219,7 @@ export function exportRekapTerjualWord(
     <tr>
       <td class="text-center">${idx + 1}</td>
       <td class="text-left">${item.nama_kitab}</td>
+      <td class="text-left">${item.toko_nama || '-'}</td>
       <td class="text-center">${item.qty_terjual}</td>
       <td class="text-right">${formatRp(item.harga_beli)}</td>
       <td class="text-right">${formatRp(item.harga_jual)}</td>
@@ -298,10 +303,11 @@ export function exportRekapTerjualWord(
     <thead>
       <tr>
         <th style="width: 5%;">NO</th>
-        <th style="width: 35%;">NAMA KITAB</th>
-        <th style="width: 10%;">TERJUAL</th>
-        <th style="width: 12%;">HARGA BELI</th>
-        <th style="width: 12%;">HARGA JUAL</th>
+        <th style="width: 28%;">NAMA KITAB</th>
+        <th style="width: 14%;">TOKO</th>
+        <th style="width: 9%;">TERJUAL</th>
+        <th style="width: 11%;">HARGA BELI</th>
+        <th style="width: 11%;">HARGA JUAL</th>
         <th style="width: 13%;">MODAL</th>
         <th style="width: 13%;">LABA KOTOR</th>
       </tr>
@@ -309,7 +315,7 @@ export function exportRekapTerjualWord(
     <tbody>
       ${tableRowsHtml}
       <tr class="total-row">
-        <td colspan="2" class="text-center">JUMLAH TOTAL</td>
+        <td colspan="3" class="text-center">JUMLAH TOTAL</td>
         <td class="text-center">${totalQty}</td>
         <td></td>
         <td></td>
@@ -400,12 +406,12 @@ export async function exportRekapTidakTerjualExcel(items: RekapTidakTerjualItem[
   const merges: { s: { r: number; c: number }; e: { r: number; c: number } }[] = []
 
   setCell(1, 0, titleText, titleStyle)
-  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } })
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } })
 
   let startDataRow = 3
   if (subtitle) {
     setCell(2, 0, subtitle, subtitleStyle)
-    merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: 8 } })
+    merges.push({ s: { r: 1, c: 0 }, e: { r: 1, c: 9 } })
     startDataRow = 4
   }
 
@@ -414,31 +420,34 @@ export async function exportRekapTidakTerjualExcel(items: RekapTidakTerjualItem[
 
   setCell(headerRow, 0, 'NO', headerStyle)
   setCell(headerRow, 1, 'NAMA KITAB', headerStyle)
-  setCell(headerRow, 2, 'STOK LAMA', headerStyle)
-  setCell(headerRow, 3, 'STOK BARU', headerStyle)
-  setCell(headerRow, 4, 'STOK TOTAL', headerStyle)
-  setCell(headerRow, 5, 'HARGA BELI', headerStyle)
-  setCell(headerRow, 6, 'HARGA JUAL', headerStyle)
-  setCell(headerRow, 7, 'NILAI ASSET (MODAL)', headerStyle)
-  setCell(headerRow, 8, 'NILAI ASSET (JUAL)', headerStyle)
+  setCell(headerRow, 2, 'TOKO', headerStyle)
+  setCell(headerRow, 3, 'STOK LAMA', headerStyle)
+  setCell(headerRow, 4, 'STOK BARU', headerStyle)
+  setCell(headerRow, 5, 'STOK TOTAL', headerStyle)
+  setCell(headerRow, 6, 'HARGA BELI', headerStyle)
+  setCell(headerRow, 7, 'HARGA JUAL', headerStyle)
+  setCell(headerRow, 8, 'NILAI ASSET (MODAL)', headerStyle)
+  setCell(headerRow, 9, 'NILAI ASSET (JUAL)', headerStyle)
 
   items.forEach((item, index) => {
     const row = firstItemRow + index
     setCell(row, 0, index + 1, centerStyle)
     setCell(row, 1, item.nama_kitab, leftStyle)
-    setCell(row, 2, item.stok_lama, centerStyle)
-    setCell(row, 3, item.stok_baru, centerStyle)
-    setCell(row, 4, item.stok_total, centerStyle, `C${row}+D${row}`)
-    setCell(row, 5, item.harga_beli, currencyStyle)
-    setCell(row, 6, item.harga_jual, currencyStyle)
-    setCell(row, 7, item.nilai_asset_modal, currencyStyle, `E${row}*F${row}`)
-    setCell(row, 8, item.nilai_asset_jual, currencyStyle, `E${row}*G${row}`)
+    setCell(row, 2, item.toko_nama || '-', leftStyle)
+    setCell(row, 3, item.stok_lama, centerStyle)
+    setCell(row, 4, item.stok_baru, centerStyle)
+    setCell(row, 5, item.stok_total, centerStyle, `D${row}+E${row}`)
+    setCell(row, 6, item.harga_beli, currencyStyle)
+    setCell(row, 7, item.harga_jual, currencyStyle)
+    setCell(row, 8, item.nilai_asset_modal, currencyStyle, `F${row}*G${row}`)
+    setCell(row, 9, item.nilai_asset_jual, currencyStyle, `F${row}*H${row}`)
   })
 
   const totalRow = firstItemRow + items.length
   setCell(totalRow, 0, 'JUMLAH TOTAL', totalLabelStyle)
   setCell(totalRow, 1, '', totalLabelStyle)
-  merges.push({ s: { r: totalRow - 1, c: 0 }, e: { r: totalRow - 1, c: 1 } })
+  setCell(totalRow, 2, '', totalLabelStyle)
+  merges.push({ s: { r: totalRow - 1, c: 0 }, e: { r: totalRow - 1, c: 2 } })
 
   const totalLama = items.reduce((acc, i) => acc + i.stok_lama, 0)
   const totalBaru = items.reduce((acc, i) => acc + i.stok_baru, 0)
@@ -446,26 +455,27 @@ export async function exportRekapTidakTerjualExcel(items: RekapTidakTerjualItem[
   const totalAssetModal = items.reduce((acc, i) => acc + i.nilai_asset_modal, 0)
   const totalAssetJual = items.reduce((acc, i) => acc + i.nilai_asset_jual, 0)
 
-  setCell(totalRow, 2, totalLama, totalQtyStyle, `SUM(C${firstItemRow}:C${totalRow - 1})`)
-  setCell(totalRow, 3, totalBaru, totalQtyStyle, `SUM(D${firstItemRow}:D${totalRow - 1})`)
-  setCell(totalRow, 4, totalStok, totalQtyStyle, `SUM(E${firstItemRow}:E${totalRow - 1})`)
-  setCell(totalRow, 5, '', totalLabelStyle)
+  setCell(totalRow, 3, totalLama, totalQtyStyle, `SUM(D${firstItemRow}:D${totalRow - 1})`)
+  setCell(totalRow, 4, totalBaru, totalQtyStyle, `SUM(E${firstItemRow}:E${totalRow - 1})`)
+  setCell(totalRow, 5, totalStok, totalQtyStyle, `SUM(F${firstItemRow}:F${totalRow - 1})`)
   setCell(totalRow, 6, '', totalLabelStyle)
-  setCell(totalRow, 7, totalAssetModal, totalValueStyle, `SUM(H${firstItemRow}:H${totalRow - 1})`)
-  setCell(totalRow, 8, totalAssetJual, totalValueStyle, `SUM(I${firstItemRow}:I${totalRow - 1})`)
+  setCell(totalRow, 7, '', totalLabelStyle)
+  setCell(totalRow, 8, totalAssetModal, totalValueStyle, `SUM(I${firstItemRow}:I${totalRow - 1})`)
+  setCell(totalRow, 9, totalAssetJual, totalValueStyle, `SUM(J${firstItemRow}:J${totalRow - 1})`)
 
-  worksheet['!ref'] = `A1:I${maxRow}`
+  worksheet['!ref'] = `A1:J${maxRow}`
   worksheet['!merges'] = merges
   worksheet['!cols'] = [
     { wch: 6 },   // A: NO
     { wch: 34 },  // B: NAMA KITAB
-    { wch: 12 },  // C: STOK LAMA
-    { wch: 12 },  // D: STOK BARU
-    { wch: 14 },  // E: STOK TOTAL
-    { wch: 15 },  // F: HARGA BELI
-    { wch: 15 },  // G: HARGA JUAL
-    { wch: 22 },  // H: NILAI ASSET MODAL
-    { wch: 22 },  // I: NILAI ASSET JUAL
+    { wch: 22 },  // C: TOKO
+    { wch: 12 },  // D: STOK LAMA
+    { wch: 12 },  // E: STOK BARU
+    { wch: 14 },  // F: STOK TOTAL
+    { wch: 15 },  // G: HARGA BELI
+    { wch: 15 },  // H: HARGA JUAL
+    { wch: 22 },  // I: NILAI ASSET MODAL
+    { wch: 22 },  // J: NILAI ASSET JUAL
   ]
   worksheet['!rows'] = Array.from({ length: maxRow }, (_, i) => ({
     hpt: i === 0 ? 24 : i === headerRow - 1 ? 22 : 20,
@@ -494,6 +504,7 @@ export function exportRekapTidakTerjualWord(items: RekapTidakTerjualItem[], subt
     <tr>
       <td class="text-center">${idx + 1}</td>
       <td class="text-left">${item.nama_kitab}</td>
+      <td class="text-left">${item.toko_nama || '-'}</td>
       <td class="text-center">${item.stok_lama}</td>
       <td class="text-center">${item.stok_baru}</td>
       <td class="text-center font-bold">${item.stok_total}</td>
@@ -580,12 +591,13 @@ export function exportRekapTidakTerjualWord(items: RekapTidakTerjualItem[], subt
     <thead>
       <tr>
         <th style="width: 4%;">NO</th>
-        <th style="width: 28%;">NAMA KITAB</th>
-        <th style="width: 9%;">STOK LAMA</th>
-        <th style="width: 9%;">STOK BARU</th>
-        <th style="width: 10%;">STOK TOTAL</th>
-        <th style="width: 10%;">HARGA BELI</th>
-        <th style="width: 10%;">HARGA JUAL</th>
+        <th style="width: 24%;">NAMA KITAB</th>
+        <th style="width: 13%;">TOKO</th>
+        <th style="width: 8%;">STOK LAMA</th>
+        <th style="width: 8%;">STOK BARU</th>
+        <th style="width: 9%;">STOK TOTAL</th>
+        <th style="width: 9%;">HARGA BELI</th>
+        <th style="width: 9%;">HARGA JUAL</th>
         <th style="width: 10%;">NILAI (MODAL)</th>
         <th style="width: 10%;">NILAI (JUAL)</th>
       </tr>
@@ -593,7 +605,7 @@ export function exportRekapTidakTerjualWord(items: RekapTidakTerjualItem[], subt
     <tbody>
       ${tableRowsHtml}
       <tr class="total-row">
-        <td colspan="2" class="text-center">JUMLAH TOTAL</td>
+        <td colspan="3" class="text-center">JUMLAH TOTAL</td>
         <td class="text-center">${totalLama}</td>
         <td class="text-center">${totalBaru}</td>
         <td class="text-center">${totalStok}</td>
@@ -1282,4 +1294,3 @@ export function exportRekapPengeluaranWord(items: RekapPengeluaranItem[], subtit
   const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' })
   downloadFile(blob, `Laporan_Pengeluaran_UPK_${new Date().toISOString().slice(0, 10)}.doc`)
 }
-

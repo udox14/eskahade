@@ -173,11 +173,12 @@ export async function getRekapKitabTerjualData(filters?: {
     }
   }
 
-  // Agregasi di JS berdasarkan nama_kitab agar tidak ada baris ganda
+  // Agregasi per katalog/toko agar kitab dengan nama sama dari toko berbeda tidak tergabung.
   const mapByName = new Map<string, RekapTerjualItem>()
   for (const r of rows) {
     const rawName = (r.nama_kitab || 'Tanpa Nama').trim()
-    const nameKey = rawName.toLowerCase()
+    const tokoKey = (r.toko_nama || 'Tanpa Toko').trim().toLowerCase()
+    const nameKey = `${r.katalog_id ?? 'tanpa-katalog'}::${rawName.toLowerCase()}::${tokoKey}`
     const qty = toInt(r.qty_terjual)
     const hBeli = toInt(r.harga_beli)
     const hJual = toInt(r.harga_jual)
@@ -267,11 +268,12 @@ export async function getRekapKitabTidakTerjualData(filters?: {
     return []
   }
 
-  // Agregasi di JS berdasarkan nama_kitab agar tidak ada baris ganda
+  // Agregasi per katalog/toko agar stok toko tidak tercampur.
   const mapByName = new Map<string, RekapTidakTerjualItem>()
   for (const r of rows) {
     const rawName = (r.nama_kitab || 'Tanpa Nama').trim()
-    const nameKey = rawName.toLowerCase()
+    const tokoKey = (r.toko_nama || 'Tanpa Toko').trim().toLowerCase()
+    const nameKey = `${r.katalog_id}::${rawName.toLowerCase()}::${tokoKey}`
     const sLama = toInt(r.stok_lama)
     const sBaru = toInt(r.stok_baru)
     const hBeli = toInt(r.harga_beli)
@@ -405,4 +407,3 @@ export async function getRekapPengeluaranData(filters?: {
 }
 
 export { getDaftarKitabPerMarhalah }
-

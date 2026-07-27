@@ -206,6 +206,7 @@ export function RekapTerjualView({
                 <tr className="bg-slate-200 text-slate-800 font-bold border-b border-slate-300">
                   <th className="py-2.5 px-3 border-r border-slate-300 text-center w-12">NO</th>
                   <th className="py-2.5 px-4 border-r border-slate-300 text-left">NAMA KITAB</th>
+                  <th className="py-2.5 px-4 border-r border-slate-300 text-left w-32">TOKO</th>
                   <th className="py-2.5 px-3 border-r border-slate-300 text-center w-24">TERJUAL</th>
                   <th className="py-2.5 px-4 border-r border-slate-300 text-right w-32">HARGA BELI</th>
                   <th className="py-2.5 px-4 border-r border-slate-300 text-right w-32">HARGA JUAL</th>
@@ -221,6 +222,9 @@ export function RekapTerjualView({
                     </td>
                     <td className="py-2 px-4 border-r border-slate-200 font-semibold text-slate-800">
                       {item.nama_kitab}
+                    </td>
+                    <td className="py-2 px-4 border-r border-slate-200 text-slate-700">
+                      {item.toko_nama || '-'}
                     </td>
                     <td className="py-2 px-3 text-center border-r border-slate-200 font-bold text-slate-700">
                       {item.qty_terjual}
@@ -242,7 +246,7 @@ export function RekapTerjualView({
               </tbody>
               <tfoot>
                 <tr className="bg-slate-100 border-t-2 border-slate-400 font-bold text-slate-900">
-                  <td colSpan={2} className="py-3 px-4 text-center border-r border-slate-300 tracking-wider">
+                  <td colSpan={3} className="py-3 px-4 text-center border-r border-slate-300 tracking-wider">
                     JUMLAH TOTAL
                   </td>
                   <td className="py-3 px-3 text-center border-r border-slate-300 font-extrabold text-indigo-700">
