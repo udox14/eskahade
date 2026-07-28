@@ -100,9 +100,9 @@ export async function getIncidentData() {
     openShifts: openShifts.map(row => ({ ...row, operator_name: names.get(row.operator_id) || row.operator_id })),
     proposers,
     scope,
-    canApprove: (roles.includes('dewan_santri') && roles.includes('jabatan:bendahara')) || roles.includes('admin'),
-    canCreate: roles.includes('bendahara') || (roles.includes('pengurus_asrama') && roles.includes('jabatan:bendahara')) || roles.includes('admin'),
-    canClose: roles.includes('bendahara') || roles.includes('admin'),
+    canApprove: (roles.includes('dewan_santri') && roles.includes('jabatan:bendahara')) || roles.includes('admin') || roles.includes('demo'),
+    canCreate: roles.includes('bendahara') || (roles.includes('pengurus_asrama') && roles.includes('jabatan:bendahara')) || roles.includes('admin') || roles.includes('demo'),
+    canClose: roles.includes('bendahara') || roles.includes('admin') || roles.includes('demo'),
     nowMs: Date.now(),
   }
 }

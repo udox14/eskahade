@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList, getCachedTahunAjaranAktif, getCachedTahunAjaranList } from '@/lib/cache/master'
 import { isKomposisiKelas } from '@/lib/akademik/grade'
 import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
+import { ensureKelasPengurusColumns } from '@/lib/akademik/kelas-pengurus'
 
 // Komposisi baru/lama AKTUAL kelas, dihitung dari data riil hasil Penempatan Kelas
 // (riwayat_pendidikan + kategori efektif santri), bukan dari input manual `baru_lama`.
@@ -55,6 +56,8 @@ async function ensureKelasExtraColumns() {
       throw error
     }
   }
+
+  await ensureKelasPengurusColumns()
 }
 
 function sortKelasByMarhalahPriority(a: any, b: any) {
@@ -82,12 +85,47 @@ function sortKelasByMarhalahPriority(a: any, b: any) {
 export async function getKelasList() {
   await ensureKelasExtraColumns()
   const data = await query<any>(`
-    SELECT k.*, m.nama as marhalah_nama, ta.nama as tahun_ajaran_nama, ${baruLamaAktualSql('k')}
+    SELECT
+      k.*,
+      m.nama as marhalah_nama,
+      ta.nama as tahun_ajaran_nama,
+      km.nama_lengkap as km_nama,
+      wakil_km.nama_lengkap as wakil_km_nama,
+      sekretaris.nama_lengkap as sekretaris_nama,
+      wakil_sekretaris.nama_lengkap as wakil_sekretaris_nama,
+      ${baruLamaAktualSql('k')}
     FROM kelas k
     LEFT JOIN marhalah m ON k.marhalah_id = m.id
+    LEFT JOIN santri km ON km.id = k.km_id
+    LEFT JOIN santri wakil_km ON wakil_km.id = k.wakil_km_id
+    LEFT JOIN santri sekretaris ON sekretaris.id = k.sekretaris_id
+    LEFT JOIN santri wakil_sekretaris ON wakil_sekretaris.id = k.wakil_sekretaris_id
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
   `)
   return data.sort(sortKelasByMarhalahPriority)
+}
+
+export type SantriKelasOption = {
+  kelas_id: string
+  id: string
+  nama_lengkap: string
+  nis: string
+}
+
+export async function getSantriAktifPerKelas() {
+  const aktif = await getCachedTahunAjaranAktif()
+  if (!aktif) return []
+
+  return query<SantriKelasOption>(`
+    SELECT rp.kelas_id, s.id, s.nama_lengkap, s.nis
+    FROM riwayat_pendidikan rp
+    JOIN santri s ON s.id = rp.santri_id
+    JOIN kelas k ON k.id = rp.kelas_id
+    WHERE rp.status_riwayat = 'aktif'
+      AND s.status_global = 'aktif'
+      AND k.tahun_ajaran_id = ?
+    ORDER BY s.nama_lengkap COLLATE NOCASE
+  `, [aktif.id])
 }
 
 export type TempelanKelasItem = {
@@ -192,6 +230,7 @@ export async function tambahKelas(formData: FormData) {
   })
 
   revalidatePath('/dashboard/master/kelas')
+  revalidatePath('/dashboard/akademik/absensi/cetak-blanko')
   return { success: true }
 }
 
@@ -327,7 +366,16 @@ export async function importKelasMassal(dataExcel: any[]) {
 
 export async function updateKelasRuanganFields(
   kelasId: string,
-  fields: { tempat?: string; grade?: string; baru_lama?: string; jenis_kelamin?: string }
+  fields: {
+    tempat?: string
+    grade?: string
+    baru_lama?: string
+    jenis_kelamin?: string
+    km_id?: string
+    wakil_km_id?: string
+    sekretaris_id?: string
+    wakil_sekretaris_id?: string
+  }
 ) {
   const session = await getSession()
   await ensureKelasExtraColumns()
@@ -343,10 +391,51 @@ export async function updateKelasRuanganFields(
   const grade = isKomposisiKelas(gradeRaw) ? gradeRaw : ''
   const baruLama = (fields.baru_lama ?? '').trim().toUpperCase()
   const jenisKelamin = fields.jenis_kelamin ?? 'L'
+  const pengurus = {
+    km_id: (fields.km_id ?? '').trim() || null,
+    wakil_km_id: (fields.wakil_km_id ?? '').trim() || null,
+    sekretaris_id: (fields.sekretaris_id ?? '').trim() || null,
+    wakil_sekretaris_id: (fields.wakil_sekretaris_id ?? '').trim() || null,
+  }
+
+  const selectedIds = Object.values(pengurus).filter((id): id is string => Boolean(id))
+  if (new Set(selectedIds).size !== selectedIds.length) {
+    return { error: 'Setiap jabatan pengurus harus diisi oleh santri yang berbeda.' }
+  }
+
+  if (selectedIds.length > 0) {
+    const placeholders = selectedIds.map(() => '?').join(',')
+    const validRows = await query<{ id: string }>(`
+      SELECT DISTINCT s.id
+      FROM riwayat_pendidikan rp
+      JOIN santri s ON s.id = rp.santri_id
+      WHERE rp.kelas_id = ?
+        AND rp.status_riwayat = 'aktif'
+        AND s.status_global = 'aktif'
+        AND s.id IN (${placeholders})
+    `, [kelasId, ...selectedIds])
+
+    if (validRows.length !== selectedIds.length) {
+      return { error: 'Pengurus harus dipilih dari santri aktif di kelas tersebut.' }
+    }
+  }
 
   await execute(
-    'UPDATE kelas SET tempat = ?, grade = ?, baru_lama = ?, jenis_kelamin = ? WHERE id = ?',
-    [tempat || null, grade || null, baruLama || null, jenisKelamin, kelasId]
+    `UPDATE kelas
+     SET tempat = ?, grade = ?, baru_lama = ?, jenis_kelamin = ?,
+         km_id = ?, wakil_km_id = ?, sekretaris_id = ?, wakil_sekretaris_id = ?
+     WHERE id = ?`,
+    [
+      tempat || null,
+      grade || null,
+      baruLama || null,
+      jenisKelamin,
+      pengurus.km_id,
+      pengurus.wakil_km_id,
+      pengurus.sekretaris_id,
+      pengurus.wakil_sekretaris_id,
+      kelasId,
+    ]
   )
 
   await logActivity({
@@ -358,11 +447,18 @@ export async function updateKelasRuanganFields(
     entityType: 'kelas',
     entityId: kelasId,
     entityLabel: existing.nama_kelas,
-    summary: `Update data ruangan kelas ${existing.nama_kelas}`,
-    details: { tempat: tempat || null, grade: grade || null, baru_lama: baruLama || null, jenis_kelamin: jenisKelamin },
+    summary: `Update data kelas ${existing.nama_kelas}`,
+    details: {
+      tempat: tempat || null,
+      grade: grade || null,
+      baru_lama: baruLama || null,
+      jenis_kelamin: jenisKelamin,
+      ...pengurus,
+    },
   })
 
   revalidatePath('/dashboard/master/kelas')
+  revalidatePath('/dashboard/akademik/absensi/cetak-blanko')
   return { success: true }
 }
 

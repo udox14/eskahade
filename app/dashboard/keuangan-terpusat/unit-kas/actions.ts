@@ -91,7 +91,7 @@ export async function setCashUnitOperator(cashUnitId: string, operatorId: string
     `SELECT id,full_name,role,roles FROM users WHERE id=?`, [operatorId])
   let roles: string[] = []
   try { roles = JSON.parse(operator?.roles || '[]') } catch { roles = [] }
-  if (!operator || (operator.role !== 'operator_loket' && !roles.includes('operator_loket'))) {
+  if (!operator || (operator.role !== 'operator_loket' && !roles.includes('operator_loket') && operator.role !== 'demo' && !roles.includes('demo'))) {
     return { error: 'Pengguna belum memiliki role Operator Loket.' }
   }
   if (!active) {
@@ -133,7 +133,7 @@ export async function getCashUnitManagementData() {
   await requireFinanceAccess('CONFIGURE')
   const operators = await mainQuery<{ id: string; full_name: string | null; email: string; asrama_binaan: string | null }>(`SELECT
       id,full_name,email,asrama_binaan FROM users
-    WHERE role='operator_loket' OR roles LIKE '%"operator_loket"%'
+    WHERE role IN ('operator_loket','demo') OR roles LIKE '%"operator_loket"%' OR roles LIKE '%"demo"%'
     ORDER BY full_name,email`)
   const units = await financeQuery<any>(`SELECT cu.*,
       (SELECT COUNT(*) FROM finance_cash_unit_operators a WHERE a.cash_unit_id=cu.id AND a.is_active=1) operator_count,

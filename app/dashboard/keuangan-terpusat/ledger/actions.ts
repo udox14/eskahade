@@ -120,7 +120,7 @@ export async function getLedgerData() {
     journals,
     entries,
     accounts,
-    canExecute: roles.includes('bendahara') || roles.includes('admin'),
+    canExecute: roles.includes('bendahara') || roles.includes('admin') || roles.includes('demo'),
     scope,
     totals: {
       posted: await financeQueryOne<{ count: number }>(`SELECT COUNT(*) count FROM finance_journals j ${countFilter} ${countFilter ? 'AND' : 'WHERE'} j.status='POSTED'`, params),

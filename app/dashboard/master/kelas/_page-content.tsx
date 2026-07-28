@@ -1,12 +1,25 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getMarhalahList, getKelasList, tambahKelas, hapusKelas, importKelasMassal, getTahunAjaranAktif, getTahunAjaranList, copyKelasFromTahunAjaran, updateKelasRuanganFields } from './actions'
+import { getMarhalahList, getKelasList, getSantriAktifPerKelas, tambahKelas, hapusKelas, importKelasMassal, getTahunAjaranAktif, getTahunAjaranList, copyKelasFromTahunAjaran, updateKelasRuanganFields, type SantriKelasOption } from './actions'
 import { Trash2, Plus, FileSpreadsheet, Upload, Save, Download, List, Loader2, CalendarDays, AlertTriangle, Printer, Copy, X, Pencil, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+
+type KelasEditRow = {
+  tempat: string
+  grade: string
+  baru_lama: string
+  jenis_kelamin: string
+  km_id: string
+  wakil_km_id: string
+  sekretaris_id: string
+  wakil_sekretaris_id: string
+}
+
+type PengurusField = 'km_id' | 'wakil_km_id' | 'sekretaris_id' | 'wakil_sekretaris_id'
 
 export default function MasterKelasPage() {
   const confirm = useConfirm()
@@ -22,7 +35,8 @@ export default function MasterKelasPage() {
   const [copySourceId, setCopySourceId] = useState<number | ''>('')
   const [isCopying, setIsCopying] = useState(false)
   const [editMode, setEditMode] = useState(false)
-  const [editData, setEditData] = useState<Record<string, { tempat: string; grade: string; baru_lama: string; jenis_kelamin: string }>>({})
+  const [editData, setEditData] = useState<Record<string, KelasEditRow>>({})
+  const [santriByKelas, setSantriByKelas] = useState<Record<string, SantriKelasOption[]>>({})
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
   const [isSaving, setIsSaving] = useState(false)
 
@@ -32,18 +46,39 @@ export default function MasterKelasPage() {
 
   const loadData = async () => {
     setLoading(true)
-    const [m, k, ta, tal] = await Promise.all([getMarhalahList(), getKelasList(), getTahunAjaranAktif(), getTahunAjaranList()])
+    const [m, k, ta, tal, santriRows] = await Promise.all([
+      getMarhalahList(),
+      getKelasList(),
+      getTahunAjaranAktif(),
+      getTahunAjaranList(),
+      getSantriAktifPerKelas(),
+    ])
+    const groupedSantri: Record<string, SantriKelasOption[]> = {}
+    santriRows.forEach((santri) => {
+      if (!groupedSantri[santri.kelas_id]) groupedSantri[santri.kelas_id] = []
+      groupedSantri[santri.kelas_id].push(santri)
+    })
     setMarhalahList(m)
     setKelasList(k)
     setTahunAktif(ta)
     setTahunAjaranList(tal)
+    setSantriByKelas(groupedSantri)
     setLoading(false)
   }
 
   const enterEditMode = () => {
-    const init: Record<string, { tempat: string; grade: string; baru_lama: string; jenis_kelamin: string }> = {}
+    const init: Record<string, KelasEditRow> = {}
     kelasList.forEach((k: any) => {
-      init[k.id] = { tempat: k.tempat || '', grade: k.grade || '', baru_lama: k.baru_lama || '', jenis_kelamin: k.jenis_kelamin || 'L' }
+      init[k.id] = {
+        tempat: k.tempat || '',
+        grade: k.grade || '',
+        baru_lama: k.baru_lama || '',
+        jenis_kelamin: k.jenis_kelamin || 'L',
+        km_id: k.km_id || '',
+        wakil_km_id: k.wakil_km_id || '',
+        sekretaris_id: k.sekretaris_id || '',
+        wakil_sekretaris_id: k.wakil_sekretaris_id || '',
+      }
     })
     setEditData(init)
     setDirtyIds(new Set())
@@ -61,6 +96,32 @@ export default function MasterKelasPage() {
     setDirtyIds(prev => new Set(prev).add(kelasId))
   }
 
+  const renderPengurusCell = (
+    kelas: any,
+    row: KelasEditRow | undefined,
+    field: PengurusField,
+    nameField: string,
+  ) => (
+    <td className="px-3 py-2">
+      {editMode && row ? (
+        <select
+          value={row[field]}
+          onChange={e => handleFieldChange(kelas.id, field, e.target.value)}
+          className="w-full min-w-[190px] px-2 py-1 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none bg-white"
+        >
+          <option value="">- Belum dipilih -</option>
+          {(santriByKelas[kelas.id] || []).map(santri => (
+            <option key={santri.id} value={santri.id}>
+              {santri.nama_lengkap}{santri.nis ? ` (${santri.nis})` : ''}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className="text-slate-600">{kelas[nameField] || '-'}</span>
+      )}
+    </td>
+  )
+
   const handleSaveChanges = async () => {
     if (dirtyIds.size === 0) { setEditMode(false); return }
     setIsSaving(true)
@@ -71,7 +132,8 @@ export default function MasterKelasPage() {
     toast.dismiss(toastId)
     const errors = results.filter((r: any) => 'error' in r)
     if (errors.length > 0) {
-      toast.error(`${errors.length} data gagal disimpan`)
+      const firstError = (errors[0] as { error: string }).error
+      toast.error(errors.length === 1 ? firstError : `${errors.length} data gagal disimpan. ${firstError}`)
     } else {
       toast.success(`${dirtyIds.size} kelas berhasil diperbarui`)
     }
@@ -306,7 +368,7 @@ export default function MasterKelasPage() {
                     onClick={enterEditMode}
                     className="inline-flex items-center gap-1.5 border border-slate-300 bg-white text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-100 normal-case"
                   >
-                    <Pencil className="w-3.5 h-3.5" /> Edit Ruangan
+                    <Pencil className="w-3.5 h-3.5" /> Edit Data Kelas
                   </button>
                 )}
               </div>
@@ -314,13 +376,25 @@ export default function MasterKelasPage() {
             {editMode && (
               <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-xs text-amber-700 flex items-center gap-2">
                 <Pencil className="w-3.5 h-3.5 flex-shrink-0" />
-                Mode edit aktif — Tempat, Grade, B/L, dan L/P bisa diedit langsung di tabel.
+                Mode edit aktif — data ruangan dan pengurus kelas bisa diedit langsung di tabel. Pilihan pengurus hanya menampilkan santri aktif dari kelas tersebut.
               </div>
             )}
             <div className="overflow-x-auto">
-              <table className="min-w-[760px] w-full text-sm text-left">
+              <table className="min-w-[1560px] w-full text-sm text-left">
                 <thead className="bg-white text-slate-600 font-bold border-b">
-                  <tr><th className="px-6 py-3">Nama Kelas</th><th className="px-6 py-3">Tingkat</th><th className="px-6 py-3">Tempat</th><th className="px-6 py-3">Grade</th><th className="px-6 py-3">B/L</th><th className="px-6 py-3">L/P</th><th className="px-6 py-3 text-right">Aksi</th></tr>
+                  <tr>
+                    <th className="px-6 py-3">Nama Kelas</th>
+                    <th className="px-6 py-3">Tingkat</th>
+                    <th className="px-6 py-3">Tempat</th>
+                    <th className="px-6 py-3">Grade</th>
+                    <th className="px-6 py-3">B/L</th>
+                    <th className="px-6 py-3">L/P</th>
+                    <th className="px-3 py-3">KM</th>
+                    <th className="px-3 py-3">Wakil KM</th>
+                    <th className="px-3 py-3">Sekretaris</th>
+                    <th className="px-3 py-3">Wakil Sekretaris</th>
+                    <th className="px-6 py-3 text-right">Aksi</th>
+                  </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {kelasList?.map((k) => {
@@ -400,6 +474,10 @@ export default function MasterKelasPage() {
                             <span className={`px-2 py-1 rounded text-[10px] font-bold ${k.jenis_kelamin === 'L' ? 'bg-blue-100 text-blue-700' : k.jenis_kelamin === 'P' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700'}`}>{k.jenis_kelamin === 'C' ? 'CAMPURAN' : k.jenis_kelamin === 'L' ? 'PUTRA' : 'PUTRI'}</span>
                           )}
                         </td>
+                        {renderPengurusCell(k, row, 'km_id', 'km_nama')}
+                        {renderPengurusCell(k, row, 'wakil_km_id', 'wakil_km_nama')}
+                        {renderPengurusCell(k, row, 'sekretaris_id', 'sekretaris_nama')}
+                        {renderPengurusCell(k, row, 'wakil_sekretaris_id', 'wakil_sekretaris_nama')}
                         <td className="px-6 py-3 text-right">
                           {!editMode && (
                             <button onClick={() => handleHapus(k.id)} className="text-slate-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>

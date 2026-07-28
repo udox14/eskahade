@@ -51,6 +51,15 @@ npm.cmd run build
 
 `test:finance` membuat D1 lokal terisolasi dan menguji posting seimbang, rollback saldo negatif, jurnal tidak seimbang, idempotensi, periode tertutup, larangan self-approval, mode `HYBRID`, constraint credential aktif, dan resume batch 1.000 santri tanpa duplikasi.
 
+## Sandbox interaktif
+
+- Buat minimal dua user dengan role `demo` bila ingin menguji alur maker–checker tanpa melanggar larangan self-approval.
+- Login sebagai user demo akan mengarahkan data aplikasi ke `DEMO_DB` dan seluruh data Keuangan Terpusat ke `DEMO_FINANCE_DB`.
+- Reset baseline dilakukan oleh admin asli dari **Pengaturan → Fitur & Akses → Reset Data Demo**. Reset mencakup kedua database demo dan tidak menyentuh data produksi.
+- Baseline loket memakai QR `SKH1.DEMO.SANTRI.0001.TEST.CREDENTIAL`, RFID `DEMO0001`, dan PIN `123456`.
+- Payment dan payout dari request akun demo disimulasikan di dalam aplikasi. Request tersebut tidak memanggil endpoint Duitku, meskipun environment produksi sedang aktif.
+- Sebelum memakai reset finansial, migration `0004_demo_sandbox_reset.sql` wajib sudah diterapkan ke `DEMO_FINANCE_DB`.
+
 ## Peralihan RFID dan QR
 
 Mode dapat diubah dari panel Kredensial menjadi `RFID`, `QR`, `HYBRID`, atau `BOTH_TRANSITION`. `HYBRID` mengaktifkan RFID dan QR permanen secara bersamaan. Mode transisi wajib mempunyai metode asal, tujuan, dan batas waktu. Scan pertama setelah batas waktu akan menyelesaikan transisi secara atomik: metode lama menjadi `SUSPENDED_BY_POLICY`; saldo, limit, PIN, foto, dan histori santri tidak berubah.

@@ -120,8 +120,14 @@ function BlankoSheet({ data }: { data: any }) {
       
       {/* ISSIAN KM DAN SEKRETARIS */}
       <div className="flex justify-between mt-4 px-12 text-[10px] font-bold">
-          <div>KM: ........................................................</div>
-          <div>Sekretaris: ........................................................</div>
+          <div>
+              <div>KM: {data.kelas.km_nama || '........................................................'}</div>
+              <div>Wakil KM: {data.kelas.wakil_km_nama || '..............................................'}</div>
+          </div>
+          <div>
+              <div>Sekretaris: {data.kelas.sekretaris_nama || '........................................................'}</div>
+              <div>Wakil Sekretaris: {data.kelas.wakil_sekretaris_nama || '..................................'}</div>
+          </div>
       </div>
       <div className="mt-2 text-[8px] text-right italic text-slate-500 no-print">Dicetak pada {format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
     </div>

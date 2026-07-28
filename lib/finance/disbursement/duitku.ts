@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { isDemoRequest } from '@/lib/auth/demo-context'
 
 const required=(name:string)=>{const value=process.env[name];if(!value)throw new Error(`${name} belum dikonfigurasi.`);return value}
 const sha256=(value:string)=>createHash('sha256').update(value).digest('hex')
@@ -10,6 +11,17 @@ export type DisbursementParty={bankCode:string;bankAccount:string;accountName:st
 async function call(url:string,payload:Record<string,unknown>){const response=await fetch(url,{method:'POST',headers:{'content-type':'application/json',accept:'application/json'},body:JSON.stringify(payload)});const body=await response.json().catch(()=>({})) as Record<string,any>;if(!response.ok)throw new Error(`Duitku disbursement HTTP ${response.status}`);return body}
 
 export async function startDuitkuBifastTransfer(party:DisbursementParty){
+  if(await isDemoRequest()){
+    const disburseId=`DEMO-DISBURSE-${Date.now()}`
+    return{
+      disburseId,
+      custRefNumber:`DEMO-${party.senderId}`,
+      accountName:party.accountName,
+      inquiry:{sandbox:true,responseCode:'00'},
+      transfer:{sandbox:true,responseCode:'00'},
+      sandbox:true as const,
+    }
+  }
   const userId=Number(required('DUITKU_DISBURSEMENT_USER_ID')),email=required('DUITKU_DISBURSEMENT_EMAIL'),secret=required('DUITKU_DISBURSEMENT_SECRET')
   const type='BIFAST',timestamp=Date.now()
   const inquirySignature=sha256(`${email}${timestamp}${party.bankCode}${type}${party.bankAccount}${party.amountRupiah}${party.purpose}${secret}`)
@@ -21,7 +33,7 @@ export async function startDuitkuBifastTransfer(party:DisbursementParty){
   const transferSignature=sha256(`${email}${transferTimestamp}${party.bankCode}${type}${party.bankAccount}${accountName}${custRefNumber}${party.amountRupiah}${party.purpose}${disburseId}${secret}`)
   const transfer=await call(endpoint('transferclearing','transferclearingsandbox'),{disburseId,userId,email,bankCode:party.bankCode,bankAccount:party.bankAccount,amountTransfer:party.amountRupiah,accountName,custRefNumber,type,purpose:party.purpose,timestamp:transferTimestamp,signature:transferSignature})
   if(!['00','68'].includes(String(transfer.responseCode||transfer.statusCode)))throw new Error(`Transfer payout ditolak: ${transfer.responseDesc||transfer.statusDesc||transfer.responseCode}`)
-  return{disburseId,custRefNumber,accountName,inquiry,transfer}
+  return{disburseId,custRefNumber,accountName,inquiry,transfer,sandbox:false as const}
 }
 
 export function verifyDuitkuDisbursementCallback(payload:Record<string,string>,bankAccount:string):boolean{

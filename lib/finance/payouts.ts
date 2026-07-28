@@ -97,6 +97,27 @@ export async function executeApiPayout(input:{payoutId:string;executorId:string}
     try{
       const bankAccount=await decryptFinanceValue(payout.account_number_encrypted)
       const result=await startDuitkuBifastTransfer({bankCode:payout.bank_code,bankAccount,accountName:payout.account_holder_name||payout.recipient_name,amountRupiah:Number(payout.amount_rupiah),purpose:`Payout ${payout.payout_type} ${payout.id}`,senderId:payout.id.replace(/-/g,'').slice(0,12),senderName:'Pesantren Sukahideng'})
+      if(result.sandbox){
+        const total=Number(payout.amount_rupiah)+Number(payout.fee_rupiah)
+        const journal=prepareJournalStatements(db,{
+          idempotencyKey:`payout:${payout.idempotency_key}`,
+          description:`Payout API sandbox ${payout.payout_type}`,
+          sourceType:'PAYOUT',sourceId:payout.id,externalReference:result.disburseId,
+          actorType:'GATEWAY',actorId:'DUITKU_SANDBOX',
+          entries:[
+            {accountCode:payableAccount(payout.payout_type),side:'DEBIT',amountRupiah:Number(payout.amount_rupiah),asramaScope:payout.asrama_scope},
+            ...(Number(payout.fee_rupiah)>0?[{accountCode:'5101' as const,side:'DEBIT' as const,amountRupiah:Number(payout.fee_rupiah),asramaScope:payout.asrama_scope}]:[]),
+            {accountCode:'1102',side:'CREDIT',amountRupiah:total,asramaScope:payout.asrama_scope},
+          ],
+        })
+        await db.batch([
+          db.prepare(`UPDATE finance_payouts SET provider_reference=?,provider_payload_json=?,updated_at=datetime('now') WHERE id=? AND status='EXECUTING'`).bind(result.disburseId,JSON.stringify(result),payout.id),
+          ...journal.statements,
+          db.prepare(`UPDATE finance_journals SET status='POSTED',posted_at=datetime('now') WHERE id=? AND status='DRAFT'`).bind(journal.journalId),
+          db.prepare(`UPDATE finance_payouts SET status='PROVIDER_SUCCESS',journal_id=?,updated_at=datetime('now') WHERE id=? AND status='EXECUTING'`).bind(journal.journalId,payout.id),
+        ])
+        return{success:true as const,pendingCallback:false,sandbox:true,providerReference:result.disburseId,journalId:journal.journalId}
+      }
       await db.prepare(`UPDATE finance_payouts SET provider_reference=?,provider_payload_json=?,updated_at=datetime('now') WHERE id=? AND status='EXECUTING'`).bind(result.disburseId,JSON.stringify(result),payout.id).run()
       return{success:true as const,pendingCallback:true,providerReference:result.disburseId}
     }catch(error){await db.prepare(`UPDATE finance_payouts SET status='FAILED',failure_reason=?,updated_at=datetime('now') WHERE id=? AND status='EXECUTING'`).bind(error instanceof Error?error.message:String(error),payout.id).run();throw error}

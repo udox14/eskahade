@@ -20,6 +20,7 @@ function wrangler(args,expectError){
 wrangler(['--file','migrations-finance/0001_finance_centralized_core.sql'])
 wrangler(['--file','migrations-finance/0002_credential_fast_enrollment.sql'])
 wrangler(['--file','migrations-finance/0003_cash_unit_operators.sql'])
+wrangler(['--file','migrations-finance/0004_demo_sandbox_reset.sql'])
 
 const positive=wrangler(['--command',`INSERT INTO finance_journals(id,idempotency_key,effective_date,description,source_type,actor_type,status) VALUES('t-j1','t-key-1','2026-08-01','Topup test','TEST','SYSTEM','DRAFT');
 INSERT INTO finance_journal_entries(id,journal_id,account_id,side,amount_rupiah) VALUES('t-e1','t-j1','fa-gateway-clearing','DEBIT',100000),('t-e2','t-j1','fa-guardian-float','CREDIT',100000);
@@ -75,4 +76,18 @@ SELECT (SELECT COUNT(*) FROM student_credentials WHERE id LIKE 'bulk-cred-%') cr
   (SELECT COUNT(*) FROM (SELECT santri_id,credential_kind FROM student_credentials WHERE id LIKE 'bulk-cred-%' GROUP BY santri_id,credential_kind HAVING COUNT(*)>1)) duplicates;`])
 if(!/"credentials"\s*:\s*1000/.test(resumed)||!/"processed"\s*:\s*1000/.test(resumed)||!/"duplicates"\s*:\s*0/.test(resumed))throw new Error('Credential batch resume produced incomplete or duplicate credentials.')
 
-process.stdout.write('finance invariants: 10 scenarios passed\n')
+const reset=wrangler(['--command',`UPDATE finance_sandbox_state SET reset_enabled=1 WHERE singleton_id=1;
+DELETE FROM finance_credential_batch_items;
+DELETE FROM finance_credential_batches;
+DELETE FROM student_credentials;
+DELETE FROM finance_wallet_movements;
+DELETE FROM finance_journal_entries;
+DELETE FROM finance_journals;
+UPDATE finance_sandbox_state SET reset_enabled=0 WHERE singleton_id=1;
+SELECT
+  (SELECT COUNT(*) FROM finance_journals) journals,
+  (SELECT COUNT(*) FROM finance_wallet_movements) movements,
+  (SELECT reset_enabled FROM finance_sandbox_state WHERE singleton_id=1) reset_enabled;`])
+if(!/"journals"\s*:\s*0/.test(reset)||!/"movements"\s*:\s*0/.test(reset)||!/"reset_enabled"\s*:\s*0/.test(reset))throw new Error('Sandbox reset guard did not clear immutable finance rows safely.')
+
+process.stdout.write('finance invariants: 11 scenarios passed\n')

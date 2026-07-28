@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { GatewayPaymentRequest, GatewayPaymentResult, PaymentGateway } from './types'
+import { isDemoRequest } from '@/lib/auth/demo-context'
 
 function required(name: string): string {
   const value = process.env[name]
@@ -16,6 +17,15 @@ export class DuitkuGateway implements PaymentGateway {
   readonly name = 'DUITKU'
 
   async createPayment(request: GatewayPaymentRequest): Promise<GatewayPaymentResult> {
+    if (await isDemoRequest()) {
+      return {
+        providerReference: `DEMO-PAY-${request.merchantOrderId}`,
+        paymentUrl: `${request.returnUrl}${request.returnUrl.includes('?') ? '&' : '?'}sandbox=1`,
+        vaNumber: '8888000000000001',
+        qrString: `DEMO-QRIS:${request.merchantOrderId}:${request.amountRupiah}`,
+        raw: { sandbox: true, statusCode: '00' },
+      }
+    }
     const merchantCode = required('DUITKU_MERCHANT_CODE')
     const apiKey = required('DUITKU_API_KEY')
     const production = process.env.DUITKU_PRODUCTION === 'true'

@@ -1037,15 +1037,15 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
   }
 
   async function handleResetDemo() {
-    if (!confirm('Reset SEMUA data demo (DEMO_DB) dan isi ulang data sampel? Data demo saat ini akan dihapus. Data ASLI tidak terpengaruh.')) return
+    if (!confirm('Reset SEMUA data demo (DEMO_DB dan DEMO_FINANCE_DB) lalu isi ulang data sampel? Data demo saat ini akan dihapus. Data ASLI tidak terpengaruh.')) return
     setResetting(true)
     try {
       const res = await fetch('/api/demo/reset', { method: 'POST' })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || 'Reset gagal')
-      showToast(`Data demo di-reset (${json.seeded} seed, ${json.syncedUsers} user demo).`, 'success')
-    } catch (e: any) {
-      showToast(e?.message || 'Reset gagal', 'error')
+      showToast(`Sandbox di-reset (${json.seeded} seed aplikasi, ${json.financeSeed?.students || 0} santri finansial, ${json.syncedUsers} user demo).`, 'success')
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Reset gagal', 'error')
     } finally {
       setResetting(false)
     }
@@ -1211,8 +1211,8 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
         <div className="flex items-start gap-3 text-sm text-amber-800">
           <RotateCcw className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
           <span>
-            <strong>Akun Demo</strong> — kosongkan data sandbox lalu isi ulang data sampel.
-            Hanya berlaku ke <strong>DEMO_DB</strong>, data asli aman.
+            <strong>Akun Demo</strong> — kosongkan sandbox aplikasi dan keuangan lalu isi ulang data sampel.
+            Hanya berlaku ke <strong>DEMO_DB</strong> dan <strong>DEMO_FINANCE_DB</strong>; data asli aman.
           </span>
         </div>
         <button

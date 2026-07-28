@@ -70,8 +70,8 @@ export async function revokeFinanceSessionAction(id:string){
 export async function getFinanceControlData(){
   const session=await requireFinanceAccess('VIEW')
   const roles=getEffectiveRoles(session)
-  const canAudit=(roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara'))||roles.includes('admin')
-  const canConfigure=roles.includes('bendahara')||roles.includes('admin')
+  const canAudit=(roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara'))||roles.includes('admin')||roles.includes('demo')
+  const canConfigure=roles.includes('bendahara')||roles.includes('admin')||roles.includes('demo')
   const users=await query<any>(`SELECT id,full_name,email FROM users`)
   const names=new Map(users.map(row=>[row.id,row.full_name||row.email]))
   const settings=await financeQuery<any>(`SELECT * FROM finance_settings ORDER BY key`)
@@ -89,7 +89,7 @@ export async function getFinanceControlData(){
     audit:audit.map(row=>({...row,actor_name:names.get(row.actor_id)||row.actor_id||row.actor_type})),
     canAudit,
     canConfigure,
-    canExecute:roles.includes('bendahara')||roles.includes('admin'),
+    canExecute:roles.includes('bendahara')||roles.includes('admin')||roles.includes('demo'),
     nowMs:Date.now(),
   }
 }

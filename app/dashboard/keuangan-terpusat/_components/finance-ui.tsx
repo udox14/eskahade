@@ -54,9 +54,14 @@ export function FinancePageHeader({ title, description, eyebrow, meta, action }:
   </div>
 }
 
-export function FinanceNavClient({ allowedHrefs }: { allowedHrefs: string[] }) {
+export function FinanceNavClient({ allowedHrefs, sandbox = false }: { allowedHrefs: string[]; sandbox?: boolean }) {
   const pathname = usePathname()
-  return <nav aria-label="Navigasi keuangan terpusat" className="-mx-4 overflow-x-auto border-b border-slate-200 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
+  return <div className="space-y-3">
+    {sandbox ? <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 shadow-sm">
+      <span className="font-extrabold tracking-wide">MODE SANDBOX · DATA KEUANGAN DUMMY</span>
+      <span>QR: <code>SKH1.DEMO.SANTRI.0001.TEST.CREDENTIAL</code> · RFID: <code>DEMO0001</code> · PIN: <code>123456</code></span>
+    </div> : null}
+    <nav aria-label="Navigasi keuangan terpusat" className="-mx-4 overflow-x-auto border-b border-slate-200 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
     <div className="flex min-w-max gap-1">
       {financeNav.filter(item => allowedHrefs.includes(item.href)).map(item => {
         const active = item.href === '/dashboard/keuangan-terpusat' ? pathname === item.href : pathname.startsWith(item.href)
@@ -66,7 +71,8 @@ export function FinanceNavClient({ allowedHrefs }: { allowedHrefs: string[] }) {
         )}><item.icon className="h-3.5 w-3.5" />{item.label}</Link>
       })}
     </div>
-  </nav>
+    </nav>
+  </div>
 }
 
 export function FinanceGuide({ title = 'Cara menggunakan halaman ini', purpose, prerequisites = [], steps, notes = [] }: {

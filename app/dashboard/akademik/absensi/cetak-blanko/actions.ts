@@ -3,8 +3,10 @@
 import { query, queryOne } from '@/lib/db'
 import { getCachedMarhalahList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
 import { buildWeeklyGuruRuleMap, getWeeklyGuruRules, summarizeWeeklyGuruAssignments } from '@/lib/akademik/guru-jadwal'
+import { ensureKelasPengurusColumns } from '@/lib/akademik/kelas-pengurus'
 
 export async function getKelasForCetak() {
+  await ensureKelasPengurusColumns()
   const aktif = await getCachedTahunAjaranAktif()
   const data = await query<any>(`
     SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
@@ -37,6 +39,7 @@ async function decorateGuruSummary(kelasRows: any[]) {
 }
 
 export async function getDataBlanko(kelasId: string) {
+  await ensureKelasPengurusColumns()
   const kelasRow = await queryOne<any>(`
     SELECT
       k.id,
@@ -47,12 +50,20 @@ export async function getDataBlanko(kelasId: string) {
       k.guru_ashar_id,
       ga.nama_lengkap AS guru_ashar_nama,
       k.guru_maghrib_id,
-      gm.nama_lengkap AS guru_maghrib_nama
+      gm.nama_lengkap AS guru_maghrib_nama,
+      km.nama_lengkap AS km_nama,
+      wakil_km.nama_lengkap AS wakil_km_nama,
+      sekretaris.nama_lengkap AS sekretaris_nama,
+      wakil_sekretaris.nama_lengkap AS wakil_sekretaris_nama
     FROM kelas k
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
     LEFT JOIN data_guru ga ON ga.id = k.guru_ashar_id
     LEFT JOIN data_guru gm ON gm.id = k.guru_maghrib_id
+    LEFT JOIN santri km ON km.id = k.km_id
+    LEFT JOIN santri wakil_km ON wakil_km.id = k.wakil_km_id
+    LEFT JOIN santri sekretaris ON sekretaris.id = k.sekretaris_id
+    LEFT JOIN santri wakil_sekretaris ON wakil_sekretaris.id = k.wakil_sekretaris_id
     WHERE k.id = ?
   `, [kelasId])
 
@@ -71,6 +82,7 @@ export async function getDataBlanko(kelasId: string) {
 }
 
 export async function getDataBlankoMassal(marhalahId: string) {
+  await ensureKelasPengurusColumns()
   const aktif = await getCachedTahunAjaranAktif()
   const kelasList = await query<any>(`
     SELECT
@@ -82,12 +94,20 @@ export async function getDataBlankoMassal(marhalahId: string) {
       k.guru_ashar_id,
       ga.nama_lengkap AS guru_ashar_nama,
       k.guru_maghrib_id,
-      gm.nama_lengkap AS guru_maghrib_nama
+      gm.nama_lengkap AS guru_maghrib_nama,
+      km.nama_lengkap AS km_nama,
+      wakil_km.nama_lengkap AS wakil_km_nama,
+      sekretaris.nama_lengkap AS sekretaris_nama,
+      wakil_sekretaris.nama_lengkap AS wakil_sekretaris_nama
     FROM kelas k
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN data_guru gs ON gs.id = k.guru_shubuh_id
     LEFT JOIN data_guru ga ON ga.id = k.guru_ashar_id
     LEFT JOIN data_guru gm ON gm.id = k.guru_maghrib_id
+    LEFT JOIN santri km ON km.id = k.km_id
+    LEFT JOIN santri wakil_km ON wakil_km.id = k.wakil_km_id
+    LEFT JOIN santri sekretaris ON sekretaris.id = k.sekretaris_id
+    LEFT JOIN santri wakil_sekretaris ON wakil_sekretaris.id = k.wakil_sekretaris_id
     WHERE k.marhalah_id = ? AND k.tahun_ajaran_id = ?
     ORDER BY k.nama_kelas
   `, [marhalahId, aktif?.id ?? 0])

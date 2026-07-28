@@ -42,7 +42,7 @@ export async function getAllocationData() {
   return {
     allocations,
     scope,
-    canReturn: roles.includes('bendahara') || roles.includes('admin'),
+    canReturn: roles.includes('bendahara') || roles.includes('admin') || roles.includes('demo'),
     nowMs: Date.now(),
   }
 }

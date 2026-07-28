@@ -7,7 +7,9 @@ export async function requireCashierOperator(): Promise<SessionUser> {
   const session = await getSession()
   if (!session) throw new Error('Sesi tidak valid.')
   const roles = getEffectiveRoles(session)
-  if (roles.includes('demo')) throw new Error('Akun demo tidak boleh memproses transaksi keuangan nyata.')
+  // Role demo selalu diarahkan ke DEMO_FINANCE_DB oleh getFinanceDB().
+  // Izinkan seluruh alur operasional agar sandbox dapat diuji end-to-end.
+  if (roles.includes('demo')) return session
   if (!roles.includes('operator_loket')) {
     throw new Error('Akun belum memiliki role Operator Loket.')
   }
@@ -15,14 +17,15 @@ export async function requireCashierOperator(): Promise<SessionUser> {
 }
 
 export function canConfigureCashUnits(session: SessionUser): boolean {
-  return getEffectiveRoles(session).includes('bendahara')
+  const roles = getEffectiveRoles(session)
+  return roles.includes('bendahara') || roles.includes('demo')
 }
 
 export async function requireFinanceAccess(permission: FinancePermission): Promise<SessionUser> {
   const session = await getSession()
   if (!session) throw new Error('Sesi tidak valid.')
   const roles = getEffectiveRoles(session)
-  if (roles.includes('demo')) throw new Error('Akun demo tidak boleh memproses transaksi keuangan nyata.')
+  if (roles.includes('demo')) return session
 
   const isCentral = roles.includes('bendahara')
   const isCouncilChecker = roles.includes('dewan_santri') && roles.includes('jabatan:bendahara')

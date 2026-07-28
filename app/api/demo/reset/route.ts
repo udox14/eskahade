@@ -1,10 +1,10 @@
 // app/api/demo/reset/route.ts
 //
-// Reset MANUAL data dummy di DEMO_DB.
+// Reset MANUAL data dummy di DEMO_DB dan DEMO_FINANCE_DB.
 // - Hanya bisa dijalankan oleh ADMIN ASLI (bukan akun demo).
 // - Beroperasi LANGSUNG ke env.DEMO_DB (tidak lewat getDB(), karena getDB()
 //   untuk admin mengembalikan DB asli).
-// - Menghapus data sandbox lalu mengisi ulang seed dummy.
+// - Menghapus data sandbox aplikasi dan keuangan lalu mengisi ulang seed dummy.
 // - Menyinkronkan user demo dari DB asli ke DEMO_DB (id harus sama agar
 //   hydrateSessionFromDb menemukan user saat session demo aktif).
 //
@@ -13,8 +13,10 @@
 import { NextResponse } from 'next/server'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getSession, isAdmin } from '@/lib/auth/session'
+import { resetDemoFinanceDatabase } from '@/lib/finance/demo-seed'
 
 type Stmt = { sql: string; params?: unknown[] }
+const errorMessage = (error: unknown) => error instanceof Error ? error.message : String(error)
 
 // Tabel data yang dibersihkan saat reset (urutan aman thd FK).
 // users TIDAK dihapus di sini — disinkronkan terpisah di bawah.
@@ -84,17 +86,39 @@ export async function POST() {
 
   const { env } = await getCloudflareContext({ async: true })
   const demoDb = env.DEMO_DB
+  const demoFinanceDb = env.DEMO_FINANCE_DB
   const realDb = env.DB
 
-  if (!demoDb) {
+  if (!demoDb || !demoFinanceDb) {
     return NextResponse.json(
-      { error: 'DEMO_DB belum dikonfigurasi. Isi binding di wrangler.jsonc.' },
+      { error: 'DEMO_DB atau DEMO_FINANCE_DB belum dikonfigurasi. Isi binding di wrangler.jsonc.' },
       { status: 500 }
     )
   }
 
   try {
-    // 1. Bersihkan data sandbox
+    const { results: demoUsers } = await realDb
+      .prepare(
+        `SELECT id, email, password_hash, full_name, role, roles
+         FROM users
+         WHERE role = 'demo' OR roles LIKE '%"demo"%'`
+      )
+      .all<{
+        id: string; email: string; password_hash: string
+        full_name: string | null; role: string; roles: string | null
+      }>()
+
+    const financeSeed = await resetDemoFinanceDatabase(
+      demoFinanceDb,
+      (demoUsers ?? []).map(user => {
+        let roles: string[] = []
+        try { roles = JSON.parse(user.roles || '[]') } catch { roles = [] }
+        if (!roles.includes('demo')) roles.push('demo')
+        return { id: user.id, fullName: user.full_name || user.email, roles }
+      }),
+    )
+
+    // 1. Bersihkan data sandbox aplikasi
     for (const t of DATA_TABLES) {
       try {
         await demoDb.prepare(`DELETE FROM ${t}`).run()
@@ -112,18 +136,7 @@ export async function POST() {
     // 3. Sinkron user demo dari DB asli → DEMO_DB (id sama!)
     let syncedUsers = 0
     try {
-      const { results } = await realDb
-        .prepare(
-          `SELECT id, email, password_hash, full_name, role, roles
-           FROM users
-           WHERE role = 'demo' OR roles LIKE '%"demo"%'`
-        )
-        .all<{
-          id: string; email: string; password_hash: string
-          full_name: string | null; role: string; roles: string | null
-        }>()
-
-      for (const u of results ?? []) {
+      for (const u of demoUsers ?? []) {
         await demoDb
           .prepare(
             `INSERT OR REPLACE INTO users (id, email, password_hash, full_name, role, roles)
@@ -133,9 +146,9 @@ export async function POST() {
           .run()
         syncedUsers++
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       return NextResponse.json(
-        { error: `Seed sukses tapi sync user demo gagal: ${e?.message}` },
+        { error: `Seed sukses tapi sync user demo gagal: ${errorMessage(e)}` },
         { status: 500 }
       )
     }
@@ -145,9 +158,10 @@ export async function POST() {
       message: 'Data demo di-reset.',
       seeded: stmts.length,
       syncedUsers,
+      financeSeed,
     })
-  } catch (err: any) {
-    console.error('[demo/reset] ERROR:', err?.message)
-    return NextResponse.json({ error: `Reset gagal: ${err?.message}` }, { status: 500 })
+  } catch (err: unknown) {
+    console.error('[demo/reset] ERROR:', errorMessage(err))
+    return NextResponse.json({ error: `Reset gagal: ${errorMessage(err)}` }, { status: 500 })
   }
 }

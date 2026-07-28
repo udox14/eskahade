@@ -131,7 +131,7 @@ export async function getPayrollData(){
     attendance:attendance.map(row=>({...row,scheduled_teacher_name:row.scheduled_teacher_name||teacherNames.get(String(row.scheduled_teacher_id))||row.scheduled_teacher_id,actual_teacher_name:row.actual_teacher_name||teacherNames.get(String(row.actual_teacher_id))||row.actual_teacher_id})),
     items:items.map(row=>({...row,teacher_name:row.teacher_name||teacherNames.get(String(row.teacher_id))||row.teacher_id})),
     teachers,
-    canConfigure:roles.includes('bendahara')||roles.includes('admin'),
-    canCheck:(roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara'))||roles.includes('admin'),
+    canConfigure:roles.includes('bendahara')||roles.includes('admin')||roles.includes('demo'),
+    canCheck:(roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara'))||roles.includes('admin')||roles.includes('demo'),
   }
 }

@@ -26,10 +26,12 @@ export async function FinanceNav(){
   const dorm=roles.includes('pengurus_asrama')&&roles.includes('jabatan:bendahara')
   const operator=roles.includes('operator_loket')
   const admin=roles.includes('admin')
+  const demo=roles.includes('demo')
   const native=central||council||dorm
   const activeBreakGlass=admin&&!native?Boolean(await financeQueryOne<{id:string}>(`SELECT id FROM finance_break_glass WHERE user_id=? AND revoked_at IS NULL AND datetime(expires_at)>datetime('now') LIMIT 1`,[session.id])):false
   const allowed=new Set<string>()
 
+  if(demo)Object.values(href).forEach(item=>allowed.add(item))
   if(central||activeBreakGlass){
     Object.values(href).forEach(item=>allowed.add(item))
     if(!admin)allowed.delete(href.breakGlass)
@@ -39,5 +41,5 @@ export async function FinanceNav(){
   if(operator)allowed.add(href.cashier)
   if(admin)allowed.add(href.breakGlass)
 
-  return <FinanceNavClient allowedHrefs={[...allowed]}/>
+  return <FinanceNavClient allowedHrefs={[...allowed]} sandbox={demo}/>
 }

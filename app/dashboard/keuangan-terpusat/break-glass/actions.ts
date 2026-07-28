@@ -11,7 +11,7 @@ export async function activateBreakGlass(formData:FormData){
   const session=await getSession()
   if(!session)return{error:'Sesi tidak valid.'}
   const roles=getEffectiveRoles(session)
-  if(!roles.includes('admin'))return{error:'Hanya admin teknis yang dapat mengaktifkan break-glass.'}
+  if(!roles.includes('admin')&&!roles.includes('demo'))return{error:'Hanya admin teknis yang dapat mengaktifkan break-glass.'}
   const hasNative=roles.includes('bendahara')||(roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara'))||(roles.includes('pengurus_asrama')&&roles.includes('jabatan:bendahara'))
   if(hasNative)return{error:'Akun ini sudah memiliki role keuangan native dan tidak boleh memakai break-glass.'}
   const reason=String(formData.get('reason')||'').trim()
@@ -33,7 +33,7 @@ export async function reviewBreakGlass(id:string){
   const session=await getSession()
   if(!session)return{error:'Sesi tidak valid.'}
   const roles=getEffectiveRoles(session)
-  if(!(roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara')))return{error:'Hanya checker Dewan Santri yang dapat mereview.'}
+  if(!(roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara'))&&!roles.includes('demo'))return{error:'Hanya checker Dewan Santri yang dapat mereview.'}
   const row=await queryOne<{id:string;user_id:string}>(`SELECT id,user_id FROM finance_break_glass WHERE id=?`,[id])
   if(!row)return{error:'Aktivasi break-glass tidak ditemukan.'}
   if(row.user_id===session.id)return{error:'Aktivasi sendiri tidak boleh direview sendiri.'}
@@ -50,7 +50,7 @@ export async function revokeBreakGlass(id:string){
   const roles=getEffectiveRoles(session)
   const row=await queryOne<{id:string;user_id:string}>(`SELECT id,user_id FROM finance_break_glass WHERE id=?`,[id])
   if(!row)return{error:'Aktivasi break-glass tidak ditemukan.'}
-  const isChecker=roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara')
+  const isChecker=(roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara'))||roles.includes('demo')
   if(!isChecker&&!(roles.includes('admin')&&row.user_id===session.id))return{error:'Anda tidak berwenang mencabut akses ini.'}
   const db=await getDB(),result=await db.prepare(`UPDATE finance_break_glass SET revoked_at=datetime('now') WHERE id=? AND revoked_at IS NULL AND datetime(expires_at)>datetime('now')`).bind(id).run()
   if(!result.meta?.changes)return{error:'Akses sudah berakhir atau sudah dicabut.'}
@@ -67,8 +67,8 @@ export async function getBreakGlassData(){
   return{
     rows,
     currentUserId:session.id,
-    canActivate:roles.includes('admin')&&!roles.includes('bendahara')&&!(roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara'))&&!(roles.includes('pengurus_asrama')&&roles.includes('jabatan:bendahara')),
-    canReview:roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara'),
+    canActivate:(roles.includes('admin')||roles.includes('demo'))&&!roles.includes('bendahara')&&!(roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara'))&&!(roles.includes('pengurus_asrama')&&roles.includes('jabatan:bendahara')),
+    canReview:(roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara'))||roles.includes('demo'),
     nowMs:Date.now(),
   }
 }

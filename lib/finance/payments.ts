@@ -2,6 +2,7 @@ import { getFinanceDB as getDB, generateId, financeQueryOne as queryOne } from '
 import { assertIntegerRupiah, financeError } from './errors'
 import { paymentGateway } from './gateway'
 import { prepareJournalStatements, prepareWalletStatements } from './ledger'
+import { isDemoRequest } from '@/lib/auth/demo-context'
 
 type PaymentIntentRow = {
   id: string
@@ -41,7 +42,7 @@ export async function createTopupIntent(input: {
 
     const ttlHours = Math.max(1, Math.min(168, Number((await queryOne<{ value: string }>(`SELECT value FROM finance_settings WHERE key='finance_payment_intent_ttl_hours'`))?.value || 24)))
     const id = generateId()
-    const merchantOrderId = `SKH-${Date.now()}-${id.slice(0, 8)}`
+    const merchantOrderId = `${await isDemoRequest() ? 'SKH-DEMO' : 'SKH'}-${Date.now()}-${id.slice(0, 8)}`
     const charged = input.amountRupiah + input.gatewayFeeRupiah
     const expiresAt = new Date(Date.now() + ttlHours * 3600_000).toISOString()
     await db.prepare(`INSERT INTO finance_payment_intents
