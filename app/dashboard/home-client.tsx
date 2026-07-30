@@ -116,6 +116,56 @@ function getIcon(name: string): React.ElementType {
   return ICON_MAP[name] ?? Settings
 }
 
+const MENU_TITLE_MAP: Record<string, string> = {
+  'Manajemen User': 'User',
+  'Manajemen Santri': 'Tools Santri',
+  'Manajemen Guru & Jadwal': 'Guru & Jadwal',
+  'Manajemen Kelas': 'Kelas',
+  'Manajemen Kitab': 'Kitab',
+  'Pembagian Kitab Guru': 'Kitab Guru',
+  'Manajemen Fitur': 'Fitur Akses',
+};
+
+function getMenuTitle(title: string) {
+  return MENU_TITLE_MAP[title] ?? title;
+}
+
+const GROUP_ITEM_ORDER: Record<string, string[]> = {
+  'Master Data': [
+    'Tahun Ajaran',
+    'Setup Tahun Ajaran',
+    'Kelas',
+    'Kitab',
+    'Kitab Guru',
+    'Guru & Jadwal',
+    'Tools Santri',
+    'Arsip Alumni',
+    'Periode Perpulangan',
+    'Master Pelanggaran',
+    'User',
+    'Fitur Akses',
+    'Log Aktivitas',
+  ],
+};
+
+function sortGroupItems(group: string, items: FiturAkses[]) {
+  const preferredOrder = GROUP_ITEM_ORDER[group];
+  if (!preferredOrder) return items;
+
+  const rankMap = new Map(preferredOrder.map((title, index) => [title, index]));
+  return [...items].sort((a, b) => {
+    const aTitle = getMenuTitle(a.title);
+    const bTitle = getMenuTitle(b.title);
+    const aRank = rankMap.get(aTitle);
+    const bRank = rankMap.get(bTitle);
+
+    if (aRank != null && bRank != null) return aRank - bRank;
+    if (aRank != null) return -1;
+    if (bRank != null) return 1;
+    return a.urutan - b.urutan;
+  });
+}
+
 // ── Deskripsi tiap fitur ──────────────────────────────────────────────────────
 const FITUR_DESC: Record<string, string> = {
   '/dashboard/santri':                               'Lihat dan kelola seluruh data induk santri yang aktif.',
@@ -237,8 +287,10 @@ const GROUP_META: Record<string, { label: string; icon: React.ElementType }> = {
   'Keuangan':     { label: 'Keuangan',             icon: CreditCard },
   'Operasional':  { label: 'Kas Operasional',      icon: Briefcase },
   'UPK':          { label: 'UPK & Kitab',          icon: ShoppingCart },
+  'Keuangan Terpusat': { label: 'Keuangan Terpusat', icon: Bank },
   'EHB':          { label: 'Ujian EHB',            icon: ClipboardList },
   'PSB':          { label: 'Pendaftaran PSB',      icon: UserPlus },
+  'POSKESTREN':   { label: 'POSKESTREN',           icon: Stethoscope },
   'Master Data':  { label: 'Master Data',          icon: Database },
 }
 
@@ -286,12 +338,14 @@ const GROUP_ORDER = [
   'Absensi Akademik',
   'Absensi',
   'Keuangan Pusat',
+  'Keuangan Terpusat',
   'Keuangan Santri',
   'Keuangan',
   'Operasional',
   'UPK',
   'EHB',
   'PSB',
+  'POSKESTREN',
   'Master Data',
 ]
 
@@ -333,6 +387,7 @@ const GROUP_COLORS: Record<string, { bg: string; text: string; hoverText: string
   'Absensi Akademik':      { bg: 'bg-teal-50 text-teal-600', text: 'text-teal-600', hoverText: 'group-hover:text-teal-700' },
   'Absensi':               { bg: 'bg-teal-50 text-teal-600', text: 'text-teal-600', hoverText: 'group-hover:text-teal-700' },
   'Keuangan Pusat':        { bg: 'bg-emerald-50 text-emerald-600', text: 'text-emerald-600', hoverText: 'group-hover:text-emerald-700' },
+  'Keuangan Terpusat':     { bg: 'bg-teal-50 text-teal-600', text: 'text-teal-600', hoverText: 'group-hover:text-teal-700' },
   'Keuangan Santri':       { bg: 'bg-cyan-50 text-cyan-600', text: 'text-cyan-600', hoverText: 'group-hover:text-cyan-700' },
   'Keuangan':              { bg: 'bg-emerald-50 text-emerald-600', text: 'text-emerald-600', hoverText: 'group-hover:text-emerald-700' },
   'UPK':                   { bg: 'bg-amber-50 text-amber-600', text: 'text-amber-600', hoverText: 'group-hover:text-amber-700' },
@@ -340,6 +395,7 @@ const GROUP_COLORS: Record<string, { bg: string; text: string; hoverText: string
   'EHB':                   { bg: 'bg-indigo-50 text-indigo-600', text: 'text-indigo-600', hoverText: 'group-hover:text-indigo-700' },
   'Operasional':           { bg: 'bg-cyan-50 text-cyan-600', text: 'text-cyan-600', hoverText: 'group-hover:text-cyan-700' },
   'PSB':                   { bg: 'bg-violet-50 text-violet-600', text: 'text-violet-600', hoverText: 'group-hover:text-violet-700' },
+  'POSKESTREN':            { bg: 'bg-red-50 text-red-600', text: 'text-red-600', hoverText: 'group-hover:text-red-700' },
 }
 
 // renderGroupIcon helper is deleted, using getGroupMeta(group).icon directly
@@ -404,7 +460,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
   // Search filter
   const allFeatures = fiturAkses.filter(f => f.href !== '/dashboard')
   const filteredFeatures = allFeatures.filter(fitur => {
-    const titleMatch = fitur.title.toLowerCase().includes(searchQuery.toLowerCase())
+    const titleMatch = getMenuTitle(fitur.title).toLowerCase().includes(searchQuery.toLowerCase())
     const descMatch = (FITUR_DESC[fitur.href] || '').toLowerCase().includes(searchQuery.toLowerCase())
     const groupMatch = fitur.group_name.toLowerCase().includes(searchQuery.toLowerCase())
     return titleMatch || descMatch || groupMatch
@@ -530,7 +586,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                             {fitur.group_name === '_standalone' ? 'Menu Utama' : fitur.group_name}
                           </span>
                         </div>
-                        <h4 className="text-sm font-bold text-slate-800 truncate">{fitur.title}</h4>
+                        <h4 className="text-sm font-bold text-slate-800 truncate">{getMenuTitle(fitur.title)}</h4>
                         <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
                       </div>
                     </Link>
@@ -601,7 +657,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
               )}
             >
               {activeGroup !== null && (() => {
-                const items = grouped.get(activeGroup)!
+                const items = sortGroupItems(activeGroup, grouped.get(activeGroup)!)
                 const meta = getGroupMeta(activeGroup)
                 const GroupIcon = meta.icon
 
@@ -638,7 +694,7 @@ export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props)
                               <FeatureIcon className={cn("w-6 h-6 transition-transform duration-200 group-hover:scale-110", theme.text)} />
                             </div>
                             <div className="flex-1 min-w-0 leading-tight">
-                              <h4 className="text-sm font-bold text-slate-800 truncate">{fitur.title}</h4>
+                              <h4 className="text-sm font-bold text-slate-800 truncate">{getMenuTitle(fitur.title)}</h4>
                               <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
                             </div>
                           </Link>

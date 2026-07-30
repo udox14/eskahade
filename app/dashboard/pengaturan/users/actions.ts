@@ -41,6 +41,7 @@ type BatchSourceUserInput = {
   role: string
   asrama_binaan?: string | null
   structural_jabatan?: string | null
+  poskestren_jabatan?: string | null
 }
 
 type LinkedUserCreateResult =
@@ -80,12 +81,13 @@ async function getUserById(id: string) {
     roles: string | null
     asrama_binaan: string | null
     structural_jabatan: string | null
+    poskestren_jabatan: string | null
     guru_id: number | null
     santri_id: string | null
     source_type: string | null
     source_ref_id: string | null
   }>(
-    'SELECT id, full_name, email, role, roles, asrama_binaan, structural_jabatan, guru_id, santri_id, source_type, source_ref_id FROM users WHERE id = ?',
+    'SELECT id, full_name, email, role, roles, asrama_binaan, structural_jabatan, poskestren_jabatan, guru_id, santri_id, source_type, source_ref_id FROM users WHERE id = ?',
     [id]
   )
 }
@@ -238,6 +240,7 @@ async function createLinkedUserFromSource(input: BatchSourceUserInput): Promise<
 
   const needsStructuralJabatan = roleNeedsStructuralJabatan([input.role])
   const structuralJabatan = needsStructuralJabatan ? normalizeStructuralJabatan(input.structural_jabatan) : null
+  const poskestrenJabatan = input.role === 'poskestren' ? (input.poskestren_jabatan || null) : null
 
   const existingSourceUser = await queryOne<{ id: string }>(
     'SELECT id FROM users WHERE source_type = ? AND source_ref_id = ? LIMIT 1',
@@ -263,8 +266,8 @@ async function createLinkedUserFromSource(input: BatchSourceUserInput): Promise<
   await execute(
     `INSERT INTO users (
       id, email, password_hash, full_name, role, roles, asrama_binaan,
-      structural_jabatan, source_type, source_ref_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      structural_jabatan, poskestren_jabatan, source_type, source_ref_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       userId,
       sourceProfile.email,
@@ -273,7 +276,8 @@ async function createLinkedUserFromSource(input: BatchSourceUserInput): Promise<
       input.role,
       rolesJson,
       input.role === 'pengurus_asrama' ? String(input.asrama_binaan || '').trim() : null,
-      needsStructuralJabatan ? structuralJabatan : null,
+      structuralJabatan,
+      poskestrenJabatan,
       input.source_type,
       input.source_ref_id,
       now,
@@ -404,8 +408,8 @@ export async function createAllGuruAccounts(): Promise<GuruAccountBatchSummary> 
       statements.push({
         sql: `INSERT INTO users (
           id, email, password_hash, full_name, role, roles, asrama_binaan,
-          source_type, source_ref_id, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, 'guru', ?, NULL, 'guru', ?, ?, ?)`,
+          structural_jabatan, poskestren_jabatan, source_type, source_ref_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 'guru', ?, NULL, NULL, NULL, 'guru', ?, ?, ?)`,
         params: [
           crypto.randomUUID(),
           email,
@@ -463,6 +467,7 @@ export async function getUsersList() {
       u.roles,
       u.asrama_binaan,
       u.structural_jabatan,
+      u.poskestren_jabatan,
       u.psb_verifikasi_akses,
       u.psb_asrama_akses,
       u.psb_bayar_akses,
@@ -474,7 +479,7 @@ export async function getUsersList() {
     LEFT JOIN kelas k ON k.wali_kelas_id = u.id AND k.tahun_ajaran_id IN (SELECT id FROM tahun_ajaran WHERE is_active = 1)
     GROUP BY
       u.id, u.email, u.full_name, u.role, u.roles, u.asrama_binaan,
-      u.structural_jabatan, u.psb_verifikasi_akses, u.psb_asrama_akses,
+      u.structural_jabatan, u.poskestren_jabatan, u.psb_verifikasi_akses, u.psb_asrama_akses,
       u.psb_bayar_akses, u.source_type, u.source_ref_id, u.created_at
     ORDER BY u.created_at DESC`
   )
@@ -585,28 +590,30 @@ export async function getUserCreationCandidates(): Promise<UserCreationCandidate
 }
 
 export async function updateUserRoles(
-  id: string,
+  userId: string,
   newRoles: string[],
   asrama?: string,
-  structuralJabatanInput?: string
+  structuralJabatanInput?: string,
+  poskestrenJabatanInput?: string
 ): Promise<{ success: boolean } | { error: string }> {
   const normalizedRoles = normalizeUserRoles(newRoles || [])
   if (normalizedRoles.length === 0) return { error: 'Minimal satu role valid harus dipilih.' }
   await ensureUserManagementColumns()
 
   const session = await getSession()
-  const beforeUser = await getUserById(id)
+  const beforeUser = await getUserById(userId)
   if (!beforeUser) return { error: 'User tidak ditemukan.' }
 
   const primaryRole = normalizedRoles[0]
   const asramaBinaan = normalizedRoles.includes('pengurus_asrama') ? (asrama || null) : null
   const needsStructuralJabatan = roleNeedsStructuralJabatan(normalizedRoles)
   const structuralJabatan = needsStructuralJabatan ? normalizeStructuralJabatan(structuralJabatanInput) : null
+  const poskestrenJabatan = normalizedRoles.includes('poskestren') ? (poskestrenJabatanInput || null) : null
   const rolesJson = JSON.stringify(normalizedRoles)
 
   await execute(
-    'UPDATE users SET role = ?, roles = ?, asrama_binaan = ?, structural_jabatan = ?, updated_at = ? WHERE id = ?',
-    [primaryRole, rolesJson, asramaBinaan, structuralJabatan, new Date().toISOString(), id]
+    'UPDATE users SET role = ?, roles = ?, asrama_binaan = ?, structural_jabatan = ?, poskestren_jabatan = ?, updated_at = ? WHERE id = ?',
+    [primaryRole, rolesJson, asramaBinaan, structuralJabatan, poskestrenJabatan, new Date().toISOString(), userId]
   )
 
     await logActivity({
@@ -616,7 +623,7 @@ export async function updateUserRoles(
       fiturHref: '/dashboard/pengaturan/users',
       logKind: 'update',
       entityType: 'user',
-    entityId: id,
+    entityId: userId,
     entityLabel: beforeUser.full_name || beforeUser.email,
     summary: `Mengubah role user ${beforeUser.full_name || beforeUser.email}`,
     details: {
@@ -626,14 +633,16 @@ export async function updateUserRoles(
           roles: parseRoles(beforeUser.roles, beforeUser.role),
           asrama_binaan: beforeUser.asrama_binaan,
           structural_jabatan: beforeUser.structural_jabatan,
+          poskestren_jabatan: (beforeUser as any).poskestren_jabatan || null,
         },
         {
           role: primaryRole,
           roles: normalizedRoles,
           asrama_binaan: asramaBinaan,
           structural_jabatan: structuralJabatan,
+          poskestren_jabatan: poskestrenJabatan,
         },
-        ['role', 'roles', 'asrama_binaan', 'structural_jabatan']
+        ['role', 'roles', 'asrama_binaan', 'structural_jabatan', 'poskestren_jabatan']
       ),
     },
   })
@@ -656,6 +665,7 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
   const role = String(formData.get('role') || '')
   const asrama = String(formData.get('asrama_binaan') || '')
   const structuralJabatan = normalizeStructuralJabatan(String(formData.get('structural_jabatan') || ''))
+  const poskestrenJabatan = String(formData.get('poskestren_jabatan') || '') || null
   const sourceTypeRaw = String(formData.get('source_type') || '').trim().toLowerCase()
   const sourceRefId = String(formData.get('source_ref_id') || '').trim()
   const sourceType = sourceTypeRaw === 'guru' || sourceTypeRaw === 'sadesa' ? sourceTypeRaw : null
@@ -667,6 +677,7 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
       role,
       asrama_binaan: asrama || null,
       structural_jabatan: structuralJabatan,
+      poskestren_jabatan: poskestrenJabatan,
     })
     if ('error' in result) return { error: result.error }
 
@@ -687,6 +698,7 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
         source_ref_id: sourceRefId,
         asrama_binaan: role === 'pengurus_asrama' ? asrama || null : null,
         structural_jabatan: roleNeedsStructuralJabatan([role]) ? structuralJabatan : null,
+        poskestren_jabatan: role === 'poskestren' ? poskestrenJabatan : null,
       },
     })
 
@@ -716,8 +728,8 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
   await execute(
     `INSERT INTO users (
       id, email, password_hash, full_name, role, roles, asrama_binaan,
-      structural_jabatan, source_type, source_ref_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      structural_jabatan, poskestren_jabatan, source_type, source_ref_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       userId,
       email,
@@ -727,6 +739,7 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
       rolesJson,
       role === 'pengurus_asrama' ? asrama : null,
       roleNeedsStructuralJabatan([role]) ? structuralJabatan : null,
+      role === 'poskestren' ? poskestrenJabatan : null,
       sourceType,
       sourceRefId || null,
       now,
@@ -749,6 +762,7 @@ export async function createUser(formData: FormData): Promise<{ success: boolean
       role,
       asrama_binaan: role === 'pengurus_asrama' ? asrama || null : null,
       structural_jabatan: roleNeedsStructuralJabatan([role]) ? structuralJabatan : null,
+      poskestren_jabatan: role === 'poskestren' ? poskestrenJabatan : null,
       source_type: sourceType,
       source_ref_id: sourceRefId || null,
     },
@@ -830,13 +844,14 @@ export async function createUsersBatch(usersData: any[]) {
         ? String(u.role).trim().toLowerCase()
         : 'wali_kelas'
       const structuralJabatan = normalizeStructuralJabatan(u.structural_jabatan)
+      const poskestrenJabatan = u.poskestren_jabatan || null
       const rolesJson = JSON.stringify([userRole])
 
       await execute(
         `INSERT INTO users (
           id, email, password_hash, full_name, role, roles, asrama_binaan,
-          structural_jabatan, source_type, source_ref_id, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          structural_jabatan, poskestren_jabatan, source_type, source_ref_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           crypto.randomUUID(),
           email,
@@ -846,6 +861,7 @@ export async function createUsersBatch(usersData: any[]) {
           rolesJson,
           userRole === 'pengurus_asrama' ? (u.asrama_binaan || null) : null,
           roleNeedsStructuralJabatan([userRole]) ? structuralJabatan : null,
+          poskestrenJabatan,
           null,
           null,
           now,
@@ -1017,6 +1033,7 @@ export async function deleteUser(userId: string): Promise<{ success: boolean } |
         role: targetUser.role,
         roles: parseRoles(targetUser.roles, targetUser.role),
         structural_jabatan: targetUser.structural_jabatan,
+        poskestren_jabatan: (targetUser as any).poskestren_jabatan || null,
       },
     })
     revalidatePath('/dashboard/pengaturan/users')
@@ -1150,6 +1167,7 @@ export async function mergeUserAccounts(primaryId: string, secondaryId: string):
   // Combine flags
   const newAsramaBinaan = primary.asrama_binaan || secondary.asrama_binaan || null
   const newStructural = primary.structural_jabatan || secondary.structural_jabatan || null
+  const newPoskestren = (primary as any).poskestren_jabatan || (secondary as any).poskestren_jabatan || null
   const newGuruId = primary.guru_id || secondary.guru_id || (primary.source_type === 'guru' ? primary.source_ref_id : (secondary.source_type === 'guru' ? secondary.source_ref_id : null))
   const newSantriId = primary.santri_id || secondary.santri_id || (['sadesa', 'santri'].includes(primary.source_type || '') ? primary.source_ref_id : (['sadesa', 'santri'].includes(secondary.source_type || '') ? secondary.source_ref_id : null))
 
@@ -1177,13 +1195,14 @@ export async function mergeUserAccounts(primaryId: string, secondaryId: string):
       roles = ?,
       asrama_binaan = ?,
       structural_jabatan = ?,
+      poskestren_jabatan = ?,
       guru_id = ?,
       santri_id = ?,
       source_type = ?,
       source_ref_id = ?
     WHERE id = ?
   `, [
-    newRole, newRolesStr, newAsramaBinaan, newStructural, newGuruId ? Number(newGuruId) : null, newSantriId, newSourceType, newSourceRefId, primaryId
+    newRole, newRolesStr, newAsramaBinaan, newStructural, newPoskestren, newGuruId ? Number(newGuruId) : null, newSantriId, newSourceType, newSourceRefId, primaryId
   ])
 
   // Merge PSB Akses flags (this needs manual read first since we didn't fetch them in getUserById)

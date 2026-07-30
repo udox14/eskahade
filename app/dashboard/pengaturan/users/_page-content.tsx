@@ -60,6 +60,7 @@ type SelectedBatchConfig = {
   role: string
   asrama_binaan: string
   structural_jabatan: string
+  poskestren_jabatan: string
 }
 
 export default function ManajemenUserPage() {
@@ -97,9 +98,11 @@ export default function ManajemenUserPage() {
 
   // Multi-role edit modal
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false)
-  const [roleEditUser, setRoleEditUser] = useState<any>(null)
+  const [roleEditUser, setRoleEditUser] = useState<any | null>(null)
   const [roleEditSelected, setRoleEditSelected] = useState<string[]>([])
-  const [roleEditJabatan, setRoleEditJabatan] = useState('')
+  const [roleEditAsrama, setRoleEditAsrama] = useState<string>('')
+  const [roleEditJabatan, setRoleEditJabatan] = useState<string>('')
+  const [roleEditPoskestrenJabatan, setRoleEditPoskestrenJabatan] = useState<string>('')
 
   // Merge Accounts
   const [isOpenMerge, setIsOpenMerge] = useState(false)
@@ -260,6 +263,7 @@ export default function ManajemenUserPage() {
           role: candidate.source_type === 'guru' ? 'guru' : newRole,
           asrama_binaan: '',
           structural_jabatan: needsStructuralJabatan([candidate.source_type === 'guru' ? 'guru' : newRole]) ? DEFAULT_STRUCTURAL_JABATAN : '',
+          poskestren_jabatan: (candidate.source_type === 'guru' ? 'guru' : newRole) === 'poskestren' ? '' : '',
         },
       }
     })
@@ -292,6 +296,7 @@ export default function ManajemenUserPage() {
             role: candidate.source_type === 'guru' ? 'guru' : newRole,
             asrama_binaan: '',
             structural_jabatan: needsStructuralJabatan([candidate.source_type === 'guru' ? 'guru' : newRole]) ? DEFAULT_STRUCTURAL_JABATAN : '',
+            poskestren_jabatan: (candidate.source_type === 'guru' ? 'guru' : newRole) === 'poskestren' ? '' : '',
           }
         }
       })
@@ -304,7 +309,9 @@ export default function ManajemenUserPage() {
     setRoleEditUser(user)
     const roles = parseRoles(user)
     setRoleEditSelected(roles)
+    setRoleEditAsrama(user.asrama_binaan || '')
     setRoleEditJabatan(needsStructuralJabatan(roles) ? (user.structural_jabatan || DEFAULT_STRUCTURAL_JABATAN) : '')
+    setRoleEditPoskestrenJabatan(user.poskestren_jabatan || '')
     setIsRoleModalOpen(true)
   }
 
@@ -317,6 +324,10 @@ export default function ManajemenUserPage() {
       toast.error('Pilih jabatan struktural')
       return
     }
+    if (roleEditSelected.includes('poskestren') && !roleEditPoskestrenJabatan) {
+      toast.error('Pilih jabatan POSKESTREN')
+      return
+    }
     // Jika ada pengurus_asrama, tanya asrama
     if (roleEditSelected.includes('pengurus_asrama') && !roleEditUser.asrama_binaan) {
       setPendingRoleUpdate({ userId: roleEditUser.id, roles: roleEditSelected })
@@ -326,14 +337,14 @@ export default function ManajemenUserPage() {
     }
     setProcessingId(roleEditUser.id)
     const toastId = toast.loading('Menyimpan role...')
-    const res = await updateUserRoles(roleEditUser.id, roleEditSelected, roleEditUser.asrama_binaan, roleEditJabatan)
+    const res = await updateUserRoles(roleEditUser.id, roleEditSelected, roleEditUser.asrama_binaan, roleEditJabatan, roleEditPoskestrenJabatan)
     toast.dismiss(toastId)
     setProcessingId(null)
     if ('error' in res) {
       toast.error('Gagal update', { description: (res as any).error })
     } else {
       const rolesJson = JSON.stringify(roleEditSelected)
-      setUsers(prev => prev.map(u => u.id === roleEditUser.id ? { ...u, role: roleEditSelected[0], roles: rolesJson, structural_jabatan: needsStructuralJabatan(roleEditSelected) ? roleEditJabatan : null } : u))
+      setUsers(prev => prev.map(u => u.id === roleEditUser.id ? { ...u, role: roleEditSelected[0], roles: rolesJson, structural_jabatan: needsStructuralJabatan(roleEditSelected) ? roleEditJabatan : null, poskestren_jabatan: roleEditSelected.includes('poskestren') ? roleEditPoskestrenJabatan : null } : u))
       toast.success('Role diperbarui', { description: roleEditSelected.map(r => ROLES.find(x=>x.value===r)?.label||r).join(', ') })
       setIsRoleModalOpen(false)
     }
@@ -361,14 +372,15 @@ export default function ManajemenUserPage() {
       const toastId = toast.loading('Menyimpan role...')
       const currentUser = users.find(u => u.id === pendingRoleUpdate.userId)
       const structuralJabatan = needsStructuralJabatan(pendingRoleUpdate.roles) ? (currentUser?.structural_jabatan || DEFAULT_STRUCTURAL_JABATAN) : ''
-      const res = await updateUserRoles(pendingRoleUpdate.userId, pendingRoleUpdate.roles, asrama, structuralJabatan)
+      const poskestrenJabatan = pendingRoleUpdate.roles.includes('poskestren') ? (currentUser?.poskestren_jabatan || '') : ''
+      const res = await updateUserRoles(pendingRoleUpdate.userId, pendingRoleUpdate.roles, asrama, structuralJabatan, poskestrenJabatan)
       toast.dismiss(toastId)
       setProcessingId(null)
       if ('error' in res) {
         toast.error('Gagal update', { description: (res as any).error })
       } else {
         const rolesJson = JSON.stringify(pendingRoleUpdate.roles)
-        setUsers(prev => prev.map(u => u.id === pendingRoleUpdate!.userId ? { ...u, role: pendingRoleUpdate!.roles[0], roles: rolesJson, asrama_binaan: asrama, structural_jabatan: structuralJabatan || null } : u))
+        setUsers(prev => prev.map(u => u.id === pendingRoleUpdate!.userId ? { ...u, role: pendingRoleUpdate!.roles[0], roles: rolesJson, asrama_binaan: asrama, structural_jabatan: structuralJabatan || null, poskestren_jabatan: poskestrenJabatan || null } : u))
         toast.success('Role & Asrama diperbarui')
       }
       setPendingRoleUpdate(null)
@@ -1131,17 +1143,32 @@ export default function ManajemenUserPage() {
                                 </div>
 
                                 <div>
-                                  <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Jabatan</label>
+                                  <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Jabatan Struktural</label>
                                   <select
                                     value={config?.structural_jabatan || ''}
                                     disabled={!needsStructuralJabatan([config?.role || ''])}
                                     onChange={(e) => updateSelectedBatchConfig(key, { structural_jabatan: e.target.value })}
                                     className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-400"
                                   >
-                                    <option value="">-- Pilih Jabatan --</option>
+                                    <option value="">(Tanpa Jabatan)</option>
                                     {STRUCTURAL_JABATAN.map(j => (
                                       <option key={j.value} value={j.value}>{j.label}</option>
                                     ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Jabatan POSKESTREN</label>
+                                  <select
+                                    value={(config as any)?.poskestren_jabatan || ''}
+                                    disabled={(config?.role || (candidate.source_type === 'guru' ? 'guru' : 'wali_kelas')) !== 'poskestren'}
+                                    onChange={(e) => updateSelectedBatchConfig(key, { poskestren_jabatan: e.target.value })}
+                                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-400"
+                                  >
+                                    <option value="">(Tanpa Jabatan)</option>
+                                    <option value="ketua">Ketua</option>
+                                    <option value="sekretaris">Sekretaris</option>
+                                    <option value="bendahara">Bendahara</option>
                                   </select>
                                 </div>
 
@@ -1586,12 +1613,14 @@ export default function ManajemenUserPage() {
                           setRoleEditSelected(prev => {
                             const next = [...prev, r.value]
                             if (needsStructuralJabatan(next) && !roleEditJabatan) setRoleEditJabatan(roleEditUser.structural_jabatan || DEFAULT_STRUCTURAL_JABATAN)
+                            if (next.includes('poskestren') && !roleEditPoskestrenJabatan) setRoleEditPoskestrenJabatan(roleEditUser.poskestren_jabatan || '')
                             return next
                           })
                         } else {
                           setRoleEditSelected(prev => {
                             const next = prev.filter(x => x !== r.value)
                             if (!needsStructuralJabatan(next)) setRoleEditJabatan('')
+                            if (!next.includes('poskestren')) setRoleEditPoskestrenJabatan('')
                             return next
                           })
                         }
@@ -1612,6 +1641,21 @@ export default function ManajemenUserPage() {
                     {STRUCTURAL_JABATAN.map(j => (
                       <option key={j.value} value={j.value}>{j.label}</option>
                     ))}
+                  </select>
+                </div>
+              )}
+              {roleEditSelected.includes('poskestren') && (
+                <div className="pt-3">
+                  <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Jabatan POSKESTREN</label>
+                  <select
+                    value={roleEditPoskestrenJabatan}
+                    onChange={(e) => setRoleEditPoskestrenJabatan(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="">Tanpa Jabatan</option>
+                    <option value="ketua">Ketua</option>
+                    <option value="sekretaris">Sekretaris</option>
+                    <option value="bendahara">Bendahara</option>
                   </select>
                 </div>
               )}
