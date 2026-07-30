@@ -132,7 +132,7 @@ export default function PoskestrenPemeriksaanContent() {
   return (
     <div className="space-y-5">
       <DashboardPageHeader
-        title="Pemeriksaan POSKESTREN"
+        title="Pemeriksaan"
         description="Registrasi profil medis, antrean harian, pemeriksaan, dan program preventif santri."
       />
       <PoskestrenTabs tabs={TABS} active={activeTab} onChange={changeTab} />
@@ -264,7 +264,7 @@ function PatientTab() {
           <>
             <div className="grid gap-3 p-3 md:hidden">
               {patientResult.items.map((patient: any) => (
-                <article key={patient.id} className="rounded-2xl border border-slate-200 p-4">
+                <article key={patient.id} className="rounded-xl border border-slate-200 p-3">
                   <div className="flex gap-3">
                     <SantriPhotoAvatar name={patient.nama_lengkap} src={patient.foto_url} size="md" />
                     <div className="min-w-0 flex-1">
@@ -310,9 +310,10 @@ function PatientTab() {
           <p className="text-xs text-rose-700">Impor satu arah; status Data Sakit tidak akan diubah.</p>
         </div>
         {sickRows.length ? (
-          <div className="divide-y divide-slate-100">
+          <>
+          <div className="divide-y divide-slate-100 md:hidden">
             {sickRows.map(row => (
-              <div key={row.episode_id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+              <div key={row.episode_id} className="flex flex-col gap-2 p-3">
                 <div className="flex-1">
                   <p className="font-bold">{row.nama_lengkap}</p>
                   <p className="text-xs text-slate-500">{row.nis} · {row.asrama || '—'} / {row.kamar || '—'}</p>
@@ -333,6 +334,36 @@ function PatientTab() {
               </div>
             ))}
           </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Santri</th>
+                  <th className="px-4 py-3">Asrama / Kamar</th>
+                  <th className="px-4 py-3">Keluhan</th>
+                  <th className="px-4 py-3 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sickRows.map(row => (
+                  <tr key={row.episode_id} className="hover:bg-slate-50/70">
+                    <td className="px-4 py-3"><p className="font-bold">{row.nama_lengkap}</p><p className="text-xs text-slate-500">{row.nis}</p></td>
+                    <td className="px-4 py-3 text-slate-600">{row.asrama || '—'} / {row.kamar || '—'}</td>
+                    <td className="max-w-md px-4 py-3 text-rose-700">{row.sakit_apa || 'Keluhan belum dirinci'}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button disabled={pending} onClick={() => startTransition(async () => {
+                        const result = await importSickEpisode({ episodeId: row.episode_id, absenSakitId: row.absen_sakit_id })
+                        if (!result.success) { toast.error(result.error); return }
+                        toast.success('Episode diimpor ke antrean POSKESTREN.')
+                        await load()
+                      })} className={buttonPrimary}>Impor</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          </>
         ) : <div className="p-8 text-center text-sm text-slate-500">Tidak ada episode aktif yang belum diimpor.</div>}
       </section>
 
@@ -502,10 +533,11 @@ function TodayTab() {
           <PageSizeSelect value={pageSize} onChange={setPageSize} hasFilter={Boolean(q || status || date)} />
         </div>
         {loading ? <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div> : result.items.length ? (
-          <div className="divide-y divide-slate-100">
+          <>
+          <div className="divide-y divide-slate-100 md:hidden">
             {result.items.map((visit: any) => (
-              <article key={visit.id} className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center">
-                <div className="flex items-center gap-3 lg:w-16">
+              <article key={visit.id} className="flex flex-col gap-2 p-3">
+                <div className="flex items-center gap-3">
                   <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-lg font-black text-emerald-700">{visit.queue_number}</span>
                 </div>
                 <div className="min-w-0 flex-1">
@@ -514,7 +546,7 @@ function TodayTab() {
                   <p className="mt-1 text-sm text-slate-700">{visit.diagnosis || visit.complaint || 'Belum ada keluhan'}</p>
                   {visit.allergies ? <p className="mt-1 text-xs font-bold text-rose-600">Alergi: {visit.allergies}</p> : null}
                 </div>
-                <div className="flex flex-wrap gap-2 lg:justify-end">
+                <div className="flex flex-wrap gap-2">
                   {visit.status === 'MENUNGGU' && practice.practice ? <button disabled={pending} onClick={() => run(() => beginVisit(visit.id), 'Pemeriksaan dimulai.')} className={buttonPrimary}>Periksa</button> : null}
                   {visit.status === 'DIPERIKSA' ? <button onClick={() => { setExamVisit(visit); setPrescription([]) }} className={buttonPrimary}>Isi pemeriksaan</button> : null}
                   {['MENUNGGU','DIPERIKSA'].includes(visit.status) ? <button disabled={pending} onClick={() => { const reason = window.prompt('Alasan pembatalan:'); if (reason) run(() => cancelVisit(visit.id, reason), 'Kunjungan dibatalkan.') }} className={buttonSecondary}>Batal</button> : null}
@@ -522,6 +554,37 @@ function TodayTab() {
               </article>
             ))}
           </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Antrean</th>
+                  <th className="px-4 py-3">Pasien</th>
+                  <th className="px-4 py-3">Status / Sumber</th>
+                  <th className="px-4 py-3">Keluhan / Diagnosis</th>
+                  <th className="px-4 py-3 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {result.items.map((visit: any) => (
+                  <tr key={visit.id} className="hover:bg-slate-50/70">
+                    <td className="px-4 py-3"><span className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl bg-emerald-100 px-2 font-black text-emerald-700">{visit.queue_number}</span></td>
+                    <td className="px-4 py-3"><p className="font-bold">{visit.nama_lengkap}</p><p className="text-xs text-slate-500">{visit.nis} · {visit.asrama || '—'} / {visit.kamar || '—'}</p>{visit.allergies ? <p className="text-xs font-bold text-rose-600">Alergi: {visit.allergies}</p> : null}</td>
+                    <td className="px-4 py-3"><div className="flex flex-wrap gap-1"><span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${visit.status === 'MENUNGGU' ? 'bg-amber-100 text-amber-700' : visit.status === 'DIPERIKSA' ? 'bg-blue-100 text-blue-700' : visit.status === 'BATAL' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'}`}>{visit.status}</span>{visit.source_type === 'DATA_SAKIT' ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">DATA SAKIT</span> : null}</div></td>
+                    <td className="max-w-md px-4 py-3 text-slate-700">{visit.diagnosis || visit.complaint || 'Belum ada keluhan'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        {visit.status === 'MENUNGGU' && practice.practice ? <button disabled={pending} onClick={() => run(() => beginVisit(visit.id), 'Pemeriksaan dimulai.')} className={buttonPrimary}>Periksa</button> : null}
+                        {visit.status === 'DIPERIKSA' ? <button onClick={() => { setExamVisit(visit); setPrescription([]) }} className={buttonPrimary}>Isi pemeriksaan</button> : null}
+                        {['MENUNGGU','DIPERIKSA'].includes(visit.status) ? <button disabled={pending} onClick={() => { const reason = window.prompt('Alasan pembatalan:'); if (reason) run(() => cancelVisit(visit.id, reason), 'Kunjungan dibatalkan.') }} className={buttonSecondary}>Batal</button> : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          </>
         ) : <EmptyState title="Antrean kosong" description="Belum ada pasien pada tanggal dan filter ini." />}
       </section>
 
@@ -592,10 +655,11 @@ function HistoryTab() {
         <PageSizeSelect value={pageSize} onChange={setPageSize} hasFilter={Boolean(q || from || to)} />
       </div>
       {loading ? <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div> : result.items.length ? (
-        <div className="divide-y divide-slate-100">
+        <>
+        <div className="divide-y divide-slate-100 md:hidden">
           {result.items.map((row: any) => (
-            <article key={row.id} className="p-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+            <article key={row.id} className="p-3">
+              <div className="flex flex-col gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2"><p className="font-bold">{row.nama_lengkap}</p><span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black text-emerald-700">{row.status}</span>{row.revision_no ? <span className="text-[10px] font-bold text-amber-700">Revisi {row.revision_no}</span> : null}</div>
                   <p className="text-xs text-slate-500">{formatDate(row.queue_date)} · {row.nis} · {row.asrama || '—'} / {row.kamar || '—'} · {row.personnel_name || '—'}</p>
@@ -622,6 +686,44 @@ function HistoryTab() {
             </article>
           ))}
         </div>
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Tanggal / Pasien</th>
+                <th className="px-4 py-3">Keluhan</th>
+                <th className="px-4 py-3">Diagnosis / Tindakan</th>
+                <th className="px-4 py-3">Obat</th>
+                <th className="px-4 py-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {result.items.map((row: any) => (
+                <tr key={row.id} className="align-top hover:bg-slate-50/70">
+                  <td className="px-4 py-3"><p className="font-bold">{row.nama_lengkap}</p><p className="text-xs text-slate-500">{formatDate(row.queue_date)} · {row.nis}</p><p className="text-xs text-slate-500">{row.asrama || '—'} / {row.kamar || '—'} · {row.personnel_name || '—'}</p></td>
+                  <td className="max-w-xs px-4 py-3 text-slate-600">{row.complaint || '—'}</td>
+                  <td className="max-w-xs px-4 py-3"><p className="font-semibold">{row.diagnosis || '—'}</p><p className="mt-1 text-xs text-slate-500">{row.treatment || 'Tanpa tindakan'}</p>{row.revision_no ? <span className="mt-1 inline-block text-[10px] font-bold text-amber-700">Revisi {row.revision_no}</span> : null}</td>
+                  <td className="max-w-xs px-4 py-3 text-slate-600">{row.medicine_names || '—'}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button disabled={pending} onClick={() => {
+                      const reason = window.prompt('Alasan revisi:')
+                      if (!reason) return
+                      const diagnosis = window.prompt('Diagnosis koreksi:', row.diagnosis || '')
+                      if (!diagnosis) return
+                      startTransition(async () => {
+                        const response = await reviseCompletedVisit({ visitId: row.id, reason, diagnosis, treatment: row.treatment, followUp: row.follow_up, referralDestination: row.referral_destination, referralNotes: row.referral_notes })
+                        if (!response.success) { toast.error(response.error); return }
+                        toast.success('Pemeriksaan direvisi dan riwayat disimpan.')
+                        await load()
+                      })
+                    }} className={buttonSecondary}>Revisi</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        </>
       ) : <EmptyState title="Tidak ada pemeriksaan" description="Ubah rentang tanggal atau kata pencarian." />}
     </section>
   )
@@ -697,15 +799,43 @@ function PreventiveTab() {
           <input value={q} onChange={event => setQ(event.target.value)} placeholder="Judul, sasaran, atau deskripsi..." className={inputClass} />
         </div>
         {loading ? <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div> : data.programs.length ? (
-          <div className="grid gap-3 p-3 lg:grid-cols-2">
+          <>
+          <div className="grid gap-2 p-3 md:hidden">
             {data.programs.map((program: any) => (
-              <button key={program.id} onClick={() => void openProgram(program)} className="rounded-2xl border border-slate-200 p-4 text-left transition hover:border-emerald-300 hover:bg-emerald-50/30">
+              <button key={program.id} onClick={() => void openProgram(program)} className="rounded-xl border border-slate-200 p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/30">
                 <div className="flex items-start justify-between gap-2"><div><p className="font-bold">{program.title}</p><p className="text-xs text-slate-500">{program.type_name || 'Tanpa jenis'} · {formatDate(program.program_date)}</p></div><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">{program.status}</span></div>
                 <p className="mt-2 text-sm text-slate-600">{program.target_summary || program.description || 'Tanpa deskripsi'}</p>
                 <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs"><span className="rounded-lg bg-slate-100 p-2"><strong className="block text-base">{program.participant_count || 0}</strong>Peserta</span><span className="rounded-lg bg-emerald-50 p-2 text-emerald-700"><strong className="block text-base">{program.present_count || 0}</strong>Hadir</span><span className="rounded-lg bg-amber-50 p-2 text-amber-700"><strong className="block text-base">{program.follow_up_count || 0}</strong>Tindak lanjut</span></div>
               </button>
             ))}
           </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Program</th>
+                  <th className="px-4 py-3">Tanggal / Jenis</th>
+                  <th className="px-4 py-3">Sasaran</th>
+                  <th className="px-4 py-3 text-center">Peserta</th>
+                  <th className="px-4 py-3 text-center">Hadir</th>
+                  <th className="px-4 py-3 text-center">Tindak lanjut</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {data.programs.map((program: any) => (
+                  <tr key={program.id} onClick={() => void openProgram(program)} className="cursor-pointer hover:bg-emerald-50/40">
+                    <td className="px-4 py-3 font-bold">{program.title}</td>
+                    <td className="px-4 py-3"><p>{formatDate(program.program_date)}</p><p className="text-xs text-slate-500">{program.type_name || 'Tanpa jenis'}</p></td>
+                    <td className="max-w-sm px-4 py-3 text-slate-600">{program.target_summary || program.description || 'Tanpa deskripsi'}</td>
+                    <td className="px-4 py-3 text-center font-bold">{program.participant_count || 0}</td><td className="px-4 py-3 text-center font-bold text-emerald-700">{program.present_count || 0}</td><td className="px-4 py-3 text-center font-bold text-amber-700">{program.follow_up_count || 0}</td>
+                    <td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">{program.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          </>
         ) : <EmptyState title="Belum ada program" description="Buat program skrining, imunisasi, penyuluhan, atau kegiatan lain." />}
       </section>
 
@@ -752,8 +882,9 @@ function PreventiveTab() {
           <div className="max-h-[94vh] w-full max-w-4xl overflow-y-auto rounded-t-3xl bg-white sm:rounded-2xl">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4"><div><h2 className="font-bold">{selectedProgram.title}</h2><p className="text-xs text-slate-500">{formatDate(selectedProgram.program_date)} · {selectedProgram.status}</p></div><button onClick={() => setSelectedProgram(null)}><X /></button></div>
             <div className="flex flex-wrap gap-2 border-b p-4">{['DRAFT','ACTIVE','COMPLETED','CANCELLED'].map(value => <button key={value} disabled={pending} onClick={() => startTransition(async () => { const response = await updatePreventiveStatus(selectedProgram.id, value as any); if (!response.success) toast.error(response.error); else { toast.success('Status diperbarui.'); setSelectedProgram({ ...selectedProgram, status: value }); await load() } })} className={value === selectedProgram.status ? buttonPrimary : buttonSecondary}>{value}</button>)}</div>
-            {participants.length ? <div className="divide-y">{participants.map(row => (
-              <div key={row.id} className="grid gap-3 p-4 lg:grid-cols-[1fr_160px_1fr_1fr_auto] lg:items-center">
+            {participants.length ? <>
+            <div className="divide-y md:hidden">{participants.map(row => (
+              <div key={row.id} className="grid gap-2 p-3">
                 <div><p className="font-bold">{row.nama_lengkap}</p><p className="text-xs text-slate-500">{row.nis} · {row.asrama || '—'} / {row.kamar || '—'}</p></div>
                 <select defaultValue={row.attendance} id={`attendance-${row.id}`} className={inputClass}><option>PENDING</option><option>PRESENT</option><option>ABSENT</option></select>
                 <input defaultValue={row.result || ''} id={`result-${row.id}`} placeholder="Hasil" className={inputClass} />
@@ -768,7 +899,36 @@ function PreventiveTab() {
                   if (!response.success) toast.error(response.error); else toast.success('Peserta diperbarui.')
                 })} className={buttonSecondary}>Simpan</button>
               </div>
-            ))}</div> : <EmptyState title="Belum ada peserta" description="Program dibuat tanpa peserta individual." />}
+            ))}</div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr><th className="px-4 py-3">Peserta</th><th className="px-4 py-3">Kehadiran</th><th className="px-4 py-3">Hasil</th><th className="px-4 py-3">Tindak lanjut</th><th className="px-4 py-3 text-right">Aksi</th></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {participants.map(row => (
+                    <tr key={row.id} className="hover:bg-slate-50/70">
+                      <td className="px-4 py-3"><p className="font-bold">{row.nama_lengkap}</p><p className="text-xs text-slate-500">{row.nis} · {row.asrama || '—'} / {row.kamar || '—'}</p></td>
+                      <td className="px-4 py-3"><select defaultValue={row.attendance} id={`attendance-desktop-${row.id}`} className={inputClass}><option>PENDING</option><option>PRESENT</option><option>ABSENT</option></select></td>
+                      <td className="px-4 py-3"><input defaultValue={row.result || ''} id={`result-desktop-${row.id}`} placeholder="Hasil" className={inputClass} /></td>
+                      <td className="px-4 py-3"><input defaultValue={row.follow_up || ''} id={`follow-desktop-${row.id}`} placeholder="Tindak lanjut" className={inputClass} /></td>
+                      <td className="px-4 py-3 text-right">
+                        <button disabled={pending} onClick={() => startTransition(async () => {
+                          const response = await updatePreventiveParticipant({
+                            id: row.id,
+                            attendance: (document.getElementById(`attendance-desktop-${row.id}`) as HTMLSelectElement).value as any,
+                            result: (document.getElementById(`result-desktop-${row.id}`) as HTMLInputElement).value,
+                            followUp: (document.getElementById(`follow-desktop-${row.id}`) as HTMLInputElement).value,
+                          })
+                          if (!response.success) toast.error(response.error); else toast.success('Peserta diperbarui.')
+                        })} className={buttonSecondary}>Simpan</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            </> : <EmptyState title="Belum ada peserta" description="Program dibuat tanpa peserta individual." />}
           </div>
         </div>
       ) : null}

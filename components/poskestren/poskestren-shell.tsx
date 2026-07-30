@@ -1,50 +1,8 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { ClipboardList, FileText, Package, Stethoscope, Users, Wallet } from 'lucide-react'
+import { ClipboardList } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
-
-const MODULES = [
-  { href: '/dashboard/poskestren/pemeriksaan', label: 'Pemeriksaan', icon: Stethoscope },
-  { href: '/dashboard/poskestren/keuangan', label: 'Keuangan', icon: Wallet },
-  { href: '/dashboard/poskestren/laporan', label: 'Laporan', icon: FileText },
-  { href: '/dashboard/poskestren/obat', label: 'Obat', icon: Package },
-  { href: '/dashboard/poskestren/manajemen', label: 'Manajemen', icon: Users },
-]
-
-export function PoskestrenModuleNav({ canFinance }: { canFinance: boolean }) {
-  const pathname = usePathname()
-  const visible = MODULES.filter(item => canFinance || item.label !== 'Keuangan')
-
-  return (
-    <nav className="no-print sticky top-0 z-20 -mx-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-sm backdrop-blur">
-      <div className="flex min-w-max gap-1">
-        {visible.map(item => {
-          const Icon = item.icon
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              prefetch
-              className={cn(
-                'inline-flex min-h-10 items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition',
-                active
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          )
-        })}
-      </div>
-    </nav>
-  )
-}
 
 export function PoskestrenTabs<T extends string>({
   tabs,

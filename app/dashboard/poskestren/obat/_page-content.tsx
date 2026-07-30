@@ -66,7 +66,7 @@ export default function PoskestrenObatContent() {
   }
   return (
     <div className="space-y-5">
-      <DashboardPageHeader title="Obat POSKESTREN" description="Katalog, batch, pembelian, serta kartu stok yang terlacak per referensi." />
+      <DashboardPageHeader title="Obat" description="Katalog, batch, pembelian, serta kartu stok yang terlacak per referensi." />
       <PoskestrenTabs tabs={TABS} active={tab} onChange={changeTab} />
       {tab === 'katalog' ? <CatalogTab /> : null}
       {tab === 'belanja' ? <PurchaseTab /> : null}
@@ -115,20 +115,27 @@ function CatalogTab() {
       </div>
       {truncated ? <LimitNotice /> : null}
       {loading ? <Loading /> : rows.length === 0 ? <EmptyState title="Belum ada obat" description="Tambah katalog obat atau ubah filter pencarian." /> : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {rows.map(row => (
-            <article key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="flex justify-between gap-3">
-                <div><h3 className="font-black text-slate-900">{row.name}</h3><p className="text-xs text-slate-500">{[row.generic_name, row.form, row.strength].filter(Boolean).join(' · ') || 'Tanpa detail'}</p></div>
-                <span className={`h-fit rounded-full px-2 py-1 text-xs font-black ${Number(row.total_stock_base) <= Number(row.minimum_stock_base) ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{Number(row.total_stock_base).toLocaleString('id-ID')} {row.base_unit}</span>
-              </div>
-              <dl className="mt-4 grid grid-cols-2 gap-2 text-xs"><div><dt className="text-slate-400">Minimum</dt><dd className="font-bold">{row.minimum_stock_base} {row.base_unit}</dd></div><div><dt className="text-slate-400">Batch aktif</dt><dd className="font-bold">{row.active_batch_count}</dd></div><div className="col-span-2"><dt className="text-slate-400">Kedaluwarsa terdekat</dt><dd className="font-bold">{row.nearest_expiry || '—'}</dd></div></dl>
-              {row.conversions ? <p className="mt-3 rounded-lg bg-slate-50 p-2 text-xs text-slate-600">Konversi: {row.conversions}</p> : null}
-              <div className="mt-4 flex gap-2"><button className={secondary} onClick={() => setEditing(row)}>Edit</button><button className={secondary} onClick={() => setConversion(row)}>Konversi</button></div>
-            </article>
-          ))}
-        </div>
-      )}
+        <>
+          <div className="space-y-2 md:hidden">
+            {rows.map(row => <article key={row.id} className="rounded-xl border border-slate-200 bg-white p-3">
+              <div className="flex items-start justify-between gap-2"><div className="min-w-0"><h3 className="truncate text-sm font-black">{row.name}</h3><p className="truncate text-[11px] text-slate-500">{[row.generic_name, row.form, row.strength].filter(Boolean).join(' · ') || 'Tanpa detail'}</p></div><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ${Number(row.total_stock_base) <= Number(row.minimum_stock_base) ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>{row.total_stock_base} {row.base_unit}</span></div>
+              <p className="mt-2 text-[11px] text-slate-500">Min. {row.minimum_stock_base} · {row.active_batch_count} batch · ED {row.nearest_expiry || '—'}</p>
+              <div className="mt-2 flex gap-2"><button className={secondary} onClick={() => setEditing(row)}>Edit</button><button className={secondary} onClick={() => setConversion(row)}>Konversi</button></div>
+            </article>)}
+          </div>
+          <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Obat</th><th className="px-4 py-3">Kategori/Bentuk</th><th className="px-4 py-3 text-right">Stok</th><th className="px-4 py-3 text-right">Minimum</th><th className="px-4 py-3 text-center">Batch</th><th className="px-4 py-3">ED terdekat</th><th className="px-4 py-3">Konversi</th><th className="px-4 py-3 text-right">Aksi</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={row.id} className="hover:bg-slate-50/70">
+                <td className="px-4 py-3"><p className="font-bold">{row.name}</p><p className="text-xs text-slate-500">{row.generic_name || '—'}{row.strength ? ` · ${row.strength}` : ''}</p></td>
+                <td className="px-4 py-3 text-slate-600">{[row.category, row.form].filter(Boolean).join(' · ') || '—'}</td>
+                <td className={`px-4 py-3 text-right font-black ${Number(row.total_stock_base) <= Number(row.minimum_stock_base) ? 'text-amber-700' : 'text-emerald-700'}`}>{Number(row.total_stock_base).toLocaleString('id-ID')} {row.base_unit}</td>
+                <td className="px-4 py-3 text-right">{row.minimum_stock_base} {row.base_unit}</td><td className="px-4 py-3 text-center">{row.active_batch_count}</td><td className="px-4 py-3">{row.nearest_expiry || '—'}</td><td className="max-w-xs px-4 py-3 text-xs text-slate-600">{row.conversions || '—'}</td>
+                <td className="px-4 py-3"><div className="flex justify-end gap-2"><button className={secondary} onClick={() => setEditing(row)}>Edit</button><button className={secondary} onClick={() => setConversion(row)}>Konversi</button></div></td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+        </>)}
       {editing ? <MedicineModal medicine={editing} pending={pending} onClose={() => setEditing(null)} onSave={(data: any) => startTransition(async () => {
         try { const result = await saveMedicine(data); if (!result.success) { toast.error(result.error); return }; toast.success('Katalog obat disimpan.'); setEditing(null); await load() } catch (e) { toast.error(e instanceof Error ? e.message : 'Gagal menyimpan.') }
       })} /> : null}
@@ -196,10 +203,10 @@ function PurchaseTab() {
       </div>
     </div>
     {truncated ? <LimitNotice /> : null}
-    {rows.length === 0 ? <EmptyState title="Belum ada pembelian" description="Buat draft pembelian untuk mencatat penerimaan batch obat." /> : <div className="space-y-3">{rows.map(row => <article key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row"><div><p className="text-xs font-bold text-slate-400">{row.purchase_date}</p><h3 className="font-black">{row.supplier_name}</h3><p className="mt-1 text-sm text-slate-500">{row.item_summary}</p></div><div className="sm:text-right"><p className="font-black text-emerald-700">{rupiah(row.total_rupiah)}</p><p className="text-xs font-bold text-slate-500">{row.status} · {row.payment_status}</p></div></div>
-      <div className="mt-3 flex flex-wrap gap-2">{row.status === 'DRAFT' ? <button className={primary} disabled={pending} onClick={() => act(receivePurchase(row.id), 'Pembelian diterima dan stok bertambah.')}>Terima barang</button> : null}{row.status === 'RECEIVED' && row.payment_status === 'UNPOSTED' ? masters.accounts.map((account: any) => <button key={account.id} className={secondary} disabled={pending} onClick={() => act(postPurchasePayment({ purchaseId: row.id, accountId: account.id }), `Pembayaran diposting dari ${account.name}.`)}>Bayar: {account.name}</button>) : null}</div>
-    </article>)}</div>}
+    {rows.length === 0 ? <EmptyState title="Belum ada pembelian" description="Buat draft pembelian untuk mencatat penerimaan batch obat." /> : <>
+      <div className="space-y-2 md:hidden">{rows.map(row => <article key={row.id} className="rounded-xl border border-slate-200 bg-white p-3"><div className="flex justify-between gap-2"><div className="min-w-0"><p className="text-[10px] font-bold text-slate-400">{row.purchase_date}</p><h3 className="truncate text-sm font-black">{row.supplier_name}</h3><p className="truncate text-[11px] text-slate-500">{row.item_summary}</p></div><div className="shrink-0 text-right"><p className="text-sm font-black text-emerald-700">{rupiah(row.total_rupiah)}</p><p className="text-[10px] font-bold text-slate-500">{row.status} · {row.payment_status}</p></div></div><div className="mt-2 flex flex-wrap gap-2">{row.status === 'DRAFT' ? <button className={primary} disabled={pending} onClick={() => act(receivePurchase(row.id), 'Pembelian diterima dan stok bertambah.')}>Terima</button> : null}{row.status === 'RECEIVED' && row.payment_status === 'UNPOSTED' ? masters.accounts.map((account: any) => <button key={account.id} className={secondary} disabled={pending} onClick={() => act(postPurchasePayment({ purchaseId: row.id, accountId: account.id }), `Pembayaran diposting dari ${account.name}.`)}>Bayar {account.name}</button>) : null}</div></article>)}</div>
+      <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Supplier</th><th className="px-4 py-3">Item</th><th className="px-4 py-3 text-center">Jumlah item</th><th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Aksi</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={row.id} className="hover:bg-slate-50/70"><td className="px-4 py-3">{row.purchase_date}</td><td className="px-4 py-3 font-bold">{row.supplier_name}</td><td className="max-w-sm px-4 py-3 text-xs text-slate-600">{row.item_summary}</td><td className="px-4 py-3 text-center">{row.item_count}</td><td className="px-4 py-3 text-right font-black text-emerald-700">{rupiah(row.total_rupiah)}</td><td className="px-4 py-3 text-xs font-bold">{row.status} · {row.payment_status}</td><td className="px-4 py-3"><div className="flex justify-end gap-2">{row.status === 'DRAFT' ? <button className={primary} disabled={pending} onClick={() => act(receivePurchase(row.id), 'Pembelian diterima dan stok bertambah.')}>Terima</button> : null}{row.status === 'RECEIVED' && row.payment_status === 'UNPOSTED' ? masters.accounts.map((account: any) => <button key={account.id} className={secondary} disabled={pending} onClick={() => act(postPurchasePayment({ purchaseId: row.id, accountId: account.id }), `Pembayaran diposting dari ${account.name}.`)}>Bayar {account.name}</button>) : null}</div></td></tr>)}</tbody></table></div>
+    </>}
     {hasMore && nextCursor ? <button className={`${secondary} w-full`} onClick={() => load(nextCursor, true)}>Muat berikutnya</button> : null}
     {show ? <PurchaseModal masters={masters} pending={pending} onClose={() => setShow(false)} onSave={(data: any) => startTransition(async () => {
       try { const result = await createPurchase(data); if (!result.success) { toast.error(result.error); return }; toast.success('Draft pembelian dibuat.'); setShow(false); await load() } catch (e) { toast.error(e instanceof Error ? e.message : 'Gagal membuat draft.') }
@@ -271,10 +278,10 @@ function MovementTab() {
         <PageSize value={filter.limit} setValue={limit => setFilter(v => ({ ...v, limit }))} filtered={Boolean(filter.q || filter.medicineId || filter.movementType || filter.from || filter.to)} />
       </div>
       {truncated ? <LimitNotice /> : null}
-      {rows.length === 0 ? <EmptyState title="Belum ada mutasi" description="Mutasi stok akan tampil lengkap dengan batch dan saldo." /> : rows.map(row => <article key={row.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="flex justify-between gap-3"><div><h3 className="font-black">{row.medicine_name}</h3><p className="text-xs text-slate-500">{row.movement_date} · {row.movement_type} · batch {row.batch_number || '—'}</p></div><span className={`font-black ${Number(row.quantity_delta) > 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{Number(row.quantity_delta) > 0 ? '+' : ''}{row.quantity_delta} {row.base_unit}</span></div>
-        <p className="mt-2 text-xs text-slate-600">Saldo {row.stock_before} → {row.stock_after}{row.notes ? ` · ${row.notes}` : ''}</p>
-      </article>)}
+      {rows.length === 0 ? <EmptyState title="Belum ada mutasi" description="Mutasi stok akan tampil lengkap dengan batch dan saldo." /> : <>
+        <div className="space-y-2 md:hidden">{rows.map(row => <article key={row.id} className="rounded-xl border border-slate-200 bg-white p-3"><div className="flex justify-between gap-2"><div className="min-w-0"><h3 className="truncate text-sm font-black">{row.medicine_name}</h3><p className="text-[11px] text-slate-500">{row.movement_date} · {row.movement_type} · {row.batch_number || 'tanpa batch'}</p></div><span className={`shrink-0 text-sm font-black ${Number(row.quantity_delta) > 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{Number(row.quantity_delta) > 0 ? '+' : ''}{row.quantity_delta} {row.base_unit}</span></div><p className="mt-1 truncate text-[11px] text-slate-500">Saldo {row.stock_before} → {row.stock_after}{row.notes ? ` · ${row.notes}` : ''}</p></article>)}</div>
+        <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Tanggal</th><th className="px-4 py-3">Obat</th><th className="px-4 py-3">Jenis</th><th className="px-4 py-3">Batch</th><th className="px-4 py-3 text-right">Mutasi</th><th className="px-4 py-3 text-right">Sebelum</th><th className="px-4 py-3 text-right">Sesudah</th><th className="px-4 py-3">Catatan/Referensi</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={row.id} className="hover:bg-slate-50/70"><td className="px-4 py-3">{row.movement_date}</td><td className="px-4 py-3 font-bold">{row.medicine_name}</td><td className="px-4 py-3 text-xs font-bold">{row.movement_type}</td><td className="px-4 py-3">{row.batch_number || '—'}</td><td className={`px-4 py-3 text-right font-black ${Number(row.quantity_delta) > 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{Number(row.quantity_delta) > 0 ? '+' : ''}{row.quantity_delta} {row.base_unit}</td><td className="px-4 py-3 text-right">{row.stock_before}</td><td className="px-4 py-3 text-right">{row.stock_after}</td><td className="max-w-sm px-4 py-3 text-xs text-slate-600">{row.notes || row.reference_id || '—'}</td></tr>)}</tbody></table></div>
+      </>}
       {hasMore && nextCursor ? <button className={`${secondary} w-full`} onClick={() => load(nextCursor, true)}>Muat berikutnya</button> : null}
     </div>
   </section>
