@@ -380,9 +380,9 @@ INSERT OR IGNORE INTO fitur_akses
   (group_name, title, href, icon, roles, is_active, urutan, is_bottomnav, bottomnav_urutan)
 VALUES
   ('POSKESTREN', 'Pemeriksaan', '/dashboard/poskestren/pemeriksaan', 'Stethoscope', '["admin","poskestren"]', 1, 1, 0, 0),
-  ('POSKESTREN', 'Keuangan', '/dashboard/poskestren/keuangan', 'Wallet', '["admin","poskestren:bendahara"]', 1, 2, 0, 0),
-  ('POSKESTREN', 'Laporan', '/dashboard/poskestren/laporan', 'FileText', '["admin","poskestren"]', 1, 3, 0, 0),
-  ('POSKESTREN', 'Obat', '/dashboard/poskestren/obat', 'Package', '["admin","poskestren"]', 1, 4, 0, 0),
+  ('POSKESTREN', 'Obat', '/dashboard/poskestren/obat', 'Package', '["admin","poskestren"]', 1, 2, 0, 0),
+  ('POSKESTREN', 'Keuangan', '/dashboard/poskestren/keuangan', 'Wallet', '["admin","poskestren:bendahara"]', 1, 3, 0, 0),
+  ('POSKESTREN', 'Laporan', '/dashboard/poskestren/laporan', 'FileText', '["admin","poskestren"]', 1, 4, 0, 0),
   ('POSKESTREN', 'Manajemen', '/dashboard/poskestren/manajemen', 'UserCog', '["admin","poskestren"]', 1, 5, 0, 0);
 
 INSERT OR IGNORE INTO role_fitur_crud_permission

@@ -156,8 +156,6 @@ function PatientTab() {
   const [santriQuery, setSantriQuery] = useState('')
   const [santriRows, setSantriRows] = useState<any[]>([])
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
-  const [sickRows, setSickRows] = useState<any[]>([])
-  const [sickLoading, setSickLoading] = useState(false)
   const [editingPatient, setEditingPatient] = useState<any>(null)
   const [pending, startTransition] = useTransition()
 
@@ -176,17 +174,8 @@ function PatientTab() {
     }
   }, [pageSize, queryText])
 
-  async function openSickModal() {
+  function openSickModal() {
     setShowSick(true)
-    setSickLoading(true)
-    try {
-      const sick = await getSickCandidates('')
-      setSickRows(sick)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Gagal memuat data sakit.')
-    } finally {
-      setSickLoading(false)
-    }
   }
 
   useEffect(() => {
@@ -324,8 +313,6 @@ function PatientTab() {
 
       {showSick ? (
         <SickCandidatesModal
-          rows={sickRows}
-          loading={sickLoading}
           pending={pending}
           onClose={() => setShowSick(false)}
           onImport={(row) => startTransition(async () => {
@@ -333,7 +320,7 @@ function PatientTab() {
               const result = await importSickEpisode({ episodeId: row.episode_id, absenSakitId: row.absen_sakit_id })
               if (!result.success) { toast.error(result.error); return }
               toast.success(`${row.nama_lengkap} berhasil diimpor ke antrean POSKESTREN.`)
-              setSickRows(rows => rows.filter(r => r.episode_id !== row.episode_id))
+              setShowSick(false)
               await load()
             } catch (e) {
               toast.error(e instanceof Error ? e.message : 'Gagal mengimpor episode.')
@@ -408,18 +395,34 @@ function PatientTab() {
 }
 
 function SickCandidatesModal({
-  rows,
-  loading,
   pending,
   onClose,
   onImport,
 }: {
-  rows: any[]
-  loading: boolean
   pending: boolean
   onClose: () => void
   onImport: (row: any) => void
 }) {
+  const [filters, setFilters] = useState({ q: '', gender: '', asrama: '', dateFrom: '', dateTo: '' })
+  const [rows, setRows] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const sick = await getSickCandidates(filters)
+      setRows(sick)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Gagal memuat data sakit.')
+    } finally {
+      setLoading(false)
+    }
+  }, [filters])
+
+  useEffect(() => {
+    const timer = setTimeout(() => void load(), 250)
+    return () => clearTimeout(timer)
+  }, [load])
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
       <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
@@ -429,6 +432,18 @@ function SickCandidatesModal({
             <p className="text-xs text-rose-600">Impor satu arah; status Data Sakit tidak akan berubah.</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700">Tutup</button>
+        </div>
+        <div className="flex flex-col gap-3 border-b bg-slate-50/70 p-4 md:flex-row">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input value={filters.q} onChange={event => setFilters(v => ({ ...v, q: event.target.value }))} placeholder="Nama, NIS, keluhan..." className={`${inputClass} pl-9`} />
+          </div>
+          <select className={inputClass} value={filters.gender} onChange={e => setFilters(v => ({ ...v, gender: e.target.value }))}>
+            <option value="">Semua gender</option><option value="L">Putra</option><option value="P">Putri</option>
+          </select>
+          <input className={inputClass} value={filters.asrama} onChange={e => setFilters(v => ({ ...v, asrama: e.target.value }))} placeholder="Asrama..." />
+          <input type="date" className={inputClass} value={filters.dateFrom} onChange={e => setFilters(v => ({ ...v, dateFrom: e.target.value }))} />
+          <input type="date" className={inputClass} value={filters.dateTo} onChange={e => setFilters(v => ({ ...v, dateTo: e.target.value }))} />
         </div>
         <div className="flex-1 overflow-y-auto">
         {loading ? (

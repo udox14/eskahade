@@ -266,10 +266,34 @@ export async function getPatients(input: PoskestrenListQuery = {}): Promise<Posk
   }
 }
 
-export async function getSickCandidates(keyword = '') {
+export async function getSickCandidates(input: { q?: string; gender?: string; asrama?: string; dateFrom?: string; dateTo?: string } = {}) {
   await requirePoskestrenFeature(PATH)
-  const q = String(keyword || '').trim().slice(0, 60)
+  const q = String(input.q || '').trim().slice(0, 60)
   const like = `%${q}%`
+  const where = [`s.status_global = 'aktif'`, `NOT EXISTS (SELECT 1 FROM poskestren_visit v WHERE v.source_episode_id = le.episode_id)`]
+  const params: unknown[] = []
+
+  if (q) {
+    where.push(`(s.nis = ? OR s.nama_lengkap LIKE ? OR s.asrama LIKE ? OR ab.sakit_apa LIKE ?)`)
+    params.push(q, like, like, like)
+  }
+  if (input.gender) {
+    where.push(`s.jenis_kelamin = ?`)
+    params.push(input.gender)
+  }
+  if (input.asrama) {
+    where.push(`s.asrama = ?`)
+    params.push(input.asrama)
+  }
+  if (input.dateFrom) {
+    where.push(`COALESCE(ab.mulai_at, ab.created_at) >= ?`)
+    params.push(input.dateFrom)
+  }
+  if (input.dateTo) {
+    where.push(`COALESCE(ab.mulai_at, ab.created_at) <= ?`)
+    params.push(input.dateTo + ' 23:59:59')
+  }
+
   return query<{
     absen_sakit_id: string
     episode_id: string
@@ -293,14 +317,10 @@ export async function getSickCandidates(keyword = '') {
      JOIN absen_sakit ab
        ON COALESCE(ab.episode_id, ab.id) = le.episode_id AND ab.created_at = le.max_created
      JOIN santri s ON s.id = ab.santri_id
-     WHERE s.status_global = 'aktif'
-       AND NOT EXISTS (
-         SELECT 1 FROM poskestren_visit v WHERE v.source_episode_id = le.episode_id
-       )
-       AND (? = '' OR s.nis = ? OR s.nama_lengkap LIKE ? OR s.asrama LIKE ? OR ab.sakit_apa LIKE ?)
+     WHERE ${where.join(' AND ')}
      ORDER BY COALESCE(ab.mulai_at, ab.created_at) DESC
-     LIMIT 50`,
-    [q, q, like, like, like]
+     LIMIT 100`,
+    params
   )
 }
 
@@ -408,7 +428,7 @@ export async function importSickEpisode(input: { episodeId: string; absenSakitId
 
   try {
     const db = await getDB()
-    const patientId = await ensurePatientForSantri(db, source, session.id)
+    const patientId = await ensurePatientForSantri(db, { id: source.santri_id, nis: source.nis, gol_darah: source.gol_darah }, session.id)
     const id = await insertQueueVisit({
       patientId,
       queueDate: toWibDateInputValue(),

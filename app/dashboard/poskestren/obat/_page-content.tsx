@@ -46,7 +46,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function PageSize({ value, setValue, filtered }: { value: PoskestrenPageSize; setValue: (v: PoskestrenPageSize) => void; filtered: boolean }) {
   return (
-    <select className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold" value={value}
+    <select className="min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 md:w-auto" value={value}
       onChange={e => setValue(e.target.value === 'all' ? 'all' : Number(e.target.value) as 20 | 50 | 100)}>
       <option value={20}>20</option><option value={50}>50</option><option value={100}>100</option>
       <option value="all" disabled={!filtered}>Semua (maks. 1.000)</option>
@@ -107,12 +107,12 @@ function CatalogTab() {
       </div>
       <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
         <div className="flex flex-col gap-3 md:flex-row">
-          <div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input className={`${inputClass} pl-9`} value={q} onChange={e => setQ(e.target.value)} placeholder="Cari nama, generik, kategori, bentuk..." /></div>
-          <select className={inputClass} value={status} onChange={e => setStatus(e.target.value)}>
+          <div className="relative flex-1"><Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><input className={`${inputClass} pl-9`} value={q} onChange={e => setQ(e.target.value)} placeholder="Cari nama, generik, kategori, bentuk..." /></div>
+          <select className={`${inputClass} md:w-48`} value={status} onChange={e => setStatus(e.target.value)}>
             <option value="active">Aktif</option><option value="low">Stok kritis</option><option value="empty">Kosong</option><option value="inactive">Nonaktif</option>
           </select>
           <PageSize value={limit} setValue={setLimit} filtered={Boolean(q || status)} />
-          <button className={primary} onClick={() => setEditing({})}><Plus className="h-4 w-4" /> Tambah obat</button>
+          <button className={`${primary} md:w-auto`} onClick={() => setEditing({})}><Plus className="h-4 w-4" /> Tambah obat</button>
         </div>
       </div>
       {truncated ? <LimitNotice /> : null}
@@ -197,7 +197,7 @@ function PurchaseTab() {
   return <section className="space-y-4">
     <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
       <div className="grid gap-3 md:grid-cols-7">
-        <input className={`${inputClass} md:col-span-2`} value={filter.q} onChange={e => setFilter(v => ({ ...v, q: e.target.value }))} placeholder="Cari supplier atau obat..." />
+        <div className="relative md:col-span-2"><Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><input className={`${inputClass} pl-9`} value={filter.q} onChange={e => setFilter(v => ({ ...v, q: e.target.value }))} placeholder="Cari supplier atau obat..." /></div>
         <input type="date" className={inputClass} value={filter.from} onChange={e => setFilter(v => ({ ...v, from: e.target.value }))} />
         <input type="date" className={inputClass} value={filter.to} onChange={e => setFilter(v => ({ ...v, to: e.target.value }))} />
         <select className={inputClass} value={filter.status} onChange={e => setFilter(v => ({ ...v, status: e.target.value }))}><option value="">Semua status</option><option>DRAFT</option><option>RECEIVED</option><option>UNPOSTED</option><option>POSTED</option></select>
@@ -273,7 +273,7 @@ function MovementTab() {
     </form>
     <div className="space-y-3">
       <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-4 md:grid-cols-6">
-        <input className={inputClass} value={filter.q} onChange={e => setFilter(v => ({ ...v, q: e.target.value }))} placeholder="Cari obat/batch..." />
+        <div className="relative"><Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><input className={`${inputClass} pl-9`} value={filter.q} onChange={e => setFilter(v => ({ ...v, q: e.target.value }))} placeholder="Cari obat/batch..." /></div>
         <select className={inputClass} value={filter.medicineId} onChange={e => setFilter(v => ({ ...v, medicineId: e.target.value }))}><option value="">Semua obat</option>{masters.medicines.map((m: any) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
         <select className={inputClass} value={filter.movementType} onChange={e => setFilter(v => ({ ...v, movementType: e.target.value }))}><option value="">Semua jenis</option><option>PURCHASE</option><option>PATIENT</option><option>PREVENTIVE</option><option>EXPIRED</option><option>DAMAGED</option><option>LOST</option><option>ADJUSTMENT_IN</option><option>ADJUSTMENT_OUT</option></select>
         <input type="date" className={inputClass} value={filter.from} onChange={e => setFilter(v => ({ ...v, from: e.target.value }))} />
