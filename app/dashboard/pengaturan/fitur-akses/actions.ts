@@ -18,6 +18,8 @@ const ALL_ROLES = [
   'guru',
   'bendahara',
   'operator_loket',
+  'poskestren',
+  'poskestren:bendahara',
   'jabatan:anggota',
   'jabatan:ketua',
   'jabatan:sekretaris',

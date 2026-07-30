@@ -1,0 +1,149 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+'use client'
+
+import { useCallback, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Download, FileSpreadsheet, FileText, Loader2, Printer, Stethoscope, Users } from 'lucide-react'
+import { toast } from 'sonner'
+
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { EmptyState, MetricCard, PoskestrenTabs } from '@/components/poskestren/poskestren-shell'
+
+import { getMonthlyReport, getPayrollReport } from './actions'
+
+type Tab = 'bulanan' | 'penggajian'
+const TABS = [
+  { value: 'bulanan' as const, label: 'Laporan Bulanan', icon: FileText },
+  { value: 'penggajian' as const, label: 'Laporan Penggajian', icon: FileSpreadsheet },
+]
+const secondary = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
+function rupiah(value: unknown) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value || 0)) }
+function currentMonth() {
+  return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', timeZone: 'Asia/Jakarta' }).format(new Date()).slice(0, 7)
+}
+
+export default function PoskestrenLaporanContent() {
+  const params = useSearchParams()
+  const router = useRouter()
+  const initial = params.get('tab') as Tab | null
+  const [tab, setTab] = useState<Tab>(initial === 'penggajian' ? initial : 'bulanan')
+  const [month, setMonth] = useState(params.get('periode') || currentMonth())
+  function changeTab(next: Tab) {
+    setTab(next); const nextParams = new URLSearchParams(params.toString()); nextParams.set('tab', next); nextParams.set('periode', month)
+    router.replace(`/dashboard/poskestren/laporan?${nextParams}`, { scroll: false })
+  }
+  function changeMonth(next: string) {
+    setMonth(next); const nextParams = new URLSearchParams(params.toString()); nextParams.set('tab', tab); nextParams.set('periode', next)
+    router.replace(`/dashboard/poskestren/laporan?${nextParams}`, { scroll: false })
+  }
+  return <div className="space-y-5">
+    <DashboardPageHeader title="Laporan POSKESTREN" description="Rekap layanan, preventif, obat, keuangan, dan penggajian dalam satu periode WIB." />
+    <div className="no-print flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><PoskestrenTabs tabs={TABS} active={tab} onChange={changeTab} /><label className="flex items-center gap-2 text-sm font-bold text-slate-600">Periode <input type="month" value={month} onChange={e => changeMonth(e.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3" /></label></div>
+    {tab === 'bulanan' ? <MonthlyReport month={month} /> : <PayrollReport month={month} />}
+  </div>
+}
+
+function ReportActions({ exportExcel }: { exportExcel: () => Promise<void> }) {
+  const [exporting, setExporting] = useState(false)
+  return <div className="no-print flex flex-wrap gap-2"><button className={secondary} onClick={() => window.print()}><Printer className="h-4 w-4" /> Cetak / PDF</button><button className={secondary} disabled={exporting} onClick={async () => { setExporting(true); try { await exportExcel() } catch (e) { toast.error(e instanceof Error ? e.message : 'Ekspor gagal.') } finally { setExporting(false) } }}>{exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Excel</button></div>
+}
+
+function MonthlyReport({ month }: { month: string }) {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const load = useCallback(async () => { setLoading(true); try { setData(await getMonthlyReport(month)) } catch (e) { toast.error(e instanceof Error ? e.message : 'Gagal memuat laporan.') } finally { setLoading(false) } }, [month])
+  useEffect(() => { void load() }, [load])
+  if (loading) return <Loading />
+  if (!data) return <EmptyState title="Laporan tidak tersedia" description="Pilih periode yang valid." />
+  const visits = data.visitSummary
+  const preventive = data.preventiveSummary
+  const finance = data.financeSummary
+  async function exportExcel() {
+    const XLSX = await import('xlsx')
+    const workbook = XLSX.utils.book_new()
+    const overview = [
+      ['Periode', data.period.month],
+      ['Pasien unik', visits.unique_patients], ['Kunjungan', visits.visits], ['Selesai', visits.completed],
+      ['Dirujuk', visits.referred], ['Sumber Data Sakit', visits.sick_source],
+      ['Program preventif', preventive.programs], ['Peserta preventif', preventive.participants],
+      ['Pemasukan', finance.income], ['Pengeluaran', finance.expense], ['Belanja obat', finance.medicine_expense],
+    ]
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(overview), 'Ringkasan')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.visitsByDorm), 'Asrama')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.diagnoses), 'Diagnosis')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.medicalStaff), 'Tenaga Medis')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.preventivePrograms), 'Preventif')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.medicineUsage), 'Pemakaian Obat')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.financeAccounts), 'Saldo Akun')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.expenseCategories), 'Kategori Pengeluaran')
+    XLSX.writeFile(workbook, `laporan-poskestren-${month}.xlsx`)
+  }
+  return <section className="space-y-5">
+    <div className="flex items-start justify-between gap-3"><div><h2 className="text-xl font-black">Laporan Bulanan {month}</h2><p className="text-xs text-slate-500">{data.period.from} s.d. {data.period.to} · WIB</p></div><ReportActions exportExcel={exportExcel} /></div>
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <MetricCard label="Pasien unik" value={visits.unique_patients || 0} />
+      <MetricCard label="Kunjungan" value={visits.visits || 0} tone="blue" />
+      <MetricCard label="Dirujuk" value={visits.referred || 0} tone="amber" />
+      <MetricCard label="Dari Data Sakit" value={visits.sick_source || 0} tone="slate" />
+    </div>
+    <ReportSection title="Layanan pemeriksaan">
+      <div className="grid gap-3 sm:grid-cols-5"><Mini label="Menunggu" value={visits.waiting} /><Mini label="Diperiksa" value={visits.examining} /><Mini label="Selesai" value={visits.completed} /><Mini label="Dirujuk" value={visits.referred} /><Mini label="Batal" value={visits.cancelled} /></div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-3"><SimpleTable title="Kunjungan per asrama" rows={data.visitsByDorm} columns={[['label', 'Asrama'], ['total', 'Kunjungan']]} /><SimpleTable title="Diagnosis terbanyak" rows={data.diagnoses} columns={[['label', 'Diagnosis'], ['total', 'Jumlah']]} /><SimpleTable title="Tenaga medis" rows={data.medicalStaff} columns={[['label', 'Nama'], ['total', 'Kunjungan'], ['referred', 'Rujukan']]} /></div>
+    </ReportSection>
+    <ReportSection title="Program preventif">
+      <div className="grid gap-3 sm:grid-cols-4"><Mini label="Program" value={preventive.programs} /><Mini label="Peserta" value={preventive.participants} /><Mini label="Hadir" value={preventive.present} /><Mini label="Tindak lanjut" value={preventive.follow_up} /></div>
+      <SimpleTable title="Rincian program" rows={data.preventivePrograms} columns={[['program_date', 'Tanggal'], ['type_name', 'Jenis'], ['title', 'Program'], ['participants', 'Peserta'], ['present', 'Hadir'], ['follow_up', 'Tindak lanjut']]} />
+    </ReportSection>
+    <ReportSection title="Obat dan stok">
+      <div className="grid gap-3 sm:grid-cols-4"><Mini label="Belanja" value={data.purchaseSummary.purchases} /><Mini label="Nilai belanja" value={rupiah(data.purchaseSummary.total)} /><Mini label="Stok kritis" value={data.stockSummary.critical} /><Mini label="Batch kedaluwarsa" value={data.stockSummary.expired_batches} /></div>
+      <SimpleTable title="Pemakaian obat" rows={data.medicineUsage} columns={[['name', 'Obat'], ['used_quantity', 'Total'], ['patient_quantity', 'Pasien'], ['preventive_quantity', 'Preventif'], ['loss_quantity', 'Rusak/kedaluwarsa']]} />
+    </ReportSection>
+    <ReportSection title="Keuangan">
+      <div className="grid gap-3 sm:grid-cols-3"><MetricCard label="Pemasukan" value={rupiah(finance.income)} /><MetricCard label="Pengeluaran" value={rupiah(finance.expense)} tone="rose" /><MetricCard label="Belanja obat" value={rupiah(finance.medicine_expense)} tone="amber" /></div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2"><SimpleTable title="Saldo per akun" rows={data.financeAccounts} columns={[['name', 'Akun'], ['balance', 'Saldo']]} moneyKeys={['balance']} /><SimpleTable title="Pengeluaran per kategori" rows={data.expenseCategories} columns={[['name', 'Kategori'], ['total', 'Total']]} moneyKeys={['total']} /></div>
+    </ReportSection>
+  </section>
+}
+
+function PayrollReport({ month }: { month: string }) {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const load = useCallback(async () => { setLoading(true); try { setData(await getPayrollReport(month)) } catch (e) { toast.error(e instanceof Error ? e.message : 'Gagal memuat penggajian.') } finally { setLoading(false) } }, [month])
+  useEffect(() => { void load() }, [load])
+  if (loading) return <Loading />
+  if (!data) return <EmptyState title="Laporan tidak tersedia" description="Pilih periode yang valid." />
+  async function exportExcel() {
+    const XLSX = await import('xlsx')
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.medical.map((row: any) => ({
+      Nama: row.full_name, Profesi: row.profession, Sesi: row.session_count, Kunjungan: row.visit_count,
+      'Subtotal Sesi': row.session_subtotal, 'Subtotal Pasien': row.patient_subtotal, Total: row.total,
+      'Tarif Sesi Efektif': row.session_rates.join('; '), 'Tarif Pasien Efektif': row.patient_rates.join('; '),
+    }))), 'Tenaga Medis')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.employees.map((row: any) => ({
+      Nama: row.full_name, Jabatan: row.position_name, 'Tanggal Efektif': row.effective_from,
+      'Gaji Bulanan': row.monthly_salary, Total: row.total,
+    }))), 'Karyawan')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['Total tenaga medis', data.medicalTotal], ['Total karyawan', data.employeeTotal], ['Total keseluruhan', data.grandTotal]]), 'Ringkasan')
+    XLSX.writeFile(workbook, `penggajian-poskestren-${month}.xlsx`)
+  }
+  return <section className="space-y-5">
+    <div className="flex items-start justify-between gap-3"><div><h2 className="text-xl font-black">Laporan Penggajian {month}</h2><p className="text-xs text-slate-500">Rekap saja · tidak membuat pembayaran atau slip gaji</p></div><ReportActions exportExcel={exportExcel} /></div>
+    <div className="grid gap-3 sm:grid-cols-3"><MetricCard label="Tenaga medis" value={rupiah(data.medicalTotal)} /><MetricCard label="Karyawan" value={rupiah(data.employeeTotal)} tone="blue" /><MetricCard label="Total penggajian" value={rupiah(data.grandTotal)} tone="amber" /></div>
+    <ReportSection title="Tenaga medis">
+      {data.medical.length === 0 ? <EmptyState title="Belum ada tenaga medis" description="Personel medis akan muncul setelah ditambahkan." /> : <div className="space-y-3">{data.medical.map((row: any) => <article key={row.id} className="rounded-xl border border-slate-200 p-4"><div className="flex flex-col justify-between gap-3 sm:flex-row"><div className="flex gap-3"><Stethoscope className="mt-1 h-5 w-5 text-emerald-600" /><div><h3 className="font-black">{row.full_name}</h3><p className="text-xs text-slate-500">{row.profession || 'Tenaga medis'}</p></div></div><strong className="text-lg text-emerald-700">{rupiah(row.total)}</strong></div><div className="mt-3 grid gap-2 text-xs sm:grid-cols-2"><p className="rounded-lg bg-slate-50 p-2">{row.session_count} sesi · subtotal {rupiah(row.session_subtotal)}</p><p className="rounded-lg bg-slate-50 p-2">{row.visit_count} kunjungan selesai · subtotal {rupiah(row.patient_subtotal)}</p></div><details className="mt-2 text-xs text-slate-500"><summary className="cursor-pointer font-bold">Tarif efektif yang terpakai</summary><p className="mt-1">Sesi: {row.session_rates.join(', ') || '—'}</p><p>Pasien: {row.patient_rates.join(', ') || '—'}</p></details></article>)}</div>}
+    </ReportSection>
+    <ReportSection title="Karyawan">
+      {data.employees.length === 0 ? <EmptyState title="Belum ada karyawan" description="Karyawan aktif pada periode akan muncul di sini." /> : <div className="space-y-3">{data.employees.map((row: any) => <article key={row.id} className="flex flex-col justify-between gap-3 rounded-xl border border-slate-200 p-4 sm:flex-row"><div className="flex gap-3"><Users className="mt-1 h-5 w-5 text-blue-600" /><div><h3 className="font-black">{row.full_name}</h3><p className="text-xs text-slate-500">{row.position_name || 'Karyawan'} · tarif efektif {row.effective_from || 'belum ada'}</p></div></div><strong className="text-lg text-blue-700">{rupiah(row.total)}</strong></article>)}</div>}
+    </ReportSection>
+  </section>
+}
+
+function ReportSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className="break-inside-avoid rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"><h2 className="mb-4 text-lg font-black">{title}</h2>{children}</section>
+}
+function Mini({ label, value }: { label: string; value: unknown }) { return <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-bold text-slate-400">{label}</p><p className="mt-1 text-lg font-black">{String(value || 0)}</p></div> }
+function SimpleTable({ title, rows, columns, moneyKeys = [] }: { title: string; rows: any[]; columns: Array<[string, string]>; moneyKeys?: string[] }) {
+  return <div className="mt-4 overflow-hidden rounded-xl border border-slate-200"><h3 className="bg-slate-50 px-3 py-2 text-sm font-black">{title}</h3>{rows.length === 0 ? <p className="p-4 text-sm text-slate-400">Tidak ada data.</p> : <div className="overflow-x-auto"><table className="min-w-full text-left text-xs"><thead><tr className="border-b border-slate-200">{columns.map(([key, label]) => <th key={key} className="px-3 py-2 font-black text-slate-500">{label}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index} className="border-b border-slate-100 last:border-0">{columns.map(([key]) => <td key={key} className="px-3 py-2">{moneyKeys.includes(key) ? rupiah(row[key]) : String(row[key] ?? '—')}</td>)}</tr>)}</tbody></table></div>}</div>
+}
+function Loading() { return <div className="flex justify-center rounded-2xl border border-slate-200 bg-white p-12"><Loader2 className="h-6 w-6 animate-spin text-emerald-600" /></div> }

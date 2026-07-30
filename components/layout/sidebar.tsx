@@ -147,6 +147,7 @@ const GROUP_ICON: Record<string, React.ElementType> = {
   'UPK': Package,
   'EHB': ClipboardList,
   'PSB': ClipboardList,
+  'POSKESTREN': Stethoscope,
   'Master Data': Database,
 };
 
@@ -413,6 +414,7 @@ const ROLE_LABEL: Record<string, string> = {
   guru: 'Guru',
   bendahara: 'Bendahara',
   operator_loket: 'Operator Loket',
+  poskestren: 'POSKESTREN',
 };
 
 const GROUP_ORDER = [
@@ -434,6 +436,7 @@ const GROUP_ORDER = [
   'UPK',
   'EHB',
   'PSB',
+  'POSKESTREN',
   'Master Data',
 ];
 
