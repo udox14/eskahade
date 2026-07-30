@@ -378,6 +378,9 @@ export async function registerManualVisit(input: { patientId: string; complaint?
 
 export async function importSickEpisode(input: { episodeId: string; absenSakitId: string }) {
   const session = await requirePoskestrenFeature(PATH, 'create')
+  if (!input.episodeId || !input.absenSakitId) {
+    return { success: false as const, error: 'Data episode tidak lengkap.' }
+  }
   const source = await queryOne<{
     id: string
     episode_id: string
@@ -390,32 +393,45 @@ export async function importSickEpisode(input: { episodeId: string; absenSakitId
     `SELECT ab.id, COALESCE(ab.episode_id, ab.id) AS episode_id, ab.santri_id, ab.sakit_apa,
             s.nis, s.nama_lengkap, s.gol_darah
      FROM absen_sakit ab JOIN santri s ON s.id = ab.santri_id
-     WHERE ab.id = ? AND COALESCE(ab.episode_id, ab.id) = ?
+     WHERE ab.id = ?
        AND ab.status_sakit = 'SAKIT' AND ab.sembuh_at IS NULL
        AND s.status_global = 'aktif'`,
-    [input.absenSakitId, input.episodeId]
+    [input.absenSakitId]
   )
-  if (!source) return { success: false as const, error: 'Episode sakit aktif tidak ditemukan.' }
-  const already = await queryOne<{ id: string }>('SELECT id FROM poskestren_visit WHERE source_episode_id = ?', [source.episode_id])
-  if (already) return { success: false as const, error: 'Episode ini sudah diimpor.' }
+  if (!source) return { success: false as const, error: 'Episode sakit aktif tidak ditemukan atau santri sudah tidak aktif.' }
 
-  const db = await getDB()
-  const patientId = await ensurePatientForSantri(db, source, session.id)
-  const id = await insertQueueVisit({
-    patientId,
-    queueDate: toWibDateInputValue(),
-    actorId: session.id,
-    sourceType: 'DATA_SAKIT',
-    sourceEpisodeId: source.episode_id,
-    sourceAbsenSakitId: source.id,
-    complaint: source.sakit_apa,
-  })
-  await writeAudit(session, 'create', 'poskestren_visit', id, `Mengimpor Data Sakit ${source.nama_lengkap}`, {
-    source_episode_id: source.episode_id,
-  })
-  refresh()
-  return { success: true as const, id }
+  // Verifikasi episode_id cocok (loose check jika episode_id berbeda dari yang dikirim UI)
+  const resolvedEpisodeId = source.episode_id
+
+  const already = await queryOne<{ id: string }>('SELECT id FROM poskestren_visit WHERE source_episode_id = ?', [resolvedEpisodeId])
+  if (already) return { success: false as const, error: 'Episode ini sudah pernah diimpor sebelumnya.' }
+
+  try {
+    const db = await getDB()
+    const patientId = await ensurePatientForSantri(db, source, session.id)
+    const id = await insertQueueVisit({
+      patientId,
+      queueDate: toWibDateInputValue(),
+      actorId: session.id,
+      sourceType: 'DATA_SAKIT',
+      sourceEpisodeId: resolvedEpisodeId,
+      sourceAbsenSakitId: source.id,
+      complaint: source.sakit_apa,
+    })
+    await writeAudit(session, 'create', 'poskestren_visit', id, `Mengimpor Data Sakit ${source.nama_lengkap}`, {
+      source_episode_id: resolvedEpisodeId,
+    })
+    refresh()
+    return { success: true as const, id }
+  } catch (error) {
+    const msg = String(error instanceof Error ? error.message : error)
+    if (msg.includes('UNIQUE')) return { success: false as const, error: 'Episode sudah diimpor (konflik data).' }
+    if (msg.includes('FOREIGN')) return { success: false as const, error: 'Referensi data tidak valid. Coba muat ulang halaman.' }
+    console.error('[importSickEpisode] error:', msg)
+    return { success: false as const, error: `Gagal mengimpor: ${msg.slice(0, 120)}` }
+  }
 }
+
 
 export async function getVisits(input: PoskestrenListQuery & { date?: string } = {}) {
   await requirePoskestrenFeature(PATH)

@@ -42,7 +42,7 @@ export function PoskestrenTabs<T extends string>({
 
 export function EmptyState({ title, description }: { title: string; description: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-12 text-center">
+    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-12 text-center">
       <p className="font-bold text-slate-700">{title}</p>
       <p className="mt-1 text-sm text-slate-500">{description}</p>
     </div>
@@ -61,17 +61,17 @@ export function MetricCard({
   tone?: 'emerald' | 'blue' | 'amber' | 'rose' | 'slate'
 }) {
   const tones = {
-    emerald: 'border-emerald-100 bg-emerald-50/70 text-emerald-800',
-    blue: 'border-blue-100 bg-blue-50/70 text-blue-800',
-    amber: 'border-amber-100 bg-amber-50/70 text-amber-800',
-    rose: 'border-rose-100 bg-rose-50/70 text-rose-800',
-    slate: 'border-slate-200 bg-white text-slate-800',
+    emerald: 'text-emerald-700',
+    blue: 'text-blue-700',
+    amber: 'text-amber-700',
+    rose: 'text-rose-700',
+    slate: 'text-slate-700',
   }
   return (
-    <article className={cn('rounded-2xl border p-4', tones[tone])}>
-      <p className="text-xs font-bold uppercase tracking-wide opacity-70">{label}</p>
-      <p className="mt-1 text-2xl font-black">{value}</p>
-      {detail ? <p className="mt-1 text-xs opacity-70">{detail}</p> : null}
+    <article className="rounded-lg border bg-white p-4">
+      <p className="text-[11px] font-bold uppercase text-slate-400">{label}</p>
+      <p className={cn('mt-1 text-lg font-extrabold', tones[tone])}>{value}</p>
+      {detail ? <p className="mt-1 text-xs text-slate-500">{detail}</p> : null}
     </article>
   )
 }

@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { BadgeDollarSign, BriefcaseBusiness, History, Loader2, Plus, Search, Stethoscope, UserRoundCog } from 'lucide-react'
+import { BadgeDollarSign, BriefcaseBusiness, History, Loader2, Plus, Search, Stethoscope, Trash2, UserRoundCog } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -11,16 +11,16 @@ import { EmptyState, MetricCard, PoskestrenTabs } from '@/components/poskestren/
 import { toWibDateInputValue } from '@/lib/date/wib'
 import type { PoskestrenPageSize } from '@/lib/poskestren/types'
 
-import { appendCompensation, getPersonnel, getPersonnelDetail, getUserOptions, savePersonnel } from './actions'
+import { appendCompensation, deletePersonnel, getPersonnel, getPersonnelDetail, getUserOptions, savePersonnel } from './actions'
 
 type Tab = 'medis' | 'karyawan'
 const TABS = [
   { value: 'medis' as const, label: 'Tenaga Medis', icon: Stethoscope },
   { value: 'karyawan' as const, label: 'Karyawan', icon: BriefcaseBusiness },
 ]
-const inputClass = 'min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100'
-const primary = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50'
-const secondary = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
+const inputClass = 'min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100'
+const primary = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50'
+const secondary = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
 function rupiah(value: unknown) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value || 0)) }
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block space-y-1"><span className="text-xs font-bold text-slate-600">{label}</span>{children}</label> }
 
@@ -33,8 +33,8 @@ export default function PoskestrenManajemenContent() {
     setTab(next); const nextParams = new URLSearchParams(params.toString()); nextParams.set('tab', next)
     router.replace(`/dashboard/poskestren/manajemen?${nextParams}`, { scroll: false })
   }
-  return <div className="space-y-5">
-    <DashboardPageHeader title="Manajemen" description="Personel, tautan akun, jabatan khusus, dan riwayat kompensasi append-only." />
+  return <div className="mx-auto max-w-7xl space-y-6 pb-24">
+    <DashboardPageHeader title="Manajemen" description="Personel, tautan akun, jabatan khusus, dan riwayat kompensasi append-only." className="border-b pb-4" />
     <PoskestrenTabs tabs={TABS} active={tab} onChange={changeTab} />
     <PersonnelTab type={tab === 'medis' ? 'MEDICAL' : 'EMPLOYEE'} />
   </div>
@@ -50,6 +50,7 @@ function PersonnelTab({ type }: { type: 'MEDICAL' | 'EMPLOYEE' }) {
   const [detail, setDetail] = useState<any>(null)
   const [showRate, setShowRate] = useState<any>(null)
   const [userOptions, setUserOptions] = useState<any[]>([])
+  const [confirmDelete, setConfirmDelete] = useState<any>(null)
   const [pending, startTransition] = useTransition()
   const load = useCallback(async () => {
     const result = await getPersonnel({ q, status, limit, personnelType: type })
@@ -69,7 +70,7 @@ function PersonnelTab({ type }: { type: 'MEDICAL' | 'EMPLOYEE' }) {
       <MetricCard label="Aktif" value={active} tone="blue" />
       <MetricCard label="Belum tertaut akun" value={rows.filter(row => !row.user_id).length} tone="amber" />
     </div>
-    <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:flex-row">
+    <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4 md:flex-row">
       <div className="relative flex-1"><Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><input className={`${inputClass} pl-9`} value={q} onChange={e => setQ(e.target.value)} placeholder="Cari nama, profesi, jabatan, kontak..." /></div>
       <select className={inputClass} value={status} onChange={e => setStatus(e.target.value)}><option value="active">Aktif</option><option value="inactive">Nonaktif</option><option value="">Semua status</option></select>
       <select className={inputClass} value={limit} onChange={e => setLimit(e.target.value === 'all' ? 'all' : Number(e.target.value) as 20 | 50 | 100)}><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option><option value="all" disabled={!Boolean(q || status)}>Semua (maks. 1.000)</option></select>
@@ -77,12 +78,13 @@ function PersonnelTab({ type }: { type: 'MEDICAL' | 'EMPLOYEE' }) {
     </div>
     {truncated ? <p className="rounded-xl bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700">Hasil “Semua” dibatasi 1.000 baris. Gunakan filter yang lebih spesifik.</p> : null}
     {rows.length === 0 ? <EmptyState title="Belum ada personel" description="Tambah personel dan riwayat kompensasinya." /> : <>
-      <div className="space-y-2 md:hidden">{rows.map(row => <article key={row.id} className="rounded-xl border border-slate-200 bg-white p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><h3 className="truncate text-sm font-black">{row.full_name}</h3><p className="truncate text-[11px] text-slate-500">{row.profession || row.position_name || 'Jabatan belum diisi'} · {row.poskestren_jabatan || 'tanpa jabatan POS'}</p></div><span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black ${row.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>{row.is_active ? 'AKTIF' : 'NONAKTIF'}</span></div><p className="mt-1 truncate text-[11px] text-slate-500">{row.email || 'Belum tertaut akun'} · efektif {row.effective_from || '—'}</p><p className="mt-1 text-xs font-bold">{type === 'MEDICAL' ? `${rupiah(row.session_rate_rupiah)}/sesi + ${rupiah(row.patient_rate_rupiah)}/pasien` : `${rupiah(row.monthly_salary_rupiah)}/bulan`}</p><div className="mt-2 flex gap-2"><button className={secondary} onClick={() => openEdit(row)}>Edit</button><button className={secondary} onClick={() => setShowRate(row)}>Tarif</button><button className={secondary} onClick={() => openDetail(row)}>Riwayat</button></div></article>)}</div>
-      <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Nama</th><th className="px-4 py-3">Profesi/Jabatan</th><th className="px-4 py-3">Kontak/Akun</th><th className="px-4 py-3">Jabatan POS</th><th className="px-4 py-3">Kompensasi aktif</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Aksi</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={row.id} className="hover:bg-slate-50/70"><td className="px-4 py-3 font-bold">{row.full_name}</td><td className="px-4 py-3"><p>{row.profession || row.position_name || '—'}</p>{row.license_number ? <p className="text-xs text-slate-500">{row.license_number}</p> : null}</td><td className="px-4 py-3"><p>{row.phone || '—'}</p><p className="text-xs text-slate-500">{row.email || 'Belum tertaut akun'}</p></td><td className="px-4 py-3">{row.poskestren_jabatan || '—'}</td><td className="px-4 py-3"><p className="font-bold">{type === 'MEDICAL' ? `${rupiah(row.session_rate_rupiah)}/sesi + ${rupiah(row.patient_rate_rupiah)}/pasien` : `${rupiah(row.monthly_salary_rupiah)}/bulan`}</p><p className="text-xs text-slate-500">Efektif {row.effective_from || '—'}</p></td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-black ${row.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>{row.is_active ? 'AKTIF' : 'NONAKTIF'}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><button className={secondary} onClick={() => openEdit(row)}><UserRoundCog className="h-4 w-4" /> Edit</button><button className={secondary} onClick={() => setShowRate(row)}><BadgeDollarSign className="h-4 w-4" /> Tarif</button><button className={secondary} onClick={() => openDetail(row)}><History className="h-4 w-4" /> Riwayat</button></div></td></tr>)}</tbody></table></div>
+      <div className="space-y-2 md:hidden">{rows.map(row => <article key={row.id} className="rounded-xl border border-slate-200 bg-white p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><h3 className="truncate text-sm font-black">{row.full_name}</h3><p className="truncate text-[11px] text-slate-500">{row.profession || row.position_name || 'Jabatan belum diisi'} · {row.poskestren_jabatan || 'tanpa jabatan POS'}</p></div><span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black ${row.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>{row.is_active ? 'AKTIF' : 'NONAKTIF'}</span></div><p className="mt-1 truncate text-[11px] text-slate-500">{row.email || 'Belum tertaut akun'} · efektif {row.effective_from || '—'}</p><p className="mt-1 text-xs font-bold">{type === 'MEDICAL' ? `${rupiah(row.session_rate_rupiah)}/sesi + ${rupiah(row.patient_rate_rupiah)}/pasien` : `${rupiah(row.monthly_salary_rupiah)}/bulan`}</p><div className="mt-2 flex gap-2"><button className={secondary} onClick={() => openEdit(row)}>Edit</button><button className={secondary} onClick={() => setShowRate(row)}>Tarif</button><button className={secondary} onClick={() => openDetail(row)}>Riwayat</button><button className="inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50" onClick={() => setConfirmDelete(row)}><Trash2 className="h-3.5 w-3.5" />Hapus</button></div></article>)}</div>
+      <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block"><table className="w-full text-left text-sm"><thead className="border-b bg-slate-50 text-xs uppercase text-slate-600"><tr><th className="px-4 py-3 font-bold">Nama</th><th className="px-4 py-3 font-bold">Profesi/Jabatan</th><th className="px-4 py-3 font-bold">Kontak/Akun</th><th className="px-4 py-3 font-bold">Jabatan POS</th><th className="px-4 py-3 font-bold">Kompensasi aktif</th><th className="px-4 py-3 font-bold">Status</th><th className="px-4 py-3 text-right font-bold">Aksi</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={row.id} className="hover:bg-slate-50/70"><td className="px-4 py-3 font-bold">{row.full_name}</td><td className="px-4 py-3"><p>{row.profession || row.position_name || '—'}</p>{row.license_number ? <p className="text-xs text-slate-500">{row.license_number}</p> : null}</td><td className="px-4 py-3"><p>{row.phone || '—'}</p><p className="text-xs text-slate-500">{row.email || 'Belum tertaut akun'}</p></td><td className="px-4 py-3">{row.poskestren_jabatan || '—'}</td><td className="px-4 py-3"><p className="font-bold">{type === 'MEDICAL' ? `${rupiah(row.session_rate_rupiah)}/sesi + ${rupiah(row.patient_rate_rupiah)}/pasien` : `${rupiah(row.monthly_salary_rupiah)}/bulan`}</p><p className="text-xs text-slate-500">Efektif {row.effective_from || '—'}</p></td><td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-black ${row.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>{row.is_active ? 'AKTIF' : 'NONAKTIF'}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><button className={secondary} onClick={() => openEdit(row)}><UserRoundCog className="h-4 w-4" /> Edit</button><button className={secondary} onClick={() => setShowRate(row)}><BadgeDollarSign className="h-4 w-4" /> Tarif</button><button className={secondary} onClick={() => openDetail(row)}><History className="h-4 w-4" /> Riwayat</button><button className="inline-flex min-h-10 items-center justify-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50" onClick={() => setConfirmDelete(row)}><Trash2 className="h-4 w-4" /> Hapus</button></div></td></tr>)}</tbody></table></div>
     </>}
     {editing ? <PersonnelModal personnel={editing} users={userOptions} pending={pending} onClose={() => setEditing(null)} onSave={(data: any) => startTransition(async () => { try { const result = await savePersonnel(data); if (!result.success) { toast.error(result.error); return }; toast.success('Data personel disimpan.'); setEditing(null); await load() } catch (e) { toast.error(e instanceof Error ? e.message : 'Gagal menyimpan personel.') } })} /> : null}
     {showRate ? <CompensationModal personnel={showRate} pending={pending} onClose={() => setShowRate(null)} onSave={(data: any) => startTransition(async () => { try { const result = await appendCompensation(data); if (!result.success) { toast.error(result.error); return }; toast.success('Riwayat kompensasi ditambahkan.'); setShowRate(null); await load() } catch (e) { toast.error(e instanceof Error ? e.message : 'Gagal menyimpan kompensasi.') } })} /> : null}
     {detail ? <HistoryModal detail={detail} onClose={() => setDetail(null)} /> : null}
+    {confirmDelete ? <ConfirmDeleteModal title={`Hapus ${confirmDelete.full_name}?`} description={`Data personel, jabatan, dan seluruh riwayat kompensasi akan dihapus permanen. Aksi ini tidak dapat dibatalkan. Pastikan personel tidak memiliki riwayat pemeriksaan.`} pending={pending} onClose={() => setConfirmDelete(null)} onConfirm={() => startTransition(async () => { try { const result = await deletePersonnel(confirmDelete.id); if (!result.success) { toast.error(result.error); return }; toast.success('Personel berhasil dihapus.'); setConfirmDelete(null); await load() } catch (e) { toast.error(e instanceof Error ? e.message : 'Gagal menghapus personel.') } })} /> : null}
   </section>
 }
 
@@ -120,6 +122,21 @@ function HistoryModal({ detail, onClose }: any) {
   return <Modal title={`Riwayat kompensasi · ${detail.personnel?.full_name}`} onClose={onClose}>{detail.compensationHistory.length === 0 ? <EmptyState title="Belum ada riwayat" description="Tambahkan tarif atau gaji efektif pertama." /> : <><div className="space-y-2 md:hidden">{detail.compensationHistory.map((row: any) => <article key={row.id} className="rounded-xl border border-slate-200 p-3"><div className="flex justify-between gap-2"><strong className="text-sm">{row.effective_from}</strong><span className="text-[10px] text-slate-400">{row.creator_name || 'Sistem'}</span></div><p className="mt-1 text-xs font-bold">{detail.personnel.personnel_type === 'MEDICAL' ? `${rupiah(row.session_rate_rupiah)}/sesi + ${rupiah(row.patient_rate_rupiah)}/pasien` : `${rupiah(row.monthly_salary_rupiah)}/bulan`}</p>{row.notes ? <p className="mt-1 truncate text-[11px] text-slate-500">{row.notes}</p> : null}</article>)}</div><div className="hidden overflow-x-auto rounded-xl border border-slate-200 md:block"><table className="w-full text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">Efektif</th><th className="px-3 py-2">Tarif sesi</th><th className="px-3 py-2">Tarif pasien</th><th className="px-3 py-2">Gaji bulanan</th><th className="px-3 py-2">Pembuat</th><th className="px-3 py-2">Catatan</th></tr></thead><tbody className="divide-y">{detail.compensationHistory.map((row: any) => <tr key={row.id}><td className="px-3 py-2 font-bold">{row.effective_from}</td><td className="px-3 py-2">{row.session_rate_rupiah == null ? '—' : rupiah(row.session_rate_rupiah)}</td><td className="px-3 py-2">{row.patient_rate_rupiah == null ? '—' : rupiah(row.patient_rate_rupiah)}</td><td className="px-3 py-2">{row.monthly_salary_rupiah == null ? '—' : rupiah(row.monthly_salary_rupiah)}</td><td className="px-3 py-2">{row.creator_name || 'Sistem'}</td><td className="px-3 py-2 text-xs text-slate-500">{row.notes || '—'}</td></tr>)}</tbody></table></div></>}</Modal>
 }
 
+function ConfirmDeleteModal({ title, description, pending, onClose, onConfirm }: { title: string; description: string; pending: boolean; onClose: () => void; onConfirm: () => void }) {
+  return <Modal title={title} onClose={onClose}>
+    <div className="space-y-4">
+      <div className="rounded-xl bg-rose-50 p-4 text-sm text-rose-800">
+        <p className="font-black mb-1">⚠ Peringatan: Aksi ini tidak dapat dibatalkan!</p>
+        <p>{description}</p>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button type="button" className={secondary} onClick={onClose} disabled={pending}>Batal</button>
+        <button type="button" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-50" onClick={onConfirm} disabled={pending}>{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />} Ya, Hapus Permanen</button>
+      </div>
+    </div>
+  </Modal>
+}
+
 function Modal({ title, onClose, wide, children }: { title: string; onClose: () => void; wide?: boolean; children: React.ReactNode }) {
-  return <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center sm:p-4"><div className={`max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl ${wide ? 'max-w-4xl' : 'max-w-xl'}`}><div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-black">{title}</h2><button type="button" className={secondary} onClick={onClose}>Tutup</button></div>{children}</div></div>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"><div className={`max-h-[90vh] w-full flex flex-col overflow-hidden rounded-xl bg-white shadow-xl ${wide ? 'max-w-4xl' : 'max-w-xl'}`}><div className="flex items-center justify-between border-b bg-slate-50 px-5 py-4"><h2 className="text-sm font-bold text-slate-800">{title}</h2><button type="button" className="text-slate-400 hover:text-slate-700" onClick={onClose}>Tutup</button></div><div className="flex-1 overflow-y-auto p-5">{children}</div></div></div>
 }

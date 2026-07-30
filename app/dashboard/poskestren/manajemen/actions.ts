@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { generateId, getDB, query, queryOne } from '@/lib/db'
-import { requirePoskestrenFeature } from '@/lib/poskestren/access'
+import { canPoskestrenDelete, requirePoskestrenFeature } from '@/lib/poskestren/access'
 import {
   assertDate,
   cleanText,
@@ -262,3 +262,70 @@ export async function appendCompensation(input: {
   refresh()
   return { success: true as const, id }
 }
+
+export async function deletePersonnel(id: string) {
+  const session = await requirePoskestrenFeature(PATH, 'update')
+  if (!canPoskestrenDelete(session)) {
+    return { success: false as const, error: 'Hanya Admin, Ketua, Sekretaris, atau Bendahara POSKESTREN yang dapat menghapus personel.' }
+  }
+  const personnel = await queryOne<{ id: string; full_name: string; user_id: string | null; personnel_type: string }>(
+    'SELECT id, full_name, user_id, personnel_type FROM poskestren_personnel WHERE id = ?',
+    [id]
+  )
+  if (!personnel) return { success: false as const, error: 'Personel tidak ditemukan.' }
+
+  // Cek apakah personel punya riwayat pemeriksaan atau transaksi keuangan
+  const hasVisit = await queryOne<{ cnt: number }>(
+    'SELECT COUNT(*) AS cnt FROM poskestren_visit WHERE personnel_id = ?',
+    [id]
+  )
+  if (hasVisit && Number(hasVisit.cnt) > 0) {
+    return { success: false as const, error: `Personel ini memiliki ${hasVisit.cnt} riwayat pemeriksaan dan tidak dapat dihapus. Nonaktifkan saja.` }
+  }
+
+  const db = await getDB()
+  const statements: any[] = []
+
+  // Hapus riwayat kompensasi
+  statements.push(db.prepare('DELETE FROM poskestren_compensation_history WHERE personnel_id = ?').bind(id))
+
+  // Lepas role poskestren dari user jika ditautkan
+  if (personnel.user_id) {
+    const user = await queryOne<{ role: string; roles: string | null }>(
+      'SELECT role, roles FROM users WHERE id = ?',
+      [personnel.user_id]
+    )
+    if (user) {
+      let roles: string[]
+      try {
+        roles = user.roles ? JSON.parse(user.roles) : []
+        if (!Array.isArray(roles)) roles = [user.role].filter(Boolean)
+      } catch { roles = [user.role].filter(Boolean) }
+      const cleaned = roles.filter(r => r !== 'poskestren' && !r.startsWith('poskestren:'))
+      statements.push(db.prepare(
+        `UPDATE users SET roles = ?, poskestren_jabatan = NULL, updated_at = datetime('now') WHERE id = ?`
+      ).bind(JSON.stringify(cleaned), personnel.user_id))
+    }
+  }
+
+  // Hapus personel
+  statements.push(db.prepare('DELETE FROM poskestren_personnel WHERE id = ?').bind(id))
+
+  await db.batch(statements)
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'poskestren_manajemen',
+    action: 'delete',
+    fiturHref: PATH,
+    logKind: 'delete',
+    entityType: 'poskestren_personnel',
+    entityId: id,
+    summary: `Menghapus personel ${personnel.full_name}`,
+    details: { personnel_type: personnel.personnel_type },
+  })
+  refresh()
+  revalidatePath('/dashboard')
+  return { success: true as const }
+}
+

@@ -9,6 +9,7 @@ import {
   Check,
   ClipboardList,
   History,
+  Hospital,
   Loader2,
   Plus,
   Search,
@@ -89,9 +90,9 @@ function Field({
   )
 }
 
-const inputClass = 'min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100'
-const buttonPrimary = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50'
-const buttonSecondary = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50'
+const inputClass = 'min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100'
+const buttonPrimary = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50'
+const buttonSecondary = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50'
 
 function PageSizeSelect({
   value,
@@ -106,7 +107,7 @@ function PageSizeSelect({
     <select
       value={value}
       onChange={event => onChange(event.target.value === 'all' ? 'all' : Number(event.target.value) as 20 | 50 | 100)}
-      className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600"
+      className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600"
     >
       <option value={20}>20</option>
       <option value={50}>50</option>
@@ -130,10 +131,11 @@ export default function PoskestrenPemeriksaanContent() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-7xl space-y-6 pb-24">
       <DashboardPageHeader
         title="Pemeriksaan"
         description="Registrasi profil medis, antrean harian, pemeriksaan, dan program preventif santri."
+        className="border-b pb-4"
       />
       <PoskestrenTabs tabs={TABS} active={activeTab} onChange={changeTab} />
       {activeTab === 'pasien' ? <PatientTab /> : null}
@@ -150,31 +152,42 @@ function PatientTab() {
   const [patientResult, setPatientResult] = useState<any>({ items: [], nextCursor: null, hasMore: false, truncated: false })
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
+  const [showSick, setShowSick] = useState(false)
   const [santriQuery, setSantriQuery] = useState('')
   const [santriRows, setSantriRows] = useState<any[]>([])
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
   const [sickRows, setSickRows] = useState<any[]>([])
+  const [sickLoading, setSickLoading] = useState(false)
   const [editingPatient, setEditingPatient] = useState<any>(null)
   const [pending, startTransition] = useTransition()
 
   const load = useCallback(async (cursor = '') => {
     setLoading(true)
     try {
-      const [patients, sick] = await Promise.all([
-        getPatients({ q: queryText, limit: pageSize, cursor }),
-        getSickCandidates(queryText),
-      ])
+      const patients = await getPatients({ q: queryText, limit: pageSize, cursor })
       setPatientResult((previous: any) => cursor
         ? { ...patients, items: [...previous.items, ...patients.items] }
         : patients
       )
-      setSickRows(sick)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Gagal memuat pasien.')
     } finally {
       setLoading(false)
     }
   }, [pageSize, queryText])
+
+  async function openSickModal() {
+    setShowSick(true)
+    setSickLoading(true)
+    try {
+      const sick = await getSickCandidates('')
+      setSickRows(sick)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Gagal memuat data sakit.')
+    } finally {
+      setSickLoading(false)
+    }
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 250)
@@ -240,15 +253,20 @@ function PatientTab() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-slate-200 bg-white">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-bold text-slate-900">Profil Pasien</h2>
             <p className="text-xs text-slate-500">Satu profil medis untuk setiap santri.</p>
           </div>
-          <button className={buttonPrimary} onClick={() => setShowAdd(true)}>
-            <Plus className="h-4 w-4" /> Daftar pasien
-          </button>
+          <div className="flex gap-2">
+            <button className={buttonSecondary} onClick={() => void openSickModal()}>
+              <Hospital className="h-4 w-4" /> Data Sakit
+            </button>
+            <button className={buttonPrimary} onClick={() => setShowAdd(true)}>
+              <Plus className="h-4 w-4" /> Daftar pasien
+            </button>
+          </div>
         </div>
         <div className="flex flex-col gap-3 bg-slate-50/70 p-4 sm:flex-row">
           <div className="relative flex-1">
@@ -284,8 +302,8 @@ function PatientTab() {
             </div>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-                  <tr><th className="px-4 py-3">Pasien</th><th className="px-4 py-3">Asrama</th><th className="px-4 py-3">Alergi/Kondisi</th><th className="px-4 py-3 text-right">Aksi</th></tr>
+                <thead className="border-b bg-slate-50 text-left text-xs uppercase text-slate-600">
+                  <tr><th className="px-4 py-3 font-bold">Pasien</th><th className="px-4 py-3 font-bold">Asrama</th><th className="px-4 py-3 font-bold">Alergi/Kondisi</th><th className="px-4 py-3 text-right font-bold">Aksi</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {patientResult.items.map((patient: any) => (
@@ -299,82 +317,40 @@ function PatientTab() {
                 </tbody>
               </table>
             </div>
-            {patientResult.hasMore ? <div className="border-t p-3 text-center"><button onClick={() => void load(patientResult.nextCursor)} className={buttonSecondary}>Muat berikutnya</button></div> : null}
-          </>
+      {patientResult.hasMore ? <div className="border-t p-3 text-center"><button onClick={() => void load(patientResult.nextCursor)} className={buttonSecondary}>Muat berikutnya</button></div> : null}
+        </>
         ) : <EmptyState title="Belum ada profil pasien" description="Daftarkan santri aktif sebagai pasien POSKESTREN." />}
       </section>
 
-      <section className="rounded-2xl border border-rose-100 bg-white">
-        <div className="border-b border-rose-100 bg-rose-50/70 p-4">
-          <h2 className="font-bold text-rose-900">Kandidat dari Data Sakit Asrama</h2>
-          <p className="text-xs text-rose-700">Impor satu arah; status Data Sakit tidak akan diubah.</p>
-        </div>
-        {sickRows.length ? (
-          <>
-          <div className="divide-y divide-slate-100 md:hidden">
-            {sickRows.map(row => (
-              <div key={row.episode_id} className="flex flex-col gap-2 p-3">
-                <div className="flex-1">
-                  <p className="font-bold">{row.nama_lengkap}</p>
-                  <p className="text-xs text-slate-500">{row.nis} · {row.asrama || '—'} / {row.kamar || '—'}</p>
-                  <p className="mt-1 text-sm text-rose-700">{row.sakit_apa || 'Keluhan belum dirinci'}</p>
-                </div>
-                <button
-                  disabled={pending}
-                  onClick={() => startTransition(async () => {
-                    const result = await importSickEpisode({ episodeId: row.episode_id, absenSakitId: row.absen_sakit_id })
-                    if (!result.success) { toast.error(result.error); return }
-                    toast.success('Episode diimpor ke antrean POSKESTREN.')
-                    await load()
-                  })}
-                  className={buttonPrimary}
-                >
-                  Impor
-                </button>
-              </div>
-            ))}
-          </div>
-          <div className="hidden overflow-x-auto md:block">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Santri</th>
-                  <th className="px-4 py-3">Asrama / Kamar</th>
-                  <th className="px-4 py-3">Keluhan</th>
-                  <th className="px-4 py-3 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {sickRows.map(row => (
-                  <tr key={row.episode_id} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-3"><p className="font-bold">{row.nama_lengkap}</p><p className="text-xs text-slate-500">{row.nis}</p></td>
-                    <td className="px-4 py-3 text-slate-600">{row.asrama || '—'} / {row.kamar || '—'}</td>
-                    <td className="max-w-md px-4 py-3 text-rose-700">{row.sakit_apa || 'Keluhan belum dirinci'}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button disabled={pending} onClick={() => startTransition(async () => {
-                        const result = await importSickEpisode({ episodeId: row.episode_id, absenSakitId: row.absen_sakit_id })
-                        if (!result.success) { toast.error(result.error); return }
-                        toast.success('Episode diimpor ke antrean POSKESTREN.')
-                        await load()
-                      })} className={buttonPrimary}>Impor</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          </>
-        ) : <div className="p-8 text-center text-sm text-slate-500">Tidak ada episode aktif yang belum diimpor.</div>}
-      </section>
+      {showSick ? (
+        <SickCandidatesModal
+          rows={sickRows}
+          loading={sickLoading}
+          pending={pending}
+          onClose={() => setShowSick(false)}
+          onImport={(row) => startTransition(async () => {
+            try {
+              const result = await importSickEpisode({ episodeId: row.episode_id, absenSakitId: row.absen_sakit_id })
+              if (!result.success) { toast.error(result.error); return }
+              toast.success(`${row.nama_lengkap} berhasil diimpor ke antrean POSKESTREN.`)
+              setSickRows(rows => rows.filter(r => r.episode_id !== row.episode_id))
+              await load()
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : 'Gagal mengimpor episode.')
+            }
+          })}
+        />
+      ) : null}
 
       {showAdd ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl">
-            <div className="sticky top-0 flex items-center justify-between border-b bg-white px-5 py-4">
-              <div><h2 className="font-bold">Daftar Pasien Baru</h2><p className="text-xs text-slate-500">Identitas diambil dari master santri aktif.</p></div>
-              <button onClick={() => setShowAdd(false)} className="rounded-xl p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b bg-slate-50 px-5 py-4">
+              <div><h2 className="text-sm font-bold text-slate-800">Daftar Pasien Baru</h2><p className="text-xs text-slate-500">Identitas diambil dari master santri aktif.</p></div>
+              <button onClick={() => setShowAdd(false)} className="text-slate-400 hover:text-slate-700">Tutup</button>
             </div>
-            <form action={submitPatient} className="space-y-4 p-5">
+            <div className="flex-1 overflow-y-auto p-5">
+              <form action={submitPatient} className="space-y-4">
               <Field label="Cari santri">
                 <input value={santriQuery} onChange={event => { setSantriQuery(event.target.value); setSelectedSantri(null) }} placeholder="Minimal 2 karakter..." className={inputClass} />
               </Field>
@@ -399,18 +375,20 @@ function PatientTab() {
               </div>
               <button disabled={pending || !selectedSantri} className={`${buttonPrimary} w-full`}>{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Simpan profil</button>
             </form>
+            </div>
           </div>
         </div>
       ) : null}
 
       {editingPatient ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl">
-            <div className="sticky top-0 flex items-center justify-between border-b bg-white px-5 py-4">
-              <div><h2 className="font-bold">Edit Profil Medis</h2><p className="text-xs text-slate-500">{editingPatient.nama_lengkap} · {editingPatient.medical_record_no}</p></div>
-              <button onClick={() => setEditingPatient(null)} className="rounded-xl p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b bg-slate-50 px-5 py-4">
+              <div><h2 className="text-sm font-bold text-slate-800">Edit Profil Medis</h2><p className="text-xs text-slate-500">{editingPatient.nama_lengkap} · {editingPatient.medical_record_no}</p></div>
+              <button onClick={() => setEditingPatient(null)} className="text-slate-400 hover:text-slate-700">Tutup</button>
             </div>
-            <form action={submitPatientUpdate} className="space-y-4 p-5">
+            <div className="flex-1 overflow-y-auto p-5">
+              <form action={submitPatientUpdate} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Golongan darah"><input name="bloodType" maxLength={4} defaultValue={editingPatient.blood_type || ''} className={inputClass} /></Field>
                 <Field label="Kontak darurat"><input name="emergencyContact" defaultValue={editingPatient.emergency_contact || ''} className={inputClass} /></Field>
@@ -421,9 +399,106 @@ function PatientTab() {
               </div>
               <button disabled={pending} className={`${buttonPrimary} w-full`}>{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Simpan perubahan</button>
             </form>
+            </div>
           </div>
         </div>
       ) : null}
+    </div>
+  )
+}
+
+function SickCandidatesModal({
+  rows,
+  loading,
+  pending,
+  onClose,
+  onImport,
+}: {
+  rows: any[]
+  loading: boolean
+  pending: boolean
+  onClose: () => void
+  onImport: (row: any) => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+        <div className="sticky top-0 flex items-center justify-between border-b bg-slate-50 px-5 py-4">
+          <div>
+            <h2 className="text-sm font-bold text-rose-900">Kandidat dari Data Sakit Asrama</h2>
+            <p className="text-xs text-rose-600">Impor satu arah; status Data Sakit tidak akan berubah.</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">Tutup</button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-slate-400"><Loader2 className="h-6 w-6 animate-spin" /></div>
+        ) : rows.length === 0 ? (
+          <div className="p-12 text-center">
+            <Hospital className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+            <p className="font-bold text-slate-500">Tidak ada episode aktif</p>
+            <p className="mt-1 text-xs text-slate-400">Semua santri sakit sudah diimpor atau belum ada yang sakit saat ini.</p>
+          </div>
+        ) : (
+          <>
+            <div className="divide-y divide-slate-100 md:hidden">
+              {rows.map(row => (
+                <div key={row.episode_id} className="flex flex-col gap-3 p-4">
+                  <div className="flex-1">
+                    <p className="font-bold">{row.nama_lengkap}</p>
+                    <p className="text-xs text-slate-500">{row.nis} · {row.asrama || '—'} / {row.kamar || '—'}</p>
+                    <p className="mt-1 text-sm font-medium text-rose-700">{row.sakit_apa || 'Keluhan belum dirinci'}</p>
+                    {row.mulai_at ? <p className="text-xs text-slate-400">Sejak: {row.mulai_at.slice(0, 10)}</p> : null}
+                  </div>
+                  <button
+                    disabled={pending}
+                    onClick={() => onImport(row)}
+                    className={buttonPrimary}
+                  >
+                    {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Impor ke antrean
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b bg-slate-50 text-xs uppercase text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3 font-bold">Santri</th>
+                    <th className="px-4 py-3 font-bold">Asrama / Kamar</th>
+                    <th className="px-4 py-3 font-bold">Keluhan</th>
+                    <th className="px-4 py-3 font-bold">Sejak</th>
+                    <th className="px-4 py-3 text-right font-bold">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {rows.map(row => (
+                    <tr key={row.episode_id} className="hover:bg-rose-50/40">
+                      <td className="px-4 py-3"><p className="font-bold">{row.nama_lengkap}</p><p className="text-xs text-slate-500">{row.nis}</p></td>
+                      <td className="px-4 py-3 text-slate-600">{row.asrama || '—'} / {row.kamar || '—'}</td>
+                      <td className="max-w-xs px-4 py-3 font-medium text-rose-700">{row.sakit_apa || 'Keluhan belum dirinci'}</td>
+                      <td className="px-4 py-3 text-slate-500">{row.mulai_at ? row.mulai_at.slice(0, 10) : '—'}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          disabled={pending}
+                          onClick={() => onImport(row)}
+                          className={buttonPrimary}
+                        >
+                          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Impor
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="border-t bg-rose-50/50 px-4 py-3">
+              <p className="text-xs text-rose-700">{rows.length} episode sakit aktif belum diimpor. Impor akan otomatis mendaftarkan profil pasien jika belum ada.</p>
+            </div>
+          </>
+        )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -511,7 +586,7 @@ function TodayTab() {
         <MetricCard label="Selesai/rujuk" value={counts.done} tone="slate" />
       </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-4">
+      <section className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
         {practice.personnel ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -525,8 +600,8 @@ function TodayTab() {
         ) : <p className="text-sm text-amber-700">Akun ini belum ditautkan ke tenaga medis. Pendaftaran antrean tetap tersedia, tetapi pemeriksaan membutuhkan tautan pada menu Manajemen.</p>}
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-        <div className="grid gap-3 border-b bg-slate-50/70 p-4 md:grid-cols-[160px_1fr_180px_auto]">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="grid gap-3 border-b bg-slate-50/50 p-4 md:grid-cols-[160px_1fr_180px_auto]">
           <input type="date" value={date} onChange={event => setDate(event.target.value)} className={inputClass} />
           <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={q} onChange={event => setQ(event.target.value)} placeholder="Pasien, NIS, asrama, diagnosis..." className={`${inputClass} pl-9`} /></div>
           <select value={status} onChange={event => setStatus(event.target.value)} className={inputClass}><option value="">Semua status</option>{['MENUNGGU','DIPERIKSA','SELESAI','DIRUJUK','BATAL'].map(value => <option key={value}>{value}</option>)}</select>
@@ -556,13 +631,13 @@ function TodayTab() {
           </div>
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <thead className="border-b bg-slate-50 text-xs uppercase text-slate-600">
                 <tr>
-                  <th className="px-4 py-3">Antrean</th>
-                  <th className="px-4 py-3">Pasien</th>
-                  <th className="px-4 py-3">Status / Sumber</th>
-                  <th className="px-4 py-3">Keluhan / Diagnosis</th>
-                  <th className="px-4 py-3 text-right">Aksi</th>
+                  <th className="px-4 py-3 font-bold">Antrean</th>
+                  <th className="px-4 py-3 font-bold">Pasien</th>
+                  <th className="px-4 py-3 font-bold">Status / Sumber</th>
+                  <th className="px-4 py-3 font-bold">Keluhan / Diagnosis</th>
+                  <th className="px-4 py-3 text-right font-bold">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -589,13 +664,14 @@ function TodayTab() {
       </section>
 
       {examVisit ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center sm:p-4">
-          <div className="max-h-[94vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4">
-              <div><h2 className="font-bold">{examVisit.nama_lengkap}</h2><p className="text-xs text-slate-500">Antrean {examVisit.queue_number} · {examVisit.medical_record_no}</p></div>
-              <button onClick={() => setExamVisit(null)} className="rounded-xl p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-slate-50 px-5 py-4">
+              <div><h2 className="text-sm font-bold text-slate-800">{examVisit.nama_lengkap}</h2><p className="text-xs text-slate-500">Antrean {examVisit.queue_number} · {examVisit.medical_record_no}</p></div>
+              <button onClick={() => setExamVisit(null)} className="text-slate-400 hover:text-slate-700">Tutup</button>
             </div>
-            <form action={submitExam} className="space-y-4 p-5">
+            <div className="flex-1 overflow-y-auto p-5">
+              <form action={submitExam} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Keluhan *"><textarea required name="complaint" defaultValue={examVisit.complaint || ''} className={`${inputClass} min-h-24`} /></Field>
                 <Field label="Diagnosis *"><textarea required name="diagnosis" className={`${inputClass} min-h-24`} /></Field>
@@ -616,7 +692,8 @@ function TodayTab() {
                 ))}</div> : <p className="p-5 text-center text-sm text-slate-500">Tidak ada obat.</p>}
               </div>
               <button disabled={pending} className={`${buttonPrimary} w-full`}>{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Selesaikan pemeriksaan</button>
-            </form>
+              </form>
+            </div>
           </div>
         </div>
       ) : null}
@@ -647,7 +724,7 @@ function HistoryTab() {
   }, [load])
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="grid gap-3 border-b bg-slate-50/70 p-4 md:grid-cols-[160px_160px_1fr_auto]">
         <input type="date" value={from} onChange={event => setFrom(event.target.value)} className={inputClass} />
         <input type="date" value={to} onChange={event => setTo(event.target.value)} className={inputClass} />
@@ -688,13 +765,13 @@ function HistoryTab() {
         </div>
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <thead className="border-b bg-slate-50 text-xs uppercase text-slate-600">
               <tr>
-                <th className="px-4 py-3">Tanggal / Pasien</th>
-                <th className="px-4 py-3">Keluhan</th>
-                <th className="px-4 py-3">Diagnosis / Tindakan</th>
-                <th className="px-4 py-3">Obat</th>
-                <th className="px-4 py-3 text-right">Aksi</th>
+                <th className="px-4 py-3 font-bold">Tanggal / Pasien</th>
+                <th className="px-4 py-3 font-bold">Keluhan</th>
+                <th className="px-4 py-3 font-bold">Diagnosis / Tindakan</th>
+                <th className="px-4 py-3 font-bold">Obat</th>
+                <th className="px-4 py-3 text-right font-bold">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -785,7 +862,7 @@ function PreventiveTab() {
 
   return (
     <div className="space-y-5">
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
           <div><h2 className="font-bold">Program Preventif</h2><p className="text-xs text-slate-500">Program fleksibel dengan hasil dan tindak lanjut per santri.</p></div>
           <div className="flex gap-2">
@@ -811,15 +888,15 @@ function PreventiveTab() {
           </div>
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <thead className="border-b bg-slate-50 text-xs uppercase text-slate-600">
                 <tr>
-                  <th className="px-4 py-3">Program</th>
-                  <th className="px-4 py-3">Tanggal / Jenis</th>
-                  <th className="px-4 py-3">Sasaran</th>
-                  <th className="px-4 py-3 text-center">Peserta</th>
-                  <th className="px-4 py-3 text-center">Hadir</th>
-                  <th className="px-4 py-3 text-center">Tindak lanjut</th>
-                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 font-bold">Program</th>
+                  <th className="px-4 py-3 font-bold">Tanggal / Jenis</th>
+                  <th className="px-4 py-3 font-bold">Sasaran</th>
+                  <th className="px-4 py-3 text-center font-bold">Peserta</th>
+                  <th className="px-4 py-3 text-center font-bold">Hadir</th>
+                  <th className="px-4 py-3 text-center font-bold">Tindak lanjut</th>
+                  <th className="px-4 py-3 font-bold">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -840,10 +917,11 @@ function PreventiveTab() {
       </section>
 
       {showCreate ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center sm:p-4">
-          <div className="max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white sm:rounded-2xl">
-            <div className="sticky top-0 flex items-center justify-between border-b bg-white px-5 py-4"><h2 className="font-bold">Program Preventif Baru</h2><button onClick={() => setShowCreate(false)}><X /></button></div>
-            <form action={submitProgram} className="space-y-4 p-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b bg-slate-50 px-5 py-4"><h2 className="text-sm font-bold text-slate-800">Program Preventif Baru</h2><button onClick={() => setShowCreate(false)} className="text-slate-400 hover:text-slate-700">Tutup</button></div>
+            <div className="flex-1 overflow-y-auto p-5">
+              <form action={submitProgram} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Judul *"><input required name="title" className={inputClass} /></Field>
                 <Field label="Tanggal *"><input required type="date" name="programDate" defaultValue={today} className={inputClass} /></Field>
@@ -873,15 +951,17 @@ function PreventiveTab() {
               <p className="text-xs font-bold text-emerald-700">{selectedParticipantIds.length} peserta dipilih</p>
               <button disabled={pending} className={`${buttonPrimary} w-full`}>Simpan program</button>
             </form>
+            </div>
           </div>
         </div>
       ) : null}
 
       {selectedProgram ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center sm:p-4">
-          <div className="max-h-[94vh] w-full max-w-4xl overflow-y-auto rounded-t-3xl bg-white sm:rounded-2xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-5 py-4"><div><h2 className="font-bold">{selectedProgram.title}</h2><p className="text-xs text-slate-500">{formatDate(selectedProgram.program_date)} · {selectedProgram.status}</p></div><button onClick={() => setSelectedProgram(null)}><X /></button></div>
-            <div className="flex flex-wrap gap-2 border-b p-4">{['DRAFT','ACTIVE','COMPLETED','CANCELLED'].map(value => <button key={value} disabled={pending} onClick={() => startTransition(async () => { const response = await updatePreventiveStatus(selectedProgram.id, value as any); if (!response.success) toast.error(response.error); else { toast.success('Status diperbarui.'); setSelectedProgram({ ...selectedProgram, status: value }); await load() } })} className={value === selectedProgram.status ? buttonPrimary : buttonSecondary}>{value}</button>)}</div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-slate-50 px-5 py-4"><div><h2 className="text-sm font-bold text-slate-800">{selectedProgram.title}</h2><p className="text-xs text-slate-500">{formatDate(selectedProgram.program_date)} · {selectedProgram.status}</p></div><button onClick={() => setSelectedProgram(null)} className="text-slate-400 hover:text-slate-700">Tutup</button></div>
+            <div className="flex-1 overflow-y-auto">
+              <div className="flex flex-wrap gap-2 border-b p-4">{['DRAFT','ACTIVE','COMPLETED','CANCELLED'].map(value => <button key={value} disabled={pending} onClick={() => startTransition(async () => { const response = await updatePreventiveStatus(selectedProgram.id, value as any); if (!response.success) toast.error(response.error); else { toast.success('Status diperbarui.'); setSelectedProgram({ ...selectedProgram, status: value }); await load() } })} className={value === selectedProgram.status ? buttonPrimary : buttonSecondary}>{value}</button>)}</div>
             {participants.length ? <>
             <div className="divide-y md:hidden">{participants.map(row => (
               <div key={row.id} className="grid gap-2 p-3">
@@ -902,8 +982,8 @@ function PreventiveTab() {
             ))}</div>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                  <tr><th className="px-4 py-3">Peserta</th><th className="px-4 py-3">Kehadiran</th><th className="px-4 py-3">Hasil</th><th className="px-4 py-3">Tindak lanjut</th><th className="px-4 py-3 text-right">Aksi</th></tr>
+                <thead className="border-b bg-slate-50 text-xs uppercase text-slate-600">
+                  <tr><th className="px-4 py-3 font-bold">Peserta</th><th className="px-4 py-3 font-bold">Kehadiran</th><th className="px-4 py-3 font-bold">Hasil</th><th className="px-4 py-3 font-bold">Tindak lanjut</th><th className="px-4 py-3 text-right font-bold">Aksi</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {participants.map(row => (
@@ -929,6 +1009,7 @@ function PreventiveTab() {
               </table>
             </div>
             </> : <EmptyState title="Belum ada peserta" description="Program dibuat tanpa peserta individual." />}
+            </div>
           </div>
         </div>
       ) : null}

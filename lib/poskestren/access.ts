@@ -22,6 +22,18 @@ export function isPoskestrenBendahara(session: SessionUser | null) {
   return Boolean(session && (isSuperAccess(session) || getEffectiveRoles(session).includes('poskestren:bendahara')))
 }
 
+/** Hak hapus data POSKESTREN: admin sistem, atau ketua/sekretaris/bendahara POSKESTREN. */
+export function canPoskestrenDelete(session: SessionUser | null): boolean {
+  if (!session) return false
+  if (isSuperAccess(session)) return true
+  const roles = getEffectiveRoles(session)
+  return (
+    roles.includes('poskestren:ketua') ||
+    roles.includes('poskestren:sekretaris') ||
+    roles.includes('poskestren:bendahara')
+  )
+}
+
 export async function requirePoskestrenFeature(
   href: string,
   action: FeatureAction = 'read'

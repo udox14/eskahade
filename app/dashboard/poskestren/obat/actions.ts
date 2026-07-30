@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { generateId, getDB, query, queryOne } from '@/lib/db'
-import { isPoskestrenBendahara, requirePoskestrenFeature } from '@/lib/poskestren/access'
+import { canPoskestrenDelete, isPoskestrenBendahara, requirePoskestrenFeature } from '@/lib/poskestren/access'
 import {
   assertDate,
   cleanText,
@@ -618,3 +618,31 @@ export async function createManualStockMovement(input: {
   return { success: true as const }
 }
 
+export async function deleteMedicine(id: string) {
+  const session = await requirePoskestrenFeature(PATH, 'update')
+  if (!canPoskestrenDelete(session)) {
+    return { success: false as const, error: 'Hanya Admin, Ketua, Sekretaris, atau Bendahara POSKESTREN yang dapat menghapus obat.' }
+  }
+  const medicine = await queryOne<{ id: string; name: string; total_stock_base: number }>(
+    'SELECT id, name, total_stock_base FROM poskestren_medicine WHERE id = ?',
+    [id]
+  )
+  if (!medicine) return { success: false as const, error: 'Obat tidak ditemukan.' }
+
+  // Tolak hapus jika masih ada stok tersisa
+  if (Number(medicine.total_stock_base) > 0) {
+    return { success: false as const, error: `Stok obat masih ${medicine.total_stock_base} unit. Habiskan atau sesuaikan stok terlebih dahulu sebelum menghapus.` }
+  }
+
+  const db = await getDB()
+  await db.batch([
+    db.prepare('DELETE FROM poskestren_unit_conversion WHERE medicine_id = ?').bind(id),
+    db.prepare('DELETE FROM poskestren_medicine_batch WHERE medicine_id = ?').bind(id),
+    db.prepare(`DELETE FROM poskestren_search_fts WHERE entity_type = 'MEDICINE' AND entity_id = ?`).bind(id),
+    db.prepare('DELETE FROM poskestren_medicine WHERE id = ?').bind(id),
+  ])
+
+  await audit(session, 'delete', 'poskestren_medicine', id, `Menghapus obat ${medicine.name}`)
+  refresh()
+  return { success: true as const }
+}
