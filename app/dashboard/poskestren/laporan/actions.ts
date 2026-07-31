@@ -209,13 +209,28 @@ export async function getPayrollReport(month: string) {
            FROM poskestren_visit v
            WHERE v.personnel_id IS NOT NULL
              AND v.status IN ('SELESAI','DIRUJUK')
+             AND (v.treatment IS NULL OR TRIM(v.treatment) = '')
+             AND v.queue_date BETWEEN ? AND ?
+           UNION ALL
+           SELECT v.personnel_id, 'PATIENT_TREATMENT' AS event_type, v.queue_date AS event_date,
+                  COALESCE((
+                    SELECT COALESCE(ch.patient_rate_with_treatment_rupiah, ch.patient_rate_rupiah)
+                    FROM poskestren_compensation_history ch
+                    WHERE ch.personnel_id = v.personnel_id
+                      AND ch.effective_from <= v.queue_date
+                    ORDER BY ch.effective_from DESC LIMIT 1
+                  ), 0) AS rate
+           FROM poskestren_visit v
+           WHERE v.personnel_id IS NOT NULL
+             AND v.status IN ('SELESAI','DIRUJUK')
+             AND v.treatment IS NOT NULL AND TRIM(v.treatment) <> ''
              AND v.queue_date BETWEEN ? AND ?
          ) rated
          GROUP BY rated.personnel_id, rated.event_type, rated.event_date, rated.rate
        ) e ON e.personnel_id = p.id
        WHERE p.personnel_type = 'MEDICAL'
        ORDER BY p.full_name, e.event_type, e.event_date`,
-      [from, to, from, to]
+      [from, to, from, to, from, to]
     ),
     query<any>(
       `SELECT p.id, p.full_name, p.position_name,
@@ -245,10 +260,13 @@ export async function getPayrollReport(month: string) {
       profession: event.profession,
       session_count: 0,
       visit_count: 0,
+      visit_treatment_count: 0,
       session_rates: [] as string[],
       patient_rates: [] as string[],
+      patient_treatment_rates: [] as string[],
       session_subtotal: 0,
       patient_subtotal: 0,
+      patient_treatment_subtotal: 0,
       total: 0,
     }
     if (event.event_type === 'SESSION') {
@@ -259,8 +277,12 @@ export async function getPayrollReport(month: string) {
       row.visit_count += Number(event.event_count)
       row.patient_subtotal += Number(event.subtotal)
       row.patient_rates.push(`${event.event_date}:${event.rate}`)
+    } else if (event.event_type === 'PATIENT_TREATMENT') {
+      row.visit_treatment_count += Number(event.event_count)
+      row.patient_treatment_subtotal += Number(event.subtotal)
+      row.patient_treatment_rates.push(`${event.event_date}:${event.rate}`)
     }
-    row.total = row.session_subtotal + row.patient_subtotal
+    row.total = row.session_subtotal + row.patient_subtotal + row.patient_treatment_subtotal
     medicalMap.set(event.id, row)
   }
   const medicalRows = [...medicalMap.values()]

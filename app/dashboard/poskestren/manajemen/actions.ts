@@ -67,7 +67,7 @@ export async function getPersonnel(input: PoskestrenListQuery & { personnelType?
             p.employment_end, p.is_active, p.notes, p.created_at,
             u.email, u.poskestren_jabatan,
             ch.effective_from, ch.session_rate_rupiah, ch.patient_rate_rupiah,
-            ch.monthly_salary_rupiah
+            ch.patient_rate_with_treatment_rupiah, ch.monthly_salary_rupiah
      FROM poskestren_personnel p
      LEFT JOIN users u ON u.id = p.user_id
      LEFT JOIN poskestren_compensation_history ch ON ch.id = (
@@ -97,7 +97,8 @@ export async function getPersonnelDetail(id: string) {
     ),
     query<any>(
       `SELECT ch.id, ch.effective_from, ch.session_rate_rupiah,
-              ch.patient_rate_rupiah, ch.monthly_salary_rupiah, ch.notes,
+              ch.patient_rate_rupiah, ch.patient_rate_with_treatment_rupiah,
+              ch.monthly_salary_rupiah, ch.notes,
               ch.created_at, u.full_name AS creator_name
        FROM poskestren_compensation_history ch
        LEFT JOIN users u ON u.id = ch.created_by
@@ -218,6 +219,7 @@ export async function appendCompensation(input: {
   effectiveFrom: string
   sessionRateRupiah?: number
   patientRateRupiah?: number
+  patientRateWithTreatmentRupiah?: number
   monthlySalaryRupiah?: number
   notes?: string
 }) {
@@ -229,9 +231,10 @@ export async function appendCompensation(input: {
   )
   if (!personnel) return { success: false as const, error: 'Personel tidak ditemukan.' }
   const sessionRate = parseNonNegativeInteger(input.sessionRateRupiah || 0, 'Tarif sesi')
-  const patientRate = parseNonNegativeInteger(input.patientRateRupiah || 0, 'Tarif pasien')
+  const patientRate = parseNonNegativeInteger(input.patientRateRupiah || 0, 'Tarif pasien (tanpa tindakan)')
+  const patientRateWithTreatment = parseNonNegativeInteger(input.patientRateWithTreatmentRupiah || 0, 'Tarif pasien (ada tindakan)')
   const monthlySalary = parseNonNegativeInteger(input.monthlySalaryRupiah || 0, 'Gaji bulanan')
-  if (personnel.personnel_type === 'MEDICAL' && sessionRate === 0 && patientRate === 0) {
+  if (personnel.personnel_type === 'MEDICAL' && sessionRate === 0 && patientRate === 0 && patientRateWithTreatment === 0) {
     return { success: false as const, error: 'Minimal salah satu tarif tenaga medis harus diisi.' }
   }
   if (personnel.personnel_type === 'EMPLOYEE' && monthlySalary === 0) {
@@ -242,12 +245,14 @@ export async function appendCompensation(input: {
     await (await getDB()).prepare(
       `INSERT INTO poskestren_compensation_history(
          id, personnel_id, effective_from, session_rate_rupiah,
-         patient_rate_rupiah, monthly_salary_rupiah, notes, created_by
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+         patient_rate_rupiah, patient_rate_with_treatment_rupiah,
+         monthly_salary_rupiah, notes, created_by
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id, personnel.id, effectiveFrom,
       personnel.personnel_type === 'MEDICAL' ? sessionRate : null,
       personnel.personnel_type === 'MEDICAL' ? patientRate : null,
+      personnel.personnel_type === 'MEDICAL' ? patientRateWithTreatment : null,
       personnel.personnel_type === 'EMPLOYEE' ? monthlySalary : null,
       cleanText(input.notes), session.id
     ).run()
@@ -260,6 +265,7 @@ export async function appendCompensation(input: {
     effective_from: effectiveFrom,
     session_rate_rupiah: sessionRate,
     patient_rate_rupiah: patientRate,
+    patient_rate_with_treatment_rupiah: patientRateWithTreatment,
     monthly_salary_rupiah: monthlySalary,
   })
   refresh()
