@@ -12,6 +12,10 @@ export type PoskestrenStockMovementType =
   | 'ADJUSTMENT_IN'
   | 'ADJUSTMENT_OUT'
   | 'REVERSAL'
+export type PoskestrenMedicineSource = 'STOCK' | 'EXTERNAL'
+export type PoskestrenObservationStatus = 'ACTIVE' | 'RECOVERED' | 'REFERRED'
+export type PoskestrenOutsideReferenceType = 'REGION' | 'PROVIDER' | 'DRIVER'
+
 
 export type PoskestrenListQuery = {
   q?: string
@@ -38,11 +42,22 @@ export type PrescriptionDraftItem = {
   notes?: string | null
 }
 
+export type ClinicalMedicineDraftItem = {
+  localId?: string
+  sourceType: PoskestrenMedicineSource
+  medicineId?: string | null
+  medicineName?: string | null
+  quantityBase?: number | null
+  dosage?: string | null
+  notes?: string | null
+}
+
 export const POSKESTREN_PAGE_SIZES = [20, 50, 100, 'all'] as const
 export const POSKESTREN_ALL_LIMIT = 1000
 
 export const POSKESTREN_HREF = {
   examination: '/dashboard/poskestren/pemeriksaan',
+  observation: '/dashboard/poskestren/observasi',
   finance: '/dashboard/poskestren/keuangan',
   reports: '/dashboard/poskestren/laporan',
   medicine: '/dashboard/poskestren/obat',

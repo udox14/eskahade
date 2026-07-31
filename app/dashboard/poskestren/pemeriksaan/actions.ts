@@ -16,6 +16,7 @@ import {
   parsePositiveInteger,
   toFtsPrefixQuery,
 } from '@/lib/poskestren/query'
+import { prepareStockMutationFromSnapshot } from '@/lib/poskestren/stock-snapshot'
 import {
   POSKESTREN_HREF,
   type PoskestrenListQuery,
@@ -147,8 +148,8 @@ export async function createPatient(input: {
   notes?: string
 }) {
   const session = await requirePoskestrenFeature(PATH, 'create')
-  const santri = await queryOne<{ id: string; nis: string; nama_lengkap: string; gol_darah: string | null }>(
-    `SELECT id, nis, nama_lengkap, gol_darah
+  const santri = await queryOne<{ id: string; nis: string; nama_lengkap: string; poskestren_code: string | null }>(
+    `SELECT id, nis, nama_lengkap, poskestren_code
      FROM santri
      WHERE id = ? AND status_global = 'aktif'`,
     [input.santriId]
@@ -170,8 +171,8 @@ export async function createPatient(input: {
   ).bind(
     id,
     santri.id,
-    patientRecordNo(santri.nis),
-    cleanText(input.bloodType, 4) || santri.gol_darah,
+    santri.poskestren_code || patientRecordNo(santri.nis),
+    null,
     cleanText(input.allergies),
     cleanText(input.specialConditions),
     cleanText(input.routineMedicines),
@@ -207,15 +208,13 @@ export async function updatePatient(input: {
 
   await (await getDB()).prepare(
     `UPDATE poskestren_patient
-     SET blood_type = ?, allergies = ?, special_conditions = ?, routine_medicines = ?,
-         emergency_contact = ?, notes = ?, updated_at = datetime('now')
+     SET allergies = ?, special_conditions = ?, routine_medicines = ?,
+         notes = ?, updated_at = datetime('now')
      WHERE id = ?`
   ).bind(
-    cleanText(input.bloodType, 4),
     cleanText(input.allergies),
     cleanText(input.specialConditions),
     cleanText(input.routineMedicines),
-    cleanText(input.emergencyContact, 200),
     cleanText(input.notes),
     input.id
   ).run()
@@ -326,16 +325,16 @@ export async function getSickCandidates(input: { q?: string; gender?: string; as
 
 async function ensurePatientForSantri(
   db: Awaited<ReturnType<typeof getDB>>,
-  santri: { id: string; nis: string; gol_darah: string | null },
+  santri: { id: string; nis: string; poskestren_code: string | null },
   actorId: string
 ) {
   const existing = await db.prepare('SELECT id FROM poskestren_patient WHERE santri_id = ?').bind(santri.id).first() as { id: string } | null
   if (existing) return existing.id
   const id = generateId()
   await db.prepare(
-    `INSERT INTO poskestren_patient(id, santri_id, medical_record_no, blood_type, created_by)
-     VALUES (?, ?, ?, ?, ?)`
-  ).bind(id, santri.id, patientRecordNo(santri.nis), santri.gol_darah, actorId).run()
+    `INSERT INTO poskestren_patient(id, santri_id, medical_record_no, created_by)
+     VALUES (?, ?, ?, ?)`
+  ).bind(id, santri.id, santri.poskestren_code || patientRecordNo(santri.nis), actorId).run()
   return id
 }
 
@@ -408,10 +407,10 @@ export async function importSickEpisode(input: { episodeId: string; absenSakitId
     sakit_apa: string | null
     nis: string
     nama_lengkap: string
-    gol_darah: string | null
+    poskestren_code: string | null
   }>(
     `SELECT ab.id, COALESCE(ab.episode_id, ab.id) AS episode_id, ab.santri_id, ab.sakit_apa,
-            s.nis, s.nama_lengkap, s.gol_darah
+            s.nis, s.nama_lengkap, s.poskestren_code
      FROM absen_sakit ab JOIN santri s ON s.id = ab.santri_id
      WHERE ab.id = ?
        AND ab.status_sakit = 'SAKIT' AND ab.sembuh_at IS NULL
@@ -428,7 +427,7 @@ export async function importSickEpisode(input: { episodeId: string; absenSakitId
 
   try {
     const db = await getDB()
-    const patientId = await ensurePatientForSantri(db, { id: source.santri_id, nis: source.nis, gol_darah: source.gol_darah }, session.id)
+    const patientId = await ensurePatientForSantri(db, { id: source.santri_id, nis: source.nis, poskestren_code: source.poskestren_code }, session.id)
     const id = await insertQueueVisit({
       patientId,
       queueDate: toWibDateInputValue(),
@@ -703,6 +702,7 @@ export async function completeVisit(input: {
   visitId: string
   complaint: string
   diagnosis: string
+  diagnosisId?: string
   treatment?: string
   followUp?: string
   referralDestination?: string
@@ -712,6 +712,14 @@ export async function completeVisit(input: {
   const session = await requirePoskestrenFeature(PATH, 'update')
   const complaint = cleanText(input.complaint)
   const diagnosis = cleanText(input.diagnosis)
+  const diagnosisRow = input.diagnosisId
+    ? await queryOne<{ id: string; name: string }>(
+        'SELECT id, name FROM poskestren_diagnosis WHERE id = ? AND is_active = 1',
+        [input.diagnosisId]
+      )
+    : null
+  if (input.diagnosisId && !diagnosisRow) return { success: false as const, error: 'Diagnosis tidak valid.' }
+  const diagnosisText = diagnosisRow?.name || diagnosis
   if (!complaint || !diagnosis) {
     return { success: false as const, error: 'Keluhan dan diagnosis wajib diisi.' }
   }
@@ -766,62 +774,22 @@ export async function completeVisit(input: {
 
   for (const item of cleanItems) {
     const medicine = medicineRows.find(row => row.id === item.medicineId)!
-    const batches = await query<{
-      id: string
-      remaining_quantity: number
-    }>(
-      `SELECT id, remaining_quantity
-       FROM poskestren_medicine_batch
-       WHERE medicine_id = ? AND remaining_quantity > 0
-         AND (expires_on IS NULL OR expires_on >= ?)
-       ORDER BY CASE WHEN expires_on IS NULL THEN 1 ELSE 0 END, expires_on, created_at, id`,
-      [item.medicineId, toWibDateInputValue()]
-    )
-    let remainingRequest = item.requested
-    let dispensed = 0
-    let runningStock = Number(medicine.total_stock_base)
-    for (const batch of batches) {
-      if (remainingRequest <= 0) break
-      const take = Math.min(remainingRequest, Number(batch.remaining_quantity))
-      if (take <= 0) continue
-      statements.push(
-        db.prepare(
-          `UPDATE poskestren_medicine_batch
-           SET remaining_quantity = remaining_quantity - ?
-           WHERE id = ?`
-        ).bind(take, batch.id)
-      )
-      statements.push(
-        db.prepare(
-          `INSERT INTO poskestren_stock_movement(
-             id, medicine_id, batch_id, movement_date, movement_type, quantity_delta,
-             stock_before, stock_after, reference_type, reference_id, notes, created_by
-           ) VALUES (?, ?, ?, ?, 'PATIENT', ?, ?, ?, 'VISIT', ?, ?, ?)`
-        ).bind(
-          generateId(),
-          item.medicineId,
-          batch.id,
-          toWibDateInputValue(),
-          -take,
-          runningStock,
-          runningStock - take,
-          visit.id,
-          item.dosage,
-          session.id
-        )
-      )
-      runningStock -= take
-      remainingRequest -= take
-      dispensed += take
-    }
+    const dispensed = Math.min(item.requested, Number(medicine.total_stock_base))
+    const prescriptionItemId = generateId()
     if (dispensed > 0) {
-      statements.push(
-        db.prepare(
-          `UPDATE poskestren_medicine
-           SET total_stock_base = total_stock_base - ?, updated_at = datetime('now')
-           WHERE id = ?`
-        ).bind(dispensed, item.medicineId)
-      )
+      const mutation = prepareStockMutationFromSnapshot(db, {
+        medicineId: item.medicineId,
+        medicineName: medicine.name,
+        stockBefore: Number(medicine.total_stock_base),
+        quantityDelta: -dispensed,
+        movementType: 'PATIENT',
+        movementDate: toWibDateInputValue(),
+        referenceType: 'PRESCRIPTION_ITEM',
+        referenceId: prescriptionItemId,
+        actorId: session.id,
+        notes: item.dosage,
+      })
+      statements.push(...mutation.statements)
     }
     if (dispensed < item.requested) hasShortage = true
     statements.push(
@@ -830,7 +798,7 @@ export async function completeVisit(input: {
            id, prescription_id, medicine_id, dosage, requested_quantity_base,
            dispensed_quantity_base, notes
          ) VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(generateId(), prescriptionId, item.medicineId, item.dosage, item.requested, dispensed, item.notes)
+      ).bind(prescriptionItemId, prescriptionId, item.medicineId, item.dosage, item.requested, dispensed, item.notes)
     )
   }
 
@@ -849,19 +817,21 @@ export async function completeVisit(input: {
   statements.push(
     db.prepare(
       `UPDATE poskestren_visit
-       SET status = ?, complaint = ?, diagnosis = ?, treatment = ?, follow_up = ?,
-           referral_destination = ?, referral_notes = ?, completed_at = ?, updated_at = ?
+       SET status = ?, complaint = ?, diagnosis_id = ?, diagnosis = ?, treatment = ?, follow_up = ?,
+           referral_destination = ?, referral_notes = ?, completed_at = ?, updated_by = ?, updated_at = ?
        WHERE id = ? AND status = 'DIPERIKSA'`
     ).bind(
       finalStatus,
       complaint,
-      diagnosis,
+      diagnosisRow?.id || null,
+      diagnosisText,
       cleanText(input.treatment),
       cleanText(input.followUp),
       cleanText(input.referralDestination, 200),
       cleanText(input.referralNotes),
       now,
       now,
+      session.id,
       visit.id
     )
   )
@@ -870,7 +840,7 @@ export async function completeVisit(input: {
     db.prepare(
       `INSERT INTO poskestren_search_fts(entity_type, entity_id, text_content)
        VALUES ('VISIT', ?, ?)`
-    ).bind(visit.id, [complaint, diagnosis, cleanText(input.treatment), cleanText(input.followUp)].filter(Boolean).join(' '))
+    ).bind(visit.id, [complaint, diagnosisText, cleanText(input.treatment), cleanText(input.followUp)].filter(Boolean).join(' '))
   )
   await db.batch(statements)
 

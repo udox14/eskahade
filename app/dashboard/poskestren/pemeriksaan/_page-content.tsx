@@ -6,12 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Activity,
   CalendarDays,
+  Building2,
   Check,
   ClipboardList,
   History,
   Hospital,
   Loader2,
   Plus,
+  MapPin,
   Search,
   Stethoscope,
   UserPlus,
@@ -26,16 +28,13 @@ import { toWibDateInputValue } from '@/lib/date/wib'
 import type { PoskestrenPageSize, PrescriptionDraftItem } from '@/lib/poskestren/types'
 
 import {
-  beginVisit,
   cancelVisit,
-  closePracticeSession,
   completeVisit,
   createPatient,
   createPreventiveProgram,
   createPreventiveType,
   getExaminationHistory,
   getMedicineOptions,
-  getMyPracticeSession,
   getPatients,
   getPreventiveData,
   getPreventiveParticipants,
@@ -46,19 +45,33 @@ import {
   reviseCompletedVisit,
   searchActiveSantri,
   searchPreventiveTargets,
-  startPracticeSession,
   updatePatient,
   updatePreventiveParticipant,
   updatePreventiveStatus,
 } from './actions'
+import {
+  beginVisitWithSession,
+  closePracticeForDoctor,
+  getClinicalAccessInfo,
+  getDiagnosisOptions,
+  getDoctorsAndSessions,
+  startPracticeForDoctor,
+} from './clinical-actions'
+import { DormVisitsTab, OutsideTreatmentTab } from './clinical-tabs'
+import { MedicalRecordsTab } from './medical-records-tab'
+import { DiagnosisManagerButton } from './diagnosis-manager'
+import { PreventiveMedicineButton } from './preventive-medicine'
 
-type Tab = 'pasien' | 'hari-ini' | 'pemeriksaan' | 'preventif'
+
+type Tab = 'pasien' | 'hari-ini' | 'pemeriksaan' | 'preventif' | 'visit-asrama' | 'berobat-keluar'
 
 const TABS = [
   { value: 'pasien' as const, label: 'Daftar Pasien', icon: UserPlus },
   { value: 'hari-ini' as const, label: 'Pasien Hari Ini', icon: CalendarDays },
   { value: 'pemeriksaan' as const, label: 'Data Pemeriksaan', icon: History },
   { value: 'preventif' as const, label: 'Preventif', icon: Activity },
+  { value: 'visit-asrama' as const, label: 'Visit Asrama', icon: Building2 },
+  { value: 'berobat-keluar' as const, label: 'Berobat Keluar', icon: MapPin },
 ]
 
 function formatDate(value: string | null | undefined) {
@@ -123,11 +136,27 @@ export default function PoskestrenPemeriksaanContent() {
   const initialTab = searchParams.get('tab') as Tab | null
   const [activeTab, setActiveTab] = useState<Tab>(TABS.some(tab => tab.value === initialTab) ? initialTab! : 'pasien')
 
+  const [access, setAccess] = useState<{ isFull: boolean; mode: string; canWriteOutsideTreatment: boolean } | null>(null)
+  useEffect(() => {
+    void getClinicalAccessInfo()
+      .then(setAccess)
+      .catch(error => toast.error(error instanceof Error ? error.message : 'Akses Pemeriksaan ditolak.'))
+  }, [])
+  const visibleTabs = useMemo(
+    () => access?.isFull ? TABS : TABS.filter(tab => tab.value === 'pemeriksaan' || tab.value === 'berobat-keluar'),
+    [access]
+  )
+  const effectiveActiveTab = visibleTabs.some(tab => tab.value === activeTab) ? activeTab : 'pemeriksaan'
+
   function changeTab(tab: Tab) {
     setActiveTab(tab)
     const params = new URLSearchParams(searchParams.toString())
     params.set('tab', tab)
     router.replace(`/dashboard/poskestren/pemeriksaan?${params.toString()}`, { scroll: false })
+  }
+
+  if (!access) {
+    return <div className="flex justify-center py-24"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>
   }
 
   return (
@@ -137,11 +166,13 @@ export default function PoskestrenPemeriksaanContent() {
         description="Registrasi profil medis, antrean harian, pemeriksaan, dan program preventif santri."
         className="border-b pb-4"
       />
-      <PoskestrenTabs tabs={TABS} active={activeTab} onChange={changeTab} />
-      {activeTab === 'pasien' ? <PatientTab /> : null}
-      {activeTab === 'hari-ini' ? <TodayTab /> : null}
-      {activeTab === 'pemeriksaan' ? <HistoryTab /> : null}
-      {activeTab === 'preventif' ? <PreventiveTab /> : null}
+      <PoskestrenTabs tabs={visibleTabs} active={effectiveActiveTab} onChange={changeTab} />
+      {effectiveActiveTab === 'pasien' ? <PatientTab /> : null}
+      {effectiveActiveTab === 'hari-ini' ? <TodayTab /> : null}
+      {effectiveActiveTab === 'pemeriksaan' ? <MedicalRecordsTab isFull={access.isFull} /> : null}
+      {effectiveActiveTab === 'preventif' ? <PreventiveTab canWrite={access.isFull} /> : null}
+      {effectiveActiveTab === 'visit-asrama' && access.isFull ? <DormVisitsTab /> : null}
+      {effectiveActiveTab === 'berobat-keluar' ? <OutsideTreatmentTab isFull={access.isFull} canWrite={access.canWriteOutsideTreatment} /> : null}
     </div>
   )
 }
@@ -197,11 +228,9 @@ function PatientTab() {
     startTransition(async () => {
       const result = await createPatient({
         santriId: selectedSantri.id,
-        bloodType: String(formData.get('bloodType') || ''),
         allergies: String(formData.get('allergies') || ''),
         specialConditions: String(formData.get('specialConditions') || ''),
         routineMedicines: String(formData.get('routineMedicines') || ''),
-        emergencyContact: String(formData.get('emergencyContact') || ''),
         notes: String(formData.get('notes') || ''),
       })
       if (!result.success) { toast.error(result.error); return }
@@ -226,11 +255,9 @@ function PatientTab() {
     startTransition(async () => {
       const result = await updatePatient({
         id: editingPatient.id,
-        bloodType: String(formData.get('bloodType') || ''),
         allergies: String(formData.get('allergies') || ''),
         specialConditions: String(formData.get('specialConditions') || ''),
         routineMedicines: String(formData.get('routineMedicines') || ''),
-        emergencyContact: String(formData.get('emergencyContact') || ''),
         notes: String(formData.get('notes') || ''),
       })
       if (!result.success) { toast.error(result.error); return }
@@ -292,7 +319,7 @@ function PatientTab() {
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
                 <thead className="border-b bg-slate-50 text-left text-xs uppercase text-slate-600">
-                  <tr><th className="px-4 py-3 font-bold">Pasien</th><th className="px-4 py-3 font-bold">Asrama</th><th className="px-4 py-3 font-bold">Alergi/Kondisi</th><th className="px-4 py-3 text-right font-bold">Aksi</th></tr>
+                  <tr><th className="px-4 py-3 font-bold">Pasien</th><th className="px-4 py-3 font-bold">Asrama</th><th className="px-4 py-3 font-bold">Alergi Obat/Riwayat Penyakit</th><th className="px-4 py-3 text-right font-bold">Aksi</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {patientResult.items.map((patient: any) => (
@@ -353,10 +380,8 @@ function PatientTab() {
               ) : null}
               {selectedSantri ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm"><strong>{selectedSantri.nama_lengkap}</strong><p className="text-xs text-emerald-700">{selectedSantri.nis} · {selectedSantri.asrama || '—'} / {selectedSantri.kamar || '—'}</p></div> : null}
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Golongan darah"><input name="bloodType" maxLength={4} className={inputClass} /></Field>
-                <Field label="Kontak darurat"><input name="emergencyContact" className={inputClass} /></Field>
-                <Field label="Alergi"><textarea name="allergies" className={`${inputClass} min-h-24`} /></Field>
-                <Field label="Kondisi khusus"><textarea name="specialConditions" className={`${inputClass} min-h-24`} /></Field>
+                <Field label="Alergi Obat"><textarea name="allergies" className={`${inputClass} min-h-24`} /></Field>
+                <Field label="Riwayat Penyakit"><textarea name="specialConditions" className={`${inputClass} min-h-24`} /></Field>
                 <Field label="Obat rutin"><textarea name="routineMedicines" className={`${inputClass} min-h-24`} /></Field>
                 <Field label="Catatan"><textarea name="notes" className={`${inputClass} min-h-24`} /></Field>
               </div>
@@ -377,10 +402,8 @@ function PatientTab() {
             <div className="flex-1 overflow-y-auto p-5">
               <form action={submitPatientUpdate} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Golongan darah"><input name="bloodType" maxLength={4} defaultValue={editingPatient.blood_type || ''} className={inputClass} /></Field>
-                <Field label="Kontak darurat"><input name="emergencyContact" defaultValue={editingPatient.emergency_contact || ''} className={inputClass} /></Field>
-                <Field label="Alergi"><textarea name="allergies" defaultValue={editingPatient.allergies || ''} className={`${inputClass} min-h-24`} /></Field>
-                <Field label="Kondisi khusus"><textarea name="specialConditions" defaultValue={editingPatient.special_conditions || ''} className={`${inputClass} min-h-24`} /></Field>
+                <Field label="Alergi Obat"><textarea name="allergies" defaultValue={editingPatient.allergies || ''} className={`${inputClass} min-h-24`} /></Field>
+                <Field label="Riwayat Penyakit"><textarea name="specialConditions" defaultValue={editingPatient.special_conditions || ''} className={`${inputClass} min-h-24`} /></Field>
                 <Field label="Obat rutin"><textarea name="routineMedicines" defaultValue={editingPatient.routine_medicines || ''} className={`${inputClass} min-h-24`} /></Field>
                 <Field label="Catatan"><textarea name="notes" defaultValue={editingPatient.notes || ''} className={`${inputClass} min-h-24`} /></Field>
               </div>
@@ -524,7 +547,10 @@ function TodayTab() {
   const [status, setStatus] = useState('')
   const [pageSize, setPageSize] = useState<PoskestrenPageSize>(50)
   const [result, setResult] = useState<any>({ items: [] })
-  const [practice, setPractice] = useState<any>({ personnel: null, practice: null })
+  const [doctorData, setDoctorData] = useState<any>({ doctors: [], currentUserId: '' })
+  const [selectedDoctorId, setSelectedDoctorId] = useState('')
+  const [selectedSessionId, setSelectedSessionId] = useState('')
+  const [diagnoses, setDiagnoses] = useState<Array<{ id: string; name: string }>>([])
   const [medicines, setMedicines] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [pending, startTransition] = useTransition()
@@ -534,20 +560,31 @@ function TodayTab() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [visits, currentPractice, medicineRows] = await Promise.all([
+      const [visits, doctors, medicineRows, diagnosisRows] = await Promise.all([
         getVisits({ date, q, status, limit: pageSize }),
-        getMyPracticeSession(),
+        getDoctorsAndSessions(),
         getMedicineOptions(),
+        getDiagnosisOptions(),
       ])
       setResult(visits)
-      setPractice(currentPractice)
+      setDoctorData(doctors)
       setMedicines(medicineRows)
+      setDiagnoses(diagnosisRows)
+      const linked = doctors.doctors.find((doctor: any) => doctor.user_id === doctors.currentUserId)
+      const preferredDoctor = doctors.doctors.find((doctor: any) => doctor.id === selectedDoctorId)
+        || linked
+        || doctors.doctors[0]
+      const preferredSession = doctors.doctors.find((doctor: any) => doctor.open_session_id === selectedSessionId)
+        || (preferredDoctor?.open_session_id ? preferredDoctor : null)
+        || doctors.doctors.find((doctor: any) => doctor.open_session_id)
+      setSelectedDoctorId(preferredDoctor?.id || '')
+      setSelectedSessionId(preferredSession?.open_session_id || '')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Gagal memuat antrean.')
     } finally {
       setLoading(false)
     }
-  }, [date, pageSize, q, status])
+  }, [date, pageSize, q, selectedDoctorId, selectedSessionId, status])
 
   useEffect(() => {
     const timer = setTimeout(() => void load(), 250)
@@ -575,11 +612,18 @@ function TodayTab() {
 
   function submitExam(formData: FormData) {
     if (!examVisit) return
+    const diagnosisId = String(formData.get('diagnosisId') || '')
+    const diagnosis = diagnoses.find(item => item.id === diagnosisId)
+    if (!diagnosis) {
+      toast.error('Pilih diagnosis dari master diagnosis.')
+      return
+    }
     run(
       () => completeVisit({
         visitId: examVisit.id,
         complaint: String(formData.get('complaint') || ''),
-        diagnosis: String(formData.get('diagnosis') || ''),
+        diagnosisId,
+        diagnosis: diagnosis.name,
         treatment: String(formData.get('treatment') || ''),
         followUp: String(formData.get('followUp') || ''),
         referralDestination: String(formData.get('referralDestination') || ''),
@@ -592,6 +636,9 @@ function TodayTab() {
     setPrescription([])
   }
 
+  const selectedDoctor = doctorData.doctors.find((doctor: any) => doctor.id === selectedDoctorId)
+  const openDoctors = doctorData.doctors.filter((doctor: any) => doctor.open_session_id)
+
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -602,17 +649,33 @@ function TodayTab() {
       </div>
 
       <section className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-        {practice.personnel ? (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="font-bold">{practice.personnel.full_name}</p>
-              <p className="text-xs text-slate-500">{practice.practice ? `Sesi dibuka ${formatDateTime(practice.practice.started_at)}` : 'Belum ada sesi praktik aktif.'}</p>
+        {doctorData.doctors.length ? (
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <Field label="Dokter yang bertugas">
+                <select value={selectedDoctorId} onChange={event => {
+                  setSelectedDoctorId(event.target.value)
+                  const doctor = doctorData.doctors.find((item: any) => item.id === event.target.value)
+                  if (doctor?.open_session_id) setSelectedSessionId(doctor.open_session_id)
+                }} className={inputClass}>
+                  {doctorData.doctors.map((doctor: any) => <option key={doctor.id} value={doctor.id}>{doctor.full_name} · {doctor.profession || 'Tenaga medis'}{doctor.open_session_id ? ' · SESI AKTIF' : ''}</option>)}
+                </select>
+              </Field>
+              <div className="flex items-end">
+                {selectedDoctor?.open_session_id
+                  ? <button disabled={pending} onClick={() => run(() => closePracticeForDoctor(selectedDoctor.open_session_id), 'Sesi praktik ditutup.')} className={buttonSecondary}>Tutup sesi</button>
+                  : <button disabled={pending || !selectedDoctorId} onClick={() => run(() => startPracticeForDoctor({ personnelId: selectedDoctorId }), 'Sesi praktik dibuka.')} className={buttonPrimary}><Stethoscope className="h-4 w-4" /> Buka sesi</button>}
+              </div>
             </div>
-            {practice.practice
-              ? <button disabled={pending} onClick={() => run(() => closePracticeSession(practice.practice.id), 'Sesi praktik ditutup.')} className={buttonSecondary}>Tutup sesi</button>
-              : <button disabled={pending} onClick={() => run(() => startPracticeSession(), 'Sesi praktik dibuka.')} className={buttonPrimary}><Stethoscope className="h-4 w-4" /> Mulai praktik</button>}
+            <Field label="Sesi aktif untuk memeriksa antrean">
+              <select value={selectedSessionId} onChange={event => setSelectedSessionId(event.target.value)} className={inputClass}>
+                <option value="">Pilih sesi dokter</option>
+                {openDoctors.map((doctor: any) => <option key={doctor.open_session_id} value={doctor.open_session_id}>{doctor.full_name} · dibuka {formatDateTime(doctor.started_at)}</option>)}
+              </select>
+            </Field>
+            <p className="text-xs text-slate-500">Petugas yang membuka sesi dan menginput pemeriksaan tetap tercatat di audit. Pelayanan serta penggajian ditautkan ke dokter terpilih.</p>
           </div>
-        ) : <p className="text-sm text-amber-700">Akun ini belum ditautkan ke tenaga medis. Pendaftaran antrean tetap tersedia, tetapi pemeriksaan membutuhkan tautan pada menu Manajemen.</p>}
+        ) : <p className="text-sm text-amber-700">Belum ada tenaga medis aktif. Tambahkan dokter pada menu Manajemen sebelum memulai pemeriksaan.</p>}
       </section>
 
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -634,10 +697,10 @@ function TodayTab() {
                   <div className="flex flex-wrap items-center gap-2"><p className="font-bold">{visit.nama_lengkap}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${visit.status === 'MENUNGGU' ? 'bg-amber-100 text-amber-700' : visit.status === 'DIPERIKSA' ? 'bg-blue-100 text-blue-700' : visit.status === 'BATAL' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'}`}>{visit.status}</span>{visit.source_type === 'DATA_SAKIT' ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">DATA SAKIT</span> : null}</div>
                   <p className="text-xs text-slate-500">{visit.nis} · {visit.asrama || '—'} / {visit.kamar || '—'} · {visit.medical_record_no}</p>
                   <p className="mt-1 text-sm text-slate-700">{visit.diagnosis || visit.complaint || 'Belum ada keluhan'}</p>
-                  {visit.allergies ? <p className="mt-1 text-xs font-bold text-rose-600">Alergi: {visit.allergies}</p> : null}
+                  {visit.allergies ? <p className="mt-1 text-xs font-bold text-rose-600">Alergi Obat: {visit.allergies}</p> : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {visit.status === 'MENUNGGU' && practice.practice ? <button disabled={pending} onClick={() => run(() => beginVisit(visit.id), 'Pemeriksaan dimulai.')} className={buttonPrimary}>Periksa</button> : null}
+                  {visit.status === 'MENUNGGU' && selectedSessionId ? <button disabled={pending} onClick={() => run(() => beginVisitWithSession({ visitId: visit.id, practiceSessionId: selectedSessionId }), 'Pemeriksaan dimulai.')} className={buttonPrimary}>Periksa</button> : null}
                   {visit.status === 'DIPERIKSA' ? <button onClick={() => { setExamVisit(visit); setPrescription([]) }} className={buttonPrimary}>Isi pemeriksaan</button> : null}
                   {['MENUNGGU','DIPERIKSA'].includes(visit.status) ? <button disabled={pending} onClick={() => { const reason = window.prompt('Alasan pembatalan:'); if (reason) run(() => cancelVisit(visit.id, reason), 'Kunjungan dibatalkan.') }} className={buttonSecondary}>Batal</button> : null}
                 </div>
@@ -659,12 +722,12 @@ function TodayTab() {
                 {result.items.map((visit: any) => (
                   <tr key={visit.id} className="hover:bg-slate-50/70">
                     <td className="px-4 py-3"><span className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl bg-emerald-100 px-2 font-black text-emerald-700">{visit.queue_number}</span></td>
-                    <td className="px-4 py-3"><p className="font-bold">{visit.nama_lengkap}</p><p className="text-xs text-slate-500">{visit.nis} · {visit.asrama || '—'} / {visit.kamar || '—'}</p>{visit.allergies ? <p className="text-xs font-bold text-rose-600">Alergi: {visit.allergies}</p> : null}</td>
+                    <td className="px-4 py-3"><p className="font-bold">{visit.nama_lengkap}</p><p className="text-xs text-slate-500">{visit.nis} · {visit.asrama || '—'} / {visit.kamar || '—'}</p>{visit.allergies ? <p className="text-xs font-bold text-rose-600">Alergi Obat: {visit.allergies}</p> : null}</td>
                     <td className="px-4 py-3"><div className="flex flex-wrap gap-1"><span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${visit.status === 'MENUNGGU' ? 'bg-amber-100 text-amber-700' : visit.status === 'DIPERIKSA' ? 'bg-blue-100 text-blue-700' : visit.status === 'BATAL' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'}`}>{visit.status}</span>{visit.source_type === 'DATA_SAKIT' ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">DATA SAKIT</span> : null}</div></td>
                     <td className="max-w-md px-4 py-3 text-slate-700">{visit.diagnosis || visit.complaint || 'Belum ada keluhan'}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
-                        {visit.status === 'MENUNGGU' && practice.practice ? <button disabled={pending} onClick={() => run(() => beginVisit(visit.id), 'Pemeriksaan dimulai.')} className={buttonPrimary}>Periksa</button> : null}
+                        {visit.status === 'MENUNGGU' && selectedSessionId ? <button disabled={pending} onClick={() => run(() => beginVisitWithSession({ visitId: visit.id, practiceSessionId: selectedSessionId }), 'Pemeriksaan dimulai.')} className={buttonPrimary}>Periksa</button> : null}
                         {visit.status === 'DIPERIKSA' ? <button onClick={() => { setExamVisit(visit); setPrescription([]) }} className={buttonPrimary}>Isi pemeriksaan</button> : null}
                         {['MENUNGGU','DIPERIKSA'].includes(visit.status) ? <button disabled={pending} onClick={() => { const reason = window.prompt('Alasan pembatalan:'); if (reason) run(() => cancelVisit(visit.id, reason), 'Kunjungan dibatalkan.') }} className={buttonSecondary}>Batal</button> : null}
                       </div>
@@ -689,7 +752,7 @@ function TodayTab() {
               <form action={submitExam} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Keluhan *"><textarea required name="complaint" defaultValue={examVisit.complaint || ''} className={`${inputClass} min-h-24`} /></Field>
-                <Field label="Diagnosis *"><textarea required name="diagnosis" className={`${inputClass} min-h-24`} /></Field>
+                <div><Field label="Diagnosis *"><select required name="diagnosisId" className={inputClass}><option value="">Pilih diagnosis</option>{diagnoses.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><DiagnosisManagerButton onChanged={load} /></div>
                 <Field label="Tindakan"><textarea name="treatment" className={`${inputClass} min-h-24`} /></Field>
                 <Field label="Tindak lanjut"><textarea name="followUp" className={`${inputClass} min-h-24`} /></Field>
                 <Field label="Tujuan rujukan"><input name="referralDestination" className={inputClass} /></Field>
@@ -716,6 +779,7 @@ function TodayTab() {
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function HistoryTab() {
   const today = toWibDateInputValue()
   const [from, setFrom] = useState(`${today.slice(0, 7)}-01`)
@@ -821,7 +885,7 @@ function HistoryTab() {
   )
 }
 
-function PreventiveTab() {
+function PreventiveTab({ canWrite = true }: { canWrite?: boolean }) {
   const today = toWibDateInputValue()
   const [q, setQ] = useState('')
   const [from, setFrom] = useState(`${today.slice(0, 7)}-01`)
@@ -976,7 +1040,7 @@ function PreventiveTab() {
           <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-slate-50 px-5 py-4"><div><h2 className="text-sm font-bold text-slate-800">{selectedProgram.title}</h2><p className="text-xs text-slate-500">{formatDate(selectedProgram.program_date)} · {selectedProgram.status}</p></div><button onClick={() => setSelectedProgram(null)} className="text-slate-400 hover:text-slate-700">Tutup</button></div>
             <div className="flex-1 overflow-y-auto">
-              <div className="flex flex-wrap gap-2 border-b p-4">{['DRAFT','ACTIVE','COMPLETED','CANCELLED'].map(value => <button key={value} disabled={pending} onClick={() => startTransition(async () => { const response = await updatePreventiveStatus(selectedProgram.id, value as any); if (!response.success) toast.error(response.error); else { toast.success('Status diperbarui.'); setSelectedProgram({ ...selectedProgram, status: value }); await load() } })} className={value === selectedProgram.status ? buttonPrimary : buttonSecondary}>{value}</button>)}</div>
+              <div className="flex flex-wrap gap-2 border-b p-4">{['DRAFT','ACTIVE','COMPLETED','CANCELLED'].map(value => <button key={value} disabled={pending} onClick={() => startTransition(async () => { const response = await updatePreventiveStatus(selectedProgram.id, value as any); if (!response.success) toast.error(response.error); else { toast.success('Status diperbarui.'); setSelectedProgram({ ...selectedProgram, status: value }); await load() } })} className={value === selectedProgram.status ? buttonPrimary : buttonSecondary}>{value}</button>)}{canWrite ? <PreventiveMedicineButton programId={selectedProgram.id} /> : null}</div>
             {participants.length ? <>
             <div className="divide-y md:hidden">{participants.map(row => (
               <div key={row.id} className="grid gap-2 p-3">

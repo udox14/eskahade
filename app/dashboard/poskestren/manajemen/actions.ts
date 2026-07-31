@@ -113,7 +113,10 @@ export async function getUserOptions(q = '') {
   await requirePoskestrenFeature(PATH)
   const search = String(q).trim().slice(0, 80)
   const params: unknown[] = []
-  const where = [`u.id NOT IN (SELECT user_id FROM poskestren_personnel WHERE user_id IS NOT NULL)`]
+  const where = [
+    `u.id NOT IN (SELECT user_id FROM poskestren_personnel WHERE user_id IS NOT NULL)`,
+    `(u.role = 'poskestren' OR u.roles LIKE '%"poskestren"%')`
+  ]
   if (search) {
     where.push('(u.full_name LIKE ? OR u.email LIKE ?)')
     params.push(`%${search}%`, `%${search}%`)
@@ -121,7 +124,7 @@ export async function getUserOptions(q = '') {
   return query<any>(
     `SELECT u.id, u.full_name, u.email, u.role, u.roles, u.poskestren_jabatan
      FROM users u WHERE ${where.join(' AND ')}
-     ORDER BY u.full_name COLLATE NOCASE LIMIT 30`,
+     ORDER BY u.full_name COLLATE NOCASE LIMIT 200`,
     params
   )
 }

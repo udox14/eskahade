@@ -1,6 +1,6 @@
 import { guardPage } from '@/lib/auth/guard'
 
-import PageContent from './_page-content'
+import PageContent from './_simple-page-content'
 
 export const dynamic = 'force-dynamic'
 

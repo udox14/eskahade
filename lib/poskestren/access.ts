@@ -34,6 +34,59 @@ export function canPoskestrenDelete(session: SessionUser | null): boolean {
   )
 }
 
+export type PoskestrenHealthAccess = {
+  session: SessionUser
+  mode: 'FULL' | 'SUMMARY_ALL' | 'SUMMARY_ASRAMA'
+  asrama: string | null
+  canWriteOutsideTreatment: boolean
+}
+
+function hasPoskestrenRole(session: SessionUser) {
+  const roles = getEffectiveRoles(session)
+  return roles.includes('poskestren') || roles.some(role => role.startsWith('poskestren:'))
+}
+
+export async function requirePoskestrenHealthRead(): Promise<PoskestrenHealthAccess> {
+  const session = await getSession()
+  if (!session) throw new PoskestrenAccessError('Tidak terautentikasi.')
+  if (isSuperAccess(session) || hasPoskestrenRole(session)) {
+    return { session, mode: 'FULL', asrama: null, canWriteOutsideTreatment: true }
+  }
+  const roles = getEffectiveRoles(session)
+  if (roles.includes('dewan_santri')) {
+    return { session, mode: 'SUMMARY_ALL', asrama: null, canWriteOutsideTreatment: false }
+  }
+  if (roles.includes('pengurus_asrama')) {
+    if (!session.asrama_binaan) {
+      throw new PoskestrenAccessError('Akun pengurus belum memiliki asrama binaan.')
+    }
+    return {
+      session,
+      mode: 'SUMMARY_ASRAMA',
+      asrama: session.asrama_binaan,
+      canWriteOutsideTreatment: true,
+    }
+  }
+  throw new PoskestrenAccessError()
+}
+
+export async function requirePoskestrenClinicalWrite(): Promise<SessionUser> {
+  const session = await getSession()
+  if (!session) throw new PoskestrenAccessError('Tidak terautentikasi.')
+  if (!isSuperAccess(session) && !hasPoskestrenRole(session)) {
+    throw new PoskestrenAccessError('Hanya petugas POSKESTREN yang dapat mengubah data klinis.')
+  }
+  return session
+}
+
+export async function requireOutsideTreatmentWrite(): Promise<PoskestrenHealthAccess> {
+  const access = await requirePoskestrenHealthRead()
+  if (!access.canWriteOutsideTreatment) {
+    throw new PoskestrenAccessError('Akses input Berobat Keluar ditolak.')
+  }
+  return access
+}
+
 export async function requirePoskestrenFeature(
   href: string,
   action: FeatureAction = 'read'
