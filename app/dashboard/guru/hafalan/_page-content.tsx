@@ -37,6 +37,7 @@ export default function HafalanPageContent() {
   const [data, setData] = useState<any>({ santri: [], bab: [], progress: {} })
   const [selectedSantriId, setSelectedSantriId] = useState('')
   const [selectedBabId, setSelectedBabId] = useState<number | null>(null)
+  const [babTab, setBabTab] = useState<'current' | 'old'>('current')
   const [santriSearch, setSantriSearch] = useState('')
   const [localChecked, setLocalChecked] = useState<Set<number>>(new Set())
   const [localWords, setLocalWords] = useState<Record<number, number[]>>({}) // jurumiyah: blokId -> word idx
@@ -93,6 +94,7 @@ export default function HafalanPageContent() {
       setData(res)
       setSelectedSantriId('')
       setSelectedBabId(null)
+      setBabTab('current')
       setLocalChecked(new Set())
       localCheckedRef.current = new Set()
       setDirty(false)
@@ -120,7 +122,24 @@ export default function HafalanPageContent() {
     return () => { window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up) }
   }, [])
 
-  const totalBlok = useMemo(() => data.bab.reduce((s: number, b: any) => s + b.blok.length, 0), [data.bab])
+  useEffect(() => {
+    if (!selectedSantriId) return
+    const scroller = document.querySelector('main') as HTMLElement | null
+    if (!scroller) return
+    const previousScrollBehavior = scroller.style.scrollBehavior
+    scroller.style.scrollBehavior = 'auto'
+    scroller.scrollTop = 0
+    scroller.style.scrollBehavior = previousScrollBehavior
+  }, [selectedSantriId])
+
+  const currentBab = useMemo(() => data.bab.filter((b: any) => b.is_editable), [data.bab])
+  const oldBab = useMemo(() => data.bab.filter((b: any) => !b.is_editable), [data.bab])
+  const visibleBab = babTab === 'old' ? oldBab : currentBab
+  const currentBlokIds = useMemo(
+    () => new Set<number>(currentBab.flatMap((b: any) => b.blok.map((blok: any) => blok.id))),
+    [currentBab],
+  )
+  const totalBlok = useMemo(() => currentBab.reduce((s: number, b: any) => s + b.blok.length, 0), [currentBab])
   const selectedSantri = useMemo(() => data.santri.find((i: any) => i.riwayat_id === selectedSantriId), [data.santri, selectedSantriId])
   const selectedBab = useMemo(() => data.bab.find((i: any) => i.id === selectedBabId), [data.bab, selectedBabId])
   const isQuran = selectedType?.key === 'quran'
@@ -281,7 +300,8 @@ export default function HafalanPageContent() {
 
   const selectSantri = (riwayatId: string) => {
     setSelectedSantriId(riwayatId)
-    setSelectedBabId(null)
+    setBabTab('current')
+    setSelectedBabId(currentBab.length === 1 ? currentBab[0].id : null)
     const scope = getScopeForSantri(riwayatId)
     const nextDraftKey = `hafalan-draft:${kelasId}:${selectedType.key}:${riwayatId}`
     try {
@@ -425,11 +445,11 @@ export default function HafalanPageContent() {
   }
 
   const selectedCount = isJurumiyah
-    ? Object.values(localWords).reduce((a, w) => a + w.length, 0)
-    : localChecked.size
+    ? visibleBab.reduce((a: number, b: any) => a + (b.blok[0] ? (localWords[b.blok[0].id] || []).length : 0), 0)
+    : visibleBab.reduce((a: number, b: any) => a + b.blok.filter((blok: any) => localChecked.has(blok.id)).length, 0)
   const totalUnits = isJurumiyah
-    ? data.bab.reduce((a: number, b: any) => a + (b.blok[0] ? wordsOf(b.blok[0]).length : 0), 0)
-    : totalBlok
+    ? visibleBab.reduce((a: number, b: any) => a + (b.blok[0] ? wordsOf(b.blok[0]).length : 0), 0)
+    : visibleBab.reduce((a: number, b: any) => a + b.blok.length, 0)
 
   useEffect(() => {
     if (!draftKey || !dirty) return
@@ -524,7 +544,10 @@ export default function HafalanPageContent() {
   }
 
   const persistedCount = (riwayatId: string) =>
-    Object.keys(data.progress).filter(k => k.startsWith(`${riwayatId}:`) && data.progress[k]).length
+    Object.keys(data.progress).filter(k => {
+      const [, blokId] = k.split(':')
+      return k.startsWith(`${riwayatId}:`) && currentBlokIds.has(Number(blokId)) && data.progress[k]
+    }).length
 
   if (loading) return <div className="py-20 text-center text-slate-400"><Loader2 className="mx-auto h-7 w-7 animate-spin" /></div>
 
@@ -535,7 +558,7 @@ export default function HafalanPageContent() {
       )}
 
       {step !== 'home' && (
-        <div className="sticky top-0 z-20 -mx-4 -mt-4 mb-4 border-b border-slate-100 bg-white/95 px-4 pb-3 pt-2 backdrop-blur md:-mx-8 md:-mt-8 md:px-8">
+        <div className="-mx-4 -mt-4 mb-4 border-b border-slate-100 bg-white px-4 pb-3 pt-2 md:-mx-8 md:-mt-8 md:px-8">
           <button onClick={goBack} className="mb-1.5 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700">
             <ArrowLeft className="h-4 w-4" />
             {step === 'santri' ? 'Jenis Hafalan' : step === 'bab' ? 'Daftar Santri' : selectedType.label}
@@ -586,9 +609,56 @@ export default function HafalanPageContent() {
         </div>
       )}
 
+      {step !== 'home' && (
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(15rem,18rem)_minmax(0,1fr)]">
+          <aside className="hidden lg:block">
+            <div className="sticky top-24 space-y-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-slate-900">Daftar santri</p>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">{data.santri.length}</span>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input value={santriSearch} onChange={e => setSantriSearch(e.target.value)} placeholder="Cari nama / NIS" className="h-10 w-full rounded-xl border border-slate-200 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+                </div>
+              </div>
+              <div className="max-h-[calc(100vh-12rem)] space-y-2 overflow-y-auto pr-1">
+                {filteredSantri.map((s: any) => {
+                  const done = persistedCount(s.riwayat_id)
+                  const pct = totalBlok ? Math.round((done / totalBlok) * 100) : 0
+                  return (
+                    <button key={s.riwayat_id} onClick={() => selectSantri(s.riwayat_id)} className={`flex w-full items-center gap-2 rounded-2xl border p-3 text-left shadow-sm transition hover:border-emerald-300 ${selectedSantriId === s.riwayat_id ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-slate-900">{s.nama}</p>
+                        <p className="text-[11px] text-slate-400">{s.nis || '-'}</p>
+                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-xs font-bold text-emerald-700">{done}/{totalBlok}</p>
+                        <ChevronRight className="ml-auto h-4 w-4 text-slate-300" />
+                      </div>
+                    </button>
+                  )
+                })}
+                {filteredSantri.length === 0 && <p className="py-10 text-center text-sm text-slate-400">Santri tidak ditemukan.</p>}
+              </div>
+            </div>
+          </aside>
+
+          <section className="min-w-0">
+            {step === 'santri' && (
+              <div className="hidden rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center lg:block">
+                <p className="font-bold text-slate-700">Pilih santri di panel kiri</p>
+                <p className="mt-1 text-sm text-slate-400">Setelah dipilih, daftar bab atau ayat akan tampil di sini.</p>
+              </div>
+            )}
+
       {/* SANTRI */}
       {step === 'santri' && (
-        <div className="space-y-3">
+        <div className="space-y-3 lg:hidden">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input value={santriSearch} onChange={e => setSantriSearch(e.target.value)} placeholder="Cari nama / NIS" className="h-11 w-full rounded-xl border border-slate-200 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
@@ -621,12 +691,29 @@ export default function HafalanPageContent() {
       {/* BAB */}
       {step === 'bab' && selectedSantri && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-4 py-2.5">
             <p className="text-sm font-bold text-slate-700">{isJurumiyah ? 'Pilih bab' : 'Pilih bab / surat'}</p>
             <p className="text-sm font-bold text-emerald-700">{selectedCount}/{totalUnits}{isJurumiyah ? ' kata' : ''}</p>
           </div>
+
+          {oldBab.length > 0 && (
+            <div className="flex w-full gap-1 rounded-xl bg-slate-100 p-1">
+              <button onClick={() => setBabTab('current')} className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition ${babTab === 'current' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                Hafalan kelas ini
+              </button>
+              <button onClick={() => setBabTab('old')} className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold transition ${babTab === 'old' ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                Hafalan lama
+              </button>
+            </div>
+          )}
+
+          {visibleBab.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm font-semibold text-slate-400">
+              Belum ada hafalan pada tab ini.
+            </div>
+          ) : (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {data.bab.map((bab: any) => {
+            {visibleBab.map((bab: any) => {
               const jblok = isJurumiyah ? bab.blok[0] : null
               const done = isJurumiyah
                 ? ((localWords[jblok?.id] || []).length + (data.progressHighlightLocked?.[`${selectedSantriId}:${jblok?.id}`]?.length || 0))
@@ -635,12 +722,12 @@ export default function HafalanPageContent() {
               const full = all > 0 && done >= all
               return (
                 <button key={bab.id} onClick={() => setSelectedBabId(bab.id)}
-                  className={`relative rounded-2xl border p-3 text-left transition hover:border-emerald-300 ${bab.is_editable ? 'border-slate-200 bg-white' : 'border-sky-100 bg-sky-50'}`}>
+                  className={`relative flex min-h-[6rem] flex-col rounded-2xl border p-3 text-left transition hover:border-emerald-300 ${bab.is_editable ? 'border-slate-200 bg-white' : 'border-sky-100 bg-sky-50'}`}>
                   <div className="flex items-start justify-between gap-1">
-                    <p className="line-clamp-2 font-bold leading-tight text-slate-900" dir={isQuran ? 'rtl' : 'ltr'} style={isQuran ? { fontFamily: QURAN_FONT } : undefined}>{bab.judul}</p>
+                    <p className={`min-w-0 flex-1 whitespace-normal break-words font-bold text-slate-900 ${isQuran ? 'text-center text-xl leading-[1.8] sm:text-2xl' : 'leading-snug'}`} dir={isQuran ? 'rtl' : 'ltr'} style={{ fontFamily: isQuran ? QURAN_FONT : ARABIC_FONT }}>{bab.judul}</p>
                     {!bab.is_editable && <span className="shrink-0 rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold text-sky-700">Lama</span>}
                   </div>
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-auto flex items-center gap-2 pt-2">
                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
                       <div className={`h-full rounded-full ${full ? 'bg-emerald-500' : 'bg-emerald-400'}`} style={{ width: `${all ? (done / all) * 100 : 0}%` }} />
                     </div>
@@ -650,6 +737,7 @@ export default function HafalanPageContent() {
               )
             })}
           </div>
+          )}
         </div>
       )}
 
@@ -752,6 +840,10 @@ export default function HafalanPageContent() {
             })}
           </div>
           )}
+        </div>
+      )}
+
+          </section>
         </div>
       )}
 
