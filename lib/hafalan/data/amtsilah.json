@@ -1,13 +1,163 @@
 {
   "judul": "Amtsilah Tashrifiyah",
+  "bab": {
+    "tsulatsi-mujarrad": {
+      "nama": "الثُّلَاثِيُّ الْمُجَرَّدُ — Tsulātsī Mujarrad (6 bab)",
+      "urutan": 1,
+      "segmen": {
+        "1": { "key": "fa-ala-yaf-ulu", "no": "فَعَلَ — يَفْعُلُ" },
+        "2": { "key": "fa-ala-yaf-ilu", "no": "فَعَلَ — يَفْعِلُ" },
+        "3": { "key": "fa-ala-yaf-alu", "no": "فَعَلَ — يَفْعَلُ" },
+        "4": { "key": "fa-ila-yaf-alu", "no": "فَعِلَ — يَفْعَلُ" },
+        "5": { "key": "fa-ila-yaf-ilu", "no": "فَعِلَ — يَفْعِلُ" },
+        "6": { "key": "fa-ula-yaf-ulu", "no": "فَعُلَ — يَفْعُلُ" }
+      }
+    },
+    "rubai-mujarrad": {
+      "nama": "الرُّبَاعِيُّ الْمُجَرَّدُ — Rubā‘ī Mujarrad (1 wazan)",
+      "urutan": 2,
+      "segmen": {
+        "1": { "key": "fa-lala-yufa-lilu", "no": "فَعْلَلَ — يُفَعْلِلُ" }
+      }
+    },
+    "tsulatsi-mazid": {
+      "nama": "الثُّلَاثِيُّ الْمَزِيدُ فِيهِ — Tsulātsī Mazīd Fīh (12 wazan)",
+      "urutan": 3,
+      "segmen": {
+        "1": { "key": "af-ala-yuf-ilu", "no": "أَفْعَلَ — يُفْعِلُ" },
+        "2": { "key": "fa-ala-yufa-ilu", "no": "فَعَّلَ — يُفَعِّلُ" },
+        "3": { "key": "faa-ala-yufaa-ilu", "no": "فَاعَلَ — يُفَاعِلُ" },
+        "4": { "key": "tafa-ala-yatafa-alu", "no": "تَفَعَّلَ — يَتَفَعَّلُ" },
+        "5": { "key": "tafaa-ala-yatafaa-alu", "no": "تَفَاعَلَ — يَتَفَاعَلُ" },
+        "6": { "key": "ifta-ala-yaf-ta-ilu", "no": "اِفْتَعَلَ — يَفْتَعِلُ" },
+        "7": { "key": "infa-ala-yanfa-ilu", "no": "اِنْفَعَلَ — يَنْفَعِلُ" },
+        "8": { "key": "if-alla-yaf-allu", "no": "اِفْعَلَّ — يَفْعَلُّ" },
+        "9": { "key": "istaf-ala-yastaf-ilu", "no": "اِسْتَفْعَلَ — يَسْتَفْعِلُ" },
+        "10": { "key": "if-awu-ala-yaf-awu-ilu", "no": "اِفْعَوْعَلَ — يَفْعَوْعِلُ" },
+        "11": { "key": "if-aala-yaf-aallu", "no": "اِفْعَالَّ — يَفْعَالُّ" },
+        "12": { "key": "if-awwala-yaf-awwilu", "no": "اِفْعَوَّلَ — يَفْعَوِّلُ" }
+      }
+    },
+    "rubai-mazid": {
+      "nama": "الرُّبَاعِيُّ الْمَزِيدُ فِيهِ — Rubā‘ī Mazīd Fīh (3 wazan)",
+      "urutan": 4,
+      "segmen": {
+        "1": { "key": "tafa-lala-yatafa-lalu", "no": "تَفَعْلَلَ — يَتَفَعْلَلُ" },
+        "2": { "key": "if-anlala-yaf-anlilu", "no": "اِفْعَنْلَلَ — يَفْعَنْلِلُ" },
+        "3": { "key": "if-alalla-yaf-alillu", "no": "اِفْعَلَلَّ — يَفْعَلِلُّ" }
+      }
+    }
+  },
   "wazan": {
     "fa-ala-yaf-ulu": {
-      "arab": "نَصَرَ يَنْصُرُ نَصْرًا وَمَنْصَرًا فَهُوَ نَاصِرٌ وَذَاكَ مَنْصُورٌ",
-      "terjemah": "Telah menolong, sedang/akan menolong, pertolongan..."
+      "arab": "فَعَلَ — يَفْعُلُ",
+      "terjemah": "Tsulātsī Mujarrad — bab 1",
+      "meta": "الثُّلَاثِيُّ الْمُجَرَّدُ"
     },
     "fa-ala-yaf-ilu": {
-      "arab": "ضَرَبَ يَضْرِبُ ضَرْبًا وَمَضْرَبًا فَهُوَ ضَارِبٌ وَذَاكَ مَضْرُوبٌ",
-      "terjemah": "Telah memukul, sedang/akan memukul, pukulan..."
+      "arab": "فَعَلَ — يَفْعِلُ",
+      "terjemah": "Tsulātsī Mujarrad — bab 2",
+      "meta": "الثُّلَاثِيُّ الْمُجَرَّدُ"
+    },
+    "fa-ala-yaf-alu": {
+      "arab": "فَعَلَ — يَفْعَلُ",
+      "terjemah": "Tsulātsī Mujarrad — bab 3",
+      "meta": "الثُّلَاثِيُّ الْمُجَرَّدُ"
+    },
+    "fa-ila-yaf-alu": {
+      "arab": "فَعِلَ — يَفْعَلُ",
+      "terjemah": "Tsulātsī Mujarrad — bab 4",
+      "meta": "الثُّلَاثِيُّ الْمُجَرَّدُ"
+    },
+    "fa-ila-yaf-ilu": {
+      "arab": "فَعِلَ — يَفْعِلُ",
+      "terjemah": "Tsulātsī Mujarrad — bab 5",
+      "meta": "الثُّلَاثِيُّ الْمُجَرَّدُ"
+    },
+    "fa-ula-yaf-ulu": {
+      "arab": "فَعُلَ — يَفْعُلُ",
+      "terjemah": "Tsulātsī Mujarrad — bab 6",
+      "meta": "الثُّلَاثِيُّ الْمُجَرَّدُ"
+    },
+    "fa-lala-yufa-lilu": {
+      "arab": "فَعْلَلَ — يُفَعْلِلُ",
+      "terjemah": "Rubā‘ī Mujarrad",
+      "meta": "الرُّبَاعِيُّ الْمُجَرَّدُ"
+    },
+    "af-ala-yuf-ilu": {
+      "arab": "أَفْعَلَ — يُفْعِلُ",
+      "terjemah": "Tsulātsī Mazīd Fīh — tambahan satu huruf",
+      "meta": "A. Mazīd satu huruf — مَزِيدٌ بِحَرْفٍ وَاحِدٍ"
+    },
+    "fa-ala-yufa-ilu": {
+      "arab": "فَعَّلَ — يُفَعِّلُ",
+      "terjemah": "Tsulātsī Mazīd Fīh — tambahan satu huruf",
+      "meta": "A. Mazīd satu huruf — مَزِيدٌ بِحَرْفٍ وَاحِدٍ"
+    },
+    "faa-ala-yufaa-ilu": {
+      "arab": "فَاعَلَ — يُفَاعِلُ",
+      "terjemah": "Tsulātsī Mazīd Fīh — tambahan satu huruf",
+      "meta": "A. Mazīd satu huruf — مَزِيدٌ بِحَرْفٍ وَاحِدٍ"
+    },
+    "tafa-ala-yatafa-alu": {
+      "arab": "تَفَعَّلَ — يَتَفَعَّلُ",
+      "terjemah": "Tsulātsī Mazīd Fīh — tambahan dua huruf",
+      "meta": "B. Mazīd dua huruf — مَزِيدٌ بِحَرْفَيْنِ"
+    },
+    "tafaa-ala-yatafaa-alu": {
+      "arab": "تَفَاعَلَ — يَتَفَاعَلُ",
+      "terjemah": "Tsulātsī Mazīd Fīh — tambahan dua huruf",
+      "meta": "B. Mazīd dua huruf — مَزِيدٌ بِحَرْفَيْنِ"
+    },
+    "ifta-ala-yaf-ta-ilu": {
+      "arab": "اِفْتَعَلَ — يَفْتَعِلُ",
+      "terjemah": "Tsulātsī Mazīd Fīh — tambahan dua huruf",
+      "meta": "B. Mazīd dua huruf — مَزِيدٌ بِحَرْفَيْنِ"
+    },
+    "infa-ala-yanfa-ilu": {
+      "arab": "اِنْفَعَلَ — يَنْفَعِلُ",
+      "terjemah": "Tsulātsī Mazīd Fīh — tambahan dua huruf",
+      "meta": "B. Mazīd dua huruf — مَزِيدٌ بِحَرْفَيْنِ"
+    },
+    "if-alla-yaf-allu": {
+      "arab": "اِفْعَلَّ — يَفْعَلُّ",
+      "terjemah": "Tsulātsī Mazīd Fīh — tambahan dua huruf",
+      "meta": "B. Mazīd dua huruf — مَزِيدٌ بِحَرْفَيْنِ"
+    },
+    "istaf-ala-yastaf-ilu": {
+      "arab": "اِسْتَفْعَلَ — يَسْتَفْعِلُ",
+      "terjemah": "Tsulātsī Mazīd Fīh — tambahan tiga huruf",
+      "meta": "C. Mazīd tiga huruf — مَزِيدٌ بِثَلَاثَةِ أَحْرُفٍ"
+    },
+    "if-awu-ala-yaf-awu-ilu": {
+      "arab": "اِفْعَوْعَلَ — يَفْعَوْعِلُ",
+      "terjemah": "Tsulātsī Mazīd Fīh — tambahan tiga huruf",
+      "meta": "C. Mazīd tiga huruf — مَزِيدٌ بِثَلَاثَةِ أَحْرُفٍ"
+    },
+    "if-aala-yaf-aallu": {
+      "arab": "اِفْعَالَّ — يَفْعَالُّ",
+      "terjemah": "Tsulātsī Mazīd Fīh — tambahan tiga huruf",
+      "meta": "C. Mazīd tiga huruf — مَزِيدٌ بِثَلَاثَةِ أَحْرُفٍ"
+    },
+    "if-awwala-yaf-awwilu": {
+      "arab": "اِفْعَوَّلَ — يَفْعَوِّلُ",
+      "terjemah": "Tsulātsī Mazīd Fīh — tambahan tiga huruf",
+      "meta": "C. Mazīd tiga huruf — مَزِيدٌ بِثَلَاثَةِ أَحْرُفٍ"
+    },
+    "tafa-lala-yatafa-lalu": {
+      "arab": "تَفَعْلَلَ — يَتَفَعْلَلُ",
+      "terjemah": "Rubā‘ī Mazīd Fīh — wazan 1",
+      "meta": "الرُّبَاعِيُّ الْمَزِيدُ فِيهِ"
+    },
+    "if-anlala-yaf-anlilu": {
+      "arab": "اِفْعَنْلَلَ — يَفْعَنْلِلُ",
+      "terjemah": "Rubā‘ī Mazīd Fīh — wazan 2",
+      "meta": "الرُّبَاعِيُّ الْمَزِيدُ فِيهِ"
+    },
+    "if-alalla-yaf-alillu": {
+      "arab": "اِفْعَلَلَّ — يَفْعَلِلُّ",
+      "terjemah": "Rubā‘ī Mazīd Fīh — wazan 3",
+      "meta": "الرُّبَاعِيُّ الْمَزِيدُ فِيهِ"
     }
   }
 }

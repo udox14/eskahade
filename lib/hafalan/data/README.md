@@ -13,7 +13,7 @@ File seed di repo ini **contoh kecil** — ganti dengan data lengkap.
 | quran     | `quran:{surah}:{ayah}`       | `quran.json[surah].ayat[ayah]`            |
 | hadits    | `hadits:{kitab}:{slug}:{n}`  | `hadits/{kitab}.json` → bab[slug].segmen[n] |
 | jurumiyah | `jurumiyah:{slug}:{n}`       | `jurumiyah.json` → bab[slug].segmen[n]    |
-| amtsilah  | `amtsilah:{slug}`            | `amtsilah.json` → wazan[slug]             |
+| amtsilah  | `amtsilah:{babslug}:{n}`     | `amtsilah.json` → bab[babslug].segmen[n] → wazan[key] |
 
 ## Bentuk file
 
@@ -32,8 +32,10 @@ File seed di repo ini **contoh kecil** — ganti dengan data lengkap.
   "bab": { "bab-1": { "nama": "باب الكلام", "urutan": 1,
                       "segmen": { "1": "...", "2": "..." } } } }
 
-// amtsilah.json — key = slug (lihat hafalanSlug())
-{ "judul": "...", "wazan": { "fa-ala-yaf-ulu": { "arab": "...", "terjemah": "..." } } }
+// amtsilah.json — bab/segmen untuk seed Master Hafalan, wazan untuk resolver teks
+{ "judul": "...", "bab": { "bab-1": { "nama": "...", "urutan": 1,
+  "segmen": { "1": { "key": "fa-ala-yaf-ulu", "no": "..." } } } },
+  "wazan": { "fa-ala-yaf-ulu": { "arab": "...", "terjemah": "..." } } }
 ```
 
 ## Matan bawaan (seed 1-klik)

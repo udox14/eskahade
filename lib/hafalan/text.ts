@@ -80,9 +80,16 @@ export function resolveHafalanText(ref?: string | null): HafalanText | null {
       return joined ? { arab: joined, meta: bab.nama } : null
     }
     case 'amtsilah': {
-      const item = AMTSILAH.wazan?.[rest[0]]
+      const [slug, seg] = rest
+      const bab = AMTSILAH.bab?.[slug]
+      const segment = bab && seg != null ? bab.segmen?.[seg] : null
+      const item = segment?.key ? AMTSILAH.wazan?.[segment.key] : segment || AMTSILAH.wazan?.[slug]
       if (!item) return null
-      return { arab: item.arab, terjemah: item.terjemah }
+      return {
+        arab: typeof item === 'string' ? item : item.arab,
+        terjemah: typeof item === 'string' ? undefined : item.terjemah,
+        meta: typeof item === 'string' ? bab?.nama : item.meta || bab?.nama,
+      }
     }
     default:
       return null
@@ -126,6 +133,9 @@ export type MatanSource = { key: string; label: string; bab: MatanBab[] }
 export function getMatanSources(jenis: string): MatanSource[] {
   if (jenis === 'jurumiyah') {
     return [{ key: 'jurumiyah', label: JURUMIYAH.judul || 'Matan Al-Ajurrumiyyah', bab: babFromSource(JURUMIYAH, 'jurumiyah', { whole: true }) }]
+  }
+  if (jenis === 'amtsilah') {
+    return [{ key: 'amtsilah', label: AMTSILAH.judul || 'Amtsilah Tashrifiyah', bab: babFromSource(AMTSILAH, 'amtsilah') }]
   }
   if (jenis === 'hadits') {
     return Object.entries(HADITS_KITAB)

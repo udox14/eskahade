@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AlertTriangle, ArrowLeft, BookOpenCheck, Check, ChevronRight, Languages, Loader2,
+  AlertTriangle, ArrowLeft, ArrowUp, BookOpenCheck, Check, ChevronRight, Languages, Loader2,
   RotateCcw, Save, Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -39,6 +39,7 @@ export default function HafalanPageContent() {
   const [selectedBabId, setSelectedBabId] = useState<number | null>(null)
   const [babTab, setBabTab] = useState<'current' | 'old'>('current')
   const [santriSearch, setSantriSearch] = useState('')
+  const [quranTargetAyat, setQuranTargetAyat] = useState('')
   const [localChecked, setLocalChecked] = useState<Set<number>>(new Set())
   const [localWords, setLocalWords] = useState<Record<number, number[]>>({}) // jurumiyah: blokId -> word idx
   const [showTerjemah, setShowTerjemah] = useState(true)
@@ -53,6 +54,7 @@ export default function HafalanPageContent() {
   const pendingChangesRef = useRef(new Map<string, Map<number, PendingChange>>())
   const autosaveTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
   const autosaveInFlightRef = useRef(new Set<string>())
+  const quranTargetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const changeRevisionRef = useRef(0)
   const currentScopeKeyRef = useRef('')
   const currentDataScopeKeyRef = useRef('')
@@ -77,10 +79,19 @@ export default function HafalanPageContent() {
   useEffect(() => {
     getHafalanInitialData().then(res => {
       setKelasList(res.kelas)
-      if (res.kelas.length === 1) setKelasId(res.kelas[0].id)
+      let cachedKelasId = ''
+      try { cachedKelasId = localStorage.getItem('hafalan-selected-kelas') || '' } catch {}
+      const availableKelasIds = res.kelas.map((kelas: any) => String(kelas.id))
+      if (res.kelas.length === 1) setKelasId(String(res.kelas[0].id))
+      else if (cachedKelasId && availableKelasIds.includes(cachedKelasId)) setKelasId(cachedKelasId)
       setLoading(false)
     })
   }, [])
+
+  useEffect(() => {
+    if (!kelasId || kelasList.length < 2) return
+    try { localStorage.setItem('hafalan-selected-kelas', kelasId) } catch {}
+  }, [kelasId, kelasList.length])
 
   useEffect(() => {
     if (!kelasId) return
@@ -111,6 +122,7 @@ export default function HafalanPageContent() {
     const timers = autosaveTimersRef.current
     return () => {
       for (const timer of timers.values()) clearTimeout(timer)
+      if (quranTargetTimerRef.current) clearTimeout(quranTargetTimerRef.current)
     }
   }, [])
 
@@ -122,15 +134,27 @@ export default function HafalanPageContent() {
     return () => { window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up) }
   }, [])
 
-  useEffect(() => {
-    if (!selectedSantriId) return
+  const scrollMainToTop = () => {
     const scroller = document.querySelector('main') as HTMLElement | null
     if (!scroller) return
     const previousScrollBehavior = scroller.style.scrollBehavior
     scroller.style.scrollBehavior = 'auto'
     scroller.scrollTop = 0
     scroller.style.scrollBehavior = previousScrollBehavior
+  }
+
+  useEffect(() => {
+    if (!selectedSantriId) return
+    scrollMainToTop()
   }, [selectedSantriId])
+
+  useEffect(() => {
+    setQuranTargetAyat('')
+    if (quranTargetTimerRef.current) {
+      clearTimeout(quranTargetTimerRef.current)
+      quranTargetTimerRef.current = null
+    }
+  }, [selectedBabId, selectedSantriId, selectedType?.key])
 
   const currentBab = useMemo(() => data.bab.filter((b: any) => b.is_editable), [data.bab])
   const oldBab = useMemo(() => data.bab.filter((b: any) => !b.is_editable), [data.bab])
@@ -161,6 +185,16 @@ export default function HafalanPageContent() {
     return !!data.progress[key] && !data.progressEditable?.[key]
   }
   const canEditBlok = (blok: any) => !!blok?.is_editable && !isReadonlyPersisted(blok.id)
+  const getQuranAyatNumber = (blok: any) => Number(String(blok?.label || '').match(/\d+/)?.[0] || 0)
+  const quranAyatRows = isQuran && selectedBab
+    ? [...selectedBab.blok].sort((a: any, b: any) => getQuranAyatNumber(a) - getQuranAyatNumber(b))
+    : []
+  const quranLastMemorizedAyat = quranAyatRows.reduce(
+    (last: number, blok: any) => localChecked.has(blok.id) ? Math.max(last, getQuranAyatNumber(blok)) : last,
+    0,
+  )
+  const quranMaxAyat = quranAyatRows.length ? getQuranAyatNumber(quranAyatRows[quranAyatRows.length - 1]) : 0
+  const quranHasEditableAyat = quranAyatRows.some((blok: any) => canEditBlok(blok))
 
   const getScopeForSantri = (riwayatId: string): AutosaveScope | null => {
     if (!kelasId || !selectedType?.key || !riwayatId) return null
@@ -285,6 +319,64 @@ export default function HafalanPageContent() {
       setSaveStatus('saving')
     }
     scheduleAutosave(scope)
+  }
+
+  const applyQuranTarget = (rawValue: string) => {
+    if (!isQuran || !selectedBab) return
+    const normalized = rawValue.replace(/\D/g, '')
+    const target = Number(normalized)
+    const currentLast = quranAyatRows.reduce(
+      (last: number, blok: any) => localCheckedRef.current.has(blok.id) ? Math.max(last, getQuranAyatNumber(blok)) : last,
+      0,
+    )
+    if (!normalized || !Number.isInteger(target) || target <= currentLast) {
+      setQuranTargetAyat('')
+      return
+    }
+    if (target > quranMaxAyat) {
+      setQuranTargetAyat('')
+      toast.info(`Maksimal ayat pada surat ini adalah ${quranMaxAyat}.`)
+      return
+    }
+
+    const nextChecked = new Set(localCheckedRef.current)
+    const addedIds: number[] = []
+    for (const blok of quranAyatRows) {
+      const ayatNumber = getQuranAyatNumber(blok)
+      if (ayatNumber > currentLast && ayatNumber <= target && canEditBlok(blok) && !nextChecked.has(blok.id)) {
+        nextChecked.add(blok.id)
+        addedIds.push(blok.id)
+      }
+    }
+    if (!addedIds.length) {
+      setQuranTargetAyat('')
+      return
+    }
+
+    setLocalChecked(nextChecked)
+    localCheckedRef.current = nextChecked
+    for (const blokId of addedIds) queueAutosave(blokId, true)
+    setDirty(true)
+    setQuranTargetAyat('')
+  }
+
+  const handleQuranTargetChange = (value: string) => {
+    const normalized = value.replace(/\D/g, '')
+    setQuranTargetAyat(normalized)
+    if (quranTargetTimerRef.current) clearTimeout(quranTargetTimerRef.current)
+    if (!normalized) return
+    quranTargetTimerRef.current = setTimeout(() => {
+      quranTargetTimerRef.current = null
+      applyQuranTarget(normalized)
+    }, 500)
+  }
+
+  const submitQuranTarget = () => {
+    if (quranTargetTimerRef.current) {
+      clearTimeout(quranTargetTimerRef.current)
+      quranTargetTimerRef.current = null
+    }
+    applyQuranTarget(quranTargetAyat)
   }
 
   const retryAutosave = () => {
@@ -611,8 +703,8 @@ export default function HafalanPageContent() {
 
       {step !== 'home' && (
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(15rem,18rem)_minmax(0,1fr)]">
-          <aside className="hidden lg:block">
-            <div className="sticky top-24 space-y-3">
+          <aside className="sticky top-4 hidden self-start lg:block">
+            <div className="space-y-3">
               <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="text-sm font-bold text-slate-900">Daftar santri</p>
@@ -623,7 +715,7 @@ export default function HafalanPageContent() {
                   <input value={santriSearch} onChange={e => setSantriSearch(e.target.value)} placeholder="Cari nama / NIS" className="h-10 w-full rounded-xl border border-slate-200 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
                 </div>
               </div>
-              <div className="max-h-[calc(100vh-12rem)] space-y-2 overflow-y-auto pr-1">
+              <div className="max-h-[calc(100vh-8rem)] space-y-2 overflow-y-auto pr-1">
                 {filteredSantri.map((s: any) => {
                   const done = persistedCount(s.riwayat_id)
                   const pct = totalBlok ? Math.round((done / totalBlok) * 100) : 0
@@ -744,6 +836,37 @@ export default function HafalanPageContent() {
       {/* BLOK — panel baca + swipe blocking */}
       {step === 'blok' && selectedBab && (
         <div className="space-y-3">
+          {isQuran && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-emerald-900">Input sampai ayat</p>
+                <p className="mt-0.5 text-xs font-semibold text-emerald-700">
+                  Sudah hafal sampai <span className="font-black">{quranLastMemorizedAyat} ayat</span> dari {quranMaxAyat} ayat.
+                </p>
+              </div>
+              <input
+                type="number"
+                min={quranLastMemorizedAyat + 1}
+                max={quranMaxAyat}
+                inputMode="numeric"
+                value={quranTargetAyat}
+                onChange={e => handleQuranTargetChange(e.target.value)}
+                onBlur={submitQuranTarget}
+                onKeyDown={e => {
+                  if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault()
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    submitQuranTarget()
+                  }
+                }}
+                disabled={!quranHasEditableAyat || quranLastMemorizedAyat >= quranMaxAyat}
+                placeholder="Nomor ayat"
+                aria-label="Input target ayat hafalan"
+                className="h-10 w-32 rounded-xl border border-emerald-200 bg-white px-3 text-center text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              />
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
               <button onClick={markSelectedBabComplete} disabled={!selectedBab.blok.some((b: any) => canEditBlok(b))} className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">Hafal semua</button>
@@ -845,6 +968,18 @@ export default function HafalanPageContent() {
 
           </section>
         </div>
+      )}
+
+      {step !== 'home' && (
+        <button
+          type="button"
+          onClick={scrollMainToTop}
+          aria-label="Scroll ke atas"
+          title="Scroll ke atas"
+          className="fixed bottom-24 right-4 z-40 inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg transition hover:border-emerald-300 hover:text-emerald-700 sm:bottom-20 sm:right-6"
+        >
+          <ArrowUp className="h-5 w-5" />
+        </button>
       )}
 
       {/* Sticky save bar */}
