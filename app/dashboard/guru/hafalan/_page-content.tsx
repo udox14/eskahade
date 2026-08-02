@@ -29,6 +29,16 @@ type PendingChange = {
   revision: number
 }
 
+type HafalanHistorySnapshot = {
+  kelasId: string
+  typeKey: string | null
+  santriId: string
+  babId: number | null
+  babTab: 'current' | 'old'
+}
+
+const HAFALAN_HISTORY_KEY = '__hafalan_step'
+
 export default function HafalanPageContent() {
   const [kelasList, setKelasList] = useState<any[]>([])
   const [kelasId, setKelasId] = useState('')
@@ -39,6 +49,7 @@ export default function HafalanPageContent() {
   const [selectedBabId, setSelectedBabId] = useState<number | null>(null)
   const [babTab, setBabTab] = useState<'current' | 'old'>('current')
   const [santriSearch, setSantriSearch] = useState('')
+  const [mobileSantriSearchOpen, setMobileSantriSearchOpen] = useState(false)
   const [quranTargetAyat, setQuranTargetAyat] = useState('')
   const [localChecked, setLocalChecked] = useState<Set<number>>(new Set())
   const [localWords, setLocalWords] = useState<Record<number, number[]>>({}) // jurumiyah: blokId -> word idx
@@ -58,6 +69,17 @@ export default function HafalanPageContent() {
   const changeRevisionRef = useRef(0)
   const currentScopeKeyRef = useRef('')
   const currentDataScopeKeyRef = useRef('')
+  const historyReadyRef = useRef(false)
+  const typesRef = useRef<any[]>([])
+  const kelasIdRef = useRef('')
+  const selectedTypeRef = useRef<any>(null)
+  const selectedSantriIdRef = useRef('')
+  const selectSantriRef = useRef<(riwayatId: string, recordHistory?: boolean) => void>(() => {})
+
+  typesRef.current = types
+  kelasIdRef.current = kelasId
+  selectedTypeRef.current = selectedType
+  selectedSantriIdRef.current = selectedSantriId
 
   const draftKey = useMemo(() => {
     if (!kelasId || !selectedType?.key || !selectedSantriId) return ''
@@ -76,6 +98,41 @@ export default function HafalanPageContent() {
   currentScopeKeyRef.current = saveScope?.key || ''
   currentDataScopeKeyRef.current = kelasId && selectedType?.key ? `${kelasId}:${selectedType.key}` : ''
 
+  const makeHafalanHistorySnapshot = (overrides: Partial<HafalanHistorySnapshot> = {}): HafalanHistorySnapshot => ({
+    kelasId: overrides.kelasId !== undefined ? overrides.kelasId : kelasId,
+    typeKey: overrides.typeKey !== undefined ? overrides.typeKey : selectedType?.key || null,
+    santriId: overrides.santriId !== undefined ? overrides.santriId : selectedSantriId,
+    babId: overrides.babId !== undefined ? overrides.babId : selectedBabId,
+    babTab: overrides.babTab !== undefined ? overrides.babTab : babTab,
+  })
+
+  const readHafalanHistory = (): HafalanHistorySnapshot | null => {
+    const raw = typeof window !== 'undefined' ? window.history.state?.[HAFALAN_HISTORY_KEY] : null
+    if (!raw || typeof raw !== 'object') return null
+    return {
+      kelasId: typeof raw.kelasId === 'string' ? raw.kelasId : '',
+      typeKey: typeof raw.typeKey === 'string' ? raw.typeKey : null,
+      santriId: typeof raw.santriId === 'string' ? raw.santriId : '',
+      babId: typeof raw.babId === 'number' ? raw.babId : null,
+      babTab: raw.babTab === 'old' ? 'old' : 'current',
+    }
+  }
+
+  const writeHafalanHistory = (snapshot: HafalanHistorySnapshot, replace = false) => {
+    if (typeof window === 'undefined') return
+    const nextState = { ...(window.history.state || {}), [HAFALAN_HISTORY_KEY]: snapshot }
+    if (replace) window.history.replaceState(nextState, '', window.location.href)
+    else window.history.pushState(nextState, '', window.location.href)
+  }
+
+  const pushHafalanHistory = (overrides: Partial<HafalanHistorySnapshot> = {}) => {
+    if (!historyReadyRef.current) return
+    const next = makeHafalanHistorySnapshot(overrides)
+    const previous = readHafalanHistory()
+    if (previous && JSON.stringify(previous) === JSON.stringify(next)) return
+    writeHafalanHistory(next)
+  }
+
   useEffect(() => {
     getHafalanInitialData().then(res => {
       setKelasList(res.kelas)
@@ -86,6 +143,54 @@ export default function HafalanPageContent() {
       else if (cachedKelasId && availableKelasIds.includes(cachedKelasId)) setKelasId(cachedKelasId)
       setLoading(false)
     })
+  }, [])
+
+  useEffect(() => {
+    if (loading || historyReadyRef.current) return
+    if (!readHafalanHistory()) {
+      writeHafalanHistory({
+        kelasId,
+        typeKey: null,
+        santriId: '',
+        babId: null,
+        babTab: 'current',
+      }, true)
+    }
+    historyReadyRef.current = true
+  }, [kelasId, loading])
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const raw = event.state?.[HAFALAN_HISTORY_KEY]
+      if (!raw) return
+
+      const snapshot = readHafalanHistory()
+      if (!snapshot) return
+      if (snapshot.kelasId && snapshot.kelasId !== kelasIdRef.current) setKelasId(snapshot.kelasId)
+
+      if (!snapshot.typeKey) {
+        setSelectedType(null)
+        setSelectedSantriId('')
+        setSelectedBabId(null)
+        setBabTab('current')
+        setMobileSantriSearchOpen(false)
+        return
+      }
+
+      const type = typesRef.current.find(item => item.key === snapshot.typeKey)
+      if (!type) return
+      setSelectedType(type)
+      const sameDataScope = kelasIdRef.current === snapshot.kelasId && selectedTypeRef.current?.key === snapshot.typeKey
+      const santriChanged = snapshot.santriId !== selectedSantriIdRef.current
+      if (sameDataScope && snapshot.santriId && santriChanged) selectSantriRef.current(snapshot.santriId, false)
+      else setSelectedSantriId(snapshot.santriId)
+      setSelectedBabId(snapshot.babId)
+      setBabTab(snapshot.babTab)
+      setMobileSantriSearchOpen(false)
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
   useEffect(() => {
@@ -390,10 +495,51 @@ export default function HafalanPageContent() {
     return !!blok?.is_editable && !(data.progress[key] && !data.progressEditable?.[key])
   }
 
-  const selectSantri = (riwayatId: string) => {
+  const selectKelas = (nextKelasId: string) => {
+    setKelasId(nextKelasId)
+    setSelectedType(null)
+    setSelectedSantriId('')
+    setSelectedBabId(null)
+    setBabTab('current')
+    setMobileSantriSearchOpen(false)
+    if (historyReadyRef.current) {
+      writeHafalanHistory(makeHafalanHistorySnapshot({
+        kelasId: nextKelasId,
+        typeKey: null,
+        santriId: '',
+        babId: null,
+        babTab: 'current',
+      }), true)
+    }
+  }
+
+  const selectType = (type: any) => {
+    setSelectedType(type)
+    setSelectedSantriId('')
+    setSelectedBabId(null)
+    setBabTab('current')
+    setMobileSantriSearchOpen(false)
+    pushHafalanHistory({
+      typeKey: type.key,
+      santriId: '',
+      babId: null,
+      babTab: 'current',
+    })
+  }
+
+  const selectSantri = (riwayatId: string, recordHistory = true) => {
+    setMobileSantriSearchOpen(false)
     setSelectedSantriId(riwayatId)
     setBabTab('current')
-    setSelectedBabId(currentBab.length === 1 ? currentBab[0].id : null)
+    const directBabId = currentBab.length === 1 ? currentBab[0].id : null
+    setSelectedBabId(directBabId)
+    if (recordHistory) {
+      pushHafalanHistory({
+        santriId: riwayatId,
+        babId: directBabId,
+        babTab: 'current',
+      })
+    }
     const scope = getScopeForSantri(riwayatId)
     const nextDraftKey = `hafalan-draft:${kelasId}:${selectedType.key}:${riwayatId}`
     try {
@@ -455,6 +601,8 @@ export default function HafalanPageContent() {
     setDirty(!!pending?.size)
     setSaveStatus(pending?.size ? 'saving' : 'saved')
   }
+
+  selectSantriRef.current = selectSantri
 
   // ── apply / drag-swipe ──
   const applyBlok = (blokId: number, val: boolean) => {
@@ -629,7 +777,16 @@ export default function HafalanPageContent() {
         : !selectedBabId ? 'bab'
           : 'blok'
 
+  const selectBab = (babId: number) => {
+    setSelectedBabId(babId)
+    pushHafalanHistory({ babId })
+  }
+
   const goBack = () => {
+    if (historyReadyRef.current && readHafalanHistory()) {
+      window.history.back()
+      return
+    }
     if (step === 'blok') setSelectedBabId(null)
     else if (step === 'bab') setSelectedSantriId('')
     else if (step === 'santri') setSelectedType(null)
@@ -669,7 +826,7 @@ export default function HafalanPageContent() {
           {kelasList.length > 1 ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <label className="mb-1.5 block text-xs font-bold uppercase text-slate-500">Kelas</label>
-              <select value={kelasId} onChange={e => setKelasId(e.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500">
+              <select value={kelasId} onChange={e => selectKelas(e.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500">
                 <option value="">Pilih kelas</option>
                 {kelasList.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
               </select>
@@ -686,7 +843,7 @@ export default function HafalanPageContent() {
           {kelasId && (
             <div className="grid gap-3 sm:grid-cols-2">
               {types.map(type => (
-                <button key={type.key} onClick={() => setSelectedType(type)} className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
+                <button key={type.key} onClick={() => selectType(type)} className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md">
                   <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600"><BookOpenCheck className="h-6 w-6" /></div>
                   <div className="min-w-0 flex-1">
                     <h2 className="font-bold text-slate-900">{type.label}</h2>
@@ -741,6 +898,54 @@ export default function HafalanPageContent() {
           </aside>
 
           <section className="min-w-0">
+            {step !== 'santri' && (
+              <div className="mb-4 space-y-2 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setMobileSantriSearchOpen(value => !value)}
+                  aria-expanded={mobileSantriSearchOpen}
+                  className="flex w-full items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm"
+                >
+                  <Search className="h-4 w-4 shrink-0 text-emerald-600" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-700">
+                    {selectedSantri ? `Santri: ${selectedSantri.nama}` : 'Cari santri'}
+                  </span>
+                  <span className="text-xs font-semibold text-emerald-700">{mobileSantriSearchOpen ? 'Tutup' : 'Ganti'}</span>
+                </button>
+                {mobileSantriSearchOpen && (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        autoFocus
+                        value={santriSearch}
+                        onChange={e => setSantriSearch(e.target.value)}
+                        placeholder="Cari nama / NIS"
+                        className="h-11 w-full rounded-xl border border-slate-200 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <div className="mt-2 max-h-72 space-y-2 overflow-y-auto">
+                      {filteredSantri.map((s: any) => (
+                        <button
+                          key={s.riwayat_id}
+                          type="button"
+                          onClick={() => selectSantri(s.riwayat_id)}
+                          className={`flex w-full items-center gap-2 rounded-xl border p-3 text-left transition hover:border-emerald-300 ${selectedSantriId === s.riwayat_id ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white'}`}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-bold text-slate-900">{s.nama}</span>
+                            <span className="block text-[11px] text-slate-400">{s.nis || '-'}</span>
+                          </span>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                        </button>
+                      ))}
+                      {filteredSantri.length === 0 && <p className="py-5 text-center text-sm text-slate-400">Santri tidak ditemukan.</p>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {step === 'santri' && (
               <div className="hidden rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center lg:block">
                 <p className="font-bold text-slate-700">Pilih santri di panel kiri</p>
@@ -813,7 +1018,7 @@ export default function HafalanPageContent() {
               const all = isJurumiyah ? (jblok ? wordsOf(jblok).length : 0) : bab.blok.length
               const full = all > 0 && done >= all
               return (
-                <button key={bab.id} onClick={() => setSelectedBabId(bab.id)}
+                <button key={bab.id} onClick={() => selectBab(bab.id)}
                   className={`relative flex min-h-[6rem] flex-col rounded-2xl border p-3 text-left transition hover:border-emerald-300 ${bab.is_editable ? 'border-slate-200 bg-white' : 'border-sky-100 bg-sky-50'}`}>
                   <div className="flex items-start justify-between gap-1">
                     <p className={`min-w-0 flex-1 whitespace-normal break-words font-bold text-slate-900 ${isQuran ? 'text-center text-xl leading-[1.8] sm:text-2xl' : 'leading-snug'}`} dir={isQuran ? 'rtl' : 'ltr'} style={{ fontFamily: isQuran ? QURAN_FONT : ARABIC_FONT }}>{bab.judul}</p>

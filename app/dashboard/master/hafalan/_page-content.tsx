@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, BookOpenCheck, ChevronRight, Loader2, Plus, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -13,13 +13,60 @@ const ARABIC_FONT = '"Amiri Quran", "Scheherazade New", "Traditional Arabic", se
 
 type Catalog = { jenis: string; label: string; kitab: { key: string; label: string }[] }
 
+const MASTER_HAFALAN_HISTORY_KEY = '__master_hafalan_step'
+
 export default function MasterHafalanContent() {
   const [data, setData] = useState<any>(null)
-  const [activeId, setActiveId] = useState<number | null>(null)
+  const [activeId, setActiveId] = useState<number | null>(() => {
+    if (typeof window === 'undefined') return null
+    const raw = window.history.state?.[MASTER_HAFALAN_HISTORY_KEY]
+    return typeof raw === 'number' ? raw : null
+  })
   const [loading, setLoading] = useState(true)
+  const historyReadyRef = useRef(false)
 
   const load = async () => setData(await getMasterAssign())
   useEffect(() => { load().finally(() => setLoading(false)) }, [])
+
+  useEffect(() => {
+    if (loading || historyReadyRef.current) return
+    const raw = window.history.state?.[MASTER_HAFALAN_HISTORY_KEY]
+    if (typeof raw !== 'number') {
+      window.history.replaceState(
+        { ...(window.history.state || {}), [MASTER_HAFALAN_HISTORY_KEY]: null },
+        '',
+        window.location.href,
+      )
+    }
+    historyReadyRef.current = true
+  }, [loading])
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const raw = event.state?.[MASTER_HAFALAN_HISTORY_KEY]
+      setActiveId(typeof raw === 'number' ? raw : null)
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  const openMarhalah = (id: number) => {
+    setActiveId(id)
+    if (!historyReadyRef.current) return
+    window.history.pushState(
+      { ...(window.history.state || {}), [MASTER_HAFALAN_HISTORY_KEY]: id },
+      '',
+      window.location.href,
+    )
+  }
+
+  const closeMarhalah = () => {
+    if (historyReadyRef.current && window.history.state?.[MASTER_HAFALAN_HISTORY_KEY] !== undefined) {
+      window.history.back()
+      return
+    }
+    setActiveId(null)
+  }
 
   const active = useMemo(() => data?.marhalah.find((m: any) => m.id === activeId) || null, [data, activeId])
 
@@ -30,9 +77,9 @@ export default function MasterHafalanContent() {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 pb-24">
       {active ? (
-        <MarhalahDetail key={active.id} marhalah={active} data={data} onBack={() => setActiveId(null)} reload={load} />
+        <MarhalahDetail key={active.id} marhalah={active} data={data} onBack={closeMarhalah} reload={load} />
       ) : (
-        <MarhalahList data={data} onOpen={setActiveId} reload={load} />
+        <MarhalahList data={data} onOpen={openMarhalah} reload={load} />
       )}
     </div>
   )
