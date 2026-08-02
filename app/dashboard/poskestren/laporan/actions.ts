@@ -28,6 +28,9 @@ export async function getMonthlyReport(month: string) {
     medicineUsage,
     purchaseSummary,
     stockSummary,
+    locationStockSummary,
+    transferSummary,
+    orderSummary,
     financeSummary,
     financeAccounts,
     expenseCategories,
@@ -101,6 +104,8 @@ export async function getMonthlyReport(month: string) {
       `SELECT m.name, m.base_unit,
               SUM(CASE WHEN sm.quantity_delta < 0 THEN -sm.quantity_delta ELSE 0 END) AS used_quantity,
               SUM(CASE WHEN sm.movement_type = 'PATIENT' THEN -sm.quantity_delta ELSE 0 END) AS patient_quantity,
+              SUM(CASE WHEN sm.reference_type = 'QUICK_MEDICINE_ISSUE' THEN -sm.quantity_delta ELSE 0 END) AS quick_quantity,
+              SUM(CASE WHEN sm.movement_type = 'PATIENT' AND sm.reference_type <> 'QUICK_MEDICINE_ISSUE' THEN -sm.quantity_delta ELSE 0 END) AS clinical_quantity,
               SUM(CASE WHEN sm.movement_type = 'PREVENTIVE' THEN -sm.quantity_delta ELSE 0 END) AS preventive_quantity,
               SUM(CASE WHEN sm.movement_type IN ('EXPIRED','DAMAGED','LOST') THEN -sm.quantity_delta ELSE 0 END) AS loss_quantity
        FROM poskestren_stock_movement sm
@@ -121,10 +126,40 @@ export async function getMonthlyReport(month: string) {
       `SELECT COUNT(CASE WHEN total_stock_base <= minimum_stock_base THEN 1 END) AS critical,
               COUNT(CASE WHEN total_stock_base = 0 THEN 1 END) AS empty,
               COALESCE(SUM(total_stock_base), 0) AS total_units,
+              COALESCE((SELECT SUM(quantity_base) FROM poskestren_medicine_location_stock mls
+                        JOIN poskestren_stock_location sl ON sl.id = mls.location_id
+                        WHERE sl.location_type = 'CENTRAL'), 0) AS central_units,
+              COALESCE((SELECT SUM(quantity_base) FROM poskestren_medicine_location_stock mls
+                        JOIN poskestren_stock_location sl ON sl.id = mls.location_id
+                        WHERE sl.location_type = 'DORM' AND sl.is_active = 1), 0) AS dorm_units,
               (SELECT COUNT(*) FROM poskestren_medicine_batch
                WHERE remaining_quantity > 0 AND expires_on IS NOT NULL AND expires_on <= ?) AS expired_batches
        FROM poskestren_medicine WHERE is_active = 1`,
       [to]
+    ),
+    query<any>(
+      `SELECT sl.name AS location_name, sl.location_type,
+              COALESCE(SUM(mls.quantity_base), 0) AS quantity_base
+       FROM poskestren_stock_location sl
+       LEFT JOIN poskestren_medicine_location_stock mls ON mls.location_id = sl.id
+       WHERE sl.is_active = 1
+       GROUP BY sl.id ORDER BY sl.location_type, sl.name COLLATE NOCASE`,
+      []
+    ),
+    query<any>(
+      `SELECT COUNT(DISTINCT t.id) AS transfers,
+              COALESCE(SUM(CASE WHEN t.transfer_date BETWEEN ? AND ? THEN ti.quantity_base ELSE 0 END), 0) AS transferred_units
+       FROM poskestren_stock_transfer t
+       LEFT JOIN poskestren_stock_transfer_item ti ON ti.transfer_id = t.id
+       WHERE t.status = 'COMPLETED' AND t.transfer_date BETWEEN ? AND ?`,
+      [from, to, from, to]
+    ),
+    query<any>(
+      `SELECT status, COUNT(*) AS total
+       FROM poskestren_medicine_order
+       WHERE order_date BETWEEN ? AND ?
+       GROUP BY status ORDER BY status`,
+      [from, to]
     ),
     query<any>(
       `SELECT COALESCE(SUM(CASE WHEN transaction_type = 'INCOME' AND status = 'POSTED' THEN amount_rupiah ELSE 0 END), 0) AS income,
@@ -169,6 +204,9 @@ export async function getMonthlyReport(month: string) {
     medicineUsage,
     purchaseSummary: purchaseSummary[0] || {},
     stockSummary: stockSummary[0] || {},
+    locationStockSummary,
+    transferSummary: transferSummary[0] || {},
+    orderSummary,
     financeSummary: financeSummary[0] || {},
     financeAccounts,
     expenseCategories,

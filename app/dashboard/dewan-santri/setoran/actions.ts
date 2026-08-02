@@ -5,7 +5,12 @@ import { getSession, hasAnyRole } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 import { SADESA_CATEGORY, SADESA_UNIT } from '@/lib/spp/unit-setor'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
-import { BULAN_SPP } from '@/lib/spp/tunggakan'
+import {
+  BULAN_SPP,
+  getSppStudentBillingStart,
+  getSppStudentStartKeySql,
+  isSppBillablePeriod,
+} from '@/lib/spp/tunggakan'
 
 const EXCLUDE_NON_SPP_ASRAMA_SQL = "AND UPPER(TRIM(COALESCE(asrama, ''))) <> 'AL-BAGHORY'"
 
@@ -101,6 +106,8 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
 
   const billingStart = await getSppBillingStart()
   const isBeforeBillingStart = (tahun * 100 + bulan) < (billingStart.tahun * 100 + billingStart.bulan)
+  const targetKey = tahun * 100 + bulan
+  const studentStartKeySql = getSppStudentStartKeySql('s', billingStart.tahun * 100 + billingStart.bulan)
   const bulanSebelumnya = bulan === 1 ? 12 : bulan - 1
   const tahunSebelumnya = bulan === 1 ? tahun - 1 : tahun
   const settings = await getSppSettings(tahun)
@@ -115,39 +122,48 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     WITH
       base_santri AS (
         SELECT
-          id,
-          COALESCE(bebas_spp, 0) AS bebas_spp,
+          s.id,
+          COALESCE(s.bebas_spp, 0) AS bebas_spp,
+          ${studentStartKeySql} AS spp_start_key,
           CASE
-            WHEN kategori_santri = ? THEN ?
-            ELSE COALESCE(asrama, 'LAINNYA')
+            WHEN s.kategori_santri = ? THEN ?
+            ELSE COALESCE(s.asrama, 'LAINNYA')
           END AS unit_setor
-        FROM santri
-        WHERE status_global = 'aktif'
-          ${EXCLUDE_NON_SPP_ASRAMA_SQL}
+        FROM santri s
+        WHERE s.status_global = 'aktif'
+          AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
       ),
       bayar_ini AS (
-        SELECT DISTINCT santri_id
-        FROM spp_log
-        WHERE tahun = ? AND bulan = ?
-          AND tujuan_setoran = 'DEWAN_SANTRI'
+        SELECT DISTINCT sl.santri_id
+        FROM spp_log sl
+        JOIN base_santri bs ON bs.id = sl.santri_id
+        WHERE sl.tahun = ? AND sl.bulan = ?
+          AND ${targetKey} >= bs.spp_start_key
+          AND sl.tujuan_setoran = 'DEWAN_SANTRI'
       ),
       bayar_tunggakan AS (
-        SELECT santri_id, COUNT(*) AS jumlah_bayar, SUM(nominal_bayar) AS total_nominal
-        FROM spp_log
-        WHERE (tahun * 100 + bulan) < (? * 100 + ?)
-          AND tanggal_bayar >= ? AND tanggal_bayar < ?
-          AND tujuan_setoran = 'DEWAN_SANTRI'
-        GROUP BY santri_id
+        SELECT sl.santri_id, COUNT(*) AS jumlah_bayar, SUM(sl.nominal_bayar) AS total_nominal
+        FROM spp_log sl
+        JOIN base_santri bs ON bs.id = sl.santri_id
+        WHERE (sl.tahun * 100 + sl.bulan) < (? * 100 + ?)
+          AND (sl.tahun * 100 + sl.bulan) >= bs.spp_start_key
+          AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
+          AND sl.tujuan_setoran = 'DEWAN_SANTRI'
+        GROUP BY sl.santri_id
       ),
       ditiadakan_ini AS (
-        SELECT DISTINCT santri_id
-        FROM spp_tagihan_ditiadakan
-        WHERE tahun = ? AND bulan = ? AND is_active = 1
+        SELECT DISTINCT td.santri_id
+        FROM spp_tagihan_ditiadakan td
+        JOIN base_santri bs ON bs.id = td.santri_id
+        WHERE td.tahun = ? AND td.bulan = ? AND td.is_active = 1
+          AND ${targetKey} >= bs.spp_start_key
         UNION
         -- SPP Juli santri baru: netral (uang ke Bendahara Pusat, bukan setoran asrama)
-        SELECT DISTINCT santri_id
-        FROM spp_log
-        WHERE tahun = ? AND bulan = ? AND tujuan_setoran = 'BENDAHARA_PUSAT'
+        SELECT DISTINCT sl.santri_id
+        FROM spp_log sl
+        JOIN base_santri bs ON bs.id = sl.santri_id
+        WHERE sl.tahun = ? AND sl.bulan = ? AND sl.tujuan_setoran = 'BENDAHARA_PUSAT'
+          AND ${targetKey} >= bs.spp_start_key
       ),
       lebih_awal_unit AS (
         SELECT bs.unit_setor,
@@ -155,7 +171,8 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
                COUNT(DISTINCT sl.santri_id) AS orang_lebih_awal
         FROM base_santri bs
         JOIN spp_log sl ON sl.santri_id = bs.id
-        WHERE (sl.tahun * 100 + sl.bulan) > (? * 100 + ?)
+         WHERE (sl.tahun * 100 + sl.bulan) > (? * 100 + ?)
+           AND (sl.tahun * 100 + sl.bulan) >= bs.spp_start_key
           AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
           AND sl.tujuan_setoran = 'DEWAN_SANTRI'
         GROUP BY bs.unit_setor
@@ -173,9 +190,10 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
       bs.unit_setor,
       COUNT(*) AS total_santri,
       SUM(bs.bebas_spp) AS bebas_spp,
-      SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS tidak_ada_tagihan,
-      COUNT(*) - SUM(bs.bebas_spp) - SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS wajib_bayar,
-      SUM(CASE WHEN bs.bebas_spp = 0 AND di.santri_id IS NULL AND bi.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS bayar_bulan_ini,
+       SUM(CASE WHEN bs.bebas_spp = 0 AND ${targetKey} >= bs.spp_start_key AND di.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS tidak_ada_tagihan,
+       SUM(CASE WHEN bs.bebas_spp = 0 AND ${targetKey} >= bs.spp_start_key THEN 1 ELSE 0 END)
+         - SUM(CASE WHEN bs.bebas_spp = 0 AND ${targetKey} >= bs.spp_start_key AND di.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS wajib_bayar,
+       SUM(CASE WHEN bs.bebas_spp = 0 AND ${targetKey} >= bs.spp_start_key AND di.santri_id IS NULL AND bi.santri_id IS NOT NULL THEN 1 ELSE 0 END) AS bayar_bulan_ini,
       COALESCE(tu.jumlah_bayar, 0) AS bayar_tunggakan_lalu,
       COALESCE(tu.orang_bayar, 0) AS orang_bayar,
       COALESCE(la.nominal_lebih_awal, 0) AS nominal_lebih_awal,
@@ -232,6 +250,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
      WHERE th.status = 'LUNAS'
        AND th.tanggal_lunas >= ? AND th.tanggal_lunas < ?
        AND s.status_global = 'aktif'
+       AND (th.tahun * 100 + th.bulan) >= ${studentStartKeySql}
        ${EXCLUDE_NON_SPP_ASRAMA_SQL.replaceAll('asrama', 's.asrama')}
      GROUP BY unit_setor`,
     [SADESA_CATEGORY, SADESA_UNIT, monthStart, monthEnd]
@@ -250,6 +269,7 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
      FROM spp_log sl
      JOIN santri s ON s.id = sl.santri_id
      WHERE (sl.tahun * 100 + sl.bulan) < (? * 100 + ?)
+       AND (sl.tahun * 100 + sl.bulan) >= ${studentStartKeySql}
        AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
        AND sl.tujuan_setoran = 'DEWAN_SANTRI'
        AND s.status_global = 'aktif'
@@ -364,6 +384,7 @@ export async function getDaftarPenunggak(tahun: number, bulan: number, unitSetor
 
   const settings = await getSppSettings(tahun)
   const nominal = settings.nominal
+  const billingStart = await getSppBillingStart()
 
   const rows = await query<{
     id: string
@@ -403,28 +424,7 @@ export async function getDaftarPenunggak(tahun: number, bulan: number, unitSetor
           END AS billable_months
         FROM consts
       ),
-      bayar_range AS (
-        SELECT sl.santri_id, COUNT(*) AS jml_bayar
-        FROM spp_log sl
-        CROSS JOIN billable_calc bc
-        WHERE (sl.tahun * 100 + sl.bulan) BETWEEN (bc.start_yr * 100 + bc.start_mo) AND (bc.cur_yr * 100 + bc.cur_mo)
-        GROUP BY sl.santri_id
-      ),
-      waive_range AS (
-        SELECT std.santri_id, COUNT(*) AS jml_waive
-        FROM spp_tagihan_ditiadakan std
-        CROSS JOIN billable_calc bc
-        WHERE std.is_active = 1
-          AND (std.tahun * 100 + std.bulan) BETWEEN (bc.start_yr * 100 + bc.start_mo) AND (bc.cur_yr * 100 + bc.cur_mo)
-        GROUP BY std.santri_id
-      ),
-      historis_tunggakan AS (
-        SELECT santri_id, COUNT(*) AS jml_historis, SUM(nominal_tagihan) AS nominal_historis
-        FROM spp_tunggakan_historis
-        WHERE status = 'BELUM_LUNAS'
-        GROUP BY santri_id
-      ),
-      santri_bill AS (
+      student_periods AS (
         SELECT
           s.id,
           s.nama_lengkap,
@@ -433,22 +433,65 @@ export async function getDaftarPenunggak(tahun: number, bulan: number, unitSetor
           s.kamar,
           s.bebas_spp,
           s.kategori_santri,
+          ${getSppStudentStartKeySql('s', billingStart.tahun * 100 + billingStart.bulan)} AS spp_start_key,
           CASE
             WHEN s.kategori_santri = ? THEN ?
             ELSE COALESCE(s.asrama, 'LAINNYA')
-          END AS unit_setor,
+          END AS unit_setor
+        FROM santri s
+        WHERE s.status_global = 'aktif'
+          AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
+      ),
+      bayar_range AS (
+        SELECT sl.santri_id, COUNT(*) AS jml_bayar
+        FROM spp_log sl
+        JOIN student_periods sp ON sp.id = sl.santri_id
+        CROSS JOIN billable_calc bc
+        WHERE (sl.tahun * 100 + sl.bulan) BETWEEN (bc.start_yr * 100 + bc.start_mo) AND (bc.cur_yr * 100 + bc.cur_mo)
+          AND (sl.tahun * 100 + sl.bulan) >= sp.spp_start_key
+        GROUP BY sl.santri_id
+      ),
+      waive_range AS (
+        SELECT std.santri_id, COUNT(*) AS jml_waive
+        FROM spp_tagihan_ditiadakan std
+        JOIN student_periods sp ON sp.id = std.santri_id
+        CROSS JOIN billable_calc bc
+        WHERE std.is_active = 1
+          AND (std.tahun * 100 + std.bulan) BETWEEN (bc.start_yr * 100 + bc.start_mo) AND (bc.cur_yr * 100 + bc.cur_mo)
+          AND (std.tahun * 100 + std.bulan) >= sp.spp_start_key
+        GROUP BY std.santri_id
+      ),
+      historis_tunggakan AS (
+        SELECT h.santri_id, COUNT(*) AS jml_historis, SUM(h.nominal_tagihan) AS nominal_historis
+        FROM spp_tunggakan_historis h
+        JOIN student_periods sp ON sp.id = h.santri_id
+        WHERE h.status = 'BELUM_LUNAS'
+          AND (h.tahun * 100 + h.bulan) >= sp.spp_start_key
+        GROUP BY h.santri_id
+      ),
+      santri_bill AS (
+        SELECT
+          sp.id,
+          sp.nama_lengkap,
+          sp.nis,
+          sp.asrama,
+          sp.kamar,
+          sp.bebas_spp,
+          sp.kategori_santri,
+          sp.unit_setor,
           COALESCE(br.jml_bayar, 0) AS jml_bayar,
           COALESCE(wr.jml_waive, 0) AS jml_waive,
           COALESCE(ht.jml_historis, 0) AS jml_historis,
           COALESCE(ht.nominal_historis, 0) AS nominal_historis,
-          bc.billable_months
-        FROM santri s
+          CASE
+            WHEN (bc.cur_yr * 100 + bc.cur_mo) < sp.spp_start_key THEN 0
+            ELSE ((bc.cur_yr * 12 + bc.cur_mo) - (sp.spp_start_key / 100 * 12 + sp.spp_start_key % 100) + 1)
+          END AS billable_months
+        FROM student_periods sp
         CROSS JOIN billable_calc bc
-        LEFT JOIN bayar_range br ON br.santri_id = s.id
-        LEFT JOIN waive_range wr ON wr.santri_id = s.id
-        LEFT JOIN historis_tunggakan ht ON ht.santri_id = s.id
-        WHERE s.status_global = 'aktif'
-          AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
+        LEFT JOIN bayar_range br ON br.santri_id = sp.id
+        LEFT JOIN waive_range wr ON wr.santri_id = sp.id
+        LEFT JOIN historis_tunggakan ht ON ht.santri_id = sp.id
       )
     SELECT
       id,
@@ -604,6 +647,8 @@ export async function getPenunggakExportData(
       COALESCE(s.kelas_sekolah, '-') AS kelas_sekolah,
       COALESCE(k.nama_kelas, '-') AS kelas_pesantren,
       s.bebas_spp,
+      s.tanggal_masuk,
+      s.created_at,
       s.kategori_santri,
       CASE
         WHEN s.kategori_santri = ? THEN ?
@@ -690,15 +735,19 @@ export async function getPenunggakExportData(
 
   rows.forEach(s => {
     const studentUnpaid: { tahun: number; bulan: number }[] = []
+    const studentBillingStart = getSppStudentBillingStart(s, billingStart)
 
     const histList = historisMap.get(s.id) ?? []
-    histList.forEach(h => studentUnpaid.push(h))
+    histList
+      .filter(h => isSppBillablePeriod(h.tahun, h.bulan, studentBillingStart))
+      .forEach(h => studentUnpaid.push(h))
 
     if (s.bebas_spp !== 1) {
       const studentPayments = paymentsMap.get(s.id) ?? new Set<string>()
       const studentWaives = waivesMap.get(s.id) ?? new Set<string>()
 
       allBerjalanMonths.forEach(m => {
+        if (!isSppBillablePeriod(m.tahun, m.bulan, studentBillingStart)) return
         const key = `${m.tahun}-${m.bulan}`
         if (!studentPayments.has(key) && !studentWaives.has(key)) {
           studentUnpaid.push(m)
@@ -821,8 +870,16 @@ async function buildRekapAsramaPayload(
   )
 
   // --- Daftar santri aktif (untuk hitung penduduk, gratis, penunggak) ---
-  const santriList = await query<{ id: string; nama_lengkap: string; kamar: string | null; bebas_spp: number }>(
-    `SELECT id, nama_lengkap, kamar, COALESCE(bebas_spp, 0) AS bebas_spp
+  const santriList = await query<{
+    id: string
+    nama_lengkap: string
+    kamar: string | null
+    bebas_spp: number
+    tanggal_masuk: string | null
+    created_at: string | null
+  }>(
+    `SELECT id, nama_lengkap, kamar, COALESCE(bebas_spp, 0) AS bebas_spp,
+            tanggal_masuk, created_at
      FROM santri
      WHERE status_global = 'aktif' AND asrama = ?
        AND COALESCE(kategori_santri, '') <> ?`,
@@ -840,14 +897,19 @@ async function buildRekapAsramaPayload(
        AND COALESCE(s.kategori_santri, '') <> ?`,
     [tahun, bulan, unitSetor, SADESA_CATEGORY]
   )
-  const ditiadakanSet = new Set(ditiadakanRows.map(r => r.santri_id))
+  const santriById = new Map(santriList.map(s => [s.id, s]))
+  const ditiadakanRowsAktif = ditiadakanRows.filter(row => {
+    const santri = santriById.get(row.santri_id)
+    return !!santri && isSppBillablePeriod(tahun, bulan, getSppStudentBillingStart(santri, billingStart))
+  })
+  const ditiadakanSet = new Set(ditiadakanRowsAktif.map(r => r.santri_id))
 
   // --- Daftar digratiskan = bebas_spp (KET Bebas) + ditiadakan bulan ini (KET Ditiadakan) ---
   const digratiskan: RekapAsramaPayload['digratiskan'] = [
     ...santriList
       .filter(s => s.bebas_spp === 1)
       .map(s => ({ nama: s.nama_lengkap, kamar: s.kamar, ket: 'Bebas' })),
-    ...ditiadakanRows.map(r => ({ nama: r.nama_lengkap, kamar: r.kamar, ket: 'Ditiadakan' })),
+    ...ditiadakanRowsAktif.map(r => ({ nama: r.nama_lengkap, kamar: r.kamar, ket: 'Ditiadakan' })),
   ].sort((a, b) => a.nama.localeCompare(b.nama))
   const jmlGratis = digratiskan.length
 
@@ -861,8 +923,13 @@ async function buildRekapAsramaPayload(
        AND sl.tahun = ? AND sl.bulan = ? AND sl.tujuan_setoran = 'BENDAHARA_PUSAT'`,
     [unitSetor, SADESA_CATEGORY, tahun, bulan]
   )
-  const pusatPaidCount = new Set(pusatPaidRows.map(r => r.santri_id)).size
-  const jmlWajibBayar = Math.max(0, jumlahPenduduk - jmlGratis - pusatPaidCount)
+  const pusatPaidSet = new Set(pusatPaidRows.map(r => r.santri_id))
+  const jmlWajibBayar = santriList.filter(s =>
+    s.bebas_spp !== 1
+    && isSppBillablePeriod(tahun, bulan, getSppStudentBillingStart(s, billingStart))
+    && !ditiadakanSet.has(s.id)
+    && !pusatPaidSet.has(s.id)
+  ).length
 
   // --- Pembayaran, waive, historis (scope asrama) untuk hitung penunggak ---
   const payments = await query<{ santri_id: string; tahun: number; bulan: number }>(
@@ -921,16 +988,21 @@ async function buildRekapAsramaPayload(
   const penunggak: RekapAsramaPayload['penunggak'] = []
   for (const s of santriList) {
     if (s.bebas_spp === 1) continue
+    const studentBillingStart = getSppStudentBillingStart(s, billingStart)
+    if (!isSppBillablePeriod(tahun, bulan, studentBillingStart)) continue
     if (ditiadakanSet.has(s.id)) continue
     const paid = paymentsMap.get(s.id) ?? new Set<number>()
     const waived = waivesMap.get(s.id) ?? new Set<number>()
     const currentUnpaid = !paid.has(targetYm) && !waived.has(targetYm)
     if (!currentUnpaid) continue
-    const unpaid: { tahun: number; bulan: number }[] = [...(historisMap.get(s.id) ?? [])]
-    berjalanMonths.forEach(m => {
-      const key = m.tahun * 100 + m.bulan
-      if (!paid.has(key) && !waived.has(key)) unpaid.push(m)
-    })
+    const unpaid: { tahun: number; bulan: number }[] = (historisMap.get(s.id) ?? [])
+      .filter(h => isSppBillablePeriod(h.tahun, h.bulan, studentBillingStart))
+    berjalanMonths
+      .filter(m => isSppBillablePeriod(m.tahun, m.bulan, studentBillingStart))
+      .forEach(m => {
+        const key = m.tahun * 100 + m.bulan
+        if (!paid.has(key) && !waived.has(key)) unpaid.push(m)
+      })
     penunggak.push({
       nama: s.nama_lengkap,
       kamar: s.kamar,
@@ -1093,6 +1165,8 @@ export async function getRekapAsramaSnapshot(
 export async function getDetailPembayarTunggakan(tahun: number, bulan: number) {
   const session = await getSession()
   assertMonitoringAccess(session)
+  const billingStart = await getSppBillingStart()
+  const studentStartKeySql = getSppStudentStartKeySql('s', billingStart.tahun * 100 + billingStart.bulan)
 
   const monthStart = `${tahun}-${String(bulan).padStart(2, '0')}-01`
   const nextMo = bulan === 12 ? 1 : bulan + 1
@@ -1135,6 +1209,7 @@ export async function getDetailPembayarTunggakan(tahun: number, bulan: number) {
     FROM gabungan g
     JOIN santri s ON s.id = g.santri_id
     WHERE s.status_global = 'aktif'
+      AND (g.tahun * 100 + g.bulan) >= ${studentStartKeySql}
       AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
     ORDER BY s.asrama, s.nama_lengkap, g.tahun, g.bulan
   `, [currentYm, monthStart, monthEnd, monthStart, monthEnd])

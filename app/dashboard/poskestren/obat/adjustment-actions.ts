@@ -15,6 +15,7 @@ export async function createSimpleStockAdjustment(input: {
   quantityDelta: number
   reason: 'ADJUSTMENT' | 'EXPIRED' | 'DAMAGED' | 'LOST'
   notes: string
+  locationId?: string
 }) {
   const session = await requirePoskestrenFeature(POSKESTREN_HREF.medicine, 'update')
   const movementDate = assertDate(input.movementDate)
@@ -46,6 +47,7 @@ export async function createSimpleStockAdjustment(input: {
     referenceId,
     actorId: session.id,
     notes,
+    locationId: input.locationId,
   })
   await db.batch(mutation.statements)
   await logActivity({

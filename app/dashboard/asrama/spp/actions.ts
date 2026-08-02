@@ -6,7 +6,16 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { ASRAMA_LIST, getSppScope, isSadesaCategory, isSadesaUnit, SADESA_CATEGORY, SADESA_UNIT } from '@/lib/spp/unit-setor'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
-import { getJumlahTunggakanHistorisBySantri, getSppBillingStartSetting, getNominalSppForYear } from '@/lib/spp/tunggakan'
+import {
+  countSppBillableMonths,
+  getJumlahTunggakanHistorisBySantri,
+  getSppBillingStartSetting,
+  getSppStudentBillingStart,
+  getSppStudentStartKeySql,
+  getNominalSppForYear,
+  isSppBillablePeriod,
+  periodKey,
+} from '@/lib/spp/tunggakan'
 import { getTujuanSetoranSpp, tujuanSetoranSql } from '@/lib/spp/tujuan-setoran'
 
 type SppClientScope = {
@@ -48,8 +57,11 @@ async function assertSantriAccess(session: SessionUser | null, santriId: string)
     nama_lengkap: string | null
     nis: string | null
     bebas_spp: number | null
+    tanggal_masuk: string | null
+    created_at: string | null
   }>(
-    `SELECT id, asrama, kategori_santri, nama_lengkap, nis, COALESCE(bebas_spp, 0) AS bebas_spp
+    `SELECT id, asrama, kategori_santri, nama_lengkap, nis, tanggal_masuk, created_at,
+            COALESCE(bebas_spp, 0) AS bebas_spp
      FROM santri
      WHERE id = ? AND status_global = 'aktif'`,
     [santriId]
@@ -120,7 +132,6 @@ export async function getDashboardSPPAll(tahun: number, unitSetor: string, targe
   const checkMonth = targetMonth && targetMonth >= 1 && targetMonth <= 12 ? targetMonth : currentMonth
   const maxCheck = tahun < new Date().getFullYear() ? 12 : currentMonth
   const startMonth = tahun === billingStart.tahun ? billingStart.bulan : (tahun < billingStart.tahun ? 13 : 1)
-  const billableCount = Math.max(0, maxCheck - startMonth + 1)
 
   const sadesaMode = isSadesaUnit(unit)
 
@@ -130,6 +141,7 @@ export async function getDashboardSPPAll(tahun: number, unitSetor: string, targe
         SELECT
           santri_id,
           COUNT(*) AS jumlah_bayar,
+          GROUP_CONCAT(DISTINCT CAST(tahun AS TEXT) || '-' || CAST(bulan AS TEXT)) AS periode_bayar,
           MAX(CASE WHEN bulan = ? THEN 1 ELSE 0 END) AS bayar_bulan_ini
         FROM spp_log
         WHERE tahun = ? AND bulan BETWEEN ? AND ?
@@ -139,17 +151,21 @@ export async function getDashboardSPPAll(tahun: number, unitSetor: string, targe
         SELECT
           santri_id,
           COUNT(*) AS jumlah_tagihan_ditiadakan,
+          GROUP_CONCAT(DISTINCT CAST(tahun AS TEXT) || '-' || CAST(bulan AS TEXT)) AS periode_ditiadakan,
           MAX(CASE WHEN bulan = ? THEN 1 ELSE 0 END) AS ditiadakan_bulan_ini
         FROM spp_tagihan_ditiadakan
         WHERE is_active = 1 AND tahun = ? AND bulan BETWEEN ? AND ?
         GROUP BY santri_id
       )
     SELECT
-      s.id, s.nama_lengkap, s.asrama, COALESCE(s.kamar, '-') AS kamar, s.foto_url, COALESCE(s.bebas_spp, 0) AS bebas_spp,
+      s.id, s.nama_lengkap, s.asrama, COALESCE(s.kamar, '-') AS kamar, s.foto_url,
+      COALESCE(s.bebas_spp, 0) AS bebas_spp, s.tanggal_masuk, s.created_at,
       COALESCE(s.sekolah, '-') AS sekolah, COALESCE(s.kelas_sekolah, '-') AS kelas_sekolah,
       COALESCE(k.nama_kelas, '-') AS kelas_pesantren,
       COALESCE(sa.jumlah_bayar, 0) AS jumlah_bayar,
+      sa.periode_bayar,
       COALESCE(da.jumlah_tagihan_ditiadakan, 0) AS jumlah_tagihan_ditiadakan,
+      da.periode_ditiadakan,
       COALESCE(sa.bayar_bulan_ini, 0) AS bulan_ini_lunas,
       COALESCE(da.ditiadakan_bulan_ini, 0) AS tagihan_ditiadakan_bulan_ini
     FROM santri s
@@ -165,22 +181,47 @@ export async function getDashboardSPPAll(tahun: number, unitSetor: string, targe
 
   const historisMap = await getJumlahTunggakanHistorisBySantri(rows.map((s: any) => s.id))
   
-  return rows.map((s: any) => ({
-    id: s.id,
-    nama_lengkap: s.nama_lengkap,
-    kamar: s.kamar,
-    foto_url: s.foto_url,
-    sekolah: s.sekolah,
-    kelas_sekolah: s.kelas_sekolah,
-    kelas_pesantren: s.kelas_pesantren,
-    bulan_ini_lunas: s.bulan_ini_lunas === 1,
-    bebas_spp: s.bebas_spp === 1,
-    tagihan_ditiadakan_bulan_ini: s.tagihan_ditiadakan_bulan_ini === 1,
-    jumlah_tagihan_ditiadakan: s.jumlah_tagihan_ditiadakan ?? 0,
-    jumlah_tunggakan_berjalan: s.bebas_spp === 1 ? 0 : Math.max(0, billableCount - (s.jumlah_bayar ?? 0) - (s.jumlah_tagihan_ditiadakan ?? 0)),
-    jumlah_tunggakan_historis: historisMap.get(s.id) ?? 0,
-    jumlah_tunggakan: (s.bebas_spp === 1 ? 0 : Math.max(0, billableCount - (s.jumlah_bayar ?? 0) - (s.jumlah_tagihan_ditiadakan ?? 0))) + (historisMap.get(s.id) ?? 0),
-  }))
+  return rows.map((s: any) => {
+    const studentBillingStart = getSppStudentBillingStart(s, billingStart)
+    const studentStartKey = periodKey(studentBillingStart.tahun, studentBillingStart.bulan)
+    const checkKey = periodKey(tahun, checkMonth)
+    const endKey = periodKey(tahun, maxCheck)
+    const paidKeys = new Set(String(s.periode_bayar ?? '').split(',').filter(Boolean).map(value => {
+      const [year, month] = value.split('-').map(Number)
+      return periodKey(year, month)
+    }))
+    const waivedKeys = new Set(String(s.periode_ditiadakan ?? '').split(',').filter(Boolean).map(value => {
+      const [year, month] = value.split('-').map(Number)
+      return periodKey(year, month)
+    }))
+    const paidCount = Array.from(paidKeys).filter(key => key >= studentStartKey && key <= endKey).length
+    const waivedCount = Array.from(waivedKeys).filter(key => key >= studentStartKey && key <= endKey).length
+    const billableCountForStudent = countSppBillableMonths(studentBillingStart, tahun, maxCheck)
+    const runningOutstanding = s.bebas_spp === 1
+      ? 0
+      : Math.max(0, billableCountForStudent - paidCount - waivedCount)
+    const billNotStarted = checkKey < studentStartKey
+
+    return {
+      id: s.id,
+      nama_lengkap: s.nama_lengkap,
+      kamar: s.kamar,
+      foto_url: s.foto_url,
+      sekolah: s.sekolah,
+      kelas_sekolah: s.kelas_sekolah,
+      kelas_pesantren: s.kelas_pesantren,
+      spp_mulai_tahun: studentBillingStart.tahun,
+      spp_mulai_bulan: studentBillingStart.bulan,
+      bulan_ini_lunas: !billNotStarted && s.bulan_ini_lunas === 1,
+      bebas_spp: s.bebas_spp === 1,
+      bulan_ini_belum_mulai: billNotStarted,
+      tagihan_ditiadakan_bulan_ini: !billNotStarted && s.tagihan_ditiadakan_bulan_ini === 1,
+      jumlah_tagihan_ditiadakan: waivedCount,
+      jumlah_tunggakan_berjalan: runningOutstanding,
+      jumlah_tunggakan_historis: historisMap.get(s.id) ?? 0,
+      jumlah_tunggakan: runningOutstanding + (historisMap.get(s.id) ?? 0),
+    }
+  })
 }
 
 export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
@@ -202,7 +243,7 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
   const baseRows = await query<any>(`
     WITH
       base_santri AS (
-        SELECT id, nama_lengkap, COALESCE(bebas_spp, 0) AS bebas_spp
+        SELECT id, nama_lengkap, tanggal_masuk, created_at, COALESCE(bebas_spp, 0) AS bebas_spp
         FROM santri
         WHERE status_global = 'aktif'
           ${sadesaMode ? 'AND kategori_santri = ?' : 'AND (kategori_santri IS NULL OR kategori_santri != ?) AND asrama = ?'}
@@ -239,6 +280,8 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
     SELECT
       bs.id,
       bs.nama_lengkap,
+      bs.tanggal_masuk,
+      bs.created_at,
       bs.bebas_spp,
       CASE WHEN di.santri_id IS NOT NULL THEN 1 ELSE 0 END AS ditiadakan_ini,
       CASE WHEN bi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS bayar_ini,
@@ -259,6 +302,7 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
   const bebasSppList: string[] = []
   let tidakAdaTagihanIni = 0
   let bayarIni = 0
+  let wajibBulanIni = 0
   let uangDiterimaTotal = 0
   let uangTunggakanLama = 0
   let uangHarusSetor = 0
@@ -271,7 +315,8 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
       if (row.bebas_spp === 1) {
         bebasSppCount++
         bebasSppList.push(row.nama_lengkap)
-      } else {
+      } else if (isSppBillablePeriod(tahun, currentMonth, getSppStudentBillingStart(row, billingStart))) {
+        wajibBulanIni++
         if (row.ditiadakan_ini === 1) tidakAdaTagihanIni++
         if (row.bayar_ini === 1) bayarIni++
       }
@@ -297,15 +342,15 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
   }
 
   const wajibSpp = totalSantri - bebasSppCount
-  const wajibBulanIni = isBeforeBillingStart ? 0 : Math.max(0, wajibSpp - tidakAdaTagihanIni)
-  const nunggakBulanIni = isBeforeBillingStart ? 0 : Math.max(0, wajibBulanIni - bayarIni)
+  const wajibBulanIniEffective = isBeforeBillingStart ? 0 : Math.max(0, wajibBulanIni - tidakAdaTagihanIni)
+  const nunggakBulanIni = isBeforeBillingStart ? 0 : Math.max(0, wajibBulanIniEffective - bayarIni)
 
   return {
     totalSantri,
     bebasSppCount,
     bebasSppList,
     wajibSpp,
-    wajibBulanIni,
+    wajibBulanIni: wajibBulanIniEffective,
     sudahBayarBulanIni: bayarIni,
     nunggakBulanIni,
     uangDiterimaTotal,
@@ -392,6 +437,10 @@ export async function bayarSPPBulanBerjalan(santriId: string, tahun: number, bul
     if ((tahun * 100 + bulan) < (billingStart.tahun * 100 + billingStart.bulan)) {
       return { error: 'Bulan tersebut belum memiliki tagihan SPP.' }
     }
+    const studentBillingStart = getSppStudentBillingStart(santri, billingStart)
+    if (!isSppBillablePeriod(tahun, bulan, studentBillingStart)) {
+      return { error: `Santri ini mulai wajib SPP pada ${studentBillingStart.value}.` }
+    }
 
     const waived = await query<{ bulan: number }>(
       `SELECT bulan FROM spp_tagihan_ditiadakan
@@ -450,14 +499,17 @@ export async function getStatusSPP(santriId: string, tahun: number) {
 }
 
 export async function getTagihanDitiadakanSPP(santriId: string, tahun: number) {
-  await assertSantriAccess(await getSession(), santriId)
-  return query<any>(
+  const santri = await assertSantriAccess(await getSession(), santriId)
+  const billingStart = await getSppBillingStart()
+  const studentBillingStart = getSppStudentBillingStart(santri, billingStart)
+  const rows = await query<any>(
     `SELECT id, santri_id, bulan, tahun, alasan, is_active, created_at, updated_at
      FROM spp_tagihan_ditiadakan
      WHERE santri_id = ? AND tahun = ? AND is_active = 1
      ORDER BY bulan`,
     [santriId, tahun]
   )
+  return rows.filter(row => isSppBillablePeriod(row.tahun, row.bulan, studentBillingStart))
 }
 
 export async function simpanTagihanDitiadakanSPP(
@@ -487,6 +539,10 @@ export async function simpanTagihanDitiadakanSPP(
     for (const santriId of uniqueSantriIds) {
       const santri = await assertSantriAccess(session, santriId)
       if ((santri as any).bebas_spp === 1) return { error: `${santri.nama_lengkap || santri.nis || santriId} sudah bebas SPP permanen.` }
+      const studentBillingStart = getSppStudentBillingStart(santri, billingStart)
+      if (cleanBulans.some(b => !isSppBillablePeriod(cleanTahun, b, studentBillingStart))) {
+        return { error: `${santri.nama_lengkap || santri.nis || santriId} belum memiliki tagihan pada salah satu bulan yang dipilih.` }
+      }
     }
 
     const bulanPh = cleanBulans.map(() => '?').join(',')
@@ -605,10 +661,13 @@ export async function simpanTagihanDitiadakanKelasSPP(
     const now = new Date().toISOString()
     let targetCount = 0
     for (const bulan of cleanBulans) {
+      const monthKey = cleanTahun * 100 + bulan
+      const studentStartSql = `${monthKey} >= ${getSppStudentStartKeySql('s', billingStart.tahun * 100 + billingStart.bulan)}`
       const countRow = await queryOne<{ total: number }>(
         `SELECT COUNT(*) AS total
          FROM santri s
          WHERE ${where}
+           AND ${studentStartSql}
            AND NOT EXISTS (
              SELECT 1 FROM spp_log sl
              WHERE sl.santri_id = s.id AND sl.tahun = ? AND sl.bulan = ?
@@ -623,6 +682,7 @@ export async function simpanTagihanDitiadakanKelasSPP(
          SELECT lower(hex(randomblob(16))), s.id, ?, ?, ?, 1, ?, ?, ?, ?
          FROM santri s
          WHERE ${where}
+           AND ${studentStartSql}
            AND NOT EXISTS (
              SELECT 1 FROM spp_log sl
              WHERE sl.santri_id = s.id AND sl.tahun = ? AND sl.bulan = ?
@@ -719,6 +779,10 @@ export async function simpanTunggakanHistorisSPP(
     if (!Number.isFinite(nominalPerBulan) || nominalPerBulan <= 0) return { error: 'Nominal tunggakan tidak valid.' }
     if (cleanBulans.some(b => (tahun * 100 + b) >= (billingStart.tahun * 100 + billingStart.bulan))) {
       return { error: 'Tunggakan historis hanya boleh sebelum awal tagihan SPP sistem.' }
+    }
+    const studentBillingStart = getSppStudentBillingStart(santri, billingStart)
+    if (cleanBulans.some(b => (tahun * 100 + b) < (studentBillingStart.tahun * 100 + studentBillingStart.bulan))) {
+      return { error: 'Bulan tunggakan historis berada sebelum bulan santri mulai masuk.' }
     }
 
     const ph = cleanBulans.map(() => '?').join(',')
@@ -832,6 +896,10 @@ export async function bayarSPP(santriId: string, tahun: number, bulans: number[]
     const billingStart = await getSppBillingStart()
     const invalidMonth = bulans.some(b => (tahun * 100 + b) < (billingStart.tahun * 100 + billingStart.bulan))
     if (invalidMonth) return { error: 'Bulan tersebut belum memiliki tagihan SPP.' }
+    const studentBillingStart = getSppStudentBillingStart(santri, billingStart)
+    if (bulans.some(b => !isSppBillablePeriod(tahun, b, studentBillingStart))) {
+      return { error: `Santri ini mulai wajib SPP pada ${studentBillingStart.value}.` }
+    }
 
     const ph = bulans.map(() => '?').join(',')
     const waived = await query<{ bulan: number }>(
@@ -897,6 +965,8 @@ export async function bayarSemuaSantriAsrama(
       return { error: 'Bulan tersebut belum memiliki tagihan SPP.' }
     }
 
+    const studentStartSql = `${tahun * 100 + bulan} >= ${getSppStudentStartKeySql('s', billingStart.tahun * 100 + billingStart.bulan)}`
+
     const sadesaMode = isSadesaUnit(unit)
     const unitWhere = sadesaMode
       ? `AND s.kategori_santri = ?`
@@ -908,6 +978,7 @@ export async function bayarSemuaSantriAsrama(
       WHERE s.status_global = 'aktif'
         AND COALESCE(s.bebas_spp, 0) = 0
         ${unitWhere}
+        AND ${studentStartSql}
         AND NOT EXISTS (
           SELECT 1 FROM spp_tagihan_ditiadakan td
           WHERE td.santri_id = s.id AND td.tahun = ? AND td.bulan = ? AND td.is_active = 1
@@ -928,6 +999,7 @@ export async function bayarSemuaSantriAsrama(
        WHERE s.status_global = 'aktif'
          AND COALESCE(s.bebas_spp, 0) = 0
          ${unitWhere}
+         AND ${studentStartSql}
          AND NOT EXISTS (
            SELECT 1 FROM spp_tagihan_ditiadakan td
            WHERE td.santri_id = s.id AND td.tahun = ? AND td.bulan = ? AND td.is_active = 1

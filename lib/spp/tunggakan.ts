@@ -21,6 +21,11 @@ export type SppBillingStart = {
   value: string
 }
 
+export type SppStudentEnrollmentDates = {
+  tanggal_masuk?: unknown
+  created_at?: unknown
+}
+
 export type SppTunggakanItem = {
   source: 'BERJALAN' | 'HISTORIS'
   id: string | null
@@ -46,6 +51,80 @@ export type SppTunggakanSummary = {
 
 export function periodKey(tahun: number, bulan: number) {
   return tahun * 100 + bulan
+}
+
+function parseDatePeriod(value: unknown): number | null {
+  const match = String(value ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!match) return null
+
+  const tahun = Number(match[1])
+  const bulan = Number(match[2])
+  const hari = Number(match[3])
+  if (!Number.isInteger(tahun) || !Number.isInteger(bulan) || !Number.isInteger(hari)) return null
+  if (tahun < 1 || bulan < 1 || bulan > 12 || hari < 1 || hari > 31) return null
+  return periodKey(tahun, bulan)
+}
+
+/**
+ * Awal tagihan efektif untuk satu santri.
+ *
+ * `created_at` ikut dipakai sebagai batas bawah supaya data yang diinput
+ * setelah tanggal masuk (termasuk tanggal masuk default 1 Januari) tidak
+ * otomatis menarik tagihan ke bulan-bulan sebelum santri dicatat di aplikasi.
+ */
+export function getSppStudentBillingStart(
+  dates: SppStudentEnrollmentDates,
+  billingStart: Pick<SppBillingStart, 'tahun' | 'bulan'>,
+): SppBillingStart {
+  const candidateKeys = [
+    periodKey(billingStart.tahun, billingStart.bulan),
+    parseDatePeriod(dates.tanggal_masuk),
+    parseDatePeriod(dates.created_at),
+  ].filter((key): key is number => key !== null)
+  const effectiveKey = Math.max(...candidateKeys)
+  const tahun = Math.floor(effectiveKey / 100)
+  const bulan = effectiveKey % 100
+
+  return {
+    tahun,
+    bulan,
+    value: `${tahun}-${String(bulan).padStart(2, '0')}`,
+  }
+}
+
+export function isSppBillablePeriod(
+  tahun: number,
+  bulan: number,
+  billingStart: Pick<SppBillingStart, 'tahun' | 'bulan'>,
+) {
+  return periodKey(tahun, bulan) >= periodKey(billingStart.tahun, billingStart.bulan)
+}
+
+export function countSppBillableMonths(
+  billingStart: Pick<SppBillingStart, 'tahun' | 'bulan'>,
+  endTahun: number,
+  endBulan: number,
+) {
+  const startKey = periodKey(billingStart.tahun, billingStart.bulan)
+  const endKey = periodKey(endTahun, endBulan)
+  if (endKey < startKey) return 0
+  return (endTahun - billingStart.tahun) * 12 + (endBulan - billingStart.bulan) + 1
+}
+
+/**
+ * SQL expression equivalent to getSppStudentBillingStart().
+ * Only used with trusted table aliases from this codebase.
+ */
+export function getSppStudentStartKeySql(alias: string, billingStartKey: number) {
+  const datePeriod = (column: string) => `CASE
+    WHEN ${alias}.${column} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-*'
+      AND CAST(substr(${alias}.${column}, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+    THEN CAST(substr(${alias}.${column}, 1, 4) AS INTEGER) * 100
+       + CAST(substr(${alias}.${column}, 6, 2) AS INTEGER)
+    ELSE 0
+  END`
+
+  return `MAX(${billingStartKey}, ${datePeriod('tanggal_masuk')}, ${datePeriod('created_at')})`
 }
 
 export function monthLabel(tahun: number, bulan: number) {
@@ -79,22 +158,29 @@ export async function getTunggakanSppSantri(santriId: string, asOf = new Date())
   const currentYear = asOf.getFullYear()
   const currentMonth = asOf.getMonth() + 1
   const billingStart = await getSppBillingStartSetting()
-  const startKey = periodKey(billingStart.tahun, billingStart.bulan)
   const endKey = periodKey(currentYear, currentMonth)
 
-  const santri = await queryOne<{ bebas_spp: number | null }>(
-    `SELECT COALESCE(bebas_spp, 0) AS bebas_spp
-     FROM santri
-     WHERE id = ?`,
+  const santri = await queryOne<{
+    bebas_spp: number | null
+    tanggal_masuk: string | null
+    created_at: string | null
+  }>(
+    `SELECT COALESCE(bebas_spp, 0) AS bebas_spp,
+            tanggal_masuk, created_at
+      FROM santri
+      WHERE id = ?`,
     [santriId]
   )
+
+  const studentBillingStart = getSppStudentBillingStart(santri ?? {}, billingStart)
+  const studentStartKey = periodKey(studentBillingStart.tahun, studentBillingStart.bulan)
 
   const paidRows = await query<{ tahun: number; bulan: number }>(
     `SELECT tahun, bulan
      FROM spp_log
      WHERE santri_id = ?
        AND (tahun * 100 + bulan) BETWEEN ? AND ?`,
-    [santriId, startKey, endKey]
+    [santriId, studentStartKey, endKey]
   )
   const paidKeys = new Set(paidRows.map(row => periodKey(row.tahun, row.bulan)))
   const waivedRows = await query<{ tahun: number; bulan: number }>(
@@ -103,14 +189,14 @@ export async function getTunggakanSppSantri(santriId: string, asOf = new Date())
      WHERE santri_id = ?
        AND is_active = 1
        AND (tahun * 100 + bulan) BETWEEN ? AND ?`,
-    [santriId, startKey, endKey]
+    [santriId, studentStartKey, endKey]
   )
   const waivedKeys = new Set(waivedRows.map(row => periodKey(row.tahun, row.bulan)))
 
   const berjalan: SppTunggakanItem[] = []
   if ((santri?.bebas_spp ?? 0) !== 1) {
-    for (let year = billingStart.tahun; year <= currentYear; year++) {
-      const fromMonth = year === billingStart.tahun ? billingStart.bulan : 1
+    for (let year = studentBillingStart.tahun; year <= currentYear; year++) {
+      const fromMonth = year === studentBillingStart.tahun ? studentBillingStart.bulan : 1
       const toMonth = year === currentYear ? currentMonth : 12
       const nominal = await getNominalSppForYear(year)
       for (let month = fromMonth; month <= toMonth; month++) {
@@ -137,9 +223,10 @@ export async function getTunggakanSppSantri(santriId: string, asOf = new Date())
   }>(
     `SELECT id, tahun, bulan, nominal_tagihan
      FROM spp_tunggakan_historis
-     WHERE santri_id = ? AND status = 'BELUM_LUNAS'
-     ORDER BY tahun, bulan`,
-    [santriId]
+      WHERE santri_id = ? AND status = 'BELUM_LUNAS'
+        AND (tahun * 100 + bulan) >= ?
+      ORDER BY tahun, bulan`,
+    [santriId, studentStartKey]
   )
   const historis = historisRows.map(row => ({
     source: 'HISTORIS' as const,
@@ -175,19 +262,28 @@ export async function getJumlahTunggakanHistorisBySantri(santriIds: string[]) {
   // D1 has a limit of 100 bind variables per query, so chunk into batches
   const CHUNK_SIZE = 80
   const result = new Map<string, number>()
+  const billingStart = await getSppBillingStartSetting()
 
   for (let i = 0; i < santriIds.length; i += CHUNK_SIZE) {
     const chunk = santriIds.slice(i, i + CHUNK_SIZE)
     const placeholders = chunk.map(() => '?').join(',')
-    const rows = await query<{ santri_id: string; jumlah: number }>(
-      `SELECT santri_id, COUNT(*) AS jumlah
-       FROM spp_tunggakan_historis
-       WHERE status = 'BELUM_LUNAS' AND santri_id IN (${placeholders})
-       GROUP BY santri_id`,
+    const rows = await query<{
+      santri_id: string
+      tahun: number
+      bulan: number
+      tanggal_masuk: string | null
+      created_at: string | null
+    }>(
+      `SELECT h.santri_id, h.tahun, h.bulan, s.tanggal_masuk, s.created_at
+       FROM spp_tunggakan_historis h
+       JOIN santri s ON s.id = h.santri_id
+       WHERE h.status = 'BELUM_LUNAS' AND h.santri_id IN (${placeholders})`,
       chunk
     )
     for (const row of rows) {
-      result.set(row.santri_id, row.jumlah)
+      const start = getSppStudentBillingStart(row, billingStart)
+      if (!isSppBillablePeriod(row.tahun, row.bulan, start)) continue
+      result.set(row.santri_id, (result.get(row.santri_id) ?? 0) + 1)
     }
   }
 

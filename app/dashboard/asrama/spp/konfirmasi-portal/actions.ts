@@ -8,6 +8,11 @@ import { getSppScope, isSadesaCategory, SADESA_CATEGORY } from '@/lib/spp/unit-s
 import { namaBulanId } from '@/lib/portal/format'
 import type { SppDetailItem } from '@/app/portal-ortu/(app)/tagihan/actions'
 import { getTujuanSetoranSpp } from '@/lib/spp/tujuan-setoran'
+import {
+  getSppBillingStartSetting,
+  getSppStudentBillingStart,
+  isSppBillablePeriod,
+} from '@/lib/spp/tunggakan'
 
 const PATH = '/dashboard/asrama/spp/konfirmasi-portal'
 const REVALIDATE_PATHS = [
@@ -136,10 +141,25 @@ export async function approveSubmissionSpp(submissionId: string): Promise<{ succ
     const detail = parseDetail(submission.detail_json)
     const berjalan = detail.filter(item => item.source === 'BERJALAN')
     const historis = detail.filter(item => item.source === 'HISTORIS')
+    const santriDates = await queryOne<{
+      tanggal_masuk: string | null
+      created_at: string | null
+    }>(
+      `SELECT tanggal_masuk, created_at FROM santri WHERE id = ?`,
+      [submission.santri_id]
+    )
+    const studentBillingStart = getSppStudentBillingStart(
+      santriDates ?? {},
+      await getSppBillingStartSetting()
+    )
 
     // Re-validasi item BERJALAN terhadap data live
     const conflicts: string[] = []
     for (const item of berjalan) {
+      if (!isSppBillablePeriod(item.tahun, item.bulan, studentBillingStart)) {
+        conflicts.push(`${namaBulanId(item.bulan)} ${item.tahun} (belum masuk masa wajib SPP)`)
+        continue
+      }
       const sudahBayar = await queryOne<{ id: string }>(
         `SELECT id FROM spp_log WHERE santri_id = ? AND tahun = ? AND bulan = ? LIMIT 1`,
         [submission.santri_id, item.tahun, item.bulan]
@@ -156,6 +176,10 @@ export async function approveSubmissionSpp(submissionId: string): Promise<{ succ
       if (ditiadakan) conflicts.push(`${namaBulanId(item.bulan)} ${item.tahun} (tagihan ditiadakan)`)
     }
     for (const item of historis) {
+      if (!isSppBillablePeriod(item.tahun, item.bulan, studentBillingStart)) {
+        conflicts.push(`${namaBulanId(item.bulan)} ${item.tahun} (belum masuk masa wajib SPP)`)
+        continue
+      }
       if (!item.historis_id) {
         conflicts.push(`${namaBulanId(item.bulan)} ${item.tahun} (data historis tidak valid)`)
         continue

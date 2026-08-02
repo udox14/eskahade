@@ -2,53 +2,22 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Download, FileSpreadsheet, FileText, Loader2, Printer, Stethoscope, Users } from 'lucide-react'
+import { Download, Loader2, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { DashboardPageHeader } from '@/components/dashboard/page-header'
-import { EmptyState, MetricCard, PoskestrenTabs } from '@/components/poskestren/poskestren-shell'
+import { EmptyState, MetricCard } from '@/components/poskestren/poskestren-shell'
 
 import { getMonthlyReport, getPayrollReport } from './actions'
 
-type Tab = 'bulanan' | 'penggajian'
-const TABS = [
-  { value: 'bulanan' as const, label: 'Laporan Bulanan', icon: FileText },
-  { value: 'penggajian' as const, label: 'Laporan Penggajian', icon: FileSpreadsheet },
-]
 const secondary = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50'
 function rupiah(value: unknown) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(value || 0)) }
-function currentMonth() {
-  return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', timeZone: 'Asia/Jakarta' }).format(new Date()).slice(0, 7)
-}
-
-export default function PoskestrenLaporanContent() {
-  const params = useSearchParams()
-  const router = useRouter()
-  const initial = params.get('tab') as Tab | null
-  const [tab, setTab] = useState<Tab>(initial === 'penggajian' ? initial : 'bulanan')
-  const [month, setMonth] = useState(params.get('periode') || currentMonth())
-  function changeTab(next: Tab) {
-    setTab(next); const nextParams = new URLSearchParams(params.toString()); nextParams.set('tab', next); nextParams.set('periode', month)
-    router.replace(`/dashboard/poskestren/laporan?${nextParams}`, { scroll: false })
-  }
-  function changeMonth(next: string) {
-    setMonth(next); const nextParams = new URLSearchParams(params.toString()); nextParams.set('tab', tab); nextParams.set('periode', next)
-    router.replace(`/dashboard/poskestren/laporan?${nextParams}`, { scroll: false })
-  }
-  return <div className="space-y-5">
-    <DashboardPageHeader title="Laporan" description="Rekap layanan, preventif, obat, keuangan, dan penggajian dalam satu periode WIB." />
-    <div className="no-print flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><PoskestrenTabs tabs={TABS} active={tab} onChange={changeTab} /><label className="flex items-center gap-2 text-sm font-bold text-slate-600">Periode <input type="month" value={month} onChange={e => changeMonth(e.target.value)} className="h-10 rounded-xl border border-slate-200 bg-white px-3" /></label></div>
-    {tab === 'bulanan' ? <MonthlyReport month={month} /> : <PayrollReport month={month} />}
-  </div>
-}
 
 function ReportActions({ exportExcel }: { exportExcel: () => Promise<void> }) {
   const [exporting, setExporting] = useState(false)
   return <div className="no-print flex flex-wrap gap-2"><button className={secondary} onClick={() => window.print()}><Printer className="h-4 w-4" /> Cetak / PDF</button><button className={secondary} disabled={exporting} onClick={async () => { setExporting(true); try { await exportExcel() } catch (e) { toast.error(e instanceof Error ? e.message : 'Ekspor gagal.') } finally { setExporting(false) } }}>{exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Excel</button></div>
 }
 
-function MonthlyReport({ month }: { month: string }) {
+export function MonthlyReport({ month }: { month: string }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const load = useCallback(async () => { setLoading(true); try { setData(await getMonthlyReport(month)) } catch (e) { toast.error(e instanceof Error ? e.message : 'Gagal memuat laporan.') } finally { setLoading(false) } }, [month])
@@ -74,6 +43,8 @@ function MonthlyReport({ month }: { month: string }) {
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.medicalStaff), 'Tenaga Medis')
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.preventivePrograms), 'Preventif')
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.medicineUsage), 'Pemakaian Obat')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.locationStockSummary), 'Saldo Lokasi')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.orderSummary), 'Status Pesanan')
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.financeAccounts), 'Saldo Akun')
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(data.expenseCategories), 'Kategori Pengeluaran')
     XLSX.writeFile(workbook, `laporan-poskestren-${month}.xlsx`)
@@ -96,7 +67,10 @@ function MonthlyReport({ month }: { month: string }) {
     </ReportSection>
     <ReportSection title="Obat dan stok">
       <div className="grid gap-3 sm:grid-cols-4"><Mini label="Belanja" value={data.purchaseSummary.purchases} /><Mini label="Nilai belanja" value={rupiah(data.purchaseSummary.total)} /><Mini label="Stok kritis" value={data.stockSummary.critical} /><Mini label="Batch kedaluwarsa" value={data.stockSummary.expired_batches} /></div>
-      <SimpleTable title="Pemakaian obat" rows={data.medicineUsage} columns={[['name', 'Obat'], ['used_quantity', 'Total'], ['patient_quantity', 'Pasien'], ['preventive_quantity', 'Preventif'], ['loss_quantity', 'Rusak/kedaluwarsa']]} />
+      <div className="mt-3 grid gap-3 sm:grid-cols-4"><Mini label="Saldo pusat" value={data.stockSummary.central_units} /><Mini label="Saldo asrama" value={data.stockSummary.dorm_units} /><Mini label="Transfer bulan ini" value={data.transferSummary.transfers} /><Mini label="Unit transfer" value={data.transferSummary.transferred_units} /></div>
+      <SimpleTable title="Pemakaian obat" rows={data.medicineUsage} columns={[['name', 'Obat'], ['used_quantity', 'Total'], ['patient_quantity', 'Pasien'], ['quick_quantity', 'Transaksi cepat'], ['clinical_quantity', 'Klinis'], ['preventive_quantity', 'Preventif'], ['loss_quantity', 'Rusak/kedaluwarsa']]} />
+      <SimpleTable title="Saldo per lokasi" rows={data.locationStockSummary} columns={[['location_name', 'Lokasi'], ['location_type', 'Tipe'], ['quantity_base', 'Saldo']]} />
+      <SimpleTable title="Status pesanan" rows={data.orderSummary} columns={[['status', 'Status'], ['total', 'Jumlah']]} />
     </ReportSection>
     <ReportSection title="Keuangan">
       <div className="grid gap-3 sm:grid-cols-3"><MetricCard label="Pemasukan" value={rupiah(finance.income)} /><MetricCard label="Pengeluaran" value={rupiah(finance.expense)} tone="rose" /><MetricCard label="Belanja obat" value={rupiah(finance.medicine_expense)} tone="amber" /></div>
@@ -105,7 +79,7 @@ function MonthlyReport({ month }: { month: string }) {
   </section>
 }
 
-function PayrollReport({ month }: { month: string }) {
+export function PayrollReport({ month }: { month: string }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const load = useCallback(async () => { setLoading(true); try { setData(await getPayrollReport(month)) } catch (e) { toast.error(e instanceof Error ? e.message : 'Gagal memuat penggajian.') } finally { setLoading(false) } }, [month])

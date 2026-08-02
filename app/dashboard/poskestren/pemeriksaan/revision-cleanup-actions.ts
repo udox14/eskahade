@@ -16,7 +16,7 @@ const CLEANUP_SETTING = 'poskestren_sample_cleanup_done'
 function refresh() {
   revalidatePath(PATH)
   revalidatePath('/dashboard/poskestren/obat')
-  revalidatePath('/dashboard/poskestren/laporan')
+  revalidatePath('/dashboard/poskestren/cetak')
 }
 
 export async function getVisitRevisionEditorData(visitId: string) {
@@ -185,7 +185,7 @@ export async function cleanupSampleVisits(input: { visitIds: string[]; reason: s
   const statements: D1PreparedStatement[] = []
   for (const [medicineId, item] of grouped) {
     if (item.quantity <= 0) continue
-    const mutation = prepareStockMutationFromSnapshot(db, {
+    const mutation = await prepareStockMutationFromSnapshot(db, {
       medicineId,
       medicineName: item.name,
       stockBefore: stockMap.get(medicineId) || 0,

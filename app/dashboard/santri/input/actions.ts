@@ -88,6 +88,7 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
   const mapKelas = new Map(kelasList.map(k => [k.nama_kelas.trim().toLowerCase(), k.id]))
 
   const tahunMasukDefault = new Date().getFullYear()
+  const tanggalMasukDefault = new Date().toISOString().slice(0, 10)
 
   const invalidJenisKelamin = dataSantri
     .map((s, index) => ({ row: index + 2, nis: s.nis, nama: s.nama_lengkap, value: s.jenis_kelamin }))
@@ -121,7 +122,7 @@ export async function importSantriMassal(dataSantri: SantriImportData[]): Promis
     provinsi: s.provinsi || null,
     jemaah: s.jemaah || null,
     no_wa_ortu: s.no_wa_ortu ? String(s.no_wa_ortu).trim() : null,
-    tanggal_masuk: s.tanggal_masuk || `${tahunMasukDefault}-01-01`,
+    tanggal_masuk: s.tanggal_masuk || tanggalMasukDefault,
     tanggal_keluar: s.tanggal_keluar || null,
     status_global: 'aktif',
     kategori_santri: normalizeKategoriSantriDasar(s.kategori_santri ?? s.sekolah),
@@ -448,7 +449,7 @@ export async function tambahSantriSatuSatu(data: {
   const now = new Date().toISOString()
   const tahunMasuk = new Date().getFullYear()
   const kategoriSantri = normalizeKategoriSantriDasar(data.kategori_santri)
-  const tanggalMasuk = rest.tanggal_masuk || `${tahunMasuk}-01-01`
+  const tanggalMasuk = rest.tanggal_masuk || now.slice(0, 10)
   const tahunMasukEfektif = Number(String(tanggalMasuk).slice(0, 4)) || tahunMasuk
   const sekolah = kategoriSantri === 'SADESA' ? null : rest.sekolah?.toUpperCase().trim() || null
   const kelasSekolah = kategoriSantri === 'SADESA' ? null : rest.kelas_sekolah?.trim() || null

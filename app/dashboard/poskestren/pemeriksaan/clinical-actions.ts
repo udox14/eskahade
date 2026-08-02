@@ -462,6 +462,12 @@ export async function createDormVisit(input: {
   const visitedAt = new Date(input.visitedAt)
   if (Number.isNaN(visitedAt.getTime())) return { success: false as const, error: 'Tanggal Visit Asrama tidak valid.' }
   const patientId = await ensurePatient(input.santriId, session.id)
+  const patient = await queryOne<{ asrama: string | null }>(
+    `SELECT s.asrama
+     FROM poskestren_patient p JOIN santri s ON s.id = p.santri_id
+     WHERE p.id = ?`,
+    [patientId]
+  )
   const medicines = normalizeClinicalMedicines(input.medicines || [])
   const stockIds = medicines.filter(item => item.sourceType === 'STOCK').map(item => item.medicineId)
   if (new Set(stockIds).size !== stockIds.length) {
@@ -506,6 +512,8 @@ export async function createDormVisit(input: {
         referenceId: itemId,
         actorId: session.id,
         notes: item.dosage,
+        locationId: item.locationId,
+        preferredAsrama: patient?.asrama,
       })
       medicineName = mutation.medicineName
       statements.push(...mutation.statements)

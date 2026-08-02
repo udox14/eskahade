@@ -723,8 +723,8 @@ export async function completeVisit(input: {
   if (!complaint || !diagnosis) {
     return { success: false as const, error: 'Keluhan dan diagnosis wajib diisi.' }
   }
-  const visit = await queryOne<{ id: string; status: PoskestrenVisitStatus; personnel_id: string | null; nama_lengkap: string }>(
-    `SELECT v.id, v.status, v.personnel_id, s.nama_lengkap
+  const visit = await queryOne<{ id: string; status: PoskestrenVisitStatus; personnel_id: string | null; nama_lengkap: string; asrama: string | null }>(
+    `SELECT v.id, v.status, v.personnel_id, s.nama_lengkap, s.asrama
      FROM poskestren_visit v
      JOIN poskestren_patient p ON p.id = v.patient_id
      JOIN santri s ON s.id = p.santri_id
@@ -739,6 +739,7 @@ export async function completeVisit(input: {
     .filter(item => item.medicineId)
     .map(item => ({
       medicineId: item.medicineId,
+      locationId: item.locationId,
       requested: parsePositiveInteger(item.requestedQuantityBase, 'Jumlah obat'),
       dosage: cleanText(item.dosage, 200),
       notes: cleanText(item.notes, 200),
@@ -777,7 +778,7 @@ export async function completeVisit(input: {
     const dispensed = Math.min(item.requested, Number(medicine.total_stock_base))
     const prescriptionItemId = generateId()
     if (dispensed > 0) {
-      const mutation = prepareStockMutationFromSnapshot(db, {
+      const mutation = await prepareStockMutationFromSnapshot(db, {
         medicineId: item.medicineId,
         medicineName: medicine.name,
         stockBefore: Number(medicine.total_stock_base),
@@ -788,6 +789,8 @@ export async function completeVisit(input: {
         referenceId: prescriptionItemId,
         actorId: session.id,
         notes: item.dosage,
+        locationId: item.locationId,
+        preferredAsrama: visit.asrama,
       })
       statements.push(...mutation.statements)
     }

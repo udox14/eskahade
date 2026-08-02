@@ -37,6 +37,7 @@ export type PoskestrenListResult<T> = {
 
 export type PrescriptionDraftItem = {
   medicineId: string
+  locationId?: string | null
   requestedQuantityBase: number
   dosage?: string | null
   notes?: string | null
@@ -46,6 +47,7 @@ export type ClinicalMedicineDraftItem = {
   localId?: string
   sourceType: PoskestrenMedicineSource
   medicineId?: string | null
+  locationId?: string | null
   medicineName?: string | null
   quantityBase?: number | null
   dosage?: string | null
@@ -59,7 +61,7 @@ export const POSKESTREN_HREF = {
   examination: '/dashboard/poskestren/pemeriksaan',
   observation: '/dashboard/poskestren/observasi',
   finance: '/dashboard/poskestren/keuangan',
-  reports: '/dashboard/poskestren/laporan',
+  reports: '/dashboard/poskestren/cetak',
   medicine: '/dashboard/poskestren/obat',
   management: '/dashboard/poskestren/manajemen',
 } as const

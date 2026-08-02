@@ -139,8 +139,12 @@ export async function addObservationMedicine(input: {
   medicine: ClinicalMedicineDraftItem
 }) {
   const session = await requirePoskestrenClinicalWrite()
-  const observation = await queryOne<{ id: string; status: string }>(
-    `SELECT id, status FROM poskestren_observation WHERE id = ?`,
+  const observation = await queryOne<{ id: string; status: string; asrama: string | null }>(
+    `SELECT o.id, o.status, s.asrama
+     FROM poskestren_observation o
+     JOIN poskestren_patient p ON p.id = o.patient_id
+     JOIN santri s ON s.id = p.santri_id
+     WHERE o.id = ?`,
     [input.observationId]
   )
   if (!observation || observation.status !== 'ACTIVE') {
@@ -163,6 +167,8 @@ export async function addObservationMedicine(input: {
       referenceId: id,
       actorId: session.id,
       notes: medicine.dosage,
+      locationId: medicine.locationId,
+      preferredAsrama: observation.asrama,
     })
     medicineName = mutation.medicineName
     statements.push(...mutation.statements)

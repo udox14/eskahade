@@ -104,6 +104,10 @@ export default function SPPPage() {
   const maxViewMonth = isCurrentYear ? currentMonthIdx : 12
   const isSadesaMode = unitSetor === SADESA_UNIT
   const isBeforeBillingStart = (year: number, month: number) => (year * 100 + month) < (billingStart.tahun * 100 + billingStart.bulan)
+  const isBeforeStudentBillingStart = (year: number, month: number, santri: any = selectedSantri) => {
+    if (!santri?.spp_mulai_tahun || !santri?.spp_mulai_bulan) return isBeforeBillingStart(year, month)
+    return (year * 100 + month) < (santri.spp_mulai_tahun * 100 + santri.spp_mulai_bulan)
+  }
 
   // Init
   useEffect(() => {
@@ -222,7 +226,7 @@ export default function SPPPage() {
   const handleQuickPay = async (e: React.MouseEvent, santri: any) => {
     e.stopPropagation()
     if (!isCurrentYear) return
-    const isNoBill = santri.bebas_spp || santri.tagihan_ditiadakan_bulan_ini
+    const isNoBill = santri.bebas_spp || santri.bulan_ini_belum_mulai || santri.tagihan_ditiadakan_bulan_ini
     if (santri.bulan_ini_lunas || isNoBill) return
 
     if (!await confirm(`Bayar SPP ${BULAN_LIST[viewMonth - 1]} ${tahun} untuk ${santri.nama_lengkap}? Nominal: Rp ${nominal.toLocaleString('id-ID')}`)) return
@@ -311,7 +315,7 @@ export default function SPPPage() {
   }
 
   const toggleBulan = (idx: number) => {
-    if (isBeforeBillingStart(tahun, idx)) return
+    if (isBeforeStudentBillingStart(tahun, idx)) return
     if (riwayatBayar.some(r => r.bulan === idx)) return
     if (selectedSantri?.bebas_spp) return
     if (tagihanDitiadakan.some(r => r.bulan === idx)) return
@@ -334,7 +338,7 @@ export default function SPPPage() {
   }
 
   const handleBayarSemuaSantri = async () => {
-    const belumLunas = allSantri.filter(s => !s.bebas_spp && !s.tagihan_ditiadakan_bulan_ini && !s.bulan_ini_lunas)
+    const belumLunas = allSantri.filter(s => !s.bebas_spp && !s.bulan_ini_belum_mulai && !s.tagihan_ditiadakan_bulan_ini && !s.bulan_ini_lunas)
     if (belumLunas.length === 0) return
     if (!await confirm(`Tandai ${belumLunas.length} santri ${unitSetor} SUDAH BAYAR SPP ${BULAN_LIST[viewMonth - 1]} ${tahun}?\n\nNominal per santri: Rp ${nominal.toLocaleString('id-ID')}`)) return
     setLoadingBatchPay(true)
@@ -361,7 +365,8 @@ export default function SPPPage() {
     setHistorisMonths(prev => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month].sort((a, b) => a - b))
   }
 
-  const isHistorisMonthAllowed = (year: number, month: number) => (year * 100 + month) < (billingStart.tahun * 100 + billingStart.bulan)
+  const isHistorisMonthAllowed = (year: number, month: number) =>
+    isBeforeBillingStart(year, month) && !isBeforeStudentBillingStart(year, month)
 
   const handleSimpanHistoris = async () => {
     if (!selectedSantri) return
@@ -404,7 +409,7 @@ export default function SPPPage() {
   }
 
   const toggleWaiveMonth = (month: number) => {
-    if (isBeforeBillingStart(tahun, month)) return
+    if (isBeforeStudentBillingStart(tahun, month)) return
     setWaiveMonths(prev => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month].sort((a, b) => a - b))
   }
 
@@ -559,7 +564,7 @@ export default function SPPPage() {
             Tampilkan
           </button>
           {hasLoaded && isCurrentYear && (() => {
-            const belumLunas = allSantri.filter(s => !s.bebas_spp && !s.tagihan_ditiadakan_bulan_ini && !s.bulan_ini_lunas)
+            const belumLunas = allSantri.filter(s => !s.bebas_spp && !s.bulan_ini_belum_mulai && !s.tagihan_ditiadakan_bulan_ini && !s.bulan_ini_lunas)
             if (belumLunas.length === 0) return null
             return (
               <button
@@ -891,7 +896,7 @@ export default function SPPPage() {
             {paginatedSantri.map((s: any, idx) => {
               const rowNum = pageSize === 'all' ? idx + 1 : (page - 1) * pageSize + idx + 1
               const isPaid = s.bulan_ini_lunas
-              const isNoBill = s.bebas_spp || s.tagihan_ditiadakan_bulan_ini
+              const isNoBill = s.bebas_spp || s.bulan_ini_belum_mulai || s.tagihan_ditiadakan_bulan_ini
               const canQuickPay = isCurrentYear && !isPaid && !isNoBill
 
               return (
@@ -932,7 +937,7 @@ export default function SPPPage() {
                     {isPaid ? (
                       <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded-md text-xs font-bold border border-green-100"><CheckCircle className="w-3 h-3"/> Lunas</span>
                     ) : isNoBill ? (
-                      <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs font-bold border border-blue-100"><CalendarX className="w-3 h-3"/> {s.bebas_spp ? 'Bebas SPP' : 'Tidak Ada'}</span>
+                      <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs font-bold border border-blue-100"><CalendarX className="w-3 h-3"/> {s.bebas_spp ? 'Bebas SPP' : s.bulan_ini_belum_mulai ? 'Belum Wajib' : 'Tidak Ada'}</span>
                     ) : (
                       <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-500 px-2 py-1 rounded-md text-xs font-bold border border-slate-200">Belum Bayar</span>
                     )}
@@ -1226,7 +1231,7 @@ export default function SPPPage() {
           const dataBayar = riwayatBayar.find(r => r.bulan === bulanIndex)
           const dataDitiadakan = tagihanDitiadakan.find(r => r.bulan === bulanIndex)
           const isSelected = selectedMonths.includes(bulanIndex)
-          const belumAdaTagihan = isBeforeBillingStart(tahun, bulanIndex)
+          const belumAdaTagihan = isBeforeStudentBillingStart(tahun, bulanIndex)
           const bebasPermanen = !!selectedSantri?.bebas_spp
           const noBill = bebasPermanen || !!dataDitiadakan
           let style = 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300'
