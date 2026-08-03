@@ -41,6 +41,9 @@ export default async function EditSantriPage({ params, searchParams }: Props) {
   if (!santri || error) return notFound()
 
   const s = santri as any
+  const tahunMasukDefault = Number(s.tahun_masuk) > 0
+    ? Number(s.tahun_masuk)
+    : Number(String(s.tanggal_masuk || '').slice(0, 4)) || ''
   const kelasOptions = kelasAktif && !kelasList.some(k => k.id === kelasAktif.kelas_id)
     ? [...kelasList, { id: kelasAktif.kelas_id, nama_kelas: kelasAktif.nama_kelas }].sort((a, b) =>
       a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
@@ -211,6 +214,20 @@ export default async function EditSantriPage({ params, searchParams }: Props) {
             <div>
               <label className={labelCls}>Tanggal Masuk</label>
               <input type="date" name="tanggal_masuk" defaultValue={s.tanggal_masuk || ''} className={inputCls} />
+              <p className="mt-1 text-[11px] text-slate-500">Jika tanggal ini diubah ke tahun lain, angkatan akan ikut berubah.</p>
+            </div>
+            <div>
+              <label className={labelCls}>Tahun Angkatan / Tahun Masuk</label>
+              <input
+                type="number"
+                name="tahun_masuk"
+                defaultValue={tahunMasukDefault}
+                min={1900}
+                max={2100}
+                placeholder="Contoh: 2024"
+                className={inputCls}
+              />
+              <p className="mt-1 text-[11px] text-slate-500">Dipakai untuk label angkatan dan tarif. Bisa diubah langsung tanpa mengubah tanggal.</p>
             </div>
             <div>
               <label className={labelCls}>Tanggal Keluar <span className="text-gray-400 font-normal normal-case">(isi jika keluar sebelum lulus)</span></label>

@@ -45,7 +45,7 @@ export async function updateSantri(id: string, formData: FormData) {
   const beforeSantri = await queryOne<Record<string, unknown>>(
     `SELECT id, nis, nama_lengkap, nik, tempat_lahir, tanggal_lahir, jenis_kelamin,
             nama_ayah, nama_ibu, alamat, gol_darah, alamat_lengkap, kecamatan, kab_kota,
-            provinsi, jemaah, no_wa_ortu, tanggal_masuk, tanggal_keluar, kategori_santri,
+            provinsi, jemaah, no_wa_ortu, tanggal_masuk, tanggal_keluar, tahun_masuk, kategori_santri,
             sekolah, kelas_sekolah, asrama, kamar
      FROM santri
      WHERE id = ?`,
@@ -59,6 +59,38 @@ export async function updateSantri(id: string, formData: FormData) {
   const sekolah = kategoriSantri === 'SADESA' ? null : formData.get('sekolah') || null
   const kelasSekolah = kategoriSantri === 'SADESA' ? null : formData.get('kelas_sekolah') || null
   const kelasPesantrenId = String(formData.get('kelas_pesantren_id') || '').trim()
+  const tanggalMasuk = String(formData.get('tanggal_masuk') || '').trim() || null
+  const tanggalKeluar = String(formData.get('tanggal_keluar') || '').trim() || null
+  const hasTahunMasukField = formData.has('tahun_masuk')
+  const rawTahunMasuk = String(formData.get('tahun_masuk') || '').trim()
+  const inputTahunMasuk = rawTahunMasuk ? Number(rawTahunMasuk) : null
+  const beforeTahunMasuk = Number(beforeSantri.tahun_masuk)
+  const previousTahunMasuk = Number.isInteger(beforeTahunMasuk) && beforeTahunMasuk >= 1900 && beforeTahunMasuk <= 2100
+    ? beforeTahunMasuk
+    : null
+  const previousTanggalMasuk = String(beforeSantri.tanggal_masuk || '').trim() || null
+  const tanggalMasukBerubah = tanggalMasuk !== previousTanggalMasuk
+  const tahunMasukFieldBerubah = hasTahunMasukField && rawTahunMasuk !== (previousTahunMasuk ? String(previousTahunMasuk) : '')
+
+  if (rawTahunMasuk) {
+    if (inputTahunMasuk === null || !Number.isInteger(inputTahunMasuk) || inputTahunMasuk < 1900 || inputTahunMasuk > 2100) {
+      return { error: 'Tahun masuk harus berupa tahun yang valid (1900–2100).' }
+    }
+  }
+
+  // `tahun_masuk` dipakai sebagai angkatan oleh modul keuangan dan laporan.
+  // Pertahankan data lama saat user hanya menyimpan perubahan lain, tetapi
+  // sinkronkan otomatis bila tanggal masuknya benar-benar diubah.
+  let tahunMasuk = previousTahunMasuk
+  if (tahunMasukFieldBerubah) {
+    tahunMasuk = inputTahunMasuk
+  } else if (tanggalMasukBerubah) {
+    const tahunDariTanggal = Number(String(tanggalMasuk || '').slice(0, 4))
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(tanggalMasuk || '')) && Number.isInteger(tahunDariTanggal)) {
+      tahunMasuk = tahunDariTanggal
+    }
+  }
+
   const afterSantri = {
     nis: formData.get('nis'),
     nama_lengkap: formData.get('nama_lengkap'),
@@ -76,8 +108,9 @@ export async function updateSantri(id: string, formData: FormData) {
     provinsi: formData.get('provinsi') || null,
     jemaah: formData.get('jemaah') || null,
     no_wa_ortu: formData.get('no_wa_ortu') || null,
-    tanggal_masuk: formData.get('tanggal_masuk') || null,
-    tanggal_keluar: formData.get('tanggal_keluar') || null,
+    tanggal_masuk: tanggalMasuk,
+    tanggal_keluar: tanggalKeluar,
+    tahun_masuk: tahunMasuk,
     kategori_santri: kategoriSantri,
     sekolah,
     kelas_sekolah: kelasSekolah,
@@ -98,7 +131,7 @@ export async function updateSantri(id: string, formData: FormData) {
         nis = ?, nama_lengkap = ?, nik = ?, tempat_lahir = ?, tanggal_lahir = ?,
         jenis_kelamin = ?, nama_ayah = ?, nama_ibu = ?, alamat = ?,
         gol_darah = ?, alamat_lengkap = ?, kecamatan = ?, kab_kota = ?, provinsi = ?,
-        jemaah = ?, no_wa_ortu = ?, tanggal_masuk = ?, tanggal_keluar = ?,
+        jemaah = ?, no_wa_ortu = ?, tanggal_masuk = ?, tanggal_keluar = ?, tahun_masuk = ?,
         kategori_santri = ?, sekolah = ?, kelas_sekolah = ?, asrama = ?, kamar = ?, updated_at = ?
       WHERE id = ?`,
       [
@@ -114,8 +147,9 @@ export async function updateSantri(id: string, formData: FormData) {
         formData.get('provinsi') || null,
         formData.get('jemaah') || null,
         formData.get('no_wa_ortu') || null,
-        formData.get('tanggal_masuk') || null,
-        formData.get('tanggal_keluar') || null,
+        tanggalMasuk,
+        tanggalKeluar,
+        tahunMasuk,
         kategoriSantri, sekolah, kelasSekolah,
         formData.get('asrama') || null, formData.get('kamar') || null,
         now, id
@@ -135,8 +169,9 @@ export async function updateSantri(id: string, formData: FormData) {
         )
       }
     }
-  } catch (err: any) {
-    return { error: `Gagal menyimpan: ${err.message}` }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { error: `Gagal menyimpan: ${message}` }
   }
 
   const changedFields = diffWhitelistedFields(beforeSantri, afterSantri, [
@@ -158,6 +193,7 @@ export async function updateSantri(id: string, formData: FormData) {
     'no_wa_ortu',
     'tanggal_masuk',
     'tanggal_keluar',
+    'tahun_masuk',
     'kategori_santri',
     'sekolah',
     'kelas_sekolah',

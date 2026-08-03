@@ -28,11 +28,14 @@ async function getTargetSppJuliPusat(unitSetor: string, tahun: number, tagihanBu
   if (tagihanBulan !== 7) return 0
 
   const row = await queryOne<{ total: number }>(
-    `SELECT COALESCE(SUM(sl.nominal_bayar), 0) AS total
-     FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
-     WHERE sl.tujuan_setoran = 'BENDAHARA_PUSAT'
-       AND sl.tahun = ? AND sl.bulan = ?
-       AND (CASE WHEN s.kategori_santri = ? THEN ? ELSE COALESCE(s.asrama, '') END) = ?`,
+      `SELECT COALESCE(SUM(sl.nominal_bayar), 0) AS total
+       FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
+       WHERE sl.tahun = ? AND sl.bulan = ?
+         AND (
+           sl.tujuan_setoran = 'BENDAHARA_PUSAT'
+           OR ${getKategoriSantriEfektifSql('s')} = 'BARU'
+         )
+         AND (CASE WHEN s.kategori_santri = ? THEN ? ELSE COALESCE(s.asrama, '') END) = ?`,
     [tahun, tagihanBulan, SADESA_CATEGORY, SADESA_UNIT, unitSetor]
   )
 

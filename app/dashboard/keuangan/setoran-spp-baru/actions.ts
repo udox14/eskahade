@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { assertFeature } from '@/lib/auth/feature'
 import { execute, query, queryOne } from '@/lib/db'
+import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 
 const PATH = '/dashboard/keuangan/setoran-spp-baru'
 
@@ -19,8 +20,11 @@ export async function getSetoranSppBaru(tahun: number) {
              COUNT(*) AS jumlah_transaksi, COUNT(DISTINCT sl.santri_id) AS jumlah_santri,
              SUM(sl.nominal_bayar) AS target_sistem
       FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
-      WHERE sl.tujuan_setoran = 'BENDAHARA_PUSAT'
-        AND sl.tahun = ? AND sl.bulan = 7
+      WHERE sl.tahun = ? AND sl.bulan = 7
+        AND (
+          sl.tujuan_setoran = 'BENDAHARA_PUSAT'
+          OR ${getKategoriSantriEfektifSql('s')} = 'BARU'
+        )
       GROUP BY COALESCE(NULLIF(TRIM(s.asrama), ''), 'LAINNYA')
     )
     SELECT l.*, ss.id AS setoran_id, ss.jumlah_aktual, ss.nama_penyetor,
@@ -36,8 +40,11 @@ export async function getSetoranSppBaru(tahun: number) {
     SELECT sl.id, sl.tahun, sl.bulan, sl.nominal_bayar, sl.tanggal_bayar,
            s.nama_lengkap, s.nis, COALESCE(NULLIF(TRIM(s.asrama), ''), 'LAINNYA') AS unit_setor
     FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
-    WHERE sl.tujuan_setoran = 'BENDAHARA_PUSAT'
-      AND sl.tahun = ? AND sl.bulan = 7
+    WHERE sl.tahun = ? AND sl.bulan = 7
+      AND (
+        sl.tujuan_setoran = 'BENDAHARA_PUSAT'
+        OR ${getKategoriSantriEfektifSql('s')} = 'BARU'
+      )
     ORDER BY unit_setor, s.nama_lengkap
   `, [tahun])
   return { rows, details }
