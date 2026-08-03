@@ -610,10 +610,14 @@ function BukuBesarTab() {
 function LaporanTab({ tahunAjaranId, tahunAjaranNama }: { tahunAjaranId: number; tahunAjaranNama: string }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [asrama, setAsrama] = useState('SEMUA')
+  const [kamar, setKamar] = useState('SEMUA')
+  const [search, setSearch] = useState('')
+  const [statusSantri, setStatusSantri] = useState<'SEMUA' | 'BARU' | 'LAMA'>('SEMUA')
 
   const loadReport = async () => {
     setLoading(true)
-    const res = await getLaporanNonSpp(tahunAjaranId)
+    const res = await getLaporanNonSpp(tahunAjaranId, { asrama, kamar, search, statusSantri })
     setData(res)
     setLoading(false)
   }
@@ -651,6 +655,37 @@ function LaporanTab({ tahunAjaranId, tahunAjaranNama }: { tahunAjaranId: number;
 
   return (
     <div className="space-y-6">
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_140px_100px_auto] md:items-end">
+          <FilterInput search={search} setSearch={setSearch} load={loadReport} />
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Status Santri</label>
+            <select value={statusSantri} onChange={(event) => setStatusSantri(event.target.value as any)} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="SEMUA">Semua Status</option>
+              <option value="BARU">Santri Baru</option>
+              <option value="LAMA">Santri Lama</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Asrama</label>
+            <select value={asrama} onChange={(event) => { setAsrama(event.target.value); setKamar('SEMUA') }} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="SEMUA">Semua Asrama</option>
+              {ASRAMA_LIST.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">Kamar</label>
+            <select value={kamar} onChange={(event) => setKamar(event.target.value)} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="SEMUA">Semua</option>
+              {Array.from({ length: 30 }, (_, index) => index + 1).map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </div>
+          <button onClick={loadReport} disabled={loading} className="flex h-11 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Tampilkan
+          </button>
+        </div>
+      </div>
+
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         {(['TOTAL', ...JENIS_ALL] as const).map((jenis) => (
           <ReportStat

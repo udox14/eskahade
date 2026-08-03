@@ -6,6 +6,7 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { ASRAMA_LIST, getSppScope, isSadesaCategory, isSadesaUnit, SADESA_CATEGORY, SADESA_UNIT } from '@/lib/spp/unit-setor'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
+import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 import {
   countSppBillableMonths,
   getJumlahTunggakanHistorisBySantri,
@@ -17,6 +18,10 @@ import {
   periodKey,
 } from '@/lib/spp/tunggakan'
 import { getTujuanSetoranSpp, tujuanSetoranSql } from '@/lib/spp/tujuan-setoran'
+
+function isPsbJuliSpecial(bulan: number, tujuanSetoran: string | null | undefined) {
+  return Number(bulan) === 7 && tujuanSetoran === 'BENDAHARA_PUSAT'
+}
 
 type SppClientScope = {
   kind: 'ASRAMA' | 'SADESA' | 'ADMIN'
@@ -131,7 +136,12 @@ export async function getDashboardSPPAll(tahun: number, unitSetor: string, targe
   // Default bulan berjalan; bisa dipilih bulan sebelumnya lewat filter.
   const checkMonth = targetMonth && targetMonth >= 1 && targetMonth <= 12 ? targetMonth : currentMonth
   const maxCheck = tahun < new Date().getFullYear() ? 12 : currentMonth
-  const startMonth = tahun === billingStart.tahun ? billingStart.bulan : (tahun < billingStart.tahun ? 13 : 1)
+  const configuredStartMonth = tahun === billingStart.tahun ? billingStart.bulan : (tahun < billingStart.tahun ? 13 : 1)
+  // Juli santri baru PSB tetap bisa dipilih dari modul ini, meskipun setting
+  // awal tagihan umum sudah berada di bulan setelah Juli.
+  const startMonth = tahun === billingStart.tahun && checkMonth === 7
+    ? Math.min(configuredStartMonth, 7)
+    : configuredStartMonth
 
   const sadesaMode = isSadesaUnit(unit)
 
@@ -160,6 +170,8 @@ export async function getDashboardSPPAll(tahun: number, unitSetor: string, targe
     SELECT
       s.id, s.nama_lengkap, s.asrama, COALESCE(s.kamar, '-') AS kamar, s.foto_url,
       COALESCE(s.bebas_spp, 0) AS bebas_spp, s.tanggal_masuk, s.created_at,
+      ${getKategoriSantriEfektifSql('s')} AS kategori_efektif,
+      CASE WHEN ${tujuanSetoranSql('s', String(tahun), '7')} = 'BENDAHARA_PUSAT' THEN 1 ELSE 0 END AS spp_juli_psb,
       COALESCE(s.sekolah, '-') AS sekolah, COALESCE(s.kelas_sekolah, '-') AS kelas_sekolah,
       COALESCE(k.nama_kelas, '-') AS kelas_pesantren,
       COALESCE(sa.jumlah_bayar, 0) AS jumlah_bayar,
@@ -200,11 +212,14 @@ export async function getDashboardSPPAll(tahun: number, unitSetor: string, targe
     const runningOutstanding = s.bebas_spp === 1
       ? 0
       : Math.max(0, billableCountForStudent - paidCount - waivedCount)
-    const billNotStarted = checkKey < studentStartKey
+    const billNotStarted = checkKey < studentStartKey && !(checkMonth === 7 && s.spp_juli_psb === 1)
 
     return {
       id: s.id,
       nama_lengkap: s.nama_lengkap,
+      kategori_efektif: s.kategori_efektif ?? 'REGULER',
+      spp_juli_psb: s.spp_juli_psb === 1,
+      spp_juli_psb_tahun: tahun,
       kamar: s.kamar,
       foto_url: s.foto_url,
       sekolah: s.sekolah,
@@ -434,11 +449,13 @@ export async function bayarSPPBulanBerjalan(santriId: string, tahun: number, bul
     if ((santri.bebas_spp ?? 0) === 1) return { error: 'Santri ini berstatus bebas SPP permanen.' }
 
     const billingStart = await getSppBillingStart()
-    if ((tahun * 100 + bulan) < (billingStart.tahun * 100 + billingStart.bulan)) {
+    const tujuanSetoran = await getTujuanSetoranSpp(santriId, tahun, bulan)
+    const isSpecialPsbJuli = isPsbJuliSpecial(bulan, tujuanSetoran)
+    if (!isSpecialPsbJuli && (tahun * 100 + bulan) < (billingStart.tahun * 100 + billingStart.bulan)) {
       return { error: 'Bulan tersebut belum memiliki tagihan SPP.' }
     }
     const studentBillingStart = getSppStudentBillingStart(santri, billingStart)
-    if (!isSppBillablePeriod(tahun, bulan, studentBillingStart)) {
+    if (!isSpecialPsbJuli && !isSppBillablePeriod(tahun, bulan, studentBillingStart)) {
       return { error: `Santri ini mulai wajib SPP pada ${studentBillingStart.value}.` }
     }
 
@@ -455,7 +472,6 @@ export async function bayarSPPBulanBerjalan(santriId: string, tahun: number, bul
     )
     if (exist.length > 0) return { error: 'Bulan tersebut sudah dibayar sebelumnya.' }
 
-    const tujuanSetoran = await getTujuanSetoranSpp(santriId, tahun, bulan)
     await execute(
       `INSERT INTO spp_log (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, tujuan_setoran)
        VALUES (?, ?, ?, ?, ?, ?, 'Quick Pay', date('now'), ?)`,
@@ -894,10 +910,11 @@ export async function bayarSPP(santriId: string, tahun: number, bulans: number[]
     if ((santri.bebas_spp ?? 0) === 1) return { error: 'Santri ini berstatus bebas SPP permanen.' }
 
     const billingStart = await getSppBillingStart()
-    const invalidMonth = bulans.some(b => (tahun * 100 + b) < (billingStart.tahun * 100 + billingStart.bulan))
+    const tujuanByBulan = new Map(await Promise.all(bulans.map(async b => [b, await getTujuanSetoranSpp(santriId, tahun, b)] as const)))
+    const invalidMonth = bulans.some(b => !isPsbJuliSpecial(b, tujuanByBulan.get(b)) && (tahun * 100 + b) < (billingStart.tahun * 100 + billingStart.bulan))
     if (invalidMonth) return { error: 'Bulan tersebut belum memiliki tagihan SPP.' }
     const studentBillingStart = getSppStudentBillingStart(santri, billingStart)
-    if (bulans.some(b => !isSppBillablePeriod(tahun, b, studentBillingStart))) {
+    if (bulans.some(b => !isPsbJuliSpecial(b, tujuanByBulan.get(b)) && !isSppBillablePeriod(tahun, b, studentBillingStart))) {
       return { error: `Santri ini mulai wajib SPP pada ${studentBillingStart.value}.` }
     }
 
@@ -915,7 +932,6 @@ export async function bayarSPP(santriId: string, tahun: number, bulans: number[]
     )
     if (exist.length > 0) return { error: 'Beberapa bulan sudah dibayar sebelumnya.' }
 
-    const tujuanByBulan = new Map(await Promise.all(bulans.map(async b => [b, await getTujuanSetoranSpp(santriId, tahun, b)] as const)))
     await batch(bulans.map(b => ({
       sql: `INSERT INTO spp_log (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, tujuan_setoran)
             VALUES (?, ?, ?, ?, ?, ?, 'Pembayaran Manual', date('now'), ?)`,
@@ -961,11 +977,15 @@ export async function bayarSemuaSantriAsrama(
     const unit = assertRequestedUnit(scope, unitSetor)
 
     const billingStart = await getSppBillingStart()
-    if ((tahun * 100 + bulan) < (billingStart.tahun * 100 + billingStart.bulan)) {
+    const isSpecialPsbJuli = bulan === 7
+    if (!isSpecialPsbJuli && (tahun * 100 + bulan) < (billingStart.tahun * 100 + billingStart.bulan)) {
       return { error: 'Bulan tersebut belum memiliki tagihan SPP.' }
     }
 
-    const studentStartSql = `${tahun * 100 + bulan} >= ${getSppStudentStartKeySql('s', billingStart.tahun * 100 + billingStart.bulan)}`
+    const specialPsbJuliSql = isSpecialPsbJuli
+      ? `(${tujuanSetoranSql('s', String(tahun), String(bulan))} = 'BENDAHARA_PUSAT')`
+      : '0'
+    const studentStartSql = `(${tahun * 100 + bulan} >= ${getSppStudentStartKeySql('s', billingStart.tahun * 100 + billingStart.bulan)} OR ${specialPsbJuliSql})`
 
     const sadesaMode = isSadesaUnit(unit)
     const unitWhere = sadesaMode

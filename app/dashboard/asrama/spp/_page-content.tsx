@@ -37,7 +37,7 @@ export default function SPPPage() {
 
   // Filter Modal
   const [filterModalOpen, setFilterModalOpen] = useState(false)
-  const [filters, setFilters] = useState<{ kamar: string[]; statusPembayaran: string; sekolah: string; kelasSekolah: string; kelasPesantren: string }>({ kamar: [], statusPembayaran: 'SEMUA', sekolah: '', kelasSekolah: '', kelasPesantren: '' })
+  const [filters, setFilters] = useState<{ kamar: string[]; statusPembayaran: string; statusSantri: string; sekolah: string; kelasSekolah: string; kelasPesantren: string }>({ kamar: [], statusPembayaran: 'SEMUA', statusSantri: 'SEMUA', sekolah: '', kelasSekolah: '', kelasPesantren: '' })
   
   // Rekap Panel
   const [rekapExpanded, setRekapExpanded] = useState(false)
@@ -105,6 +105,9 @@ export default function SPPPage() {
   const isSadesaMode = unitSetor === SADESA_UNIT
   const isBeforeBillingStart = (year: number, month: number) => (year * 100 + month) < (billingStart.tahun * 100 + billingStart.bulan)
   const isBeforeStudentBillingStart = (year: number, month: number, santri: any = selectedSantri) => {
+    // SPP Juli santri baru PSB adalah tagihan khusus ke Bendahara Pusat,
+    // sehingga tetap dapat dipilih walaupun tanggal masuk tercatat setelah Juli.
+    if (month === 7 && santri?.spp_juli_psb && santri?.spp_juli_psb_tahun === year) return false
     if (!santri?.spp_mulai_tahun || !santri?.spp_mulai_bulan) return isBeforeBillingStart(year, month)
     return (year * 100 + month) < (santri.spp_mulai_tahun * 100 + santri.spp_mulai_bulan)
   }
@@ -178,6 +181,8 @@ export default function SPPPage() {
       const q = searchQuery.toLowerCase()
       result = result.filter(s => s.nama_lengkap?.toLowerCase().includes(q))
     }
+    if (filters.statusSantri === 'BARU') result = result.filter(s => s.kategori_efektif === 'BARU')
+    if (filters.statusSantri === 'LAMA') result = result.filter(s => s.kategori_efektif !== 'BARU')
     if (filters.kamar.length) result = result.filter(s => filters.kamar.includes(s.kamar))
     if (filters.sekolah) result = result.filter(s => s.sekolah === filters.sekolah)
     if (filters.kelasSekolah) result = result.filter(s => s.kelas_sekolah === filters.kelasSekolah)
@@ -216,6 +221,7 @@ export default function SPPPage() {
     if (filters.sekolah) count++
     if (filters.kelasSekolah) count++
     if (filters.kelasPesantren) count++
+    if (filters.statusSantri !== 'SEMUA') count++
     if (filters.statusPembayaran !== 'SEMUA') count++
     return count
   }, [filters])
@@ -536,7 +542,8 @@ export default function SPPPage() {
             >
               {BULAN_LIST.map((namaBulan, idx) => {
                 const month = idx + 1
-                const disabled = isBeforeBillingStart(tahun, month) || month > maxViewMonth
+                // Juli tetap dapat dibuka untuk melihat/membayar SPP khusus santri baru PSB.
+                const disabled = (isBeforeBillingStart(tahun, month) && month !== 7) || month > maxViewMonth
                 return <option key={month} value={month} disabled={disabled}>{namaBulan}</option>
               })}
             </select>
@@ -1043,6 +1050,19 @@ export default function SPPPage() {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">Status Santri</label>
+                <select
+                  value={filters.statusSantri}
+                  onChange={e => setFilters(f => ({ ...f, statusSantri: e.target.value }))}
+                  className="w-full p-2.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
+                >
+                  <option value="SEMUA">Semua Santri</option>
+                  <option value="BARU">Santri Baru saja</option>
+                  <option value="LAMA">Santri Lama saja</option>
+                </select>
+              </div>
+
               {!isSadesaMode && filterOptions.kamars?.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
@@ -1106,7 +1126,7 @@ export default function SPPPage() {
 
             <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
               <button 
-                onClick={() => { setFilters({ kamar: [], statusPembayaran: 'SEMUA', sekolah: '', kelasSekolah: '', kelasPesantren: '' }); setPage(1); }}
+                onClick={() => { setFilters({ kamar: [], statusPembayaran: 'SEMUA', statusSantri: 'SEMUA', sekolah: '', kelasSekolah: '', kelasPesantren: '' }); setPage(1); }}
                 className="px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
               >
                 Reset Filter
