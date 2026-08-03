@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
-import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPPAll, getClientRestriction, batalkanPembayaranSPP, getSppBillingStart, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, simpanTagihanDitiadakanKelasSPP, cabutTagihanDitiadakanSPP, getRekapStatistikSPP, getStatusSetoranUnit, getFilterOptions, bayarSPPBulanBerjalan, bayarSemuaSantriAsrama, getSetoranInfoBulanIni, submitSetoranAsrama } from './actions'
+import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPPAll, getClientRestriction, batalkanPembayaranSPP, getSppBillingStart, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, simpanTagihanDitiadakanKelasSPP, cabutTagihanDitiadakanSPP, getRekapStatistikSPP, getStatusSetoranUnit, getFilterOptions, bayarSPPBulanBerjalan, bayarSemuaSantriAsrama, getSetoranInfoBulanIni, getSetoranSppJuliInfo, submitSetoranAsrama, submitSetoranSppJuliSantriBaru } from './actions'
 import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, Wallet, Ban, CalendarX, BarChart, AlertCircle, Users, Send, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -86,8 +86,15 @@ export default function SPPPage() {
     tanggalMulai: string | null
     setoran: any | null
     setoranPusat: any | null
-    targetPusat: number
   } | null>(null)
+  const [setoranJuliInfo, setSetoranJuliInfo] = useState<{
+    unit: string
+    tahun: number
+    bulan: number
+    targetPusat: number
+    setoranPusat: any | null
+  } | null>(null)
+  const [setoranJuliLoading, setSetoranJuliLoading] = useState(false)
   const [setoranInfoLoading, setSetoranInfoLoading] = useState(false)
   const [setoranNama, setSetoranNama] = useState('')
   const [setoranBulanIni, setSetoranBulanIni] = useState('')
@@ -136,6 +143,15 @@ export default function SPPPage() {
       .catch(() => {})
       .finally(() => setSetoranInfoLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (!scope || !unitSetor) return
+    setSetoranJuliLoading(true)
+    getSetoranSppJuliInfo(tahun, viewMonth, unitSetor)
+      .then(setSetoranJuliInfo)
+      .catch(() => setSetoranJuliInfo(null))
+      .finally(() => setSetoranJuliLoading(false))
+  }, [scope, unitSetor, tahun, viewMonth])
 
   // Load Data
   const loadData = async () => {
@@ -249,6 +265,7 @@ export default function SPPPage() {
       toast.success('Pembayaran Berhasil!')
       await loadData()
       refreshSetoranInfo()
+      refreshSetoranJuliInfo()
       if (view === 'PAYMENT' && selectedSantri?.id === santri.id) {
         await refreshSelectedStatus()
       }
@@ -318,6 +335,7 @@ export default function SPPPage() {
       toast.success('Pembayaran Berhasil!')
       await loadData()
       refreshSetoranInfo()
+      refreshSetoranJuliInfo()
       await refreshSelectedStatus()
     }
   }
@@ -358,6 +376,7 @@ export default function SPPPage() {
       toast.success(`${res.count} santri berhasil ditandai lunas`)
       await loadData()
       refreshSetoranInfo()
+      refreshSetoranJuliInfo()
     }
   }
 
@@ -485,6 +504,15 @@ export default function SPPPage() {
     getSetoranInfoBulanIni().then(setSetoranInfo).catch(() => {})
   }
 
+  const refreshSetoranJuliInfo = () => {
+    if (!scope || !unitSetor) return
+    setSetoranJuliLoading(true)
+    getSetoranSppJuliInfo(tahun, viewMonth, unitSetor)
+      .then(setSetoranJuliInfo)
+      .catch(() => setSetoranJuliInfo(null))
+      .finally(() => setSetoranJuliLoading(false))
+  }
+
   const handleSubmitSetoran = async (e: React.FormEvent) => {
     e.preventDefault()
     const jumlahBulanIni = Number(setoranBulanIni.replace(/\D/g, '') || '0')
@@ -506,14 +534,18 @@ export default function SPPPage() {
 
   const handleSubmitSetoranPusat = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (viewMonth !== 7) {
+      toast.error('Pilih bulan Juli terlebih dahulu untuk menyetorkan SPP santri baru.')
+      return
+    }
     const nominal = Number(setoranPusatNominal.replace(/\D/g, '') || '0')
     if (nominal <= 0) return toast.error('Nominal setoran Bendahara Pesantren wajib diisi.')
     setSubmittingSetoranPusat(true)
-    const res = await submitSetoranAsrama(nominal, 0, setoranPusatNama, 'BENDAHARA_PUSAT')
+    const res = await submitSetoranSppJuliSantriBaru(unitSetor, tahun, viewMonth, nominal, setoranPusatNama)
     setSubmittingSetoranPusat(false)
     if ('error' in res) return toast.error(res.error)
     toast.success('Setoran dikirim ke Bendahara Pesantren!')
-    setSetoranPusatNama(''); setSetoranPusatNominal(''); refreshSetoranInfo()
+    setSetoranPusatNama(''); setSetoranPusatNominal(''); refreshSetoranJuliInfo()
   }
 
   const tunggakanHistorisBelumLunas = tunggakanHistoris.filter(item => item.status !== 'LUNAS')
@@ -703,16 +735,16 @@ export default function SPPPage() {
         )
       })()}
 
-      {((setoranInfo?.targetPusat ?? 0) > 0 || setoranInfo?.setoranPusat) && (() => {
-        const row = setoranInfo?.setoranPusat
+      {viewMonth === 7 && !setoranJuliLoading && ((setoranJuliInfo?.targetPusat ?? 0) > 0 || setoranJuliInfo?.setoranPusat) && (() => {
+        const row = setoranJuliInfo?.setoranPusat
         const fmtRpLocal = (n: number) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`
         return <div className="overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50 px-4 py-3"><div><h3 className="text-sm font-bold text-emerald-900">Setoran SPP Juli Santri Baru — Periode Agustus</h3><p className="text-xs text-emerald-700">Target sistem untuk dikonfirmasi Bendahara: {fmtRpLocal(setoranInfo?.targetPusat || 0)}</p></div><Wallet className="h-5 w-5 text-emerald-700"/></div>
+          <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50 px-4 py-3"><div><h3 className="text-sm font-bold text-emerald-900">Setoran SPP Juli Santri Baru</h3><p className="text-xs text-emerald-700">Pilih Juli lalu kirim dari sini untuk dikonfirmasi Bendahara: {fmtRpLocal(setoranJuliInfo?.targetPusat || 0)}</p></div><Wallet className="h-5 w-5 text-emerald-700"/></div>
           {row?.tanggal_terima ? <div className="flex gap-3 p-4 text-sm"><CheckCircle className="h-5 w-5 text-green-600"/><div><b className="text-green-700">Sudah Dikonfirmasi Bendahara Pesantren</b><p className="text-slate-500">{row.nama_penyetor} · {fmtRpLocal(row.jumlah_aktual)}</p></div></div>
           : row?.tanggal_setor ? <div className="flex gap-3 p-4 text-sm"><Clock className="h-5 w-5 text-blue-600"/><div><b className="text-blue-700">Menunggu Konfirmasi Bendahara Pesantren</b><p className="text-slate-500">{row.nama_penyetor} · {fmtRpLocal(row.jumlah_aktual)}</p></div></div>
           : <form onSubmit={handleSubmitSetoranPusat} className="grid gap-3 p-4 md:grid-cols-[1fr_1fr_auto]">
             <input required value={setoranPusatNama} onChange={e=>setSetoranPusatNama(e.target.value)} placeholder="Nama penyetor" className="rounded-lg border px-3 py-2 text-sm"/>
-            <input required value={setoranPusatNominal ? Number(setoranPusatNominal.replace(/\D/g,'')).toLocaleString('id-ID') : ''} onChange={e=>setSetoranPusatNominal(e.target.value)} placeholder={`Nominal (target ${fmtRpLocal(setoranInfo?.targetPusat || 0)})`} className="rounded-lg border px-3 py-2 text-sm"/>
+            <input required value={setoranPusatNominal ? Number(setoranPusatNominal.replace(/\D/g,'')).toLocaleString('id-ID') : ''} onChange={e=>setSetoranPusatNominal(e.target.value)} placeholder={`Nominal (target ${fmtRpLocal(setoranJuliInfo?.targetPusat || 0)})`} className="rounded-lg border px-3 py-2 text-sm"/>
             <button disabled={submittingSetoranPusat} className="rounded-lg bg-emerald-700 px-5 py-2 text-sm font-bold text-white disabled:opacity-50">{submittingSetoranPusat ? 'Mengirim...' : 'Kirim ke Bendahara'}</button>
           </form>}
         </div>

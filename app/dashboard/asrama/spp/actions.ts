@@ -23,21 +23,17 @@ function isPsbJuliSpecial(bulan: number, tujuanSetoran: string | null | undefine
   return Number(bulan) === 7 && tujuanSetoran === 'BENDAHARA_PUSAT'
 }
 
-/**
- * SPP Juli santri baru disetorkan pada periode Agustus, terlepas dari
- * tanggal pembayaran di spp_log (dibayar lewat PSB pada Juli atau dibayar
- * dari modul SPP pada Agustus).
- */
-async function getTargetSppJuliPusat(unitSetor: string, tahun: number, periodeBulan: number) {
-  if (periodeBulan !== 8) return 0
+/** Target pembayaran SPP Juli yang memang diarahkan ke Bendahara Pusat. */
+async function getTargetSppJuliPusat(unitSetor: string, tahun: number, tagihanBulan: number) {
+  if (tagihanBulan !== 7) return 0
 
   const row = await queryOne<{ total: number }>(
     `SELECT COALESCE(SUM(sl.nominal_bayar), 0) AS total
      FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
      WHERE sl.tujuan_setoran = 'BENDAHARA_PUSAT'
-       AND sl.tahun = ? AND sl.bulan = 7
+       AND sl.tahun = ? AND sl.bulan = ?
        AND (CASE WHEN s.kategori_santri = ? THEN ? ELSE COALESCE(s.asrama, '') END) = ?`,
-    [tahun, SADESA_CATEGORY, SADESA_UNIT, unitSetor]
+    [tahun, tagihanBulan, SADESA_CATEGORY, SADESA_UNIT, unitSetor]
   )
 
   return Number(row?.total ?? 0)
@@ -1080,7 +1076,7 @@ export async function getSetoranInfoBulanIni() {
   const yr = now.getFullYear()
   const mo = now.getMonth() + 1
 
-  const [windowRow, setoranRows, targetPusat] = await Promise.all([
+  const [windowRow, setoranRows] = await Promise.all([
     queryOne<{ tanggal_mulai: string }>(
       `SELECT tanggal_mulai FROM spp_setoran_window WHERE tahun = ? AND bulan = ?`,
       [yr, mo]
@@ -1100,7 +1096,6 @@ export async function getSetoranInfoBulanIni() {
        WHERE COALESCE(NULLIF(TRIM(unit_setor), ''), asrama) = ? AND tahun = ? AND bulan = ?`,
       [unit, yr, mo]
     ),
-    getTargetSppJuliPusat(unit, yr, mo),
   ])
 
   const setoranDewan = setoranRows.find((row: any) => row.tujuan_setoran === 'DEWAN_SANTRI') ?? null
@@ -1113,7 +1108,126 @@ export async function getSetoranInfoBulanIni() {
     tanggalMulai: windowRow?.tanggal_mulai ?? null,
     setoran: setoranDewan,
     setoranPusat,
-    targetPusat: Number(targetPusat ?? 0),
+  }
+}
+
+export async function getSetoranSppJuliInfo(tahun: number, bulan: number, unitSetor: string) {
+  const session = await getSession()
+  const scope = getScopeOrThrow(session)
+  const unit = assertRequestedUnit(scope, unitSetor)
+
+  if (Number(bulan) !== 7) {
+    return { unit, tahun, bulan, targetPusat: 0, setoranPusat: null }
+  }
+
+  const [targetPusat, setoranPusat] = await Promise.all([
+    getTargetSppJuliPusat(unit, tahun, bulan),
+    queryOne<any>(
+      `SELECT tanggal_setor, tanggal_terima, jumlah_aktual, jumlah_bulan_ini,
+              jumlah_tunggakan_bayar, status, nama_penyetor, tujuan_setoran
+       FROM spp_setoran
+       WHERE COALESCE(NULLIF(TRIM(unit_setor), ''), asrama) = ?
+         AND tahun = ? AND bulan = ? AND tujuan_setoran = 'BENDAHARA_PUSAT'`,
+      [unit, tahun, bulan]
+    ),
+  ])
+
+  return { unit, tahun, bulan, targetPusat, setoranPusat }
+}
+
+export async function submitSetoranSppJuliSantriBaru(
+  unitSetor: string,
+  tahun: number,
+  bulan: number,
+  jumlahAktual: number,
+  namaPenyetor: string,
+): Promise<{ success: boolean } | { error: string }> {
+  try {
+    const session = await getSession()
+    const scope = getScopeOrThrow(session)
+    const cleanUnit = assertRequestedUnit(scope, unitSetor)
+    const cleanTahun = Number(tahun)
+    const cleanBulan = Number(bulan)
+    const cleanJumlah = Number(jumlahAktual)
+    const cleanNama = String(namaPenyetor ?? '').trim()
+
+    if (!Number.isInteger(cleanTahun) || cleanTahun < 2000) return { error: 'Tahun tagihan tidak valid.' }
+    if (cleanBulan !== 7) return { error: 'Setoran ini khusus SPP bulan Juli.' }
+    if (!Number.isFinite(cleanJumlah) || cleanJumlah <= 0) return { error: 'Nominal setoran harus lebih dari 0.' }
+    if (!cleanNama) return { error: 'Nama penyetor wajib diisi.' }
+
+    const now = new Date()
+    const currentPeriodKey = now.getFullYear() * 100 + (now.getMonth() + 1)
+    if (currentPeriodKey <= cleanTahun * 100 + cleanBulan) {
+      return { error: 'Setoran SPP Juli baru dapat dikirim mulai bulan setelah Juli.' }
+    }
+
+    const targetPusat = await getTargetSppJuliPusat(cleanUnit, cleanTahun, cleanBulan)
+    if (targetPusat <= 0) {
+      return { error: 'Belum ada pembayaran SPP Juli santri baru yang dapat disetorkan.' }
+    }
+
+    const existing = await queryOne<{ tanggal_terima: string | null }>(
+      `SELECT tanggal_terima
+       FROM spp_setoran
+       WHERE COALESCE(NULLIF(TRIM(unit_setor), ''), asrama) = ?
+         AND tahun = ? AND bulan = ? AND tujuan_setoran = 'BENDAHARA_PUSAT'`,
+      [cleanUnit, cleanTahun, cleanBulan]
+    )
+    if (existing?.tanggal_terima) {
+      return { error: 'Setoran SPP Juli ini sudah dikonfirmasi Bendahara Pesantren.' }
+    }
+
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth() + 1
+    await execute(
+      `INSERT INTO spp_setoran
+         (id, asrama, unit_setor, jenis_unit_setor, bulan, tahun,
+          tanggal_setor, nama_penyetor, jumlah_aktual, jumlah_bulan_ini,
+          jumlah_tunggakan_bayar, status, tujuan_setoran)
+       VALUES (?, ?, ?, ?, ?, ?, date('now'), ?, ?, ?, 0, 'menunggu_konfirmasi', 'BENDAHARA_PUSAT')
+       ON CONFLICT(unit_setor, bulan, tahun, tujuan_setoran) DO UPDATE SET
+         tanggal_setor          = excluded.tanggal_setor,
+         nama_penyetor          = excluded.nama_penyetor,
+         jumlah_aktual          = excluded.jumlah_aktual,
+         jumlah_bulan_ini       = excluded.jumlah_bulan_ini,
+         jumlah_tunggakan_bayar = 0,
+         status                 = 'menunggu_konfirmasi'`,
+      [
+        generateId(), cleanUnit, cleanUnit,
+        isSadesaUnit(cleanUnit) ? 'SADESA' : 'ASRAMA',
+        cleanBulan, cleanTahun, cleanNama, cleanJumlah, cleanJumlah,
+      ]
+    )
+
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'spp_setoran',
+      action: 'submit',
+      fiturHref: '/dashboard/asrama/spp',
+      logKind: 'create',
+      entityType: 'spp_setoran',
+      entityId: `${cleanUnit}:${cleanTahun}:${cleanBulan}:BENDAHARA_PUSAT`,
+      entityLabel: cleanUnit,
+      summary: `Mengirim setoran SPP Juli ${cleanUnit} ke Bendahara Pesantren`,
+      details: {
+        tahun: cleanTahun,
+        bulan: cleanBulan,
+        periode_setor_tahun: currentYear,
+        periode_setor_bulan: currentMonth,
+        tujuan_setoran: 'BENDAHARA_PUSAT',
+        jumlah: cleanJumlah,
+        target_sistem: targetPusat,
+        nama_penyetor: cleanNama,
+      },
+    })
+
+    revalidatePath('/dashboard/asrama/spp')
+    revalidatePath('/dashboard/dewan-santri/setoran')
+    revalidatePath('/dashboard/keuangan/setoran-spp-baru')
+    return { success: true }
+  } catch (error: any) {
+    return { error: error?.message || 'Gagal mengirim setoran SPP Juli.' }
   }
 }
 
@@ -1129,39 +1243,31 @@ export async function submitSetoranAsrama(
     const unit = scope.defaultUnit
     const cleanUnit = unit.trim().toUpperCase()
 
+    if (tujuanSetoran === 'BENDAHARA_PUSAT') {
+      return { error: 'Untuk SPP Juli santri baru, pilih bulan Juli lalu gunakan tombol Kirim ke Bendahara.' }
+    }
+
     const now = new Date()
     const yr = now.getFullYear()
     const mo = now.getMonth() + 1
     const today = now.toISOString().slice(0, 10)
 
-    const isSetoranPusat = tujuanSetoran === 'BENDAHARA_PUSAT'
-    if (!isSetoranPusat) {
-      const windowRow = await queryOne<{ tanggal_mulai: string }>(
-        `SELECT tanggal_mulai FROM spp_setoran_window WHERE tahun = ? AND bulan = ?`,
-        [yr, mo]
-      )
-      if (!windowRow) return { error: 'Dewan Santri belum membuka periode setoran bulan ini.' }
-      if (today < windowRow.tanggal_mulai) return { error: `Setoran baru dibuka mulai ${windowRow.tanggal_mulai}.` }
-    } else if (mo !== 8) {
-      return { error: 'Setoran SPP Juli santri baru dibuka pada periode Agustus.' }
-    }
+    const windowRow = await queryOne<{ tanggal_mulai: string }>(
+      `SELECT tanggal_mulai FROM spp_setoran_window WHERE tahun = ? AND bulan = ?`,
+      [yr, mo]
+    )
+    if (!windowRow) return { error: 'Dewan Santri belum membuka periode setoran bulan ini.' }
+    if (today < windowRow.tanggal_mulai) return { error: `Setoran baru dibuka mulai ${windowRow.tanggal_mulai}.` }
 
     const existing = await queryOne<{ tanggal_terima: string | null }>(
       `SELECT tanggal_terima FROM spp_setoran WHERE COALESCE(NULLIF(TRIM(unit_setor), ''), asrama) = ? AND tahun = ? AND bulan = ? AND tujuan_setoran = ?`,
       [cleanUnit, yr, mo, tujuanSetoran]
     )
-    if (existing?.tanggal_terima) return { error: `Setoran bulan ini sudah dikonfirmasi oleh ${tujuanSetoran === 'BENDAHARA_PUSAT' ? 'Bendahara Pesantren' : 'Dewan Santri'}.` }
+    if (existing?.tanggal_terima) return { error: 'Setoran bulan ini sudah dikonfirmasi Dewan Santri.' }
 
     const jumlahTotal = (jumlahBulanIni || 0) + (jumlahTunggakan || 0)
     if (jumlahTotal <= 0) return { error: 'Jumlah setoran harus lebih dari 0.' }
     if (!namaPenyetor.trim()) return { error: 'Nama penyetor wajib diisi.' }
-
-    if (isSetoranPusat) {
-      const targetPusat = await getTargetSppJuliPusat(cleanUnit, yr, mo)
-      if (targetPusat <= 0) {
-        return { error: 'Belum ada pembayaran SPP Juli santri baru yang dapat disetorkan.' }
-      }
-    }
 
     await execute(
       `INSERT INTO spp_setoran
@@ -1192,7 +1298,7 @@ export async function submitSetoranAsrama(
       entityType: 'spp_setoran',
       entityId: `${cleanUnit}:${yr}:${mo}:${tujuanSetoran}`,
       entityLabel: cleanUnit,
-      summary: `Mengirim setoran SPP ${cleanUnit} ke ${tujuanSetoran === 'BENDAHARA_PUSAT' ? 'Bendahara Pesantren' : 'Dewan Santri'}`,
+      summary: `Mengirim setoran SPP ${cleanUnit} ke Dewan Santri`,
       details: { tahun: yr, bulan: mo, tujuan_setoran: tujuanSetoran, jumlah: jumlahTotal, nama_penyetor: namaPenyetor.trim() },
     })
 
@@ -1240,8 +1346,12 @@ export async function batalkanPembayaranSPP(logId: string): Promise<{ success: b
   try {
     const session = await getSession()
     await assertSantriAccess(session, current.santri_id)
-    const collectionYear = Number(String(current.tanggal_bayar).slice(0, 4))
-    const collectionMonth = Number(String(current.tanggal_bayar).slice(5, 7))
+    const collectionYear = current.tujuan_setoran === 'BENDAHARA_PUSAT' && current.bulan === 7
+      ? current.tahun
+      : Number(String(current.tanggal_bayar).slice(0, 4))
+    const collectionMonth = current.tujuan_setoran === 'BENDAHARA_PUSAT' && current.bulan === 7
+      ? 7
+      : Number(String(current.tanggal_bayar).slice(5, 7))
     const confirmed = await queryOne<{ id: string }>(`
       SELECT id FROM spp_setoran
       WHERE tahun = ? AND bulan = ? AND tujuan_setoran = ? AND status = 'dikonfirmasi'
