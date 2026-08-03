@@ -16,6 +16,14 @@ export async function getSetoranSppBaru(tahun: number, bulan: number) {
   const nextMonth = bulan === 12 ? 1 : bulan + 1
   const nextYear = bulan === 12 ? tahun + 1 : tahun
   const end = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
+  // SPP khusus santri baru selalu masuk ke setoran pusat pada periode
+  // Agustus. Jadi pada filter Agustus, baca tagihan Juli tanpa bergantung
+  // pada tanggal pembayaran (bisa dibayar lewat PSB pada Juli atau lewat
+  // modul SPP pada Agustus).
+  const ledgerPeriodSql = bulan === 8
+    ? 'sl.tahun = ? AND sl.bulan = 7'
+    : 'sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?'
+  const ledgerPeriodParams = bulan === 8 ? [tahun] : [start, end]
 
   const rows = await query<any>(`
     WITH ledger AS (
@@ -24,7 +32,7 @@ export async function getSetoranSppBaru(tahun: number, bulan: number) {
              SUM(sl.nominal_bayar) AS target_sistem
       FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
       WHERE sl.tujuan_setoran = 'BENDAHARA_PUSAT'
-        AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
+        AND ${ledgerPeriodSql}
       GROUP BY COALESCE(NULLIF(TRIM(s.asrama), ''), 'LAINNYA')
     )
     SELECT l.*, ss.id AS setoran_id, ss.jumlah_aktual, ss.nama_penyetor,
@@ -34,16 +42,16 @@ export async function getSetoranSppBaru(tahun: number, bulan: number) {
       AND ss.tujuan_setoran = 'BENDAHARA_PUSAT'
     LEFT JOIN users u ON u.id = ss.penerima_id
     ORDER BY l.unit_setor
-  `, [start, end, tahun, bulan])
+  `, [...ledgerPeriodParams, tahun, bulan])
 
   const details = await query<any>(`
     SELECT sl.id, sl.tahun, sl.bulan, sl.nominal_bayar, sl.tanggal_bayar,
            s.nama_lengkap, s.nis, COALESCE(NULLIF(TRIM(s.asrama), ''), 'LAINNYA') AS unit_setor
     FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
     WHERE sl.tujuan_setoran = 'BENDAHARA_PUSAT'
-      AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
+      AND ${ledgerPeriodSql}
     ORDER BY unit_setor, s.nama_lengkap
-  `, [start, end])
+  `, ledgerPeriodParams)
   return { rows, details }
 }
 

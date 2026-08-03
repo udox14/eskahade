@@ -23,6 +23,26 @@ function isPsbJuliSpecial(bulan: number, tujuanSetoran: string | null | undefine
   return Number(bulan) === 7 && tujuanSetoran === 'BENDAHARA_PUSAT'
 }
 
+/**
+ * SPP Juli santri baru disetorkan pada periode Agustus, terlepas dari
+ * tanggal pembayaran di spp_log (dibayar lewat PSB pada Juli atau dibayar
+ * dari modul SPP pada Agustus).
+ */
+async function getTargetSppJuliPusat(unitSetor: string, tahun: number, periodeBulan: number) {
+  if (periodeBulan !== 8) return 0
+
+  const row = await queryOne<{ total: number }>(
+    `SELECT COALESCE(SUM(sl.nominal_bayar), 0) AS total
+     FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
+     WHERE sl.tujuan_setoran = 'BENDAHARA_PUSAT'
+       AND sl.tahun = ? AND sl.bulan = 7
+       AND (CASE WHEN s.kategori_santri = ? THEN ? ELSE COALESCE(s.asrama, '') END) = ?`,
+    [tahun, SADESA_CATEGORY, SADESA_UNIT, unitSetor]
+  )
+
+  return Number(row?.total ?? 0)
+}
+
 type SppClientScope = {
   kind: 'ASRAMA' | 'SADESA' | 'ADMIN'
   lockedUnit: string | null
@@ -1080,14 +1100,7 @@ export async function getSetoranInfoBulanIni() {
        WHERE COALESCE(NULLIF(TRIM(unit_setor), ''), asrama) = ? AND tahun = ? AND bulan = ?`,
       [unit, yr, mo]
     ),
-    queryOne<{ total: number }>(
-      `SELECT COALESCE(SUM(sl.nominal_bayar), 0) AS total
-       FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
-       WHERE sl.tujuan_setoran = 'BENDAHARA_PUSAT'
-         AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
-         AND (CASE WHEN s.kategori_santri = ? THEN ? ELSE COALESCE(s.asrama, '') END) = ?`,
-      [`${yr}-${String(mo).padStart(2, '0')}-01`, `${mo === 12 ? yr + 1 : yr}-${String(mo === 12 ? 1 : mo + 1).padStart(2, '0')}-01`, SADESA_CATEGORY, SADESA_UNIT, unit]
-    ),
+    getTargetSppJuliPusat(unit, yr, mo),
   ])
 
   const setoranDewan = setoranRows.find((row: any) => row.tujuan_setoran === 'DEWAN_SANTRI') ?? null
@@ -1100,7 +1113,7 @@ export async function getSetoranInfoBulanIni() {
     tanggalMulai: windowRow?.tanggal_mulai ?? null,
     setoran: setoranDewan,
     setoranPusat,
-    targetPusat: targetPusat?.total ?? 0,
+    targetPusat: Number(targetPusat ?? 0),
   }
 }
 
@@ -1121,12 +1134,17 @@ export async function submitSetoranAsrama(
     const mo = now.getMonth() + 1
     const today = now.toISOString().slice(0, 10)
 
-    const windowRow = await queryOne<{ tanggal_mulai: string }>(
-      `SELECT tanggal_mulai FROM spp_setoran_window WHERE tahun = ? AND bulan = ?`,
-      [yr, mo]
-    )
-    if (!windowRow) return { error: 'Dewan Santri belum membuka periode setoran bulan ini.' }
-    if (today < windowRow.tanggal_mulai) return { error: `Setoran baru dibuka mulai ${windowRow.tanggal_mulai}.` }
+    const isSetoranPusat = tujuanSetoran === 'BENDAHARA_PUSAT'
+    if (!isSetoranPusat) {
+      const windowRow = await queryOne<{ tanggal_mulai: string }>(
+        `SELECT tanggal_mulai FROM spp_setoran_window WHERE tahun = ? AND bulan = ?`,
+        [yr, mo]
+      )
+      if (!windowRow) return { error: 'Dewan Santri belum membuka periode setoran bulan ini.' }
+      if (today < windowRow.tanggal_mulai) return { error: `Setoran baru dibuka mulai ${windowRow.tanggal_mulai}.` }
+    } else if (mo !== 8) {
+      return { error: 'Setoran SPP Juli santri baru dibuka pada periode Agustus.' }
+    }
 
     const existing = await queryOne<{ tanggal_terima: string | null }>(
       `SELECT tanggal_terima FROM spp_setoran WHERE COALESCE(NULLIF(TRIM(unit_setor), ''), asrama) = ? AND tahun = ? AND bulan = ? AND tujuan_setoran = ?`,
@@ -1137,6 +1155,13 @@ export async function submitSetoranAsrama(
     const jumlahTotal = (jumlahBulanIni || 0) + (jumlahTunggakan || 0)
     if (jumlahTotal <= 0) return { error: 'Jumlah setoran harus lebih dari 0.' }
     if (!namaPenyetor.trim()) return { error: 'Nama penyetor wajib diisi.' }
+
+    if (isSetoranPusat) {
+      const targetPusat = await getTargetSppJuliPusat(cleanUnit, yr, mo)
+      if (targetPusat <= 0) {
+        return { error: 'Belum ada pembayaran SPP Juli santri baru yang dapat disetorkan.' }
+      }
+    }
 
     await execute(
       `INSERT INTO spp_setoran

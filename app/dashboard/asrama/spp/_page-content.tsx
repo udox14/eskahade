@@ -248,6 +248,7 @@ export default function SPPPage() {
     } else {
       toast.success('Pembayaran Berhasil!')
       await loadData()
+      refreshSetoranInfo()
       if (view === 'PAYMENT' && selectedSantri?.id === santri.id) {
         await refreshSelectedStatus()
       }
@@ -316,6 +317,7 @@ export default function SPPPage() {
     if ('error' in res) { toast.error(res.error) } else {
       toast.success('Pembayaran Berhasil!')
       await loadData()
+      refreshSetoranInfo()
       await refreshSelectedStatus()
     }
   }
@@ -355,6 +357,7 @@ export default function SPPPage() {
     if ('error' in res) { toast.error(res.error) } else {
       toast.success(`${res.count} santri berhasil ditandai lunas`)
       await loadData()
+      refreshSetoranInfo()
     }
   }
 
@@ -704,7 +707,7 @@ export default function SPPPage() {
         const row = setoranInfo?.setoranPusat
         const fmtRpLocal = (n: number) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`
         return <div className="overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50 px-4 py-3"><div><h3 className="text-sm font-bold text-emerald-900">Setoran SPP Juli Santri Baru ke Bendahara Pesantren</h3><p className="text-xs text-emerald-700">Target sistem periode penerimaan ini: {fmtRpLocal(setoranInfo?.targetPusat || 0)}</p></div><Wallet className="h-5 w-5 text-emerald-700"/></div>
+          <div className="flex items-center justify-between border-b border-emerald-100 bg-emerald-50 px-4 py-3"><div><h3 className="text-sm font-bold text-emerald-900">Setoran SPP Juli Santri Baru — Periode Agustus</h3><p className="text-xs text-emerald-700">Target sistem untuk dikonfirmasi Bendahara: {fmtRpLocal(setoranInfo?.targetPusat || 0)}</p></div><Wallet className="h-5 w-5 text-emerald-700"/></div>
           {row?.tanggal_terima ? <div className="flex gap-3 p-4 text-sm"><CheckCircle className="h-5 w-5 text-green-600"/><div><b className="text-green-700">Sudah Dikonfirmasi Bendahara Pesantren</b><p className="text-slate-500">{row.nama_penyetor} · {fmtRpLocal(row.jumlah_aktual)}</p></div></div>
           : row?.tanggal_setor ? <div className="flex gap-3 p-4 text-sm"><Clock className="h-5 w-5 text-blue-600"/><div><b className="text-blue-700">Menunggu Konfirmasi Bendahara Pesantren</b><p className="text-slate-500">{row.nama_penyetor} · {fmtRpLocal(row.jumlah_aktual)}</p></div></div>
           : <form onSubmit={handleSubmitSetoranPusat} className="grid gap-3 p-4 md:grid-cols-[1fr_1fr_auto]">
