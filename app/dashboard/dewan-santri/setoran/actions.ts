@@ -11,6 +11,7 @@ import {
   getSppStudentStartKeySql,
   isSppBillablePeriod,
 } from '@/lib/spp/tunggakan'
+import { tujuanSetoranSql } from '@/lib/spp/tujuan-setoran'
 
 const EXCLUDE_NON_SPP_ASRAMA_SQL = "AND UPPER(TRIM(COALESCE(asrama, ''))) <> 'AL-BAGHORY'"
 
@@ -160,11 +161,16 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
         WHERE td.tahun = ? AND td.bulan = ? AND td.is_active = 1
           AND ${targetKey} >= bs.spp_start_key
         UNION
-        -- SPP Juli santri baru: netral (uang ke Bendahara Pusat, bukan setoran asrama)
-        SELECT DISTINCT sl.santri_id
-        FROM spp_log sl
-        JOIN base_santri bs ON bs.id = sl.santri_id
-        WHERE sl.tahun = ? AND sl.bulan = ? AND sl.tujuan_setoran = 'BENDAHARA_PUSAT'
+        -- Santri baru PSB angkatan ini: SPP Juli-nya ke Bendahara Pusat,
+        -- bukan kewajiban asrama — terlepas sudah bayar atau belum.
+        -- FIX: sebelumnya hanya cek spp_log (hanya yang sudah bayar),
+        -- sehingga santri PSB di AL-FALAH/BAHAGIA yang belum bayar Juli
+        -- salah masuk wajib_bayar asrama. Sekarang cek langsung dari
+        -- kriteria santri menggunakan tujuanSetoranSql.
+        SELECT DISTINCT bs.id AS santri_id
+        FROM base_santri bs
+        JOIN santri s ON s.id = bs.id
+        WHERE ${tujuanSetoranSql('s', String(tahun), String(bulan))} = 'BENDAHARA_PUSAT'
           AND ${targetKey} >= bs.spp_start_key
       ),
       lebih_awal_unit AS (
@@ -231,15 +237,14 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     GROUP BY bs.unit_setor
     ORDER BY CASE WHEN bs.unit_setor = ? THEN 1 ELSE 0 END, bs.unit_setor
   `, [
-    SADESA_CATEGORY, SADESA_UNIT,
-    tahun, bulan,
-    tahun, bulan, monthStart, monthEnd,
-    tahun, bulan,
-    tahun, bulan,
-    tahun, bulan, monthStart, monthEnd,
-    // kas_bulan_ini_unit params: tahun, bulan, monthStart, monthEnd, targetKey
-    tahun, bulan, monthStart, monthEnd, targetKey,
-    SADESA_UNIT,
+    SADESA_CATEGORY, SADESA_UNIT,                    // base_santri
+    tahun, bulan,                                    // bayar_ini
+    tahun, bulan, monthStart, monthEnd,              // bayar_tunggakan
+    tahun, bulan,                                    // ditiadakan_ini sumber 1 (manual)
+    // ditiadakan_ini sumber 2 tidak butuh params (tujuanSetoranSql pakai interpolasi langsung)
+    tahun, bulan, monthStart, monthEnd,              // lebih_awal_unit
+    tahun, bulan, monthStart, monthEnd, targetKey,   // kas_bulan_ini_unit
+    SADESA_UNIT,                                     // ORDER BY
   ])
 
   const setoranRows = await query<{

@@ -293,11 +293,13 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
         FROM spp_tagihan_ditiadakan
         WHERE tahun = ? AND bulan = ? AND is_active = 1
         UNION
-        -- SPP Juli santri baru: netral untuk asrama (uang ke Bendahara Pusat),
-        -- diperlakukan seperti tidak ada tagihan di sisi asrama.
-        SELECT DISTINCT santri_id
-        FROM spp_log
-        WHERE tahun = ? AND bulan = ? AND tujuan_setoran = 'BENDAHARA_PUSAT'
+        -- Santri baru PSB angkatan ini: SPP Juli ke Bendahara Pusat, bukan asrama.
+        -- FIX: ganti dari cek spp_log (hanya yang sudah bayar) ke cek kriteria santri
+        -- langsung agar santri PSB yang belum bayar Juli juga masuk tidak_ada_tagihan.
+        SELECT DISTINCT bs.id AS santri_id
+        FROM base_santri bs
+        JOIN santri s ON s.id = bs.id
+        WHERE ${tujuanSetoranSql('s', String(tahun), String(currentMonth))} = 'BENDAHARA_PUSAT'
       ),
       uang_masuk_bulan_ini AS (
         SELECT sl.santri_id, sl.nominal_bayar, sl.bulan, sl.tahun
@@ -328,8 +330,8 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
     LEFT JOIN bayar_ini bi ON bi.santri_id = bs.id
     LEFT JOIN uang_masuk_bulan_ini um ON um.santri_id = bs.id
     LEFT JOIN uang_historis_masuk_bulan_ini uh ON uh.santri_id = bs.id
-  `, sadesaMode ? [SADESA_CATEGORY, tahun, currentMonth, tahun, currentMonth, tahun, currentMonth, currentMonthStart, currentMonthEnd, currentMonthStart, currentMonthEnd]
-                : [SADESA_CATEGORY, unit, tahun, currentMonth, tahun, currentMonth, tahun, currentMonth, currentMonthStart, currentMonthEnd, currentMonthStart, currentMonthEnd])
+  `, sadesaMode ? [SADESA_CATEGORY, tahun, currentMonth, tahun, currentMonth, currentMonthStart, currentMonthEnd, currentMonthStart, currentMonthEnd]
+                : [SADESA_CATEGORY, unit, tahun, currentMonth, tahun, currentMonth, currentMonthStart, currentMonthEnd, currentMonthStart, currentMonthEnd])
 
   let totalSantri = 0
   let bebasSppCount = 0
