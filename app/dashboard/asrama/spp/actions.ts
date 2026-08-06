@@ -365,7 +365,10 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
         uangTunggakanLama += row.nominal_historis_masuk
       }
       if (row.nominal_bayar_masuk > 0) {
-        const isTunggakan = (row.tahun_tagihan_dibayar * 100 + row.bulan_tagihan_dibayar) < (new Date().getFullYear() * 100 + currentMonth)
+        // Fix #10: pakai parameter `tahun` (bukan new Date().getFullYear()) sebagai referensi.
+        // Sebelumnya pakai waktu real-time sehingga rekap tahun lalu selalu menganggap
+        // semua pembayaran sebagai tunggakan (karena tahun_tagihan_dibayar < tahun sekarang).
+        const isTunggakan = (row.tahun_tagihan_dibayar * 100 + row.bulan_tagihan_dibayar) < (tahun * 100 + currentMonth)
         if (isTunggakan) {
           uangTunggakanLama += row.nominal_bayar_masuk
         } else {

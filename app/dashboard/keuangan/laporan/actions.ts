@@ -1,9 +1,16 @@
 'use server'
 
 import { query } from '@/lib/db'
+import { getSession, hasAnyRole } from '@/lib/auth/session'
 import { getCachedBiayaSettings } from '@/lib/cache/master'
 
 export async function getLaporanKeuangan(tahun: number) {
+  // Fix #11: Auth guard — hanya admin/keuangan yang boleh akses laporan keuangan
+  const session = await getSession()
+  if (!session || !hasAnyRole(session, ['admin', 'keuangan', 'bendahara_pusat'])) {
+    throw new Error('Akses ditolak: hanya admin atau keuangan yang dapat melihat laporan ini.')
+  }
+
   const startDate = `${tahun}-01-01`
   const endDate = `${tahun}-12-31`
 
@@ -19,8 +26,10 @@ export async function getLaporanKeuangan(tahun: number) {
     ORDER BY pt.tanggal_bayar DESC
   `, [startDate, endDate])
 
-  // SPP Juli yang dibayar via flow PSB tercatat di spp_log (bertag psb_receipt_id).
-  // Uangnya milik Bendahara Pusat — dimunculkan di sini, TIDAK di setoran asrama.
+  // SPP Juli yang diarahkan ke Bendahara Pusat (santri baru PSB atau kategori BARU).
+  // Fix #5: Filter diubah dari `psb_receipt_id IS NOT NULL` ke `tujuan_setoran = 'BENDAHARA_PUSAT'`.
+  // Filter lama melewatkan pembayaran SPP Juli yang dilakukan via modul asrama
+  // (Quick Pay / pembayaran manual) karena tidak menyimpan psb_receipt_id.
   const sppJuliPsb = await query<any>(`
     SELECT sl.id, sl.nominal_bayar, sl.tanggal_bayar, sl.keterangan,
            s.nama_lengkap, s.nis, s.asrama,
@@ -28,7 +37,7 @@ export async function getLaporanKeuangan(tahun: number) {
     FROM spp_log sl
     JOIN santri s ON s.id = sl.santri_id
     LEFT JOIN users u ON u.id = sl.penerima_id
-    WHERE sl.psb_receipt_id IS NOT NULL
+    WHERE sl.tujuan_setoran = 'BENDAHARA_PUSAT'
       AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar <= ?
     ORDER BY sl.tanggal_bayar DESC
   `, [startDate, endDate])

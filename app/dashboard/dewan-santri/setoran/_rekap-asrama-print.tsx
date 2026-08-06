@@ -297,7 +297,7 @@ const RekapAsramaSheet = React.forwardRef<HTMLDivElement, { payload: RekapAsrama
 
         <div className="notes">
           <div>*Mohon isi dengan lengkap</div>
-          <div>*Rincian Setor = (Jumlah Santri yang Bayar Bulan ini + Jumlah Santri yang Bayar Tunggakan Bulan lalu) × {formatCurrency(ringkasan.tarif)} = Total Setoran</div>
+          <div>*Rincian Setor = Kas SPP Bulan Ini + Uang Pelunasan Tunggakan + Uang Titipan (Bayar Lebih Awal) = Total Setoran</div>
         </div>
       </div>
     )

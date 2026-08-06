@@ -125,18 +125,22 @@ export async function getNonSppOutstandingSantri(
 
   // BANGUNAN: lifetime, tanpa filter tahun ajaran
   {
-    const paidRow = await queryOne<{ total: number }>(`
-      SELECT COALESCE(SUM(nominal_bayar), 0) AS total
+    const paidRow = await queryOne<{ total: number; has_exemption: number }>(`
+      SELECT COALESCE(SUM(nominal_bayar), 0) AS total,
+             -- Cek apakah ada record pembebasan (nominal_bayar = 0 adalah marker pembebasan)
+             MAX(CASE WHEN nominal_bayar = 0 THEN 1 ELSE 0 END) AS has_exemption
       FROM pembayaran_tahunan p
       WHERE p.santri_id = ? AND p.jenis_biaya = 'BANGUNAN' AND COALESCE(p.status, 'AKTIF') != 'VOID'
     `, [santriId])
     const rawPaid = toInt(paidRow?.total)
-    const paid = legacySettled && tarif.BANGUNAN <= 0 ? 0 : rawPaid
+    // Jika ada record pembebasan (nominal_bayar = 0), santri dianggap lunas penuh
+    const isExempted = (paidRow?.has_exemption ?? 0) === 1
+    const paid = (legacySettled && tarif.BANGUNAN <= 0) ? 0 : (isExempted ? tarif.BANGUNAN : rawPaid)
     items.push({
       jenis: 'BANGUNAN',
       tarif: tarif.BANGUNAN,
       paid,
-      sisa: Math.max(0, tarif.BANGUNAN - paid),
+      sisa: isExempted ? 0 : Math.max(0, tarif.BANGUNAN - paid),
       tahun_ajaran_id: tahunAjaran.id,
       tahun_tagihan: null,
     })
@@ -144,20 +148,24 @@ export async function getNonSppOutstandingSantri(
 
   // Tahunan: per tahun ajaran (fallback tahun_tagihan utk baris lama tanpa TA)
   for (const jenis of NON_SPP_JENIS_TAHUNAN) {
-    const paidRow = await queryOne<{ total: number }>(`
-      SELECT COALESCE(SUM(nominal_bayar), 0) AS total
+    const paidRow = await queryOne<{ total: number; has_exemption: number }>(`
+      SELECT COALESCE(SUM(nominal_bayar), 0) AS total,
+             -- Cek apakah ada record pembebasan (nominal_bayar = 0 adalah marker pembebasan)
+             MAX(CASE WHEN nominal_bayar = 0 THEN 1 ELSE 0 END) AS has_exemption
       FROM pembayaran_tahunan p
       WHERE p.santri_id = ? AND p.jenis_biaya = ?
         AND COALESCE(p.status, 'AKTIF') != 'VOID'
         AND ((p.tahun_ajaran_id = ?) OR (p.tahun_ajaran_id IS NULL AND p.tahun_tagihan = ?))
     `, [santriId, jenis, tahunAjaran.id, tahunTagihan])
     const rawPaid = toInt(paidRow?.total)
-    const paid = legacySettled && tarif[jenis] <= 0 ? 0 : rawPaid
+    // Jika ada record pembebasan (nominal_bayar = 0), santri dianggap lunas penuh
+    const isExempted = (paidRow?.has_exemption ?? 0) === 1
+    const paid = (legacySettled && tarif[jenis] <= 0) ? 0 : (isExempted ? tarif[jenis] : rawPaid)
     items.push({
       jenis,
       tarif: tarif[jenis],
       paid,
-      sisa: Math.max(0, tarif[jenis] - paid),
+      sisa: isExempted ? 0 : Math.max(0, tarif[jenis] - paid),
       tahun_ajaran_id: tahunAjaran.id,
       tahun_tagihan: tahunTagihan,
     })

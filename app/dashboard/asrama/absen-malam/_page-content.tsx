@@ -331,7 +331,7 @@ export default function AbsenMalamPage() {
 
       {/* FIXED BOTTOM */}
       {kamars.length > 0 && santriKamar.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-3 bg-gradient-to-t from-slate-100 to-transparent z-40">
+        <div className="fixed bottom-0 left-0 right-0 px-4 pb-24 md:pb-6 pt-3 bg-gradient-to-t from-slate-100 to-transparent z-40">
           <div className="max-w-lg mx-auto flex gap-3">
             <button onClick={() => setKamarIdx(i => Math.max(0, i - 1))} disabled={kamarIdx === 0}
               className="p-3.5 bg-white border rounded-2xl shadow disabled:opacity-30 active:scale-90">

@@ -253,7 +253,10 @@ export async function getSantriPembebasan(filter: {
        SELECT p.santri_id, p.jenis_biaya, p.tahun_tagihan
        FROM pembayaran_tahunan p
        INNER JOIN selected_santri ss ON ss.id = p.santri_id
-       WHERE p.tahun_tagihan = ?`,
+       -- Hanya ambil record pembebasan (nominal_bayar = 0), bukan pembayaran normal.
+       -- Fix: sebelumnya semua transaksi terambil sehingga pembayaran normal
+       -- muncul sebagai badge "BEBAS" di UI dan tombol Cabut tidak berfungsi.
+       WHERE p.tahun_tagihan = ? AND p.nominal_bayar = 0`,
       [...params, tahun]
     )
 

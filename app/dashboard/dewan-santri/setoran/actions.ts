@@ -98,6 +98,8 @@ type MonitoringRow = {
   orang_bayar: number
   nominal_lebih_awal: number
   orang_lebih_awal: number
+  // Fix #1: kas aktual yang masuk bulan ini untuk tagihan bulan ini
+  kas_bulan_ini: number
 }
 
 export async function getMonitoringSetoran(tahun: number, bulan: number) {
@@ -177,6 +179,25 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
           AND sl.tujuan_setoran = 'DEWAN_SANTRI'
         GROUP BY bs.unit_setor
       ),
+      -- Fix #1 + #4: CTE terpisah untuk menghitung KAS TUNAI bulan ini
+      -- (bayar tagihan bulan ini, dibayar dalam rentang tanggal bulan ini).
+      -- Fix #4: filter portal_submission_id IS NULL agar pembayaran via Portal
+      -- Ortu (transfer bank/QRIS) tidak masuk saldo KAS TUNAI asrama.
+      -- Pembayaran portal tetap terhitung LUNAS di bayar_bulan_ini (progress),
+      -- tapi tidak dicatat sebagai uang fisik yang dipegang bendahara asrama.
+      kas_bulan_ini_unit AS (
+        SELECT bs.unit_setor,
+               SUM(sl.nominal_bayar) AS total_nominal
+        FROM base_santri bs
+        JOIN spp_log sl ON sl.santri_id = bs.id
+        WHERE sl.tahun = ? AND sl.bulan = ?
+          AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
+          AND sl.tujuan_setoran = 'DEWAN_SANTRI'
+          AND sl.portal_submission_id IS NULL
+          AND bs.bebas_spp = 0
+          AND ? >= bs.spp_start_key
+        GROUP BY bs.unit_setor
+      ),
       tunggakan_unit AS (
         SELECT bs.unit_setor,
                SUM(bt.jumlah_bayar) AS jumlah_bayar,
@@ -197,12 +218,16 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
       COALESCE(tu.jumlah_bayar, 0) AS bayar_tunggakan_lalu,
       COALESCE(tu.orang_bayar, 0) AS orang_bayar,
       COALESCE(la.nominal_lebih_awal, 0) AS nominal_lebih_awal,
-      COALESCE(la.orang_lebih_awal, 0) AS orang_lebih_awal
+      COALESCE(la.orang_lebih_awal, 0) AS orang_lebih_awal,
+      -- Fix #1: kas aktual yang diterima bulan ini untuk tagihan bulan ini
+      -- (berbeda dari bayar_bulan_ini yang cek status lunas tanpa filter tanggal)
+      COALESCE(kb.total_nominal, 0) AS kas_bulan_ini
     FROM base_santri bs
     LEFT JOIN bayar_ini bi ON bi.santri_id = bs.id
     LEFT JOIN ditiadakan_ini di ON di.santri_id = bs.id
     LEFT JOIN tunggakan_unit tu ON tu.unit_setor = bs.unit_setor
     LEFT JOIN lebih_awal_unit la ON la.unit_setor = bs.unit_setor
+    LEFT JOIN kas_bulan_ini_unit kb ON kb.unit_setor = bs.unit_setor
     GROUP BY bs.unit_setor
     ORDER BY CASE WHEN bs.unit_setor = ? THEN 1 ELSE 0 END, bs.unit_setor
   `, [
@@ -212,6 +237,8 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     tahun, bulan,
     tahun, bulan,
     tahun, bulan, monthStart, monthEnd,
+    // kas_bulan_ini_unit params: tahun, bulan, monthStart, monthEnd, targetKey
+    tahun, bulan, monthStart, monthEnd, targetKey,
     SADESA_UNIT,
   ])
 
@@ -286,7 +313,10 @@ export async function getMonitoringSetoran(tahun: number, bulan: number) {
     const persentase = isBeforeBillingStart || r.wajib_bayar <= 0 ? 0 : Math.round((r.bayar_bulan_ini / r.wajib_bayar) * 100)
     const bayarTunggakan = (isBeforeBillingStart ? 0 : r.bayar_tunggakan_lalu) + (historisPaid?.jumlah_bayar ?? 0)
     const orangBayarTunggakan = (isBeforeBillingStart ? 0 : r.orang_bayar) + (historisPaid?.orang_bayar ?? 0)
-    const nominalBulanIni = isBeforeBillingStart ? 0 : r.bayar_bulan_ini * tarif
+    const nominalBulanIni = isBeforeBillingStart ? 0 : r.kas_bulan_ini
+    // Catatan: bayar_bulan_ini × tarif TIDAK dipakai lagi untuk nominal kas karena
+    // akan double counting jika santri bayar bulan berikutnya di bulan ini (titipan).
+    // bayar_bulan_ini tetap dipakai hanya untuk persentase/progress.
     const nominalTunggakanBerjalan = isBeforeBillingStart ? 0 : (tunggakanPaidMap.get(r.unit_setor) ?? 0)
     const nominalTunggakanHistoris = historisPaid?.total_nominal ?? 0
     const totalNominal = nominalBulanIni + nominalTunggakanBerjalan + nominalTunggakanHistoris + r.nominal_lebih_awal
