@@ -225,12 +225,12 @@ export async function getPsbFinancialReport(filters: PsbFinancialFilters = {}) {
            r.id AS receipt_id, r.receipt_no, r.total AS receipt_total,
            r.created_at AS receipt_created_at, r.metode, u.id AS penerima_id, u.full_name AS penerima_nama
     FROM spp_log sl
-    JOIN psb_payment_receipt r ON r.id = sl.psb_receipt_id
+    LEFT JOIN psb_payment_receipt r ON r.id = sl.psb_receipt_id
     JOIN santri s ON s.id = sl.santri_id
     LEFT JOIN psb_flow pf ON pf.santri_id = s.id
     LEFT JOIN users u ON u.id = sl.penerima_id
     WHERE ${baseWhere}
-      AND sl.psb_receipt_id IS NOT NULL
+      AND (sl.psb_receipt_id IS NOT NULL OR sl.tujuan_setoran = 'BENDAHARA_PUSAT')
       AND COALESCE(r.is_void, 0) = 0
       AND sl.bulan = ?
   `, [SPP_JULI_BULAN])

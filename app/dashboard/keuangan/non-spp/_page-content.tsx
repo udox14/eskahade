@@ -471,7 +471,10 @@ function MiniLedger({ santriId, tahunAjaranId, onVoid }: { santriId: string; tah
                 {p.batch_id && <p>Batch: {p.batch_id.slice(0, 8)}</p>}
                 {p.status === 'VOID' && <p className="font-bold">VOID: {p.void_reason}</p>}
               </div>
-              {p.status !== 'VOID' && !p.psb_receipt_id && <button onClick={() => voidPayment(p.id)} className="rounded border border-red-200 bg-white px-2 py-1 font-bold text-red-700">Void</button>}
+              <div className="flex gap-1">
+                {p.status !== 'VOID' && !p.psb_receipt_id && <a href={`/dashboard/keuangan/non-spp/kuitansi/${p.id}`} target="_blank" className="rounded border border-emerald-200 bg-white px-2 py-1 font-bold text-emerald-700 hover:bg-emerald-50">Cetak</a>}
+                {p.status !== 'VOID' && !p.psb_receipt_id && <button onClick={() => voidPayment(p.id)} className="rounded border border-red-200 bg-white px-2 py-1 font-bold text-red-700 hover:bg-red-50">Void</button>}
+              </div>
             </div>
           </div>
         ))}
