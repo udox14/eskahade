@@ -9,10 +9,7 @@ import {
   SectionCard,
   DataTable,
   Badge,
-  MonthSelect,
-  AsramaSelect,
-  FilterBar,
-  usePageNav,
+  MonthAsramaFilter,
 } from '../_components/pimpinan-ui'
 
 export const dynamic = 'force-dynamic'
@@ -41,7 +38,7 @@ export default async function PimpinanAbsensiSantriPage({
         actions={<PrintButton />}
       />
 
-      <AbsensiSantriFilter
+      <MonthAsramaFilter
         month={data.period.month}
         asrama={params.asrama || ''}
         asramaOptions={asramaOptions}
@@ -156,23 +153,5 @@ export default async function PimpinanAbsensiSantriPage({
         </SectionCard>
       </div>
     </div>
-  )
-}
-
-function AbsensiSantriFilter({
-  month,
-  asrama,
-  asramaOptions,
-}: {
-  month: string
-  asrama: string
-  asramaOptions: string[]
-}) {
-  const navigate = usePageNav()
-  return (
-    <FilterBar>
-      <MonthSelect value={month} onChange={value => navigate({ month: value, asrama })} />
-      <AsramaSelect value={asrama} onChange={value => navigate({ month, asrama: value })} options={asramaOptions} />
-    </FilterBar>
   )
 }

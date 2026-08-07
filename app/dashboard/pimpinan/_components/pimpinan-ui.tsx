@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils'
 import { BULAN_PANJANG } from '@/lib/pimpinan/format'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { PimpinanNav } from './pimpinan-nav'
 
 export function PageHeader({
   title,
@@ -23,11 +24,14 @@ export function PageHeader({
   actions?: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div className="min-w-0">
-        <DashboardPageHeader title={title} description={description || ''} />
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <DashboardPageHeader title={title} description={description || ''} />
+        </div>
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      <PimpinanNav />
     </div>
   )
 }
@@ -242,6 +246,33 @@ export function MonthSelect({
         ))}
       </select>
     </label>
+  )
+}
+
+export function MonthPeriodFilter({ month }: { month: string }) {
+  const navigate = usePageNav()
+  return (
+    <FilterBar>
+      <MonthSelect value={month} onChange={value => navigate({ month: value })} />
+    </FilterBar>
+  )
+}
+
+export function MonthAsramaFilter({
+  month,
+  asrama,
+  asramaOptions,
+}: {
+  month: string
+  asrama: string
+  asramaOptions: string[]
+}) {
+  const navigate = usePageNav()
+  return (
+    <FilterBar>
+      <MonthSelect value={month} onChange={value => navigate({ month: value, asrama })} />
+      <AsramaSelect value={asrama} onChange={value => navigate({ month, asrama: value })} options={asramaOptions} />
+    </FilterBar>
   )
 }
 

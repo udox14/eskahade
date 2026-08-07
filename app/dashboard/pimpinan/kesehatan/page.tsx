@@ -8,9 +8,7 @@ import {
   KpiCard,
   SectionCard,
   DataTable,
-  MonthSelect,
-  FilterBar,
-  usePageNav,
+  MonthPeriodFilter,
 } from '../_components/pimpinan-ui'
 
 export const dynamic = 'force-dynamic'
@@ -33,7 +31,7 @@ export default async function PimpinanKesehatanPage({
         actions={<PrintButton />}
       />
 
-      <KesehatanFilter month={data.period.month} />
+      <MonthPeriodFilter month={data.period.month} />
 
       <div className="print-area space-y-5">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -102,14 +100,5 @@ export default async function PimpinanKesehatanPage({
         </SectionCard>
       </div>
     </div>
-  )
-}
-
-function KesehatanFilter({ month }: { month: string }) {
-  const navigate = usePageNav()
-  return (
-    <FilterBar>
-      <MonthSelect value={month} onChange={value => navigate({ month: value })} />
-    </FilterBar>
   )
 }

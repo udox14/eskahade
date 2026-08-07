@@ -9,10 +9,8 @@ import {
   SectionCard,
   DataTable,
   Badge,
-  MonthSelect,
-  FilterBar,
+  MonthPeriodFilter,
 } from '../_components/pimpinan-ui'
-import { usePageNav } from '../_components/pimpinan-ui'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +32,7 @@ export default async function PimpinanKeuanganPage({
         actions={<PrintButton />}
       />
 
-      <MonthFilter month={data.period.month} />
+      <MonthPeriodFilter month={data.period.month} />
 
       <div className="print-area space-y-5">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -125,14 +123,5 @@ export default async function PimpinanKeuanganPage({
         </SectionCard>
       </div>
     </div>
-  )
-}
-
-function MonthFilter({ month }: { month: string }) {
-  const navigate = usePageNav()
-  return (
-    <FilterBar>
-      <MonthSelect value={month} onChange={value => navigate({ month: value })} />
-    </FilterBar>
   )
 }

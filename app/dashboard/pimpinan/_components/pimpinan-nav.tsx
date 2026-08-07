@@ -40,26 +40,31 @@ export function PimpinanNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="no-print flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {PIMPINAN_MENU.map(item => {
-        const Icon = item.icon
-        const active = pathname === item.href || (item.href !== '/dashboard/pimpinan' && pathname.startsWith(item.href))
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              'inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition',
-              active
-                ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            {item.label}
-          </Link>
-        )
-      })}
+    <nav
+      aria-label="Navigasi monitoring pimpinan"
+      className="no-print -mx-4 overflow-x-auto border-b border-slate-200 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0"
+    >
+      <div className="flex min-w-max gap-1">
+        {PIMPINAN_MENU.map(item => {
+          const Icon = item.icon
+          const active = pathname === item.href || (item.href !== '/dashboard/pimpinan' && pathname.startsWith(item.href))
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'flex min-h-11 items-center gap-1.5 border-b-2 px-3 py-3 text-xs font-bold transition-colors sm:min-h-0 sm:py-2.5',
+                active
+                  ? 'border-emerald-600 text-emerald-700'
+                  : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {item.label}
+            </Link>
+          )
+        })}
+      </div>
     </nav>
   )
 }
