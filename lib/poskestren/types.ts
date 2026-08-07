@@ -1,6 +1,6 @@
 export type PoskestrenJabatan = 'ketua' | 'bendahara' | 'sekretaris'
 export type PoskestrenPersonnelType = 'MEDICAL' | 'EMPLOYEE'
-export type PoskestrenVisitStatus = 'MENUNGGU' | 'DIPERIKSA' | 'SELESAI' | 'DIRUJUK' | 'BATAL'
+export type PoskestrenVisitStatus = 'MENUNGGU' | 'DIPERIKSA' | 'OBAT' | 'SELESAI' | 'DIRUJUK' | 'BATAL'
 export type PoskestrenPageSize = 20 | 50 | 100 | 'all'
 export type PoskestrenStockMovementType =
   | 'PURCHASE'

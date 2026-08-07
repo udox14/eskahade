@@ -12,6 +12,7 @@ import {
   History,
   Hospital,
   Loader2,
+  Package,
   Plus,
   MapPin,
   Search,
@@ -59,15 +60,17 @@ import {
 } from './clinical-actions'
 import { DormVisitsTab, OutsideTreatmentTab } from './clinical-tabs'
 import { MedicalRecordsTab } from './medical-records-tab'
+import { MedicineDeliveryTab } from './medicine-delivery-tab'
 import { DiagnosisManagerButton } from './diagnosis-manager'
 import { PreventiveMedicineButton } from './preventive-medicine'
 
 
-type Tab = 'pasien' | 'hari-ini' | 'pemeriksaan' | 'preventif' | 'visit-asrama' | 'berobat-keluar'
+type Tab = 'pasien' | 'hari-ini' | 'penyerahan' | 'pemeriksaan' | 'preventif' | 'visit-asrama' | 'berobat-keluar'
 
 const TABS = [
   { value: 'pasien' as const, label: 'Daftar Pasien', icon: UserPlus },
   { value: 'hari-ini' as const, label: 'Pasien Hari Ini', icon: CalendarDays },
+  { value: 'penyerahan' as const, label: 'Penyerahan Obat', icon: Package },
   { value: 'pemeriksaan' as const, label: 'Data Pemeriksaan', icon: History },
   { value: 'preventif' as const, label: 'Preventif', icon: Activity },
   { value: 'visit-asrama' as const, label: 'Visit Asrama', icon: Building2 },
@@ -168,7 +171,8 @@ export default function PoskestrenPemeriksaanContent() {
       />
       <PoskestrenTabs tabs={visibleTabs} active={effectiveActiveTab} onChange={changeTab} />
       {effectiveActiveTab === 'pasien' ? <PatientTab /> : null}
-      {effectiveActiveTab === 'hari-ini' ? <TodayTab /> : null}
+      {effectiveActiveTab === 'hari-ini' ? <TodayTab onGoToDelivery={() => changeTab('penyerahan')} /> : null}
+      {effectiveActiveTab === 'penyerahan' ? <MedicineDeliveryTab /> : null}
       {effectiveActiveTab === 'pemeriksaan' ? <MedicalRecordsTab isFull={access.isFull} /> : null}
       {effectiveActiveTab === 'preventif' ? <PreventiveTab canWrite={access.isFull} /> : null}
       {effectiveActiveTab === 'visit-asrama' && access.isFull ? <DormVisitsTab /> : null}
@@ -188,6 +192,8 @@ function PatientTab() {
   const [santriRows, setSantriRows] = useState<any[]>([])
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
   const [editingPatient, setEditingPatient] = useState<any>(null)
+  const [registeringPatient, setRegisteringPatient] = useState<any>(null)
+  const [registeringSick, setRegisteringSick] = useState<any>(null)
   const [pending, startTransition] = useTransition()
 
   const load = useCallback(async (cursor = '') => {
@@ -243,10 +249,66 @@ function PatientTab() {
   }
 
   function addVisit(patient: any) {
+    setRegisteringPatient(patient)
+  }
+
+  function submitRegistration(payload: {
+    complaint: string
+    temperatureCelsius: number | null
+    systolicPressure: number | null
+    diastolicPressure: number | null
+    weightKg: number | null
+    diseaseHistory: string
+    allergies: string
+  }, target: any) {
     startTransition(async () => {
-      const result = await registerManualVisit({ patientId: patient.id })
+      const result = await registerManualVisit({
+        patientId: target.id,
+        complaint: payload.complaint,
+        temperatureCelsius: payload.temperatureCelsius,
+        systolicPressure: payload.systolicPressure,
+        diastolicPressure: payload.diastolicPressure,
+        weightKg: payload.weightKg,
+        diseaseHistory: payload.diseaseHistory,
+        allergies: payload.allergies,
+      })
       if (!result.success) { toast.error(result.error); return }
-      toast.success(`${patient.nama_lengkap} masuk antrean hari ini.`)
+      toast.success(`${target.nama_lengkap} masuk antrean hari ini.`)
+      setRegisteringPatient(null)
+      await load()
+    })
+  }
+
+  function submitSickRegistration(payload: {
+    complaint: string
+    temperatureCelsius: number | null
+    systolicPressure: number | null
+    diastolicPressure: number | null
+    weightKg: number | null
+    diseaseHistory: string
+    allergies: string
+  }) {
+    if (!registeringSick) return
+    startTransition(async () => {
+      try {
+        const result = await importSickEpisode({
+          episodeId: registeringSick.episode_id,
+          absenSakitId: registeringSick.absen_sakit_id,
+          temperatureCelsius: payload.temperatureCelsius,
+          systolicPressure: payload.systolicPressure,
+          diastolicPressure: payload.diastolicPressure,
+          weightKg: payload.weightKg,
+          diseaseHistory: payload.diseaseHistory,
+          allergies: payload.allergies,
+        })
+        if (!result.success) { toast.error(result.error); return }
+        toast.success(`${registeringSick.nama_lengkap} berhasil diimpor ke antrean POSKESTREN.`)
+        setRegisteringSick(null)
+        setShowSick(false)
+        await load()
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Gagal mengimpor episode.')
+      }
     })
   }
 
@@ -342,17 +404,33 @@ function PatientTab() {
         <SickCandidatesModal
           pending={pending}
           onClose={() => setShowSick(false)}
-          onImport={(row) => startTransition(async () => {
-            try {
-              const result = await importSickEpisode({ episodeId: row.episode_id, absenSakitId: row.absen_sakit_id })
-              if (!result.success) { toast.error(result.error); return }
-              toast.success(`${row.nama_lengkap} berhasil diimpor ke antrean POSKESTREN.`)
-              setShowSick(false)
-              await load()
-            } catch (e) {
-              toast.error(e instanceof Error ? e.message : 'Gagal mengimpor episode.')
-            }
-          })}
+          onImport={(row) => setRegisteringSick(row)}
+        />
+      ) : null}
+
+      {registeringPatient ? (
+        <RegistrationModal
+          title={`Registrasi Kunjungan · ${registeringPatient.nama_lengkap}`}
+          subtitle={`${registeringPatient.medical_record_no} · ${registeringPatient.nis} · ${registeringPatient.asrama || '—'} / ${registeringPatient.kamar || '—'}`}
+          defaultComplaint=""
+          initialAllergies={registeringPatient.allergies || ''}
+          initialDiseaseHistory={registeringPatient.special_conditions || ''}
+          pending={pending}
+          onClose={() => setRegisteringPatient(null)}
+          onSubmit={payload => submitRegistration(payload, registeringPatient)}
+        />
+      ) : null}
+
+      {registeringSick ? (
+        <RegistrationModal
+          title={`Impor ke Antrean · ${registeringSick.nama_lengkap}`}
+          subtitle="Keluhan terisi dari Data Sakit. Lengkapi tanda vital lalu simpan."
+          defaultComplaint={registeringSick.sakit_apa || ''}
+          initialAllergies={registeringSick.allergies || ''}
+          initialDiseaseHistory={registeringSick.special_conditions || ''}
+          pending={pending}
+          onClose={() => setRegisteringSick(null)}
+          onSubmit={submitSickRegistration}
         />
       ) : null}
 
@@ -413,6 +491,69 @@ function PatientTab() {
           </div>
         </div>
       ) : null}
+    </div>
+  )
+}
+
+function RegistrationModal({
+  title,
+  subtitle,
+  defaultComplaint,
+  initialAllergies,
+  initialDiseaseHistory,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  title: string
+  subtitle: string
+  defaultComplaint?: string
+  initialAllergies?: string
+  initialDiseaseHistory?: string
+  pending: boolean
+  onClose: () => void
+  onSubmit: (payload: {
+    complaint: string
+    temperatureCelsius: number | null
+    systolicPressure: number | null
+    diastolicPressure: number | null
+    weightKg: number | null
+    diseaseHistory: string
+    allergies: string
+  }) => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+        <div className="sticky top-0 flex items-center justify-between border-b bg-slate-50 px-5 py-4">
+          <div><h2 className="text-sm font-bold text-slate-800">{title}</h2><p className="text-xs text-slate-500">{subtitle}</p></div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">Tutup</button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5">
+          <form action={formData => onSubmit({
+            complaint: String(formData.get('complaint') || ''),
+            temperatureCelsius: Number(formData.get('temperature') || 0) || null,
+            systolicPressure: Number(formData.get('systolic') || 0) || null,
+            diastolicPressure: Number(formData.get('diastolic') || 0) || null,
+            weightKg: Number(formData.get('weight') || 0) || null,
+            diseaseHistory: String(formData.get('diseaseHistory') || ''),
+            allergies: String(formData.get('allergies') || ''),
+          })} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-4">
+              <Field label="Suhu °C"><input type="number" step="0.1" min={30} max={45} name="temperature" placeholder="36.5" className={inputClass} /></Field>
+              <Field label="TD Sistolik"><input type="number" min={40} max={300} name="systolic" placeholder="120" className={inputClass} /></Field>
+              <Field label="TD Diastolik"><input type="number" min={30} max={200} name="diastolic" placeholder="80" className={inputClass} /></Field>
+              <Field label="Berat kg"><input type="number" step="0.1" min={1} max={300} name="weight" placeholder="45" className={inputClass} /></Field>
+            </div>
+            <Field label="Keluhan *"><textarea required name="complaint" defaultValue={defaultComplaint || ''} className={`${inputClass} min-h-24`} /></Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Riwayat Penyakit"><textarea name="diseaseHistory" defaultValue={initialDiseaseHistory || ''} className={`${inputClass} min-h-24`} /></Field>
+              <Field label="Alergi Obat"><textarea name="allergies" defaultValue={initialAllergies || ''} className={`${inputClass} min-h-24`} /></Field>
+            </div>
+            <button disabled={pending} className={`${buttonPrimary} w-full`}>{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />} Simpan pendaftaran</button>
+          </form>
+        </div>
+      </div>
     </div>
   )
 }
@@ -541,7 +682,7 @@ function SickCandidatesModal({
   )
 }
 
-function TodayTab() {
+function TodayTab({ onGoToDelivery }: { onGoToDelivery: () => void }) {
   const [date, setDate] = useState(toWibDateInputValue())
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('')
@@ -606,6 +747,7 @@ function TodayTab() {
       total: items.length,
       waiting: items.filter((item: any) => item.status === 'MENUNGGU').length,
       active: items.filter((item: any) => item.status === 'DIPERIKSA').length,
+      medicine: items.filter((item: any) => item.status === 'OBAT').length,
       done: items.filter((item: any) => item.status === 'SELESAI' || item.status === 'DIRUJUK').length,
     }
   }, [result.items])
@@ -630,7 +772,7 @@ function TodayTab() {
         referralNotes: String(formData.get('referralNotes') || ''),
         prescriptionItems: prescription,
       }),
-      'Pemeriksaan diselesaikan.'
+      'Pemeriksaan disimpan. Obat dapat diserahkan di tab Penyerahan Obat.'
     )
     setExamVisit(null)
     setPrescription([])
@@ -641,10 +783,11 @@ function TodayTab() {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <MetricCard label="Antrean tampil" value={counts.total} detail={date} />
         <MetricCard label="Menunggu" value={counts.waiting} tone="amber" />
         <MetricCard label="Diperiksa" value={counts.active} tone="blue" />
+        <MetricCard label="Menunggu obat" value={counts.medicine} tone="rose" />
         <MetricCard label="Selesai/rujuk" value={counts.done} tone="slate" />
       </div>
 
@@ -682,7 +825,7 @@ function TodayTab() {
         <div className="grid gap-3 border-b bg-slate-50/50 p-4 md:grid-cols-[160px_1fr_180px_auto]">
           <input type="date" value={date} onChange={event => setDate(event.target.value)} className={inputClass} />
           <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={q} onChange={event => setQ(event.target.value)} placeholder="Pasien, NIS, asrama, diagnosis..." className={`${inputClass} pl-9`} /></div>
-          <select value={status} onChange={event => setStatus(event.target.value)} className={inputClass}><option value="">Semua status</option>{['MENUNGGU','DIPERIKSA','SELESAI','DIRUJUK','BATAL'].map(value => <option key={value}>{value}</option>)}</select>
+          <select value={status} onChange={event => setStatus(event.target.value)} className={inputClass}><option value="">Semua status</option>{['MENUNGGU','DIPERIKSA','OBAT','SELESAI','DIRUJUK','BATAL'].map(value => <option key={value}>{value}</option>)}</select>
           <PageSizeSelect value={pageSize} onChange={setPageSize} hasFilter={Boolean(q || status || date)} />
         </div>
         {loading ? <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div> : result.items.length ? (
@@ -694,7 +837,7 @@ function TodayTab() {
                   <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-lg font-black text-emerald-700">{visit.queue_number}</span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2"><p className="font-bold">{visit.nama_lengkap}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${visit.status === 'MENUNGGU' ? 'bg-amber-100 text-amber-700' : visit.status === 'DIPERIKSA' ? 'bg-blue-100 text-blue-700' : visit.status === 'BATAL' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'}`}>{visit.status}</span>{visit.source_type === 'DATA_SAKIT' ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">DATA SAKIT</span> : null}</div>
+                  <div className="flex flex-wrap items-center gap-2"><p className="font-bold">{visit.nama_lengkap}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${visit.status === 'MENUNGGU' ? 'bg-amber-100 text-amber-700' : visit.status === 'DIPERIKSA' ? 'bg-blue-100 text-blue-700' : visit.status === 'OBAT' ? 'bg-violet-100 text-violet-700' : visit.status === 'BATAL' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'}`}>{visit.status}</span>{visit.source_type === 'DATA_SAKIT' ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">DATA SAKIT</span> : null}</div>
                   <p className="text-xs text-slate-500">{visit.nis} · {visit.asrama || '—'} / {visit.kamar || '—'} · {visit.medical_record_no}</p>
                   <p className="mt-1 text-sm text-slate-700">{visit.diagnosis || visit.complaint || 'Belum ada keluhan'}</p>
                   {visit.allergies ? <p className="mt-1 text-xs font-bold text-rose-600">Alergi Obat: {visit.allergies}</p> : null}
@@ -702,7 +845,8 @@ function TodayTab() {
                 <div className="flex flex-wrap gap-2">
                   {visit.status === 'MENUNGGU' && selectedSessionId ? <button disabled={pending} onClick={() => run(() => beginVisitWithSession({ visitId: visit.id, practiceSessionId: selectedSessionId }), 'Pemeriksaan dimulai.')} className={buttonPrimary}>Periksa</button> : null}
                   {visit.status === 'DIPERIKSA' ? <button onClick={() => { setExamVisit(visit); setPrescription([]) }} className={buttonPrimary}>Isi pemeriksaan</button> : null}
-                  {['MENUNGGU','DIPERIKSA'].includes(visit.status) ? <button disabled={pending} onClick={() => { const reason = window.prompt('Alasan pembatalan:'); if (reason) run(() => cancelVisit(visit.id, reason), 'Kunjungan dibatalkan.') }} className={buttonSecondary}>Batal</button> : null}
+                  {visit.status === 'OBAT' ? <button onClick={onGoToDelivery} className={buttonPrimary}><Package className="h-4 w-4" /> Penyerahan obat</button> : null}
+                  {['MENUNGGU','DIPERIKSA','OBAT'].includes(visit.status) ? <button disabled={pending} onClick={() => { const reason = window.prompt('Alasan pembatalan:'); if (reason) run(() => cancelVisit(visit.id, reason), 'Kunjungan dibatalkan.') }} className={buttonSecondary}>Batal</button> : null}
                 </div>
               </article>
             ))}
@@ -723,13 +867,14 @@ function TodayTab() {
                   <tr key={visit.id} className="hover:bg-slate-50/70">
                     <td className="px-4 py-3"><span className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl bg-emerald-100 px-2 font-black text-emerald-700">{visit.queue_number}</span></td>
                     <td className="px-4 py-3"><p className="font-bold">{visit.nama_lengkap}</p><p className="text-xs text-slate-500">{visit.nis} · {visit.asrama || '—'} / {visit.kamar || '—'}</p>{visit.allergies ? <p className="text-xs font-bold text-rose-600">Alergi Obat: {visit.allergies}</p> : null}</td>
-                    <td className="px-4 py-3"><div className="flex flex-wrap gap-1"><span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${visit.status === 'MENUNGGU' ? 'bg-amber-100 text-amber-700' : visit.status === 'DIPERIKSA' ? 'bg-blue-100 text-blue-700' : visit.status === 'BATAL' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'}`}>{visit.status}</span>{visit.source_type === 'DATA_SAKIT' ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">DATA SAKIT</span> : null}</div></td>
+                    <td className="px-4 py-3"><div className="flex flex-wrap gap-1"><span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${visit.status === 'MENUNGGU' ? 'bg-amber-100 text-amber-700' : visit.status === 'DIPERIKSA' ? 'bg-blue-100 text-blue-700' : visit.status === 'OBAT' ? 'bg-violet-100 text-violet-700' : visit.status === 'BATAL' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'}`}>{visit.status}</span>{visit.source_type === 'DATA_SAKIT' ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">DATA SAKIT</span> : null}</div></td>
                     <td className="max-w-md px-4 py-3 text-slate-700">{visit.diagnosis || visit.complaint || 'Belum ada keluhan'}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
                         {visit.status === 'MENUNGGU' && selectedSessionId ? <button disabled={pending} onClick={() => run(() => beginVisitWithSession({ visitId: visit.id, practiceSessionId: selectedSessionId }), 'Pemeriksaan dimulai.')} className={buttonPrimary}>Periksa</button> : null}
                         {visit.status === 'DIPERIKSA' ? <button onClick={() => { setExamVisit(visit); setPrescription([]) }} className={buttonPrimary}>Isi pemeriksaan</button> : null}
-                        {['MENUNGGU','DIPERIKSA'].includes(visit.status) ? <button disabled={pending} onClick={() => { const reason = window.prompt('Alasan pembatalan:'); if (reason) run(() => cancelVisit(visit.id, reason), 'Kunjungan dibatalkan.') }} className={buttonSecondary}>Batal</button> : null}
+                        {visit.status === 'OBAT' ? <button onClick={onGoToDelivery} className={buttonPrimary}><Package className="h-4 w-4" /> Penyerahan obat</button> : null}
+                        {['MENUNGGU','DIPERIKSA','OBAT'].includes(visit.status) ? <button disabled={pending} onClick={() => { const reason = window.prompt('Alasan pembatalan:'); if (reason) run(() => cancelVisit(visit.id, reason), 'Kunjungan dibatalkan.') }} className={buttonSecondary}>Batal</button> : null}
                       </div>
                     </td>
                   </tr>
@@ -750,6 +895,14 @@ function TodayTab() {
             </div>
             <div className="flex-1 overflow-y-auto p-5">
               <form action={submitExam} className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-xs font-bold uppercase text-slate-500">Data Pendaftaran (dari petugas)</p>
+                <div className="mt-2 grid gap-3 text-sm sm:grid-cols-3">
+                  <div><span className="text-xs font-bold text-slate-400">Tanda vital</span><p className="font-semibold">Suhu {examVisit.temperature_celsius ?? '—'}°C · TD {examVisit.systolic_pressure ?? '—'}/{examVisit.diastolic_pressure ?? '—'} · BB {examVisit.weight_kg ?? '—'} kg</p></div>
+                  <div><span className="text-xs font-bold text-slate-400">Riwayat penyakit</span><p className="font-semibold">{examVisit.special_conditions || 'Tidak ada catatan'}</p></div>
+                  <div><span className="text-xs font-bold text-slate-400">Alergi obat</span><p className="font-semibold text-rose-600">{examVisit.allergies || 'Tidak ada catatan'}</p></div>
+                </div>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Keluhan *"><textarea required name="complaint" defaultValue={examVisit.complaint || ''} className={`${inputClass} min-h-24`} /></Field>
                 <div><Field label="Diagnosis *"><select required name="diagnosisId" className={inputClass}><option value="">Pilih diagnosis</option>{diagnoses.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><DiagnosisManagerButton onChanged={load} /></div>

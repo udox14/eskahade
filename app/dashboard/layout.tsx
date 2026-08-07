@@ -4,6 +4,7 @@ import { getSession, getEffectiveRoles } from "@/lib/auth/session";
 import { queryOne } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { getFiturForRoles, getBottomNavGlobalEnabled, type FiturAkses } from "@/lib/cache/fitur-akses";
+import { getSidebarGroups, type SidebarGroupConfig } from "@/lib/menu/groups";
 import { ensureOperasionalSchema } from '@/lib/operasional'
 
 import { capitalizeEachWord } from '@/lib/utils';
@@ -62,29 +63,31 @@ export default async function DashboardLayout({
       // NULL = belum diset user → ikut default (aktif), 0 = user matiin sendiri
       userShowBottomNav = user.show_bottomnav !== 0
     }
-  } catch (err: any) {
-    console.error('[layout] queryOne users ERROR:', err?.message)
+  } catch (err: unknown) {
+    console.error('[layout] queryOne users ERROR:', err instanceof Error ? err.message : err)
   }
 
   console.log('[layout] accessRoles:', accessRoles)
 
   try {
     await ensureOperasionalSchema()
-  } catch (err: any) {
-    console.error('[layout] ensureOperasionalSchema ERROR:', err?.message)
+  } catch (err: unknown) {
+    console.error('[layout] ensureOperasionalSchema ERROR:', err instanceof Error ? err.message : err)
   }
 
-  // Ambil fitur dan setting bottomnav secara paralel
+  // Ambil fitur, setting bottomnav, dan konfigurasi grup sidebar secara paralel
   let fiturAkses: FiturAkses[] = []
   let globalBottomNavEnabled = true
+  let sidebarGroups: SidebarGroupConfig[] = []
 
   try {
-    [fiturAkses, globalBottomNavEnabled] = await Promise.all([
+    [fiturAkses, globalBottomNavEnabled, sidebarGroups] = await Promise.all([
       getFiturForRoles(accessRoles, session.id),
       getBottomNavGlobalEnabled(),
+      getSidebarGroups(),
     ])
-  } catch (err: any) {
-    console.error('[layout] fetch error:', err?.message)
+  } catch (err: unknown) {
+    console.error('[layout] fetch error:', err instanceof Error ? err.message : err)
     try { fiturAkses = await getFiturForRoles(accessRoles, session.id) } catch {}
   }
 
@@ -117,6 +120,7 @@ export default async function DashboardLayout({
       userName={userName}
       avatarUrl={avatarUrl}
       fiturAkses={fiturAkses}
+      sidebarGroups={sidebarGroups}
       globalBottomNavEnabled={globalBottomNavEnabled}
       userShowBottomNav={userShowBottomNav}
     >

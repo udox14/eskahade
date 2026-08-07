@@ -58,7 +58,7 @@ export function MonthlyReport({ month }: { month: string }) {
       <MetricCard label="Dari Data Sakit" value={visits.sick_source || 0} tone="slate" />
     </div>
     <ReportSection title="Layanan pemeriksaan">
-      <div className="grid gap-3 sm:grid-cols-5"><Mini label="Menunggu" value={visits.waiting} /><Mini label="Diperiksa" value={visits.examining} /><Mini label="Selesai" value={visits.completed} /><Mini label="Dirujuk" value={visits.referred} /><Mini label="Batal" value={visits.cancelled} /></div>
+      <div className="grid gap-3 sm:grid-cols-6"><Mini label="Menunggu" value={visits.waiting} /><Mini label="Diperiksa" value={visits.examining} /><Mini label="Menunggu obat" value={visits.waiting_medicine} /><Mini label="Selesai" value={visits.completed} /><Mini label="Dirujuk" value={visits.referred} /><Mini label="Batal" value={visits.cancelled} /></div>
       <div className="mt-4 grid gap-4 lg:grid-cols-3"><SimpleTable title="Kunjungan per asrama" rows={data.visitsByDorm} columns={[['label', 'Asrama'], ['total', 'Kunjungan']]} /><SimpleTable title="Diagnosis terbanyak" rows={data.diagnoses} columns={[['label', 'Diagnosis'], ['total', 'Jumlah']]} /><SimpleTable title="Tenaga medis" rows={data.medicalStaff} columns={[['label', 'Nama'], ['total', 'Kunjungan'], ['referred', 'Rujukan']]} /></div>
     </ReportSection>
     <ReportSection title="Program preventif">

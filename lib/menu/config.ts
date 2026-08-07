@@ -160,40 +160,10 @@ export function getMenuTitle(title: string) {
   return MENU_TITLE_MAP[title] ?? title;
 }
 
-export const GROUP_ITEM_ORDER: Record<string, string[]> = {
-  'Master Data': [
-    'Tahun Ajaran',
-    'Setup Tahun Ajaran',
-    'Kelas',
-    'Kitab',
-    'Kitab Guru',
-    'Guru & Jadwal',
-    'Tools Santri',
-    'Arsip Alumni',
-    'Periode Perpulangan',
-    'Master Pelanggaran',
-    'User',
-    'Fitur Akses',
-    'Log Aktivitas',
-  ],
-};
-
-export function sortGroupItems(group: string, items: FiturAkses[]) {
-  const preferredOrder = GROUP_ITEM_ORDER[group];
-  if (!preferredOrder) return items;
-
-  const rankMap = new Map(preferredOrder.map((title, index) => [title, index]));
-  return [...items].sort((a, b) => {
-    const aTitle = getMenuTitle(a.title);
-    const bTitle = getMenuTitle(b.title);
-    const aRank = rankMap.get(aTitle);
-    const bRank = rankMap.get(bTitle);
-
-    if (aRank != null && bRank != null) return aRank - bRank;
-    if (aRank != null) return -1;
-    if (bRank != null) return 1;
-    return a.urutan - b.urutan;
-  });
+// Urutan item dalam grup: kolom `urutan` di fitur_akses adalah sumber kebenaran
+// (diubah lewat admin UI /dashboard/pengaturan/fitur-akses → tab Susunan).
+export function sortFiturItems(items: FiturAkses[]) {
+  return [...items].sort((a, b) => (a.urutan - b.urutan) || (a.id - b.id));
 }
 
 export const GROUP_ORDER = [

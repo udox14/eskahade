@@ -40,6 +40,7 @@ export async function getMonthlyReport(month: string) {
               COUNT(DISTINCT p.santri_id) AS unique_patients,
               COUNT(CASE WHEN v.status = 'MENUNGGU' THEN 1 END) AS waiting,
               COUNT(CASE WHEN v.status = 'DIPERIKSA' THEN 1 END) AS examining,
+              COUNT(CASE WHEN v.status = 'OBAT' THEN 1 END) AS waiting_medicine,
               COUNT(CASE WHEN v.status = 'SELESAI' THEN 1 END) AS completed,
               COUNT(CASE WHEN v.status = 'DIRUJUK' THEN 1 END) AS referred,
               COUNT(CASE WHEN v.status = 'BATAL' THEN 1 END) AS cancelled,

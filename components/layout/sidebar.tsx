@@ -21,8 +21,9 @@ import {
   GROUP_ICON,
   GROUP_ORDER,
   ROLE_LABEL,
-  sortGroupItems,
+  sortFiturItems,
 } from "@/lib/menu/config";
+import type { SidebarGroupConfig } from "@/lib/menu/groups";
 
 type ThemeKey = 'light' | 'emerald' | 'blue' | 'purple' | 'rose' | 'slate';
 
@@ -239,13 +240,14 @@ interface SidebarProps {
   userRole?: string;
   userRoles?: string[];
   fiturAkses: FiturAkses[];
+  sidebarGroups?: SidebarGroupConfig[];
   isCollapsed: boolean;
   toggleSidebar: () => void;
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
 }
 
-export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isCollapsed, toggleSidebar, isMobileOpen = false, onMobileClose }: SidebarProps) {
+export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sidebarGroups = [], isCollapsed, toggleSidebar, isMobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const [theme, setTheme] = useState<ThemeKey>('light');
   const [mounted, setMounted] = useState(false);
@@ -259,15 +261,36 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
     if (!groupMap.has(f.group_name)) groupMap.set(f.group_name, []);
     groupMap.get(f.group_name)!.push(f);
   }
-  const groupedMenu = GROUP_ORDER
-    .filter(g => groupMap.has(g))
-    .map(g => ({ group: g, items: sortGroupItems(g, groupMap.get(g)!) }))
+
+  // Urutan & label grup dari tabel sidebar_groups (DB), dengan fallback ke
+  // GROUP_ORDER legacy kalau tabel kosong/belum migrasi.
+  const groupCfgMap = new Map<string, SidebarGroupConfig>();
+  for (const g of sidebarGroups) groupCfgMap.set(g.group_name, g);
+
+  const minUrutanOf = (group: string) => Math.min(...groupMap.get(group)!.map(i => i.urutan));
+
+  const cfgOrdered = [...sidebarGroups]
+    .filter(g => g.is_active && groupMap.has(g.group_name))
+    .sort((a, b) => (a.urutan - b.urutan) || a.group_name.localeCompare(b.group_name))
+    .map(g => g.group_name);
+  const configuredSet = new Set(cfgOrdered);
+  const fallbackOrder = GROUP_ORDER.filter(g => groupMap.has(g) && !configuredSet.has(g));
+  const fallbackSet = new Set(fallbackOrder);
+  const leftoverOrder = Array.from(groupMap.keys())
+    .filter(g => !configuredSet.has(g) && !fallbackSet.has(g))
+    .sort((a, b) => (minUrutanOf(a) - minUrutanOf(b)) || a.localeCompare(b));
+  const orderedGroups = [...cfgOrdered, ...fallbackOrder, ...leftoverOrder];
+
+  const groupLabel = (group: string) => groupCfgMap.get(group)?.label || group;
+
+  const groupedMenu = orderedGroups
+    .map(g => ({ group: g, label: groupLabel(g), items: sortFiturItems(groupMap.get(g)!) }))
     .map(g => {
       if (!searchQuery) return g;
       const lowerQuery = searchQuery.toLowerCase();
       const filteredItems = g.items.filter(i => 
         getMenuTitle(i.title).toLowerCase().includes(lowerQuery) || 
-        (g.group !== '_standalone' && g.group.toLowerCase().includes(lowerQuery))
+        (g.group !== '_standalone' && g.label.toLowerCase().includes(lowerQuery))
       );
       return { ...g, items: filteredItems };
     })
@@ -422,7 +445,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
 
         {/* ── NAV — grup menu (scrollable) ── */}
         <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-transparent hover:[&::-webkit-scrollbar-thumb]:bg-slate-300 transition-colors pb-10">
-          {groupedMenu.map(({ group, items }) => {
+          {groupedMenu.map(({ group, label, items }) => {
 
             // Item standalone (top-level, tanpa folder)
             if (group === '_standalone') {
@@ -491,7 +514,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, isColl
                         "font-semibold text-xs tracking-normal transition-colors",
                         hasActiveChild || isOpen ? c.activeText : `${c.mutedText} ${c.hoverText}`
                       )}>
-                        {group}
+                        {label}
                       </span>
                     )}
                   </div>

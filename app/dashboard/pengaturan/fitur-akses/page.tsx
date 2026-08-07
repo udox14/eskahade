@@ -1,7 +1,7 @@
 import { guardPage } from '@/lib/auth/guard'
-import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getSession, isAdmin } from '@/lib/auth/session'
 import { redirect } from 'next/navigation'
-import { getAllCrudPermissionsForAdmin, getAllFiturForAdmin, getBottomNavGlobalStatus } from './actions'
+import { getAllCrudPermissionsForAdmin, getAllFiturForAdmin, getBottomNavGlobalStatus, getSidebarGroupsForAdmin } from './actions'
 import { FiturAksesClient } from './client'
 
 export const dynamic = 'force-dynamic'
@@ -11,10 +11,11 @@ export default async function FiturAksesPage() {
   const session = await getSession()
   if (!session || !isAdmin(session)) redirect('/dashboard')
 
-  const [fiturList, globalBottomNavEnabled, crudPermissions] = await Promise.all([
+  const [fiturList, globalBottomNavEnabled, crudPermissions, sidebarGroups] = await Promise.all([
     getAllFiturForAdmin(),
     getBottomNavGlobalStatus(),
     getAllCrudPermissionsForAdmin(),
+    getSidebarGroupsForAdmin(),
   ])
 
   return (
@@ -22,13 +23,14 @@ export default async function FiturAksesPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Manajemen Fitur</h1>
         <p className="text-gray-500 text-sm mt-1">
-          Kelola akses fitur per role pengguna. Perubahan berlaku dalam ~5 menit (cache).
+          Kelola akses fitur per role pengguna, serta susunan menu sidebar (urutan, nama, grup). Perubahan berlaku dalam ~5 menit (cache).
         </p>
       </div>
       <FiturAksesClient
         fiturList={fiturList}
         globalBottomNavEnabled={globalBottomNavEnabled}
         crudPermissions={crudPermissions}
+        sidebarGroups={sidebarGroups}
       />
     </div>
   )

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { toggleFiturActive, addRoleToFitur, removeRoleFromFitur, toggleFiturBottomNav, setBottomNavUrutan, toggleBottomNavGlobal, toggleCrudPermission } from './actions'
-import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone, ShieldCheck, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Trash2, Search, X, RotateCcw } from 'lucide-react'
+import { toggleFiturActive, addRoleToFitur, removeRoleFromFitur, toggleFiturBottomNav, setBottomNavUrutan, toggleBottomNavGlobal, toggleCrudPermission, createSidebarGroup, renameSidebarGroup, moveSidebarGroup, toggleSidebarGroupActive, deleteSidebarGroup, updateFiturTitle, moveFiturToGroup, reorderFiturItems } from './actions'
+import { ToggleRight, ToggleLeft, ShieldAlert, Info, Users, CheckCircle2, XCircle, LayoutGrid, Smartphone, ShieldCheck, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Trash2, Search, X, RotateCcw, ListOrdered, Plus, Check, Eye, EyeOff, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CrudAction } from '@/lib/auth/crud'
 
@@ -215,8 +215,17 @@ interface FiturItem {
   icon: string
   roles: string[]
   is_active: boolean
+  urutan: number
   is_bottomnav: boolean
   bottomnav_urutan: number
+}
+
+interface SidebarGroupItem {
+  group_name: string
+  label: string | null
+  urutan: number
+  is_active: boolean
+  item_count: number
 }
 
 interface CrudPermissionItem {
@@ -231,11 +240,13 @@ interface Props {
   fiturList: FiturItem[]
   globalBottomNavEnabled: boolean
   crudPermissions: CrudPermissionItem[]
+  sidebarGroups: SidebarGroupItem[]
 }
 
-function getOrderedGroups(grouped: Map<string, FiturItem[]>) {
-  const ordered = GROUP_ORDER.filter(g => grouped.has(g))
-  const extra = Array.from(grouped.keys()).filter(g => !GROUP_ORDER.includes(g)).sort()
+function getOrderedGroups(grouped: Map<string, FiturItem[]>, groupOrder?: string[]) {
+  const order = groupOrder ?? GROUP_ORDER
+  const ordered = order.filter(g => grouped.has(g))
+  const extra = Array.from(grouped.keys()).filter(g => !order.includes(g)).sort()
   return [...ordered, ...extra]
 }
 
@@ -261,17 +272,19 @@ function TabPerFitur({
   fiturList,
   loadingId,
   pending,
+  groupOrder,
   onToggleActive,
   onToggleRole,
 }: {
   fiturList: FiturItem[]
   loadingId: string | null
   pending: boolean
+  groupOrder?: string[]
   onToggleActive: (f: FiturItem) => void
   onToggleRole: (f: FiturItem, role: string) => void
 }) {
   const grouped = groupFiturList(fiturList)
-  const groups = getOrderedGroups(grouped)
+  const groups = getOrderedGroups(grouped, groupOrder)
 
   return (
     <div className="space-y-4">
@@ -352,13 +365,13 @@ function TabPerFitur({
 }
 
 // ── Tab: Per Role ─────────────────────────────────────────────────────────────
-function TabPerRole({ fiturList }: { fiturList: FiturItem[] }) {
+function TabPerRole({ fiturList, groupOrder }: { fiturList: FiturItem[]; groupOrder?: string[] }) {
   const [selectedRole, setSelectedRole] = useState<string>('sekpen')
 
   // Kelompokkan fitur yang dimiliki role terpilih, per grup
   const fiturForRole = fiturList.filter(f => f.roles.includes(selectedRole))
   const grouped = groupFiturList(fiturForRole)
-  const groups = getOrderedGroups(grouped)
+  const groups = getOrderedGroups(grouped, groupOrder)
 
   const totalAktif   = fiturForRole.filter(f => f.is_active).length
   const totalNonaktif = fiturForRole.filter(f => !f.is_active).length
@@ -1031,13 +1044,340 @@ function TabBottomNav({
   )
 }
 
+// ── Tab: Susunan Sidebar ──────────────────────────────────────────────────────
+interface TabSusunanProps {
+  fiturList: FiturItem[]
+  groups: SidebarGroupItem[]
+  pending: boolean
+  onCreateGroup: (name: string, label: string) => void
+  onRenameGroup: (g: SidebarGroupItem, label: string) => void
+  onMoveGroup: (g: SidebarGroupItem, direction: 'up' | 'down') => void
+  onToggleGroupActive: (g: SidebarGroupItem) => void
+  onDeleteGroup: (g: SidebarGroupItem, moveTo: string) => void
+  onRenameFitur: (f: FiturItem, title: string) => void
+  onMoveFitur: (f: FiturItem, targetGroup: string) => void
+  onReorderFitur: (groupName: string, orderedIds: number[]) => void
+}
+
+function TabSusunan({ fiturList, groups, pending, onCreateGroup, onRenameGroup, onMoveGroup, onToggleGroupActive, onDeleteGroup, onRenameFitur, onMoveFitur, onReorderFitur }: TabSusunanProps) {
+  const [newGroupName, setNewGroupName] = useState('')
+  const [newGroupLabel, setNewGroupLabel] = useState('')
+  const [editingGroup, setEditingGroup] = useState<string | null>(null)
+  const [editingGroupLabel, setEditingGroupLabel] = useState('')
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null)
+  const [deleteMoveTo, setDeleteMoveTo] = useState('')
+  const [editingItem, setEditingItem] = useState<number | null>(null)
+  const [editingItemTitle, setEditingItemTitle] = useState('')
+
+  const moveTargets = groups.filter(g => g.group_name !== '_standalone')
+
+  const itemsByGroup = (groupName: string) =>
+    fiturList
+      .filter(f => f.group_name === groupName)
+      .sort((a, b) => a.urutan - b.urutan || a.id - b.id)
+
+  const reorderItem = (groupName: string, index: number, dir: 'up' | 'down') => {
+    const items = itemsByGroup(groupName)
+    const target = dir === 'up' ? index - 1 : index + 1
+    if (target < 0 || target >= items.length) return
+    const next = [...items]
+    const tmp = next[index]
+    next[index] = next[target]
+    next[target] = tmp
+    onReorderFitur(groupName, next.map(i => i.id))
+  }
+
+  return (
+    <div className="space-y-4">
+
+      {/* Form buat grup baru */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex-1 min-w-[180px]">
+            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Nama grup baru</label>
+            <input
+              value={newGroupName}
+              onChange={e => setNewGroupName(e.target.value)}
+              placeholder="contoh: Kegiatan Santri"
+              className="w-full h-10 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+            />
+          </div>
+          <div className="flex-1 min-w-[180px]">
+            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Label tampilan (opsional)</label>
+            <input
+              value={newGroupLabel}
+              onChange={e => setNewGroupLabel(e.target.value)}
+              placeholder="nama yang tampil di sidebar"
+              className="w-full h-10 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (!newGroupName.trim()) return
+              onCreateGroup(newGroupName, newGroupLabel)
+              setNewGroupName('')
+              setNewGroupLabel('')
+            }}
+            disabled={pending || !newGroupName.trim()}
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+          >
+            <Plus className="w-4 h-4" />
+            Buat Grup
+          </button>
+        </div>
+      </div>
+
+      {groups.map((g, gi) => {
+        const items = itemsByGroup(g.group_name)
+        const isPinned = g.group_name === '_standalone'
+        const displayName = g.label || (isPinned ? 'Menu Utama' : g.group_name)
+
+        return (
+          <div key={g.group_name} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+            {/* Header grup */}
+            <div className={cn("border-b px-4 py-3 flex flex-wrap items-center gap-2", g.is_active ? "bg-slate-50" : "bg-red-50/40")}>
+              {!isPinned && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => onMoveGroup(g, 'up')}
+                    disabled={gi <= 1 || pending}
+                    className="w-7 h-7 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-30 transition-colors"
+                    title="Geser grup ke atas"
+                  >
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => onMoveGroup(g, 'down')}
+                    disabled={gi >= groups.length - 1 || pending}
+                    className="w-7 h-7 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-30 transition-colors"
+                    title="Geser grup ke bawah"
+                  >
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              <div className="min-w-0">
+                {editingGroup === g.group_name ? (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      autoFocus
+                      value={editingGroupLabel}
+                      onChange={e => setEditingGroupLabel(e.target.value)}
+                      className="h-8 rounded-lg border border-slate-200 px-2 text-sm font-semibold outline-none focus:border-emerald-400"
+                    />
+                    <button
+                      onClick={() => { onRenameGroup(g, editingGroupLabel); setEditingGroup(null) }}
+                      disabled={pending}
+                      className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 disabled:opacity-50"
+                      title="Simpan nama grup"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setEditingGroup(null)}
+                      className="w-7 h-7 rounded-lg border border-slate-200 bg-white text-slate-500 flex items-center justify-center hover:bg-slate-50"
+                      title="Batal"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h2 className={cn("font-semibold text-sm", g.is_active ? "text-slate-700" : "text-red-500")}>{displayName}</h2>
+                    {g.group_name !== displayName && (
+                      <span className="text-[10px] font-mono text-slate-400">{g.group_name}</span>
+                    )}
+                  </div>
+                )}
+                <div className="text-[11px] text-slate-400">
+                  {items.length} menu · {isPinned ? 'bagian terpin — selalu paling atas' : `posisi ${gi + 1}`}
+                </div>
+              </div>
+
+              <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                {!isPinned && (
+                  <>
+                    <button
+                      onClick={() => { setEditingGroup(g.group_name); setEditingGroupLabel(g.label || g.group_name) }}
+                      disabled={pending}
+                      className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                      title="Rename grup"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Rename</span>
+                    </button>
+                    <button
+                      onClick={() => onToggleGroupActive(g)}
+                      disabled={pending}
+                      className={cn(
+                        "inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-colors",
+                        g.is_active
+                          ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                          : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                      )}
+                      title={g.is_active ? 'Sembunyikan dari sidebar' : 'Tampilkan di sidebar'}
+                    >
+                      {g.is_active ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      <span className="hidden sm:inline">{g.is_active ? 'Sembunyikan' : 'Tampilkan'}</span>
+                    </button>
+                    {confirmingDelete === g.group_name ? (
+                      <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-lg px-2 py-1">
+                        <select
+                          value={deleteMoveTo}
+                          onChange={e => setDeleteMoveTo(e.target.value)}
+                          className="h-7 rounded-md border border-red-200 bg-white text-xs px-1 outline-none max-w-[150px]"
+                          title="Grup tujuan item"
+                        >
+                          <option value="">pindah item ke…</option>
+                          {moveTargets.filter(t => t.group_name !== g.group_name).map(t => (
+                            <option key={t.group_name} value={t.group_name}>{t.label || t.group_name}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => onDeleteGroup(g, deleteMoveTo)}
+                          disabled={pending || (items.length > 0 && !deleteMoveTo)}
+                          className="h-7 px-2 rounded-md bg-red-600 text-white text-xs font-semibold hover:bg-red-700 disabled:opacity-50"
+                          title="Hapus grup"
+                        >
+                          Hapus
+                        </button>
+                        <button
+                          onClick={() => { setConfirmingDelete(null); setDeleteMoveTo('') }}
+                          className="h-7 px-2 rounded-md border border-slate-200 bg-white text-slate-500 text-xs hover:bg-slate-50"
+                          title="Batal"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setConfirmingDelete(g.group_name); setDeleteMoveTo('') }}
+                        disabled={pending}
+                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                        title="Hapus grup"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Hapus</span>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Item di dalam grup */}
+            {items.length === 0 ? (
+              <div className="px-4 py-4 text-center text-xs text-slate-400">
+                Belum ada menu di grup ini. Gunakan dropdown pindah grup pada baris item untuk memindahkan menu ke sini.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {items.map((fitur, idx) => {
+                  const isFirst = idx === 0
+                  const isLast = idx === items.length - 1
+                  const Icon = getIcon(fitur.icon)
+                  return (
+                    <div key={fitur.id} className="flex items-center gap-2 px-4 py-2.5">
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => reorderItem(g.group_name, idx, 'up')}
+                          disabled={isFirst || pending}
+                          className="w-7 h-7 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-30 transition-colors"
+                          title="Naikkan"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => reorderItem(g.group_name, idx, 'down')}
+                          disabled={isLast || pending}
+                          className="w-7 h-7 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-emerald-50 hover:text-emerald-600 disabled:opacity-30 transition-colors"
+                          title="Turunkan"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <Icon className="w-4 h-4 text-slate-400 shrink-0" />
+
+                      <div className="flex-1 min-w-0">
+                        {editingItem === fitur.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              autoFocus
+                              value={editingItemTitle}
+                              onChange={e => setEditingItemTitle(e.target.value)}
+                              className="h-8 rounded-lg border border-slate-200 px-2 text-xs font-semibold outline-none focus:border-emerald-400 w-full max-w-xs"
+                            />
+                            <button
+                              onClick={() => { onRenameFitur(fitur, editingItemTitle); setEditingItem(null) }}
+                              disabled={pending}
+                              className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 disabled:opacity-50"
+                              title="Simpan nama menu"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setEditingItem(null)}
+                              className="w-7 h-7 rounded-lg border border-slate-200 bg-white text-slate-500 flex items-center justify-center hover:bg-slate-50"
+                              title="Batal"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="text-xs font-semibold text-slate-800 block sm:inline">{fitur.title}</span>
+                            <span className="text-[10px] text-slate-400 font-mono sm:ml-2 block sm:inline truncate">{fitur.href}</span>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => { setEditingItem(fitur.id); setEditingItemTitle(fitur.title) }}
+                          disabled={pending}
+                          className="w-7 h-7 rounded-lg border border-slate-200 bg-white text-slate-500 flex items-center justify-center hover:bg-slate-100 transition-colors"
+                          title="Rename menu"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <select
+                          value={fitur.group_name}
+                          onChange={e => onMoveFitur(fitur, e.target.value)}
+                          disabled={pending}
+                          className="h-8 rounded-lg border border-slate-200 bg-white text-xs px-2 outline-none focus:border-emerald-400 max-w-[150px] text-slate-600"
+                          title="Pindahkan ke grup lain"
+                        >
+                          {fitur.group_name === '_standalone' && (
+                            <option value="_standalone">Menu Utama</option>
+                          )}
+                          {moveTargets.map(t => (
+                            <option key={t.group_name} value={t.group_name}>{t.label || t.group_name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
-export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: initialGlobal, crudPermissions: initialCrudPermissions }: Props) {
+export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: initialGlobal, crudPermissions: initialCrudPermissions, sidebarGroups: initialSidebarGroups }: Props) {
   const [fiturList, setFiturList] = useState<FiturItem[]>(initial)
   const [crudPermissions, setCrudPermissions] = useState<CrudPermissionItem[]>(initialCrudPermissions)
+  const [groups, setGroups] = useState<SidebarGroupItem[]>(initialSidebarGroups)
   const [globalEnabled, setGlobalEnabled] = useState(initialGlobal)
   const [togglingGlobal, setTogglingGlobal] = useState(false)
-  const [activeTab, setActiveTab] = useState<'fitur' | 'role' | 'crud' | 'bottomnav'>('fitur')
+  const [activeTab, setActiveTab] = useState<'susunan' | 'fitur' | 'role' | 'crud' | 'bottomnav'>('susunan')
   const [searchQuery, setSearchQuery] = useState('')
   const [pending, startTransition] = useTransition()
   const [loadingId, setLoadingId] = useState<string | null>(null)
@@ -1051,6 +1391,7 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
       })
     : fiturList
   const showSearch = activeTab !== 'bottomnav'
+  const groupOrder = groups.map(g => g.group_name)
 
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
     setToast({ msg, type })
@@ -1205,6 +1546,170 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
     })
   }
 
+  // ── Susunan sidebar: grup ───────────────────────────────────────────────────
+  function handleCreateGroup(name: string, label: string) {
+    const key = 'create-group'
+    setLoadingId(key)
+    startTransition(async () => {
+      try {
+        await createSidebarGroup(name, label)
+        setGroups(prev => [...prev, {
+          group_name: name.trim(),
+          label: label.trim() || null,
+          urutan: prev.length === 0 ? 0 : Math.max(...prev.map(g => g.urutan)) + 1,
+          is_active: true,
+          item_count: 0,
+        }])
+        showToast(`Grup "${label.trim() || name.trim()}" dibuat`)
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : 'Gagal membuat grup', 'error')
+      } finally {
+        setLoadingId(null)
+      }
+    })
+  }
+
+  function handleRenameGroup(g: SidebarGroupItem, label: string) {
+    const key = `group-${g.group_name}`
+    setLoadingId(key)
+    startTransition(async () => {
+      try {
+        await renameSidebarGroup(g.group_name, label)
+        setGroups(prev => prev.map(x => x.group_name === g.group_name ? { ...x, label: label.trim() || null } : x))
+        showToast(`Grup "${g.label || g.group_name}" diubah menjadi "${label.trim() || g.group_name}"`)
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : 'Gagal rename grup', 'error')
+      } finally {
+        setLoadingId(null)
+      }
+    })
+  }
+
+  function handleMoveGroup(g: SidebarGroupItem, direction: 'up' | 'down') {
+    const key = `group-${g.group_name}`
+    setLoadingId(key)
+    startTransition(async () => {
+      try {
+        await moveSidebarGroup(g.group_name, direction)
+        setGroups(prev => {
+          const idx = prev.findIndex(x => x.group_name === g.group_name)
+          const target = direction === 'up' ? idx - 1 : idx + 1
+          if (idx === -1 || target < 0 || target >= prev.length) return prev
+          const next = prev.map(x => ({ ...x }))
+          const u = next[idx].urutan
+          next[idx].urutan = next[target].urutan
+          next[target].urutan = u
+          return next.sort((a, b) => a.urutan - b.urutan || a.group_name.localeCompare(b.group_name))
+        })
+        showToast(`Grup "${g.label || g.group_name}" digeser ke ${direction === 'up' ? 'atas' : 'bawah'}`)
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : 'Gagal menggeser grup', 'error')
+      } finally {
+        setLoadingId(null)
+      }
+    })
+  }
+
+  function handleToggleGroupActive(g: SidebarGroupItem) {
+    const key = `group-${g.group_name}`
+    setLoadingId(key)
+    startTransition(async () => {
+      try {
+        await toggleSidebarGroupActive(g.group_name)
+        setGroups(prev => prev.map(x => x.group_name === g.group_name ? { ...x, is_active: !x.is_active } : x))
+        showToast(`Grup "${g.label || g.group_name}" ${g.is_active ? 'disembunyikan dari' : 'ditampilkan di'} sidebar`)
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : 'Gagal mengubah status grup', 'error')
+      } finally {
+        setLoadingId(null)
+      }
+    })
+  }
+
+  function handleDeleteGroup(g: SidebarGroupItem, moveTo: string) {
+    const key = `group-${g.group_name}`
+    setLoadingId(key)
+    startTransition(async () => {
+      try {
+        await deleteSidebarGroup(g.group_name, moveTo || undefined)
+        setGroups(prev => {
+          let next = prev.filter(x => x.group_name !== g.group_name)
+          if (moveTo) {
+            next = next.map(x => x.group_name === moveTo ? { ...x, item_count: x.item_count + g.item_count } : x)
+            setFiturList(items => items.map(f => f.group_name === g.group_name ? { ...f, group_name: moveTo } : f))
+          }
+          return next
+        })
+        showToast(`Grup "${g.label || g.group_name}" dihapus${moveTo ? ` (${g.item_count} menu dipindah ke ${moveTo})` : ''}`)
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : 'Gagal menghapus grup', 'error')
+      } finally {
+        setLoadingId(null)
+      }
+    })
+  }
+
+  // ── Susunan sidebar: item ───────────────────────────────────────────────────
+  function handleRenameFitur(fitur: FiturItem, title: string) {
+    const key = `title-${fitur.id}`
+    setLoadingId(key)
+    startTransition(async () => {
+      try {
+        await updateFiturTitle(fitur.id, title)
+        updateLocal(fitur.id, f => ({ ...f, title: title.trim() }))
+        showToast(`Menu "${fitur.title}" diubah menjadi "${title.trim()}"`)
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : 'Gagal rename menu', 'error')
+      } finally {
+        setLoadingId(null)
+      }
+    })
+  }
+
+  function handleMoveFitur(fitur: FiturItem, targetGroup: string) {
+    if (targetGroup === fitur.group_name) return
+    const key = `move-${fitur.id}`
+    setLoadingId(key)
+    startTransition(async () => {
+      try {
+        await moveFiturToGroup(fitur.id, targetGroup)
+        setFiturList(prev => {
+          const targetItems = prev.filter(f => f.group_name === targetGroup)
+          const nextUrutan = targetItems.length === 0 ? 1 : Math.max(...targetItems.map(f => f.urutan)) + 1
+          return prev.map(f => {
+            if (f.id === fitur.id) return { ...f, group_name: targetGroup, urutan: nextUrutan }
+            if (f.group_name === fitur.group_name && f.urutan > fitur.urutan) return { ...f, urutan: f.urutan - 1 }
+            return f
+          })
+        })
+        showToast(`Menu "${fitur.title}" dipindah ke grup "${targetGroup}"`)
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : 'Gagal memindahkan menu', 'error')
+      } finally {
+        setLoadingId(null)
+      }
+    })
+  }
+
+  function handleReorderFitur(groupName: string, orderedIds: number[]) {
+    const key = `reorder-${groupName}`
+    setLoadingId(key)
+    startTransition(async () => {
+      try {
+        await reorderFiturItems(groupName, orderedIds)
+        setFiturList(prev => prev.map(f => {
+          const idx = orderedIds.indexOf(f.id)
+          return idx === -1 ? f : { ...f, urutan: idx + 1 }
+        }))
+        showToast('Urutan menu diperbarui')
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : 'Gagal mengubah urutan menu', 'error')
+      } finally {
+        setLoadingId(null)
+      }
+    })
+  }
+
   return (
     <div className="space-y-5">
 
@@ -1270,7 +1775,19 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
       )}
 
       {/* Tab switcher */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+      <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+        <button
+          onClick={() => setActiveTab('susunan')}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+            activeTab === 'susunan'
+              ? "bg-white text-slate-800 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <ListOrdered className="w-4 h-4" />
+          Susunan
+        </button>
         <button
           onClick={() => setActiveTab('fitur')}
           className={cn(
@@ -1322,16 +1839,31 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
       </div>
 
       {/* Tab content */}
-      {activeTab === 'fitur' ? (
+      {activeTab === 'susunan' ? (
+        <TabSusunan
+          fiturList={filteredFiturList}
+          groups={groups}
+          pending={pending}
+          onCreateGroup={handleCreateGroup}
+          onRenameGroup={handleRenameGroup}
+          onMoveGroup={handleMoveGroup}
+          onToggleGroupActive={handleToggleGroupActive}
+          onDeleteGroup={handleDeleteGroup}
+          onRenameFitur={handleRenameFitur}
+          onMoveFitur={handleMoveFitur}
+          onReorderFitur={handleReorderFitur}
+        />
+      ) : activeTab === 'fitur' ? (
         <TabPerFitur
           fiturList={filteredFiturList}
           loadingId={loadingId}
           pending={pending}
+          groupOrder={groupOrder}
           onToggleActive={handleToggleActive}
           onToggleRole={handleToggleRole}
         />
       ) : activeTab === 'role' ? (
-        <TabPerRole fiturList={filteredFiturList} />
+        <TabPerRole fiturList={filteredFiturList} groupOrder={groupOrder} />
       ) : activeTab === 'crud' ? (
         <TabCrudMatrix
           fiturList={filteredFiturList}

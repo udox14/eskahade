@@ -11,6 +11,7 @@ import { Header } from "@/components/layout/header";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { cn } from "@/lib/utils";
 import type { FiturAkses } from "@/lib/cache/fitur-akses";
+import type { SidebarGroupConfig } from "@/lib/menu/groups";
 import { IconContext } from "@phosphor-icons/react";
 
 interface ClientLayoutProps {
@@ -21,11 +22,12 @@ interface ClientLayoutProps {
   userName: string;
   avatarUrl?: string | null;
   fiturAkses: FiturAkses[];
+  sidebarGroups?: SidebarGroupConfig[];
   globalBottomNavEnabled: boolean;
   userShowBottomNav: boolean;
 }
 
-export function ClientLayout({ children, userRole, userRoles, userEmail, userName, avatarUrl, fiturAkses, globalBottomNavEnabled, userShowBottomNav }: ClientLayoutProps) {
+export function ClientLayout({ children, userRole, userRoles, userEmail, userName, avatarUrl, fiturAkses, sidebarGroups = [], globalBottomNavEnabled, userShowBottomNav }: ClientLayoutProps) {
   // State collapse dipersist ke localStorage agar pilihan user bertahan antar sesi
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -60,6 +62,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
         userRole={userRole}
         userRoles={userRoles}
         fiturAkses={fiturAkses}
+        sidebarGroups={sidebarGroups}
         isCollapsed={isCollapsed}
         toggleSidebar={() => {
           setIsCollapsed(prev => {
