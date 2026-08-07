@@ -9,52 +9,62 @@
     "1": {
      "no": "1",
      "arab": "أَكْمَلُ المُؤْمِنِيْنَ إِيْمَاناً أَحْسَنُهُمْ خُلُقًا (رواه أحمد)",
-     "terjemah": "\"Orang Mukmin yang paling sempurna imannya ialah orang yang paling baik budi pekertinya.\" (HR. Ahmad)"
+     "terjemah": "\"Orang Mukmin yang paling sempurna imannya ialah orang yang paling baik budi pekertinya.\" (HR. Ahmad)",
+     "judul": "IMAN DAN BUDI PEKERTI"
     },
     "2": {
      "no": "2",
      "arab": "لَا يُؤْمِنُ أحَدُكُمْ حَتَّى يُحِبَّ لِأَخِيْهِ مَا يُحِبُّ لِنَفْسِهِ. (رواه البخاري)",
-     "terjemah": "\"Tidaklah sempurna iman salah seorang di antara kalian, hingga ia mencintai untuk saudaranya apa yang ia cintai untuk dirinya sendiri\". (HR. Al-Bukhari)"
+     "terjemah": "\"Tidaklah sempurna iman salah seorang di antara kalian, hingga ia mencintai untuk saudaranya apa yang ia cintai untuk dirinya sendiri\". (HR. Al-Bukhari)",
+     "judul": "CINTA KEPADA SESAMA MANUSIA"
     },
     "3": {
      "no": "3",
      "arab": "كُلْ وَاشْرَبْ وَالْبَسْ وَتَصَدَّقْ فِي غَيْرِ سَرَفٍ وَلَا مَخِيْلَةٍ (رواه أبو داود)",
-     "terjemah": "\"Makanlah, minumlah, pakailah dan bersedekahlah tanpa berlebih-lebihan dan bermegah-megahan.\" (HR. Abu Daud)"
+     "terjemah": "\"Makanlah, minumlah, pakailah dan bersedekahlah tanpa berlebih-lebihan dan bermegah-megahan.\" (HR. Abu Daud)",
+     "judul": "HIDUP SEDERHANA"
     },
     "4": {
      "no": "4",
      "arab": "مَنْ دَلَّ عَلَى خَيْرٍ فَلَهُ مِثْلُ أَجْرِ فَاعِلِهِ (رواه مسلم)",
-     "terjemah": "\"Barang siapa yang menunjukkan kebaikan (kepada orang lain), maka ia memperoleh pahala sama seperti orang yang mengerjakannya.\" (HR. Muslim)"
+     "terjemah": "\"Barang siapa yang menunjukkan kebaikan (kepada orang lain), maka ia memperoleh pahala sama seperti orang yang mengerjakannya.\" (HR. Muslim)",
+     "judul": "MENUNJUKKAN KEPADA KEBAIKAN"
     },
     "5": {
      "no": "5",
      "arab": "رِضَا اللَّهِ فِي رِضَا الوَالِدَيْنِ وَسُخْطُ اللَّهِ فِي سُخْطِ الوَالِدَيْنِ (رواه الترمذي)",
-     "terjemah": "\"Keridlaan Allah itu tergantung dari adanya keridlaan ibu-bapak, dan kemurkaan Allah itu tergantung dari adanya kemurkaan ibu bapak.\" (HR. At-Tirmidzi)"
+     "terjemah": "\"Keridlaan Allah itu tergantung dari adanya keridlaan ibu-bapak, dan kemurkaan Allah itu tergantung dari adanya kemurkaan ibu bapak.\" (HR. At-Tirmidzi)",
+     "judul": "RIDHO DAN MURKA ALLAH"
     },
     "6": {
      "no": "6",
      "arab": "آيَةُ المُنَافِقِ ثَلَاثٌ: إِذَا حَدَّثَ كَذَبَ وَإِذَا وَعَدَ أخْلَفَ وَإِذَا اؤْتُمِنَ خَانَ. (رواه الشيخان)",
-     "terjemah": "\"Tanda orang munafik itu tiga: (1) apabila berbicara, ia dusta, (2) apabila berjanji, ia ingkar dan (3) apabila dipercaya, ia khianat.\" (HR. Al-Bukhari dan Muslim)"
+     "terjemah": "\"Tanda orang munafik itu tiga: (1) apabila berbicara, ia dusta, (2) apabila berjanji, ia ingkar dan (3) apabila dipercaya, ia khianat.\" (HR. Al-Bukhari dan Muslim)",
+     "judul": "TANDA ORANG MUNAFIK"
     },
     "7": {
      "no": "7",
      "arab": "لَيْسَ الشَّدِيْدُ بِالصُّرَعَةِ إِنَّمَا الشَّدِيْدُ الَّذِيْ يَـمْلِكُ نَفْسَهُ عِنْدَ الغَضَبِ (رواه الشيخان)",
-     "terjemah": "\"Orang kuat itu, bukanlah orang yang kuat bergulat, tetapi sebenarnya orang kuat itu, ialah yang dapat mengendalikan dirinya ketika marah.\" (HR. Al-Bukhari dan Muslim)"
+     "terjemah": "\"Orang kuat itu, bukanlah orang yang kuat bergulat, tetapi sebenarnya orang kuat itu, ialah yang dapat mengendalikan dirinya ketika marah.\" (HR. Al-Bukhari dan Muslim)",
+     "judul": "MENAHAN MARAH"
     },
     "8": {
      "no": "8",
      "arab": "الـحَيَاءُ مِنَ الإِيْمَانِ (رواه الشيخان)",
-     "terjemah": "\"Malu itu sebagian dari iman.\" (HR. Al-Bukhari dan Muslim)"
+     "terjemah": "\"Malu itu sebagian dari iman.\" (HR. Al-Bukhari dan Muslim)",
+     "judul": "MALU SEBAGIAN DARI IMAN"
     },
     "9": {
      "no": "9",
      "arab": "مَا عَابَ النَّبِيُّ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ طَعامًا قَطُّ إنِ اشْتَهاهُ أَكَلَهُ وَإنْ كَرِهَهُ تَرَكَهُ (رواه البخاري)",
-     "terjemah": "\"Nabi Muhammd SAW tidak pernah sekali pun mencela makanan. Apa yang beliau inginkan, beliau makan (asalkan halal) dan yang tidak diinginkan tidak dimakan.\" (HR. Al-Bukhari)"
+     "terjemah": "\"Nabi Muhammd SAW tidak pernah sekali pun mencela makanan. Apa yang beliau inginkan, beliau makan (asalkan halal) dan yang tidak diinginkan tidak dimakan.\" (HR. Al-Bukhari)",
+     "judul": "LARANGAN MENCELA MAKANAN"
     },
     "10": {
      "no": "10",
      "arab": "لَا يَأْخُذَنَّ أَحَدُكُمْ مَتَاعَ أَخِيْهِ لَاعِبًا وَلَا جَادًّا (رواه الترمذي)",
-     "terjemah": "\"Janganlah kamu mengambil barang milik orang lain, baik bergurau (pura-pura) maupun sengaja.\" (HR. At-Tirmidzi)"
+     "terjemah": "\"Janganlah kamu mengambil barang milik orang lain, baik bergurau (pura-pura) maupun sengaja.\" (HR. At-Tirmidzi)",
+     "judul": "LARANGAN MENGAMBIL BARANG ORANG LAIN"
     }
    }
   },
@@ -65,52 +75,62 @@
     "1": {
      "no": "11",
      "arab": "تَصَافَحُوْا يَذْهَبِ الغِلُّ عَنْ قُلُوْبِكُمْ (رواه البيهقي)",
-     "terjemah": "\"Berjabatan tanganlah kamu satu sama lain, niscaya dendam kesumat dari hatimu akan lenyap.\" (HR. Al-Baihaqi)"
+     "terjemah": "\"Berjabatan tanganlah kamu satu sama lain, niscaya dendam kesumat dari hatimu akan lenyap.\" (HR. Al-Baihaqi)",
+     "judul": "FAIDAH BERJABATAN TANGAN"
     },
     "2": {
      "no": "12",
      "arab": "رَحِمَ اللَّهُ عَبْدًا سَمْحًا إِذَا بَاعَ وَإِذَا اشْتَرَى وَإِذَا اقْتَضَى (رواه البخاري)",
-     "terjemah": "\"Semoga Allah merahmati seorang hamba yang bersikap lembut saat ia menjual, saat ia membeli, dan saat ia menagih.\". (HR. Al-Bukhari)"
+     "terjemah": "\"Semoga Allah merahmati seorang hamba yang bersikap lembut saat ia menjual, saat ia membeli, dan saat ia menagih.\". (HR. Al-Bukhari)",
+     "judul": "MENJUAL, MEMBELI DAN MENAGIH SECARA MUDAH"
     },
     "3": {
      "no": "13",
      "arab": "يَا رَسُوْلَ اللَّهِ أيُّ الإِسْلَامِ أفْضَلُ؟ قَالَ: مَنْ سَلِمَ المُسْلِمُونَ مِنْ لِسَانِهِ وَيَدِهِ (رواه مسلم)",
-     "terjemah": "\"Ya Rasulullah! Siapakah gerangan orang lslam yang paling utama? Beliau menjawab: Ialah orang Islam yang sesama orang Islam lainnya (merasa) aman dari gangguan lidah dan tangannya.\" (HR. Muslim)"
+     "terjemah": "\"Ya Rasulullah! Siapakah gerangan orang lslam yang paling utama? Beliau menjawab: Ialah orang Islam yang sesama orang Islam lainnya (merasa) aman dari gangguan lidah dan tangannya.\" (HR. Muslim)",
+     "judul": "ORANG ISLAM YANG UTAMA"
     },
     "4": {
      "no": "14",
      "arab": "لَا تَجْلِسُوْا بَيْنَ رَجُلَيْنِ إِلَّا بِإِذْنِهِمَا (رواه أبو داود)",
-     "terjemah": "\"Janganlah kamu duduk di antara dua orang kecuali dengan seijin keduanya.\" (HR. Abu Daud)"
+     "terjemah": "\"Janganlah kamu duduk di antara dua orang kecuali dengan seijin keduanya.\" (HR. Abu Daud)",
+     "judul": "ETIKA DUDUK DI ANTARA DUA ORANG"
     },
     "5": {
      "no": "15",
      "arab": "العَائِدُ فِي هِبَتِهِ كَالْكَلْبِ يَقِيْئُ ثُمَّ يَعُوْدُ فِي قَيْئِهِ (رواه البخاري)",
-     "terjemah": "\"Orang yang meminta kembali barang pemberiannya bagaikan seekor anjing yang muntah lalu memakan kembali muntahnya.\" (HR. Al-Bukhari)"
+     "terjemah": "\"Orang yang meminta kembali barang pemberiannya bagaikan seekor anjing yang muntah lalu memakan kembali muntahnya.\" (HR. Al-Bukhari)",
+     "judul": "LARANGAN MENARIK KEMBALI PEMBERIAN"
     },
     "6": {
      "no": "16",
      "arab": "اِتَّقُوْا دَعْوَةَ الْمَظْلُوْمِ وَإِنْ كَانَ كَافِرًا فَإِنَّهُ لَيْسَ دُوْنَهَا حِجَابٌ (رواه مسلم)",
-     "terjemah": "\"Waspadalah terhadap doa orang yang dizalimi, bahkan jika dia seorang kafir, karena tidak ada penghalang di antara doa tersebut (dan Allah).\" (HR. Muslim)"
+     "terjemah": "\"Waspadalah terhadap doa orang yang dizalimi, bahkan jika dia seorang kafir, karena tidak ada penghalang di antara doa tersebut (dan Allah).\" (HR. Muslim)",
+     "judul": "DOA ORANG YANG TERANIAYA"
     },
     "7": {
      "no": "17",
      "arab": "المُسْلِمُ مَنْ سَلِمَ المُسْلِمُونَ مِنْ لِسَانِهِ وَيَدِهِ (رواه مسلم)",
-     "terjemah": "\"Orang yang sempurna Islamnya ialah orang yang menyelamatkan orang Islam yang lainnya dari gangguan lidah dan tangganya \" (HR. Muslim)"
+     "terjemah": "\"Orang yang sempurna Islamnya ialah orang yang menyelamatkan orang Islam yang lainnya dari gangguan lidah dan tangganya \" (HR. Muslim)",
+     "judul": "PERINTAH MENJAGA LIDAH DAN TANGAN"
     },
     "8": {
      "no": "18",
      "arab": "المُؤْمِنُ لِلْمُؤْمِنِ كَالْبُنْيانِ يَشُدُّ بَعْضُهُ بَعْضًا (رواه مسلم)",
-     "terjemah": "\"Orang mukmin dengan orang mukmin lainnya, laksana suatu bangunan, sebagian memperkokoh pada bagian yang lain. \" (HR. Muslim)"
+     "terjemah": "\"Orang mukmin dengan orang mukmin lainnya, laksana suatu bangunan, sebagian memperkokoh pada bagian yang lain. \" (HR. Muslim)",
+     "judul": "PERUMPAMAAN SESAMA MUSLIM"
     },
     "9": {
      "no": "19",
      "arab": "مَنْ كَانَ حَالِفًا فَلْيَحْلِفْ بِاللَّهِ أَوْ لِيَصْمُتْ (رواه البخاري)",
-     "terjemah": "\"Barang siapa (terpaksa) bersumpah, hendaklah bersumpah dengan nama Allah atau lebih baik diam \" (HR. Bukhari)"
+     "terjemah": "\"Barang siapa (terpaksa) bersumpah, hendaklah bersumpah dengan nama Allah atau lebih baik diam \" (HR. Bukhari)",
+     "judul": "SUMPAH YANG DIPERBOLEHKAN"
     },
     "10": {
      "no": "20",
      "arab": "كَفَى بِالمَرْءِ إِثْمًا أَنْ يُحَدِّثَ بِكُلِّ مَا سَمِعَ (رواه مسلم)",
-     "terjemah": "\"Amat besar dosa seseorang, jika ia menceritakan setiap yang ia dengar.\" (HR. Muslim)"
+     "terjemah": "\"Amat besar dosa seseorang, jika ia menceritakan setiap yang ia dengar.\" (HR. Muslim)",
+     "judul": "LARANGAN MENCERITAKAN SEMUA YANG DIDENGAR"
     }
    }
   },
@@ -121,52 +141,62 @@
     "1": {
      "no": "21",
      "arab": "دَعْ مَا يَرِيْبُكَ إِلَى مَا لَا يَرِيْبُكَ (رواه الترمذي والنسائي)",
-     "terjemah": "\"Tinggalkanlah apa yang membuatmu ragu, lakukan apa yang tidak membuatmu ragu.\" (HR. At-Tirmidzi dan An-Nasa'i)"
+     "terjemah": "\"Tinggalkanlah apa yang membuatmu ragu, lakukan apa yang tidak membuatmu ragu.\" (HR. At-Tirmidzi dan An-Nasa'i)",
+     "judul": "MENINGGALKAN YANG MERAGUKAN"
     },
     "2": {
      "no": "22",
      "arab": "مِنْ حُسْنِ إِسْــلَامِ الْمَرْءِ تَرْكُهُ مَا لَا يَعْنِيْهِ (رواه الترمذي)",
-     "terjemah": "\"Di antara tanda kesempurnaan islam seseorang adalah meninggalkan urusan yang tidak penting baginya.\"  (HR. At-Tirmidzi)"
+     "terjemah": "\"Di antara tanda kesempurnaan islam seseorang adalah meninggalkan urusan yang tidak penting baginya.\"  (HR. At-Tirmidzi)",
+     "judul": "MENINGGALKAN URUSAN YANG TIDAK PENTING"
     },
     "3": {
      "no": "23",
      "arab": "لَا يُلْدَغُ المُؤْمِنُ مِنْ جُحْرٍ وَاحِدٍ مَرَّتَيْنِ (رواه البخاري)",
-     "terjemah": "\"Seorang mukmin tidak akan disengat dari lubang yang sama dua kali.\" (HR. Al-Bukhari)"
+     "terjemah": "\"Seorang mukmin tidak akan disengat dari lubang yang sama dua kali.\" (HR. Al-Bukhari)",
+     "judul": "LARANGAN MENGULANGI KESALAHAN"
     },
     "4": {
      "no": "24",
      "arab": "خَصْلَتَانِ لَا تَجْتَمِعَانِ فِي مُؤْمِنٍ: البُخْلُ وَسُوْءُ الـخُلُقِ (رواه الترمذي)",
-     "terjemah": "\"Dua hal yang tidak akan bersatu dalam seorang mukmin: kikir dan buruk akhlak.\" (HR. At-Tirmidzi)"
+     "terjemah": "\"Dua hal yang tidak akan bersatu dalam seorang mukmin: kikir dan buruk akhlak.\" (HR. At-Tirmidzi)",
+     "judul": "LARANGAN KIKIR DAN BERAKHLAK BURUK"
     },
     "5": {
      "no": "25",
      "arab": "كُلُّ بَنِي آدَمَ خَطَّاءٌ وَخَيْرُ الـخَطَّائِـيْنَ التَّوَّابُوْنَ (رواه الترمذي)",
-     "terjemah": "\"Semua anak adam (manusia) sering membuat kesalahan, dan sebaik-baik yang membuat kesalahan ialah mereka yang suka bertaubat.\" (HR. At-Tirmidzi)"
+     "terjemah": "\"Semua anak adam (manusia) sering membuat kesalahan, dan sebaik-baik yang membuat kesalahan ialah mereka yang suka bertaubat.\" (HR. At-Tirmidzi)",
+     "judul": "KESALAHAN DAN TAUBAT"
     },
     "6": {
      "no": "26",
      "arab": "الصُّمْتُ حِكْمَةٌ وَقَلِيْلٌ فَاعِلُهُ (رواه البيهقي)",
-     "terjemah": "\"Diam itu adalah satu kebijaksanaan, tetapi sedikit orang yang melakukannya.\" (HR. Al-Baihaqi)"
+     "terjemah": "\"Diam itu adalah satu kebijaksanaan, tetapi sedikit orang yang melakukannya.\" (HR. Al-Baihaqi)",
+     "judul": "DIAM ITU BIJAKSANA"
     },
     "7": {
      "no": "27",
      "arab": "لَعَنَ رَسُوْلُ اللَّهِ ﷺ الرّاشِيَ وَالمُرْتَشِيَ (رواه أحمد)",
-     "terjemah": "\"Rasulullah SAW. Mengutuk Pemberi Suap dan Penerima Suap.\" (HR. Ahmad)"
+     "terjemah": "\"Rasulullah SAW. Mengutuk Pemberi Suap dan Penerima Suap.\" (HR. Ahmad)",
+     "judul": "LARANGAN SUAP MENYUAP"
     },
     "8": {
      "no": "28",
      "arab": "إِيَّاكُمْ وَالحَسَدَ فَإِنَّ الـحَسَدَ يَأْكُلُ الحَسَنَاتِ كَمَا تَأْكُلُ النَّارُ الحَطَبَ (رواه أبو داود)",
-     "terjemah": "\"Jauhilah sifat hasad, karena sesungguhnya hasad akan memakan (merusak) amal kebaikan, seperti api melalap kayu bakar.\"(HR. Abu Dawud)"
+     "terjemah": "\"Jauhilah sifat hasad, karena sesungguhnya hasad akan memakan (merusak) amal kebaikan, seperti api melalap kayu bakar.\"(HR. Abu Dawud)",
+     "judul": "LARANGAN HASAD (DENGKI, IRI HATI)"
     },
     "9": {
      "no": "29",
      "arab": "إِنَّ أَخْوَفَ مَا أَخَافُ عَلَيْكُمْ الشِّرْكُ الأَصْغَرُ، الرِّيَاءُ (رواه أحمد)",
-     "terjemah": "\"Sesungguhnya yang paling aku khawatirkan menimpa kalian adalah syirik kecil, yaitu riya' (beribadah bukan karena Allah semata, tetapi untuk dilihat orang).\" (HR. Ahmad)"
+     "terjemah": "\"Sesungguhnya yang paling aku khawatirkan menimpa kalian adalah syirik kecil, yaitu riya' (beribadah bukan karena Allah semata, tetapi untuk dilihat orang).\" (HR. Ahmad)",
+     "judul": "SYIRIK KECIL"
     },
     "10": {
      "no": "30",
      "arab": "قُلِ الـحَقَّ وَلَوْ كَانَ مُرًّا (رواه ابن حبان)",
-     "terjemah": "\"Ucapkanlah kebenaran, meskipun pahit.\" (HR. Ibnu Hibban)"
+     "terjemah": "\"Ucapkanlah kebenaran, meskipun pahit.\" (HR. Ibnu Hibban)",
+     "judul": "PERINTAH MENGUCAPKAN KEBENARAN"
     }
    }
   },
@@ -177,52 +207,62 @@
     "1": {
      "no": "31",
      "arab": "مَنْ سَلَكَ طَرِيْقًا يَلْتَمِسُ فِيْهِ عِلْمًا سَهَّلَ اللَّهُ لَهُ طَرِيْقًا إِلَى الـجَنَّةِ (رواه مسلم)",
-     "terjemah": "\"Barang siapa menempuh suatu jalan untuk mencari ilmu, maka Allah akan memudahkan baginya jalan ke surga.\"(HR. Muslim)"
+     "terjemah": "\"Barang siapa menempuh suatu jalan untuk mencari ilmu, maka Allah akan memudahkan baginya jalan ke surga.\"(HR. Muslim)",
+     "judul": "MENCARI ILMU SEBAGAI JALAN MENUJU SURGA"
     },
     "2": {
      "no": "32",
      "arab": "اُحْثُوْا فِي أَفْوَاهِ المَدَّاحِيْنَ التُّرَابَ (رواه ابن حبان)",
-     "terjemah": "\"Taburkanlah pasir di mulut orang yang suka memuji-muji orang.\"(HR. Ibnu Hibban)"
+     "terjemah": "\"Taburkanlah pasir di mulut orang yang suka memuji-muji orang.\"(HR. Ibnu Hibban)",
+     "judul": "LARANGAN PUJIAN YANG TIDAK TULUS"
     },
     "3": {
      "no": "33",
      "arab": "أبْغَضُ الرِّجَالِ إِلَى اللَّهِ الألَدُّ الخَصِمُ (رواه الشيخان)",
-     "terjemah": "\"Orang yang paling di benci Allah SWT, ialah orang yang suka bertengkar.\"(HR. Al-Bukhari dan Muslim)"
+     "terjemah": "\"Orang yang paling di benci Allah SWT, ialah orang yang suka bertengkar.\"(HR. Al-Bukhari dan Muslim)",
+     "judul": "LARANGAN BERTENGKAR"
     },
     "4": {
      "no": "34",
      "arab": "إِذَا سَرَّتْكَ حَسَنَتُكَ وَسَاءَتْكَ سَيِّئَتُكَ فَأَنْتَ مُؤْمِنٌ (رواه أحمد)",
-     "terjemah": "\"Jika kebaikanmu membuatmu senang dan keburukanmu membuatmu tidak senang, maka engkau adalah orang yang beriman.\" (HR. Ahmad)"
+     "terjemah": "\"Jika kebaikanmu membuatmu senang dan keburukanmu membuatmu tidak senang, maka engkau adalah orang yang beriman.\" (HR. Ahmad)",
+     "judul": "TANDA ORANG BERIMAN"
     },
     "5": {
      "no": "35",
      "arab": "مَنْ عَيَّرَ أَخَاهُ بِذَنْبٍ لَمْ يَمُتْ حَتَّى يَعْمَلَهُ (رواه الترمذي)",
-     "terjemah": "\"Barang siapa mencela saudaranya karena (telah melakukan) suatu dosa, ia tidak akan mati sebelum melakukan dosa serupa.\" (HR. At-Tirmidzi)"
+     "terjemah": "\"Barang siapa mencela saudaranya karena (telah melakukan) suatu dosa, ia tidak akan mati sebelum melakukan dosa serupa.\" (HR. At-Tirmidzi)",
+     "judul": "LARANGAN MENCELA KESALAHAN ORANG LAIN"
     },
     "6": {
      "no": "36",
      "arab": "لَا يَـحْكُمْ أَحَدٌ بَيْنَ اثْنَيْنِ وَهُوَ غَضْبانُ (رواه الشيخان)",
-     "terjemah": "\"Janganlah seseorang mengadili antara dua orang ketika ia sedang marah.\" (HR. Al-Bukhari dan Muslim)"
+     "terjemah": "\"Janganlah seseorang mengadili antara dua orang ketika ia sedang marah.\" (HR. Al-Bukhari dan Muslim)",
+     "judul": "LARANGAN MENGADILI SAAT MARAH"
     },
     "7": {
      "no": "37",
      "arab": "أَدِّ الأَمَانَةَ إِلَى مَنِ ائْـتَمَنَكَ وَلَا تَـخُنْ مَنْ خَانَكَ (رواه الترمذي)",
-     "terjemah": "\"Laksanakan amanah dari orang yang telah mempercayaimu, dan jangan khianati orang yang telah mengkhianatimu.\" (HR. At-Tirmidzi)"
+     "terjemah": "\"Laksanakan amanah dari orang yang telah mempercayaimu, dan jangan khianati orang yang telah mengkhianatimu.\" (HR. At-Tirmidzi)",
+     "judul": "KEPERCAYAAN DAN PENGKHIANATAN DALAM AMANAH"
     },
     "8": {
      "no": "38",
      "arab": "مِنَ السَّرَفِ أَنْ تَأْكُلَ كُلَّ مَا اشْتَهَيْتَ (رواه ابن ماجه)",
-     "terjemah": "\"Termasuk boros; engkau makan apa saja yang engkau inginkan.\" (HR. Ibnu Majah)"
+     "terjemah": "\"Termasuk boros; engkau makan apa saja yang engkau inginkan.\" (HR. Ibnu Majah)",
+     "judul": "LARANGAN MAKAN BERLEBIHAN"
     },
     "9": {
      "no": "39",
      "arab": "مَنْ رَغِبَ عَنْ سُنَّتِي فَلَيْسَ مِنِّي. (رواه مسلم)",
-     "terjemah": "\"Barangsiapa enggan mengikuti sunnahku, maka dia bukan bagian dari golonganku.\" (HR. Muslim)"
+     "terjemah": "\"Barangsiapa enggan mengikuti sunnahku, maka dia bukan bagian dari golonganku.\" (HR. Muslim)",
+     "judul": "MENGIKUTI SUNNAH NABI"
     },
     "10": {
      "no": "40",
      "arab": "طَلَبُ الْعِلْمِ فَرِيْضَةٌ عَلَى كُلِّ مُسْلِمٍ. (رواه مسلم)",
-     "terjemah": "\"Menuntut ilmu itu wajib bagi setiap muslim.\" (HR. Muslim)"
+     "terjemah": "\"Menuntut ilmu itu wajib bagi setiap muslim.\" (HR. Muslim)",
+     "judul": "KEWAJIBAN MENUNTUT ILMU"
     }
    }
   },
@@ -233,52 +273,62 @@
     "1": {
      "no": "41",
      "arab": "خَيْرُكُمْ مَنْ تَعَلَّمَ اْلقُرْآنَ وَعَلَّمَهُ. (رواه البخاري)",
-     "terjemah": "\"Sebaik-baik kalian adalah orang yang mempelajari Al-Qur'an dan mengajarkannya.\" (HR. Al-Bukhari)"
+     "terjemah": "\"Sebaik-baik kalian adalah orang yang mempelajari Al-Qur'an dan mengajarkannya.\" (HR. Al-Bukhari)",
+     "judul": "MEMPELAJARI DAN MENGAJARKAN AL-QUR'AN"
     },
     "2": {
      "no": "42",
      "arab": "المَاهِرُ بِالقُرْآنِ مَعَ السَّفَرَةِ الكِرَامِ البَرَرَةِ (رواه البخاري)",
-     "terjemah": "\"Orang yang pintar membaca Al-Qur'an akan tinggal bersama Jibril.\" (HR. Al-Bukhari)"
+     "terjemah": "\"Orang yang pintar membaca Al-Qur'an akan tinggal bersama Jibril.\" (HR. Al-Bukhari)",
+     "judul": "KEUTAMAAN MEMBACA AL-QUR'AN"
     },
     "3": {
      "no": "43",
      "arab": "الـجَنَّةُ تَحْتَ أَقْدَامِ الْأُمَّهَاتِ. (رواه النسائي)",
-     "terjemah": "\"Surga itu ada di bawah telapak kaki Ibu.\" (HR. An-Nasa'i)"
+     "terjemah": "\"Surga itu ada di bawah telapak kaki Ibu.\" (HR. An-Nasa'i)",
+     "judul": "SURGA DI BAWAH TELAPAK KAKI IBU"
     },
     "4": {
      "no": "44",
      "arab": "تَبَسُّمُكَ فِى وَجْهِ أَخِيْكَ صَدَقَةٌ. (رواه مسلم)",
-     "terjemah": "\"Senyummu di hadapan saudaramu adalah sedekah.\" (HR. Muslim)"
+     "terjemah": "\"Senyummu di hadapan saudaramu adalah sedekah.\" (HR. Muslim)",
+     "judul": "SENYUM ADALAH SEDEKAH"
     },
     "5": {
      "no": "45",
      "arab": "لَا يَدْخُلُ الجَنَّةَ قَاطِعُ رَحِمٍ. (رواه البخاري)",
-     "terjemah": "\"Tidak akan masuk surga orang yang memutus silaturahim.\" (HR. Al-Bukhari)"
+     "terjemah": "\"Tidak akan masuk surga orang yang memutus silaturahim.\" (HR. Al-Bukhari)",
+     "judul": "BAHAYA MEMUTUS SILATURAHIM"
     },
     "6": {
      "no": "46",
      "arab": "أَفْضَلُ الإِيْمَانِ الصَّبْرُ وَالسَّمَاحَةُ. (رواه البخاري)",
-     "terjemah": "\"Iman yang utama adalah sabar dan pemaaf.\" (HR. Al-Bukhari)"
+     "terjemah": "\"Iman yang utama adalah sabar dan pemaaf.\" (HR. Al-Bukhari)",
+     "judul": "SABAR DAN PEMAAF"
     },
     "7": {
      "no": "47",
      "arab": "أَكْثَرُ خَطَايَا ابْنِ آدَمَ فىِ لِسَانِهِ. (رواه الطبراني)",
-     "terjemah": "\"Kebanyakan dosa anak-anak Adam itu ada pada lisannya.\" (HR. Ath-Thabrani)"
+     "terjemah": "\"Kebanyakan dosa anak-anak Adam itu ada pada lisannya.\" (HR. Ath-Thabrani)",
+     "judul": "DOSA LISAN"
     },
     "8": {
      "no": "48",
      "arab": "مَنْ لَمْ يَشْكُرِ النَّاسَ لَمْ يَشْكُرِ اللَّهَ. (رواه أحـمد)",
-     "terjemah": "\"Barang siapa yang tidak bersyukur kepada manusia, berarti tidak bersyukur kepada Allah.\" (HR. Ahmad)"
+     "terjemah": "\"Barang siapa yang tidak bersyukur kepada manusia, berarti tidak bersyukur kepada Allah.\" (HR. Ahmad)",
+     "judul": "BERTERIMA KASIH KEPADA SESAMA MANUSIA"
     },
     "9": {
      "no": "49",
      "arab": "سِبَابُ الْمُسْلِمِ فُسُوقٌ وَقِتَالُهُ كُفْرٌ. (رواه البخاري)",
-     "terjemah": "\"Mencaci seorang muslim adalah kefasikan dan membunuhnya adalah kekufuran.\" (HR. Al-Bukhari)"
+     "terjemah": "\"Mencaci seorang muslim adalah kefasikan dan membunuhnya adalah kekufuran.\" (HR. Al-Bukhari)",
+     "judul": "LARANGAN MENYAKITI MUSLIM"
     },
     "10": {
      "no": "50",
      "arab": "إِنَّ اللَّهَ جَمِيلٌ يُحِبُّ الْجَمَالَ (رواه مسلم)",
-     "terjemah": "\"Sesungguhnya Allah itu indah dan menyukai keindahan.\" (HR. Muslim)"
+     "terjemah": "\"Sesungguhnya Allah itu indah dan menyukai keindahan.\" (HR. Muslim)",
+     "judul": "ANJURAN MENCINTAI KEINDAHAN"
     }
    }
   },
@@ -289,52 +339,62 @@
     "1": {
      "no": "51",
      "arab": "مَنْ أَحَبَّ أَنْ يُبْسَطَ لَهُ فِيْ رِزْقِهِ ، وَأَنْ يُنْسَأَ لَهُ فِيْ أَثَرِهِ فَلْيَصِلْ رَحِمَهُ (رواه البخاري)",
-     "terjemah": "\"Barangsiapa yang ingin mudah (luas) rizkinya dan panjang umurnya hendaklah mempererat tali silaturahim\" (HR. Bukhori)"
+     "terjemah": "\"Barangsiapa yang ingin mudah (luas) rizkinya dan panjang umurnya hendaklah mempererat tali silaturahim\" (HR. Bukhori)",
+     "judul": "PERINTAH MEMEPERERAT TALI SILATURRAHIM"
     },
     "2": {
      "no": "52",
      "arab": "إِثْنَانِ لَا يَنْظُرُ اللّٰهُ إِلَيْهِمَا يَوْمَ الْقِيَامَةِ: قَاطِعُ الرَّحْمِ وَجَارُ السُّوْءِ (رواه الديلمي)",
-     "terjemah": "\"Dua orang yang tidak akan dipandang Allah di hari Kiamat: 1. Orang yang memutuskan tali Silaturrahim 2. Tetangga yang berperilaku buruk\" (HR. Ad-DailamI)"
+     "terjemah": "\"Dua orang yang tidak akan dipandang Allah di hari Kiamat: 1. Orang yang memutuskan tali Silaturrahim 2. Tetangga yang berperilaku buruk\" (HR. Ad-DailamI)",
+     "judul": "LARANGAN MEMUTUS TALI SILATURRAHIM"
     },
     "3": {
      "no": "53",
      "arab": "إِنَّ اللّٰهَ أَوْحٰى إِلَيَّ أَنْ تَوَاضَعُوْا حَتَّى لَا يَبْغِيَ أَحَدٌ عَلٰى أَحَدٍ وَلَا يَفْخَرَ أَحَدٌ عَلٰى أَحَدٍ (رواه مسلم)",
-     "terjemah": "Sesungguhnya Allah telah mewahyukan kepadaku: \"Hendaklah kamu saling menghormati satu sama lain, jangan ada seseorang menganiaya yang lain, dan jangan ada seseorang yang sombong terhadap yang lain\" (HR.Muslim)"
+     "terjemah": "Sesungguhnya Allah telah mewahyukan kepadaku: \"Hendaklah kamu saling menghormati satu sama lain, jangan ada seseorang menganiaya yang lain, dan jangan ada seseorang yang sombong terhadap yang lain\" (HR.Muslim)",
+     "judul": "SALING MENGHORMATI"
     },
     "4": {
      "no": "54",
      "arab": "اتّقِ اللهَ حَيْثُمَا كُنْتَ وَأَتْبِعِ السَّيِّئَةَ الْحَسَنَةَ تَمْحُهَا وَخَالِقِ النَّاسَ بِخُلُقٍ حَسَنٍ (رواه أحمد)",
-     "terjemah": "\"Bertakwalah kepada Allah dimana saja kamu berada, dan ikutilah perbuatan jelek oleh perbuatan baik, niscaya hal itu akan menghapusnya (dosa perbuatan jelekmu). Dan perlakukanlah manusia dengan perilaku yang baik\" (HR. Ahmad)"
+     "terjemah": "\"Bertakwalah kepada Allah dimana saja kamu berada, dan ikutilah perbuatan jelek oleh perbuatan baik, niscaya hal itu akan menghapusnya (dosa perbuatan jelekmu). Dan perlakukanlah manusia dengan perilaku yang baik\" (HR. Ahmad)",
+     "judul": "PERINTAH TAQWA, AMAL KEBAJIKAN DAN PERILAKU BAIK"
     },
     "5": {
      "no": "55",
      "arab": "لَأَنْ يَأْخُذَ أَحَدُكُمْ حَبْلَهُ فَيَأْتِيَ بِحُزْمَةِ الْحَطَبِ عَلَى ظَهْرِهِ فَيَبِيعَهَا فَيَكُفَّ اللَّهُ بِهَا وَجْهَهُ خَيْرٌ لَهُ مِنْ أَنْ يَسْأَلَ النَّاسَ أَعْطَوْهُ أَوْ مَنَعُوهُ (رواه البخاري)",
-     "terjemah": "\"Sungguh, jika seorang dari kalian yang mengambil talinya, lalu dia mencari seikat kayu bakar dan dibawa dengan punggungnya kemudian dia menjualnya, sehingga dengan hal itu Allah menjaga wajahnya (kehormatannya), itu lebih baik baginya dari pada dia meminta-minta kepada manusia, baik manusia itu memberinya atau menolaknya\" (HR.Bukhori)"
+     "terjemah": "\"Sungguh, jika seorang dari kalian yang mengambil talinya, lalu dia mencari seikat kayu bakar dan dibawa dengan punggungnya kemudian dia menjualnya, sehingga dengan hal itu Allah menjaga wajahnya (kehormatannya), itu lebih baik baginya dari pada dia meminta-minta kepada manusia, baik manusia itu memberinya atau menolaknya\" (HR.Bukhori)",
+     "judul": "LARANGAN MEMINTA-MINTA"
     },
     "6": {
      "no": "56",
      "arab": "سُئِلَ النَّبِيُّ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ أَيُّ الْأَعْمَالِ أَحَبُّ إِلَى اللّٰهِ قَالَ أَدْوَمُهَا وَإِنْ قَلَّ (رواه البخاري)",
-     "terjemah": "\"Nabi shallallahu 'alaihi wasallam pernah ditanya; \"Amalan apakah yang paling dicintai Allah?\" Dia menjawab; 'Yang dikerjakan terus menerus walaupun sedikit\" (HR. Bukhori)"
+     "terjemah": "\"Nabi shallallahu 'alaihi wasallam pernah ditanya; \"Amalan apakah yang paling dicintai Allah?\" Dia menjawab; 'Yang dikerjakan terus menerus walaupun sedikit\" (HR. Bukhori)",
+     "judul": "AMAL YANG PALING DISUKAI ALLAH"
     },
     "7": {
      "no": "57",
      "arab": "لَا يَرْمِي رَجُلٌ رَجُلًا بِالْفُسُوْقِ وَلَا يَرْمِيْهِ بِالْكُفْرِ إِلَّا ارْتَدَّتْ عَلَيْهِ إِنْ لَمْ يَكُنْ صَاحِبُهُ كَذٰلِكَ (رواه البخاري)",
-     "terjemah": "\"Tidaklah seseorang melempar tuduhan kepada orang lain dengan kefasikan, dan tidak pula menuduh dengan kekufuran melainkan (tuduhan itu) akan kembali kepadanya, jika tuduhannya tidak seperti itu.\" (HR.BUKHORI)"
+     "terjemah": "\"Tidaklah seseorang melempar tuduhan kepada orang lain dengan kefasikan, dan tidak pula menuduh dengan kekufuran melainkan (tuduhan itu) akan kembali kepadanya, jika tuduhannya tidak seperti itu.\" (HR.BUKHORI)",
+     "judul": "LARANGAN MENUDUH FASIQ DAN KAFIR"
     },
     "8": {
      "no": "58",
      "arab": "مَنْ رَأَى مِنْكُمْ مُنْكَرًا فَلْيُغَيِّرْهُ بِيَدِهِ، فَإِنْ لَمْ يَسْتَطِعْ فَبِلِسَانِهِ، فَإِنْ لَمْ يَسْتَطِعْ فَبِقَلْبِهِ، وَذٰلِكَ أَضْعَفُ الْإِيْمَانِ (رواه مسلم)",
-     "terjemah": "\"Barangsiapa di antara kalian melihat kemungkaran, hendaklah memperbaiki dengan tangannya (kekuasaan). Apabila tidak mampu, hendaklah memperbaiki dengan lidahnya (nasihat). Apabila tidak mampu, hendaklah (mengingkari) dengan hatinya. Itulah selemah-lemahnya iman\" (HR. MUSLIM)"
+     "terjemah": "\"Barangsiapa di antara kalian melihat kemungkaran, hendaklah memperbaiki dengan tangannya (kekuasaan). Apabila tidak mampu, hendaklah memperbaiki dengan lidahnya (nasihat). Apabila tidak mampu, hendaklah (mengingkari) dengan hatinya. Itulah selemah-lemahnya iman\" (HR. MUSLIM)",
+     "judul": "ETIKA MENCEGAH KEMUNGKARAN"
     },
     "9": {
      "no": "59",
      "arab": "اُنْصُرْ أَخَاكَ ظَالِمًا أَوْ مَظْلُومًا قَالُوا يَا رَسُولَ اللَّهِ هَذَا نَنْصُرُهُ مَظْلُومًا فَكَيْفَ نَنْصُرُهُ ظَالِمًا قَالَ تَأْخُذُ فَوْقَ يَدَيْهِ (رواه البخاري)",
-     "terjemah": "\"Tolonglah Saudaramu, baik yang berbuat dzholim maupun yang didzholimi\". Mereka bertanya: \"Wahai Rasulullah, kami faham (cara) menolong orang yang didzholimi, tapi bagaimana kami menolong orang yang berbuat dzholim?\" Beliau bersabda: Pegang tangannya (agar tidak berbuat dzholim)\"(HR.Bukhori)"
+     "terjemah": "\"Tolonglah Saudaramu, baik yang berbuat dzholim maupun yang didzholimi\". Mereka bertanya: \"Wahai Rasulullah, kami faham (cara) menolong orang yang didzholimi, tapi bagaimana kami menolong orang yang berbuat dzholim?\" Beliau bersabda: Pegang tangannya (agar tidak berbuat dzholim)\"(HR.Bukhori)",
+     "judul": "MENCEGAH ORANG DZHOLIM"
     },
     "10": {
      "no": "60",
      "arab": "اُنْظُرُوْا إِلٰى مَنْ هُوَ أَسْفَلَ مِنْكُمْ، وَلَا تَنْظُرُوْا إِلٰى مَنْ هُوَ فَوْقَكُمْ فَهُوَ أَجْدَرُ أَنْ لَا تَزْدَرُوْا نِعْمَةَ اللّٰهِ عَلَيْكُمْ (رواه الشيخان)",
-     "terjemah": "\"Pandanglah orang yang lebih rendah (hartanya) dari padamu, Jangan memandang kepada orang yang lebih tinggi dari padamu karena yang demikian itu adalah lebih baik, agar kamu tidak menganggap kecil ni'mat Allah yang telah dianugerahkan kepadamu\" (HR. Bukhori dan Muslim)"
+     "terjemah": "\"Pandanglah orang yang lebih rendah (hartanya) dari padamu, Jangan memandang kepada orang yang lebih tinggi dari padamu karena yang demikian itu adalah lebih baik, agar kamu tidak menganggap kecil ni'mat Allah yang telah dianugerahkan kepadamu\" (HR. Bukhori dan Muslim)",
+     "judul": "BERSYUKUR DENGAN MENYADARI KELEBIHAN DIRI ATAS ORANG LAIN"
     }
    }
   },
@@ -345,52 +405,62 @@
     "1": {
      "no": "61",
      "arab": "اللَّهُمَّ إِنِّى أَعُوذُ بِكَ مِنْ زَوَالِ نِعْمَتِكَ وَتَحَوُّلِ عَافِيَتِكَ وَفُجَاءَةِ نِقْمَتِكَ وَجَمِيعِ سَخَطِكَ (رواه مسلم)",
-     "terjemah": "\"Ya Allah, sesungguhnya aku ini berlindung kepada-Mu dari hilangnya nikmat yang telah Engaku berikan, dari berubahnya kesehatan yang Engkau anugerahkan (menjadi sakit), dari siksa-Mu yang datang secara tiba-tiba, serta dari segala murka-Mu.\" (HR. Muslim)"
+     "terjemah": "\"Ya Allah, sesungguhnya aku ini berlindung kepada-Mu dari hilangnya nikmat yang telah Engaku berikan, dari berubahnya kesehatan yang Engkau anugerahkan (menjadi sakit), dari siksa-Mu yang datang secara tiba-tiba, serta dari segala murka-Mu.\" (HR. Muslim)",
+     "judul": "DO'A MOHON PERLINDUNGAN"
     },
     "2": {
      "no": "62",
      "arab": "إِنَّ الْغَضَبَ مِنْ الشَّيْطَانِ وَإِنَّ الشَّيْطَانَ خُلِقَ مِنَ النَّارِ وَإِنَّمَا تُطْفَأُ النَّارُ بِالْمَاءِ فَإِذَا غَضِبَ أَحَدُكُمْ فَلْيَتَوَضَّأْ (رواه أبو داود)",
-     "terjemah": "\"Sesungguhnya marah itu dari setan dan setan diciptakan dari api, sementara api hanya dapat dipadamkan dengan air. Maka jika salah seorang dari kalian marah, hendaklah dia berwudhu.\"(HR.ABU DAUD)"
+     "terjemah": "\"Sesungguhnya marah itu dari setan dan setan diciptakan dari api, sementara api hanya dapat dipadamkan dengan air. Maka jika salah seorang dari kalian marah, hendaklah dia berwudhu.\"(HR.ABU DAUD)",
+     "judul": "CARA MEREDAM AMARAH"
     },
     "3": {
      "no": "63",
      "arab": "أشَدُّ النَّاسِ حَسْرَةً ﻳَﻮْﻡَ اﻟﻘِﻴَﺎﻣَﺔِ ﺭَﺟُﻞٌ ﺃﻣْﻜَﻨَﻪُ ﻃَﻠَﺐُ اﻟﻌِﻠْﻢِ ﻓِﻲ اﻟﺪُّﻧْﻴَﺎ ﻓَﻠَﻢْ ﻳَﻄْﻠُﺒْﻪُ ﻭﺭَﺟُﻞٌ ﻋَﻠَّﻢَ ﻋِﻠْﻤﺎً ﻓﺎﻧْﺘَﻔَﻊَ ﺑﻪِ ﻣَﻦْ ﺳَﻤِﻌَﻪُ ﻣِﻨْﻪُ ﺩُﻭْﻧَﻪُ (رواه اﺑْﻦ ﻋَﺴَﺎﻛِﺮ)",
-     "terjemah": "\"Orang yang paling menyesal pada hari kiamat adalah orang yang memiliki kesempatan mencari Ilmu di dunia tetapi tidak melakukannya dan orang yang mengajarkan suatu ilmu yang bermanfaat bagi orang lain, sedangkan ia sendiri tidak memanfaatkannya\" (Ibnu 'Asakir)"
+     "terjemah": "\"Orang yang paling menyesal pada hari kiamat adalah orang yang memiliki kesempatan mencari Ilmu di dunia tetapi tidak melakukannya dan orang yang mengajarkan suatu ilmu yang bermanfaat bagi orang lain, sedangkan ia sendiri tidak memanfaatkannya\" (Ibnu 'Asakir)",
+     "judul": "ORANG YANG PALING MENYESAL DI HARI KIAMAT"
     },
     "4": {
      "no": "64",
      "arab": "حَقُّ الْمُسْلِمِ عَلَى الْمُسْلِمِ سِتٌّ : إِذَا لَقِيْتَهُ فَسَلِّمْ عَلَيْهِ، وَإِذَا دَعَاكَ فَأَجِبْهُ، وَإِذَا اسْتَنْصَحَكَ فَانْصَحْهُ، وَإِذَا عَطَشَ فَحَمِدَ اللّٰهَ فَشَمِّتْهُ، وَإِذَا مَرِضَ فَعُدْهُ، فَإِذَا مَاتَ فَاتْبَعْهُ (رواه مسلم)",
-     "terjemah": "\"Hak Muslim terhadap muslim yang lainnya ada 6: 1. Bila bertemu, ucapkanlah salam kepadanya. 2. Bila dipanggil, datanglah. 3. Bila diminta nasihat, berilah nasihat 4. Bila ia bersin, lalu mengucapkan \"الحمد لله\", maka jawablah dengan ucapan \"يرحَمُكَِ الله\" 5. Bila ia sakit, tengoklah 6. Bila ia meninggal, antarkanlah (jenazahnya sampai ke kubur)\" (HR.MUSLIM)"
+     "terjemah": "\"Hak Muslim terhadap muslim yang lainnya ada 6: 1. Bila bertemu, ucapkanlah salam kepadanya. 2. Bila dipanggil, datanglah. 3. Bila diminta nasihat, berilah nasihat 4. Bila ia bersin, lalu mengucapkan \"الحمد لله\", maka jawablah dengan ucapan \"يرحَمُكَِ الله\" 5. Bila ia sakit, tengoklah 6. Bila ia meninggal, antarkanlah (jenazahnya sampai ke kubur)\" (HR.MUSLIM)",
+     "judul": "HAK-HAK ANTAR SESAMA MUSLIM"
     },
     "5": {
      "no": "65",
      "arab": "سَأَلْتُ رَسُوْلَ اللهِ ﷺ : أَيُّ الذَّنْبِ أَعْظَمُ ؟ قَالَ : أَنْ تَجْعَلَ لِلّٰهِ نِدًّا وَهُوَ خَلَقَكَ ، قُلْتُ ثُمَّ أَيٌّ ؟ قَالَ : أَنْ تَقْتُلَ وَلَدَكَ خَشْيَةَ أَنْ يَأْكُلَ مَعَكَ ، قُلْتُ : ثُمَّ أَيٌّ ؟ قَالَ : أَنْ تُزَانِيَ بِحَلِيْلَةِ جَارِكَ (رواه الشيخان)",
-     "terjemah": "\"Saya bertanya kepada Rasulallah Shallallahu Alaihi Wasallam \"Dosa apakah yang paling besar?\" Rasulullah menjawab: menyekutukan Allah yang telah menciptakanmu. Saya bertanya lagi \"Dosa apa lagi?\" Rasulullah menjawab: \"Membunuh anakmu karena takut makan bersama mu (sengsara)\" Saya bertanya lagi \"Dosa apa lagi?\" Rasulullah menjawab: \"Berzina dengan istri tetangga mu\" (HR. Bukhori dan Muslim)"
+     "terjemah": "\"Saya bertanya kepada Rasulallah Shallallahu Alaihi Wasallam \"Dosa apakah yang paling besar?\" Rasulullah menjawab: menyekutukan Allah yang telah menciptakanmu. Saya bertanya lagi \"Dosa apa lagi?\" Rasulullah menjawab: \"Membunuh anakmu karena takut makan bersama mu (sengsara)\" Saya bertanya lagi \"Dosa apa lagi?\" Rasulullah menjawab: \"Berzina dengan istri tetangga mu\" (HR. Bukhori dan Muslim)",
+     "judul": "DOSA-DOSA BESAR"
     },
     "6": {
      "no": "66",
      "arab": "ﻣَﻦْ ﻛَﺎﻥَ ﻳُﺆْﻣِﻦُ ﺑِﺎللّٰﻪِ ﻭَاﻟْﻴَﻮْﻡِ اْلآﺧِﺮِ ﻓَﻠْﻴَﻘُﻞْ ﺧَﻴْﺮًا ﺃَﻭْ ﻟِﻴﺼْﻤُﺖْ، ﻭَﻣَﻦْ ﻛَﺎﻥَ ﻳُﺆْﻣِﻦُ ﺑِﺎللّٰﻪِ ﻭَاﻟْﻴَﻮْﻡِ اﻵْﺧِﺮِ ﻓَﻠْﻴُﻜْﺮِﻡْ ﺟَﺎﺭَﻩُ، ﻭَﻣَﻦْ ﻛَﺎﻥَ ﻳُﺆْﻣِﻦُ ﺑِﺎللّٰﻪِ ﻭَاﻟْﻴَﻮْﻡِ اﻵْﺧِﺮِ ﻓَﻠْﻴُﻜْﺮِﻡْ ﺿَﻴْﻔَﻪُ (رواه مسلم)",
-     "terjemah": "\"Barangsiapa beriman kepada Allah dan hari akhir, maka hendaklah ia berbicara baik atau diam. Barangsiapa beriman kepada Allah dan hari akhir, hendaklah ia menghormati tetangganya. Dan barangsiapa beriman kepada Allah dan hari akhir, hendaklah ia menghormati tamunya\" (HR. MUSLIM)"
+     "terjemah": "\"Barangsiapa beriman kepada Allah dan hari akhir, maka hendaklah ia berbicara baik atau diam. Barangsiapa beriman kepada Allah dan hari akhir, hendaklah ia menghormati tetangganya. Dan barangsiapa beriman kepada Allah dan hari akhir, hendaklah ia menghormati tamunya\" (HR. MUSLIM)",
+     "judul": "MENGHORMATI TETANGGA DAN TAMU"
     },
     "7": {
      "no": "67",
      "arab": "لَايَدْخُلُ الْجَنَّةَ مَنْ كَانَ فِيْ قَلْبِهِ مِثْقَالُ ذَرَّةٍ مِنْ كِبْرٍ قَالَ رَجُلٌ إِنَّ الرَّجُلَ يُحِبُّ أَنْ يَكُوْنَ ثَوْبُهُ حَسَنًا وَنَعْلُهُ حَسَنَةً قَالَ إِنَّ اللّٰهَ جَمِيْلٌ يُحِبُّ الْجَمَالَ الْكِبْرُ بَطَرُ الْحَقِّ وَغَمْطُ النَّاسِ (رواه مسلم)",
-     "terjemah": "\"Tidak akan masuk surga, orang yang di dalam hatinya terdapat kesombongan seberat biji sawi pun.\" Seorang laki-laki bertanya, \"Sesungguhnya seseorang menyukai apabila baju dan sandalnya bagus (apakah ini termasuk kesombongan)?\" Beliau menjawab: \"Sesungguhnya Allah itu indah dan menyukai yang keindahan. Kesombongan itu menolak kebenaran dan meremehkan manusia.\"(HR. MUSLIM)"
+     "terjemah": "\"Tidak akan masuk surga, orang yang di dalam hatinya terdapat kesombongan seberat biji sawi pun.\" Seorang laki-laki bertanya, \"Sesungguhnya seseorang menyukai apabila baju dan sandalnya bagus (apakah ini termasuk kesombongan)?\" Beliau menjawab: \"Sesungguhnya Allah itu indah dan menyukai yang keindahan. Kesombongan itu menolak kebenaran dan meremehkan manusia.\"(HR. MUSLIM)",
+     "judul": "TAKABBUR (SOMBONG)"
     },
     "8": {
      "no": "68",
      "arab": "اِضْمَنُوْا لِي سِتًّا مِنْ أَنْفُسِكُمْ أَضْمَنْ لَكُمُ الْجَنَّةَ اُصْدُقُوْا إِذَا حَدَّثْتُمْ وَأَوْفُوْا إِذَا وَعَدْتُمْ وَأَدُّوْا إِذَا اؤْتُمِنْتُمْ وَاحْفَظُوْا فُرُوْجَكُمْ وَغُضُّوْا أَبْصَارَكُمْ وَكُفُّوْا أَيْدِيَكُمْ (رواه أحمد)",
-     "terjemah": "\"Jaminlah enam hal untukku dari diri kalian, niscaya aku akan menjamin surga untuk kalian: 1. Jujurlah jika berbicara 2. Tepatilah jika kalian berjanji 3. Tunaikanlah amanat jika kalian diserahi amanat 4. Jagalah kemaluan kalian 5. Tundukkan pandangan kalian 6. Tahanlah tangan kalian (dari menyakiti orang lain)\" (HR.AHMAD)"
+     "terjemah": "\"Jaminlah enam hal untukku dari diri kalian, niscaya aku akan menjamin surga untuk kalian: 1. Jujurlah jika berbicara 2. Tepatilah jika kalian berjanji 3. Tunaikanlah amanat jika kalian diserahi amanat 4. Jagalah kemaluan kalian 5. Tundukkan pandangan kalian 6. Tahanlah tangan kalian (dari menyakiti orang lain)\" (HR.AHMAD)",
+     "judul": "ENAM PERKARA SEBAGAI JAMINAN MASUK SURGA"
     },
     "9": {
      "no": "69",
      "arab": "جَاءَ رَجُلٌ إِلَى رَسُولِ اللَّهِ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ فَقَالَ يَا رَسُولَ اللَّهِ مَنْ أَحَقُّ النَّاسِ بِحُسْنِ صَحَابَتِي قَالَ أُمُّكَ قَالَ ثُمَّ مَنْ قَالَ ثُمَّ أُمُّكَ قَالَ ثُمَّ مَنْ قَالَ ثُمَّ أُمُّكَ قَالَ ثُمَّ مَنْ قَالَ ثُمَّ أَبُوكَ (رواه البخاري)",
-     "terjemah": "\"Seorang laki-laki datang kepada Rasulullôh ShallAllahu 'alaihi wasallam sambil berkata; \"Wahai Rasulullôh, siapakah orang yang paling berhak aku perlakukan baik?\" Beliau menjawab: \"Ibumu.\" Dia bertanya lagi; \"Kemudian siapa?\" Beliau menjawab: \"Ibumu.\" Dia bertanya lagi; \"kemudian siapa lagi?\" Beliau menjawab: \"Ibumu.\" Dia bertanya lagi; \"Kemudian siapa lagi?\" Beliau menjawab: \"Kemudian ayahmu\". (HR.BUKHORI)"
+     "terjemah": "\"Seorang laki-laki datang kepada Rasulullôh ShallAllahu 'alaihi wasallam sambil berkata; \"Wahai Rasulullôh, siapakah orang yang paling berhak aku perlakukan baik?\" Beliau menjawab: \"Ibumu.\" Dia bertanya lagi; \"Kemudian siapa?\" Beliau menjawab: \"Ibumu.\" Dia bertanya lagi; \"kemudian siapa lagi?\" Beliau menjawab: \"Ibumu.\" Dia bertanya lagi; \"Kemudian siapa lagi?\" Beliau menjawab: \"Kemudian ayahmu\". (HR.BUKHORI)",
+     "judul": "MENYANTUNI IBU-BAPAK"
     },
     "10": {
      "no": "70",
      "arab": "عَلَيْكُمْ بِالصِّدْقِ فَإِنَّ الصِّدْقَ يَهْدِيْ إِلَى الْبِرِّ وَالْبِرُّ يَهْدِيْ إِلَى الْجَنَّةِ وََما يَزَالُ الْعَبْدُ يَصْدُقُ وَيَتَحَرَّى الصِّدْقَ حَتَّى يُكْتَبَ عِنْدَ اللّٰهِ صِدِّيْقًا، وَإِيَّاكُمْ وَالْكَذِبَ فَإِنَّ الْكَذِبَ يَهْدِيْ إِلَى الْفُجُوْرِ وَالْفُجُوْرُ يَهْدِيْ إِلَى النَّارِ وَلَا يَزَالُ الْعَبْدُ يَكْذِبُ وَيَتَحَرَّى الْكَذِبَ حَتَّى يُكْتَبَ عِنْدَ اللّٰهِ كَذَّابًا (رواه الشيخان)",
-     "terjemah": "\"Hendaklah kalian jujur, karena kejujuran itu akan membimbing kepada kebaikan, dan kebaikan itu akan membawa ke surga. Seseorang senantiasa jujur dan membiasakan sifat jujur, sehingga orang itu dicatat di sisi Allah sebagai orang yang benar-benar jujur. Dan jauhilah berbohong, karena bohong itu membimbing kepada kejahatan, dan kejahatan itu membawa ke neraka. Seseorang senantiasa berbohong dan membiasakan sifat bohong, sehingga ia dicatat di sisi Allah sebagai seorang tukang bohong\" (HR. Bukhori dan Muslim)"
+     "terjemah": "\"Hendaklah kalian jujur, karena kejujuran itu akan membimbing kepada kebaikan, dan kebaikan itu akan membawa ke surga. Seseorang senantiasa jujur dan membiasakan sifat jujur, sehingga orang itu dicatat di sisi Allah sebagai orang yang benar-benar jujur. Dan jauhilah berbohong, karena bohong itu membimbing kepada kejahatan, dan kejahatan itu membawa ke neraka. Seseorang senantiasa berbohong dan membiasakan sifat bohong, sehingga ia dicatat di sisi Allah sebagai seorang tukang bohong\" (HR. Bukhori dan Muslim)",
+     "judul": "BERKATA JUJUR DAN BOHONG"
     }
    }
   }

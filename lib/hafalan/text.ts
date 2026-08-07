@@ -59,7 +59,7 @@ export function resolveHafalanText(ref?: string | null): HafalanText | null {
         if (!seg) return null
         return typeof seg === 'string'
           ? { arab: seg, meta: bab.nama }
-          : { arab: seg.arab, terjemah: seg.terjemah, meta: bab.nama }
+          : { arab: seg.arab, terjemah: seg.terjemah, meta: seg.judul || bab.nama }
       }
       // legacy: hadits:{kitab}:{no}
       const item = kitab.items?.[rest[1]]

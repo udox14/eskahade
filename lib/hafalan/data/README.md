@@ -25,7 +25,7 @@ File seed di repo ini **contoh kecil** — ganti dengan data lengkap.
 // hadits/<kitab>.json — bersegmen per bab (daftar di HADITS_KITAB pada text.ts)
 { "kitab": "akhlaq-ibtidaiyah-1", "judul": "Hadits Akhlaq Ibtidaiyah 1",
   "bab": { "tema-1": { "nama": "1. العبادة لله", "urutan": 1,
-                       "segmen": { "1": { "arab": "...", "terjemah": "..." } } } } }
+                       "segmen": { "1": { "judul": "Judul hadits (opsional, tampil sebagai subjudul)", "arab": "...", "terjemah": "..." } } } } }
 
 // jurumiyah.json — per bab dipecah jadi segmen (guru bisa blok/swipe sebagian)
 { "judul": "Matan Al-Ajurrumiyyah",
