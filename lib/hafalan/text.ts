@@ -6,6 +6,7 @@ import amtsilah from './data/amtsilah.json'
 import haditsAkhlaq1 from './data/hadits/akhlaq-ibtidaiyah-1.json'
 import haditsTalkhish2 from './data/hadits/talkhish-riyadl-ibtidaiyah-2.json'
 import haditsTalkhish3 from './data/hadits/talkhish-riyadl-ibtidaiyah-3.json'
+import hadits70 from './data/hadits/70-hadits.json'
 
 export type HafalanText = {
   arab?: string
@@ -22,6 +23,7 @@ const HADITS_KITAB: Record<string, AnyRecord> = {
   'akhlaq-ibtidaiyah-1': haditsAkhlaq1 as AnyRecord,
   'talkhish-riyadl-ibtidaiyah-2': haditsTalkhish2 as AnyRecord,
   'talkhish-riyadl-ibtidaiyah-3': haditsTalkhish3 as AnyRecord,
+  '70-hadits': hadits70 as AnyRecord,
 }
 
 const QURAN = quran as AnyRecord
