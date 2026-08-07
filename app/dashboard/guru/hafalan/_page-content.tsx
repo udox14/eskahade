@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AlertTriangle, ArrowLeft, ArrowUp, BookOpenCheck, Check, ChevronRight, Languages, Loader2,
-  RotateCcw, Save, Search,
+  ArrowLeft, ArrowUp, BookOpenCheck, Check, ChevronRight, Languages, Loader2, Lock,
+  RotateCcw, Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -26,6 +26,7 @@ type AutosaveScope = {
 
 type PendingChange = {
   checked: boolean
+  words?: number[]
   revision: number
 }
 
@@ -62,6 +63,7 @@ export default function HafalanPageContent() {
   const dragRef = useRef<{ add: boolean } | null>(null)
   const wordDragRef = useRef<{ blokId: number; add: boolean } | null>(null)
   const localCheckedRef = useRef(localChecked)
+  const localWordsRef = useRef(localWords)
   const pendingChangesRef = useRef(new Map<string, Map<number, PendingChange>>())
   const autosaveTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>())
   const autosaveInFlightRef = useRef(new Set<string>())
@@ -224,6 +226,10 @@ export default function HafalanPageContent() {
   }, [localChecked])
 
   useEffect(() => {
+    localWordsRef.current = localWords
+  }, [localWords])
+
+  useEffect(() => {
     const timers = autosaveTimersRef.current
     return () => {
       for (const timer of timers.values()) clearTimeout(timer)
@@ -276,6 +282,31 @@ export default function HafalanPageContent() {
 
   const wordsOf = (blok: any): string[] => String(blok?.teks?.arab || '').split(/\s+/).filter(Boolean)
   const lockedWords = (blokId: number): Set<number> => new Set(data.progressHighlightLocked?.[`${selectedSantriId}:${blokId}`] || [])
+  const orderedBabBloks = (bloks: any[]) => [...bloks].sort((a, b) => ((a.urutan ?? 0) - (b.urutan ?? 0)) || ((a.id ?? 0) - (b.id ?? 0)))
+  const blokLabel = (blok: any) => String(blok?.label || 'bagian ini')
+
+  // Aturan hafalan berurutan: blok hanya boleh ditandai jika semua blok
+  // sebelumnya dalam bab yang sama sudah ditandai. Uncheck selalu bebas.
+  const firstUncheckedBefore = (bab: any, blok: any, checkedSet = localCheckedRef.current): any | null => {
+    const list = orderedBabBloks(bab.blok)
+    const idx = list.findIndex(b => b.id === blok.id)
+    if (idx <= 0) return null
+    for (let i = 0; i < idx; i++) {
+      if (!checkedSet.has(list[i].id)) return list[i]
+    }
+    return null
+  }
+
+  // Jurumiyah: kata ke-k hanya boleh di-highlight jika kata 0..k-1 sudah
+  // di-highlight atau terkunci dari marhalah sebelumnya.
+  const isWordReady = (blokId: number, wordIdx: number) => {
+    const sel = new Set(localWordsRef.current[blokId] || [])
+    const locked = lockedWords(blokId)
+    for (let i = 0; i < wordIdx; i++) {
+      if (!sel.has(i) && !locked.has(i)) return false
+    }
+    return true
+  }
   const filteredSantri = useMemo(() => {
     const needle = santriSearch.trim().toLowerCase()
     if (!needle) return data.santri
@@ -327,7 +358,7 @@ export default function HafalanPageContent() {
     autosaveTimersRef.current.delete(scopeKey)
   }
 
-  function scheduleAutosave(scope: AutosaveScope, delay = 800) {
+  function scheduleAutosave(scope: AutosaveScope, delay = 1000) {
     clearAutosaveTimer(scope.key)
     const timer = setTimeout(() => {
       autosaveTimersRef.current.delete(scope.key)
@@ -348,27 +379,62 @@ export default function HafalanPageContent() {
     }
 
     try {
-      const res = await simpanHafalanProgressBatch({
-        kelasId: scope.kelasId,
-        jenis: scope.jenis,
-        riwayatId: scope.riwayatId,
-        changes: Array.from(snapshot.entries()).map(([blokId, change]) => ({
-          blokId,
-          checked: change.checked,
-        })),
-      })
-      if ('error' in res) throw new Error(res.error)
+      const isJurumiyahScope = scope.jenis === 'jurumiyah'
+      const skippedBlokIds: number[] = []
+      const appliedBlokIds: number[] = []
+      if (isJurumiyahScope) {
+        const perBlok = data.bab
+          .flatMap((b: any) => b.blok)
+          .filter((blok: any) => canEditBlok(blok))
+          .map((blok: any) => ({ blokId: blok.id, words: localWordsRef.current[blok.id] || [] }))
+        const r = await simpanHafalanHighlightBatch({
+          kelasId: scope.kelasId,
+          jenis: scope.jenis,
+          riwayatId: scope.riwayatId,
+          perBlok,
+        })
+        if ('error' in r) throw new Error(r.error)
+        skippedBlokIds.push(...(r.skippedBlokIds || []))
+        appliedBlokIds.push(...Array.from(snapshot.keys()))
+      } else {
+        const r = await simpanHafalanProgressBatch({
+          kelasId: scope.kelasId,
+          jenis: scope.jenis,
+          riwayatId: scope.riwayatId,
+          changes: Array.from(snapshot.entries()).map(([blokId, change]) => ({
+            blokId,
+            checked: change.checked,
+          })),
+        })
+        if ('error' in r) throw new Error(r.error)
+        skippedBlokIds.push(...(r.skippedBlokIds || []))
+        appliedBlokIds.push(...(r.appliedBlokIds || Array.from(snapshot.keys())))
+      }
 
-      const appliedIds = new Set(res.appliedBlokIds || snapshot.keys())
+      const appliedIds = new Set(appliedBlokIds)
       if (currentDataScopeKeyRef.current === `${scope.kelasId}:${scope.jenis}`) {
         setData((prev: any) => {
           const np = { ...prev.progress }
           const nps = { ...(prev.progressStatus || {}) }
           const npe = { ...(prev.progressEditable || {}) }
+          const nh: Record<string, number[]> | null = isJurumiyahScope ? { ...(prev.progressHighlight || {}) } : null
           for (const [blokId, change] of snapshot) {
             if (!appliedIds.has(blokId)) continue
             const key = `${scope.riwayatId}:${blokId}`
-            if (change.checked) {
+            if (isJurumiyahScope) {
+              const words = change.words || []
+              if (words.length) {
+                nh![key] = [...words]
+                np[key] = true
+                nps[key] = 'hafal'
+                npe[key] = true
+              } else {
+                delete nh![key]
+                delete np[key]
+                delete nps[key]
+                delete npe[key]
+              }
+            } else if (change.checked) {
               np[key] = true
               nps[key] = 'hafal'
               npe[key] = true
@@ -378,8 +444,32 @@ export default function HafalanPageContent() {
               delete npe[key]
             }
           }
-          return { ...prev, progress: np, progressStatus: nps, progressEditable: npe }
+          return isJurumiyahScope
+            ? { ...prev, progress: np, progressStatus: nps, progressEditable: npe, progressHighlight: nh }
+            : { ...prev, progress: np, progressStatus: nps, progressEditable: npe }
         })
+      }
+
+      if (skippedBlokIds.length && currentScopeKeyRef.current === scope.key) {
+        if (isJurumiyahScope) {
+          setLocalWords(prev => {
+            const nw = { ...prev }
+            for (const blokId of skippedBlokIds) {
+              const key = `${scope.riwayatId}:${blokId}`
+              nw[blokId] = [...(data.progressHighlight?.[key] || [])]
+            }
+            localWordsRef.current = nw
+            return nw
+          })
+        } else {
+          setLocalChecked(prev => {
+            const nc = new Set(prev)
+            for (const blokId of skippedBlokIds) nc.delete(blokId)
+            localCheckedRef.current = nc
+            return nc
+          })
+        }
+        toast.info('Ada bagian yang melewati urutan hafalan — dikembalikan ke belum hafal.')
       }
 
       const latest = pendingChangesRef.current.get(scope.key)
@@ -413,10 +503,11 @@ export default function HafalanPageContent() {
     }
   }
 
-  const queueAutosave = (blokId: number, checked: boolean, scope = saveScope) => {
-    if (!isQuran || !scope) return
+  const queueAutosave = (blokId: number, checked: boolean, scope = saveScope, words?: number[]) => {
+    if (!scope) return
     getPendingForScope(scope).set(blokId, {
       checked,
+      words,
       revision: ++changeRevisionRef.current,
     })
     if (currentScopeKeyRef.current === scope.key) {
@@ -548,23 +639,35 @@ export default function HafalanPageContent() {
         const parsed = JSON.parse(raw)
         if (Array.isArray(parsed?.checkedBlokIds)) {
           const restoredChecked = new Set<number>(parsed.checkedBlokIds.map(Number))
+          const restoredWords = parsed.words || {}
           let restoredHasPending = !!(scope && pendingChangesRef.current.get(scope.key)?.size)
           setLocalChecked(restoredChecked)
           localCheckedRef.current = restoredChecked
-          setLocalWords(parsed.words || {})
+          setLocalWords(restoredWords)
+          localWordsRef.current = restoredWords
           setDirty(true)
-          setSaveStatus(isQuran ? 'saving' : 'idle')
-          if (isQuran && scope) {
+          setSaveStatus('saving')
+          if (scope) {
             for (const bab of data.bab) for (const blok of bab.blok) {
               if (!canEditBlokForSantri(blok, riwayatId)) continue
-              const checked = restoredChecked.has(blok.id)
-              if (checked !== !!data.progress[`${riwayatId}:${blok.id}`]) {
-                queueAutosave(blok.id, checked, scope)
-                restoredHasPending = true
+              if (isJurumiyah) {
+                const words = restoredWords[blok.id] || []
+                const persisted = data.progressHighlight?.[`${riwayatId}:${blok.id}`] || []
+                const same = words.length === persisted.length && words.every((w: number) => persisted.includes(w))
+                if (!same) {
+                  queueAutosave(blok.id, words.length > 0, scope, words)
+                  restoredHasPending = true
+                }
+              } else {
+                const checked = restoredChecked.has(blok.id)
+                if (checked !== !!data.progress[`${riwayatId}:${blok.id}`]) {
+                  queueAutosave(blok.id, checked, scope)
+                  restoredHasPending = true
+                }
               }
             }
           }
-          if (isQuran && !restoredHasPending) {
+          if (!restoredHasPending) {
             setDirty(false)
             setSaveStatus('saved')
             try { sessionStorage.removeItem(nextDraftKey) } catch {}
@@ -605,22 +708,27 @@ export default function HafalanPageContent() {
   selectSantriRef.current = selectSantri
 
   // ── apply / drag-swipe ──
-  const applyBlok = (blokId: number, val: boolean) => {
+  const applyBlok = (blok: any, val: boolean) => {
+    const blocker = val && selectedBab ? firstUncheckedBefore(selectedBab, blok) : null
+    if (blocker) {
+      toast.info(`Tandai dulu "${blokLabel(blocker)}" sebelum bagian ini.`)
+      return
+    }
     setLocalChecked(prev => {
       const n = new Set(prev)
-      if (val) n.add(blokId); else n.delete(blokId)
+      if (val) n.add(blok.id); else n.delete(blok.id)
       localCheckedRef.current = n
       return n
     })
     setDirty(true)
-    queueAutosave(blokId, val)
+    queueAutosave(blok.id, val)
   }
 
   const onBlokPointerDown = (blok: any) => {
     if (!canEditBlok(blok)) return toast.info('Progress marhalah sebelumnya hanya bisa dilihat')
     const val = !localCheckedRef.current.has(blok.id)
     dragRef.current = { add: val }
-    applyBlok(blok.id, val)
+    applyBlok(blok, val)
   }
 
   const onListPointerMove = (e: React.PointerEvent) => {
@@ -629,28 +737,37 @@ export default function HafalanPageContent() {
     if (!node) return
     const id = Number(node.getAttribute('data-blok-id'))
     const blok = selectedBab.blok.find((b: any) => b.id === id)
-    if (blok && canEditBlok(blok)) applyBlok(id, dragRef.current.add)
+    if (!blok || !canEditBlok(blok)) return
+    if (dragRef.current.add && firstUncheckedBefore(selectedBab, blok)) return
+    applyBlok(blok, dragRef.current.add)
   }
 
   const toggleSingle = (blok: any) => {
     if (!canEditBlok(blok)) return toast.info('Progress marhalah sebelumnya hanya bisa dilihat')
-    applyBlok(blok.id, !localCheckedRef.current.has(blok.id))
+    applyBlok(blok, !localCheckedRef.current.has(blok.id))
   }
 
   // ── Jurumiyah: highlight kata ──
   const applyWord = (blokId: number, wordIdx: number, val: boolean) => {
     if (lockedWords(blokId).has(wordIdx)) return
-    setLocalWords(prev => {
-      const cur = new Set(prev[blokId] || [])
-      if (val) cur.add(wordIdx); else cur.delete(wordIdx)
-      return { ...prev, [blokId]: Array.from(cur) }
-    })
+    if (val && !isWordReady(blokId, wordIdx)) {
+      toast.info('Tandai dulu kata sebelumnya agar urutan hafalan benar.')
+      return
+    }
+    const cur = new Set(localWordsRef.current[blokId] || [])
+    if (val) cur.add(wordIdx); else cur.delete(wordIdx)
+    const next = Array.from(cur)
+    const nw = { ...localWordsRef.current, [blokId]: next }
+    localWordsRef.current = nw
+    setLocalWords(nw)
     setDirty(true)
+    queueAutosave(blokId, next.length > 0, saveScope, next)
   }
 
   const onWordPointerDown = (blokId: number, wordIdx: number) => {
     if (lockedWords(blokId).has(wordIdx)) return
     const has = (localWords[blokId] || []).includes(wordIdx)
+    if (dragMode && !has && !isWordReady(blokId, wordIdx)) return
     if (dragMode) wordDragRef.current = { blokId, add: !has }
     applyWord(blokId, wordIdx, !has)
   }
@@ -661,6 +778,7 @@ export default function HafalanPageContent() {
     const node = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest('[data-word-idx]')
     if (!node) return
     const idx = Number(node.getAttribute('data-word-idx'))
+    if (drag.add && !isWordReady(drag.blokId, idx)) return
     applyWord(drag.blokId, idx, drag.add)
   }
 
@@ -671,8 +789,11 @@ export default function HafalanPageContent() {
       if (!blok || !canEditBlok(blok)) return
       const locked = lockedWords(blok.id)
       const all = wordsOf(blok).map((_, i) => i).filter(i => !locked.has(i))
-      setLocalWords(prev => ({ ...prev, [blok.id]: all }))
+      const nw = { ...localWordsRef.current, [blok.id]: all }
+      localWordsRef.current = nw
+      setLocalWords(nw)
       setDirty(true)
+      queueAutosave(blok.id, all.length > 0, saveScope, all)
       return
     }
     const editableBlokIds = selectedBab.blok.filter((b: any) => canEditBlok(b)).map((b: any) => b.id)
@@ -717,58 +838,6 @@ export default function HafalanPageContent() {
     setDirty(false)
     setSaveStatus('saved')
     try { if (draftKey) sessionStorage.removeItem(draftKey) } catch {}
-  }
-
-  const saveProgress = async () => {
-    if (!selectedSantriId) return
-    if (isJurumiyah) return saveHighlight()
-    setSaving(true)
-    const res = await simpanHafalanProgressBatch({
-      kelasId, jenis: selectedType.key, riwayatId: selectedSantriId,
-      changes: data.bab.flatMap((b: any) => b.blok)
-        .filter((blok: any) => canEditBlok(blok))
-        .map((blok: any) => ({ blokId: blok.id, checked: localChecked.has(blok.id) })),
-    })
-    setSaving(false)
-    if ('error' in res) return toast.error(res.error)
-    const checkedSet = new Set(res.checkedBlokIds)
-    setData((prev: any) => {
-      const np = { ...prev.progress }, nps = { ...(prev.progressStatus || {}) }, npe = { ...(prev.progressEditable || {}) }
-      for (const bab of prev.bab) for (const blok of bab.blok) {
-        if (!canEditBlok(blok)) continue
-        const key = `${selectedSantriId}:${blok.id}`
-        if (checkedSet.has(blok.id)) { np[key] = true; nps[key] = 'hafal'; npe[key] = true }
-        else { delete np[key]; delete nps[key]; delete npe[key] }
-      }
-      return { ...prev, progress: np, progressStatus: nps, progressEditable: npe }
-    })
-    setDirty(false)
-    try { if (draftKey) sessionStorage.removeItem(draftKey) } catch {}
-    toast.success('Hafalan disimpan')
-  }
-
-  const saveHighlight = async () => {
-    setSaving(true)
-    const perBlok = Object.entries(localWords)
-      .map(([blokId, words]) => ({ blokId: Number(blokId), words }))
-      .filter(p => p.words.length && data.bab.some((b: any) => b.blok.some((bl: any) => bl.id === p.blokId && canEditBlok(bl))))
-    const res = await simpanHafalanHighlightBatch({ kelasId, jenis: selectedType.key, riwayatId: selectedSantriId, perBlok })
-    setSaving(false)
-    if ('error' in res) return toast.error(res.error)
-    setData((prev: any) => {
-      const nh = { ...(prev.progressHighlight || {}) }
-      const np = { ...prev.progress }
-      for (const bab of prev.bab) for (const blok of bab.blok) {
-        if (!canEditBlok(blok)) continue
-        const key = `${selectedSantriId}:${blok.id}`
-        const words = localWords[blok.id] || []
-        if (words.length) { nh[key] = [...words]; np[key] = true } else { delete nh[key]; delete np[key] }
-      }
-      return { ...prev, progressHighlight: nh, progress: np }
-    })
-    setDirty(false)
-    try { if (draftKey) sessionStorage.removeItem(draftKey) } catch {}
-    toast.success('Hafalan disimpan')
   }
 
   const step: 'home' | 'santri' | 'bab' | 'blok' =
@@ -1087,18 +1156,11 @@ export default function HafalanPageContent() {
 
           <p className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500">
             {isQuran
-              ? 'Tap ayat untuk menandai hafal. Perubahan disimpan otomatis setelah 800 ms.'
+              ? 'Tap ayat untuk menandai hafal. Perubahan disimpan otomatis setelah 1 detik. Hafalan harus berurutan — ayat 1 dulu, baru ayat berikutnya.'
               : dragMode
                 ? 'Mode Blok aktif: geser jari untuk menandai beberapa bagian sekaligus (scroll dimatikan sementara).'
-                : 'Tap bagian untuk menandai hafal. Aktifkan "Mode Blok" untuk swipe banyak sekaligus.'}
+                : 'Tap bagian untuk menandai hafal. Perubahan disimpan otomatis setelah 1 detik. Hafalan harus berurutan — bagian 1 dulu, baru bagian berikutnya.'}
           </p>
-
-          {dirty && !isQuran && (
-            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-800">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <p className="text-xs font-semibold leading-5">Belum tersimpan. Tekan Simpan Hafalan agar masuk database.</p>
-            </div>
-          )}
 
           {isJurumiyah && selectedBab.blok[0] ? (
             <div
@@ -1139,20 +1201,23 @@ export default function HafalanPageContent() {
               const persisted = getPersistedChecked(blok.id)
               const readonly = isReadonlyPersisted(blok.id)
               const changed = canEditBlok(blok) && checked !== persisted
+              const blocked = canEditBlok(blok) && !checked && !!firstUncheckedBefore(selectedBab, blok, localChecked)
               const num = isQuran ? (String(blok.label).match(/\d+/)?.[0] || blok.label) : blok.label
               return (
                 <div key={blok.id} data-blok-id={blok.id}
                   onClick={() => { if (!dragMode) toggleSingle(blok) }}
                   onPointerDown={() => { if (dragMode) onBlokPointerDown(blok) }}
                   style={{ touchAction: dragMode ? 'none' : 'auto' }}
+                  title={blocked ? `Tandai dulu "${blokLabel(firstUncheckedBefore(selectedBab, blok, localChecked))}"` : undefined}
                   className={`flex select-none items-stretch gap-3 rounded-2xl border p-3 transition ${
                     readonly ? 'cursor-not-allowed border-sky-200 bg-sky-50'
+                    : blocked ? 'cursor-not-allowed border-slate-100 bg-slate-50 opacity-60'
                     : changed && checked ? 'border-amber-400 bg-amber-50 ring-1 ring-amber-200'
                     : changed && !checked ? 'border-rose-300 bg-rose-50'
                     : checked ? 'border-emerald-500 bg-emerald-50'
                     : 'cursor-pointer border-slate-200 bg-white hover:border-emerald-300'}`}>
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black ${checked ? 'bg-emerald-600 text-white' : readonly ? 'bg-sky-200 text-sky-700' : 'bg-slate-100 text-slate-500'}`}>
-                    {checked ? <Check className="h-5 w-5" /> : num}
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black ${checked ? 'bg-emerald-600 text-white' : readonly ? 'bg-sky-200 text-sky-700' : blocked ? 'bg-slate-200 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                    {checked ? <Check className="h-5 w-5" /> : blocked ? <Lock className="h-4 w-4" /> : num}
                   </div>
                   <div className="min-w-0 flex-1">
                     {blok.teks?.arab ? (
@@ -1187,26 +1252,27 @@ export default function HafalanPageContent() {
         </button>
       )}
 
-      {/* Sticky save bar */}
+      {/* Sticky save status */}
       {selectedSantriId && step !== 'home' && step !== 'santri' && (
-        <div className="fixed inset-x-0 bottom-14 z-30 mx-auto flex max-w-3xl gap-2 px-3 sm:bottom-4">
-          {isQuran ? (
-            <div className="flex flex-1 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-lg">
-              <span className={saveStatus === 'error' ? 'text-rose-600' : saveStatus === 'saving' ? 'text-amber-700' : 'text-emerald-700'}>
-                {saveStatus === 'error' ? 'Gagal' : saveStatus === 'saving' ? 'Menyimpan' : 'Tersimpan'}
-              </span>
-              {saveStatus === 'saving' && <Loader2 className="h-4 w-4 animate-spin text-amber-600" />}
-              {saveStatus === 'error' && <button onClick={retryAutosave} disabled={saving} className="text-xs font-black text-rose-700 underline underline-offset-2 disabled:opacity-50">Coba lagi</button>}
-            </div>
-          ) : (
-            <>
-              <button onClick={resetAllDraft} disabled={!dirty || saving} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-lg disabled:opacity-50">
-                <RotateCcw className="h-4 w-4" />
-              </button>
-              <button onClick={saveProgress} disabled={saving} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-lg disabled:opacity-50">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Simpan Hafalan ({selectedCount})
-              </button>
-            </>
+        <div className="fixed inset-x-0 bottom-14 z-30 mx-auto flex w-fit max-w-[calc(100vw-1.5rem)] items-center gap-2 px-3 sm:bottom-4">
+          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-lg">
+            <span className={saveStatus === 'error' ? 'text-rose-600' : saveStatus === 'saving' ? 'text-amber-700' : 'text-emerald-700'}>
+              {saveStatus === 'error' ? 'Gagal menyimpan' : saveStatus === 'saving' ? 'Menyimpan' : 'Tersimpan'}
+            </span>
+            {saveStatus === 'saving' && <Loader2 className="h-4 w-4 animate-spin text-amber-600" />}
+            {saveStatus === 'error' && <button onClick={retryAutosave} disabled={saving} className="text-xs font-black text-rose-700 underline underline-offset-2 disabled:opacity-50">Coba lagi</button>}
+          </div>
+          {dirty && (
+            <button
+              type="button"
+              onClick={resetAllDraft}
+              disabled={saving}
+              title="Batalkan perubahan"
+              aria-label="Batalkan perubahan"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg transition hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-50"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
           )}
         </div>
       )}

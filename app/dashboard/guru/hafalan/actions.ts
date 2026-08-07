@@ -235,8 +235,51 @@ export async function simpanHafalanProgressBatch(payload: {
 
   const changes = Array.from(requestedChanges.entries()).map(([blokId, change]) => ({ blokId, ...change }))
   const guruId = await getGuruIdForSession(session)
-  if (changes.length > 0) {
-    await batch(changes.map(change => change.checked
+
+  // Validasi urutan hafalan (berlaku untuk semua jenis): sebuah blok hanya
+  // boleh ditandai hafal bila semua blok sebelumnya dalam bab yang sama
+  // (urutannya lebih kecil) sudah punya progres. Uncheck selalu diizinkan.
+  const orderRows = await query<{ id: number; bab_id: number; urutan: number }>(`
+    SELECT hblk.id, hblk.bab_id, hblk.urutan
+    FROM hafalan_blok hblk
+    WHERE hblk.id IN (${Array.from(validIds).map(() => '?').join(',')})
+  `, Array.from(validIds))
+  const existingRows = await query<{ blok_id: number }>(
+    'SELECT blok_id FROM hafalan_progress WHERE riwayat_pendidikan_id = ?',
+    [payload.riwayatId],
+  )
+  const existingBloks = new Set(existingRows.map(r => Number(r.blok_id)))
+  const batchChecked = new Map<number, boolean>()
+  for (const change of changes) batchChecked.set(change.blokId, change.checked)
+  const isChecked = (blokId: number): boolean =>
+    batchChecked.has(blokId) ? batchChecked.get(blokId)! : existingBloks.has(blokId)
+
+  const prefixReadyByBlok = new Map<number, boolean>()
+  const byBab = new Map<number, { id: number; urutan: number }[]>()
+  for (const row of orderRows) {
+    const arr = byBab.get(row.bab_id) || []
+    arr.push(row)
+    byBab.set(row.bab_id, arr)
+  }
+  for (const arr of byBab.values()) {
+    arr.sort((a, b) => (a.urutan ?? 0) - (b.urutan ?? 0) || (a.id ?? 0) - (b.id ?? 0))
+    let allPrevChecked = true
+    for (const row of arr) {
+      prefixReadyByBlok.set(row.id, allPrevChecked)
+      if (!isChecked(row.id)) allPrevChecked = false
+    }
+  }
+
+  const skippedBlokIds: number[] = []
+  const applied = changes.filter(change => {
+    if (!change.checked) return true
+    if (prefixReadyByBlok.get(change.blokId) !== false) return true
+    skippedBlokIds.push(change.blokId)
+    return false
+  })
+
+  if (applied.length > 0) {
+    await batch(applied.map(change => change.checked
       ? {
           sql: `
             INSERT INTO hafalan_progress (
@@ -269,8 +312,8 @@ export async function simpanHafalanProgressBatch(payload: {
     ))
   }
 
-  const checkedIds = changes.filter(change => change.checked).map(change => change.blokId)
-  const appliedBlokIds = changes.map(change => change.blokId)
+  const checkedIds = applied.filter(change => change.checked).map(change => change.blokId)
+  const appliedBlokIds = applied.map(change => change.blokId)
 
   await logActivity({
     actor: actorFromSession(session),
@@ -280,12 +323,12 @@ export async function simpanHafalanProgressBatch(payload: {
     logKind: 'update',
     entityType: 'hafalan_progress_batch',
     entityId: `${payload.riwayatId}:${payload.jenis}`,
-    summary: `Menyimpan hafalan ${payload.jenis} untuk ${changes.length} perubahan`,
-    details: { kelas_id: payload.kelasId, jenis: payload.jenis, total_perubahan: changes.length, total_blok_hafal: checkedIds.length },
+    summary: `Menyimpan hafalan ${payload.jenis} untuk ${applied.length} perubahan`,
+    details: { kelas_id: payload.kelasId, jenis: payload.jenis, total_perubahan: applied.length, total_blok_hafal: checkedIds.length, dilewati_urutan: skippedBlokIds.length },
   })
 
   revalidatePath('/dashboard/guru/hafalan')
-  return { success: true, checkedBlokIds: checkedIds, appliedBlokIds }
+  return { success: true, checkedBlokIds: checkedIds, appliedBlokIds, skippedBlokIds }
 }
 
 /** Jurumiyah: simpan highlight kata per blok (1 bab = 1 blok teks utuh). */
@@ -317,18 +360,45 @@ export async function simpanHafalanHighlightBatch(payload: {
   if (!scope?.santri_id || !scope.marhalah_id) return { error: 'Data santri atau marhalah tidak valid.' }
   const guruId = await getGuruIdForSession(session)
 
-  // hapus progress highlight marhalah ini untuk blok valid, lalu tulis ulang
-  const ph = Array.from(validIds).map(() => '?').join(',')
-  await execute(
-    `DELETE FROM hafalan_progress WHERE santri_id = ? AND marhalah_id = ? AND blok_id IN (${ph})`,
-    [scope.santri_id, scope.marhalah_id, ...Array.from(validIds)]
-  )
+  const blokIds = Array.from(validIds)
+  const ph = blokIds.map(() => '?').join(',')
+  const parseWords = (raw: string | null): number[] => {
+    if (!raw) return []
+    try { const a = JSON.parse(raw); return Array.isArray(a) ? a.map(Number).filter(Number.isFinite) : [] } catch { return [] }
+  }
+  const [existingRows, lockedRows] = await Promise.all([
+    query<{ blok_id: number; highlight: string | null }>(
+      `SELECT blok_id, highlight FROM hafalan_progress WHERE santri_id = ? AND marhalah_id = ? AND blok_id IN (${ph})`,
+      [scope.santri_id, scope.marhalah_id, ...blokIds],
+    ),
+    query<{ blok_id: number; highlight: string | null }>(
+      `SELECT blok_id, highlight FROM hafalan_progress WHERE santri_id = ? AND marhalah_id != ? AND blok_id IN (${ph})`,
+      [scope.santri_id, scope.marhalah_id, ...blokIds],
+    ),
+  ])
+  const persistedWords = new Map<number, number[]>()
+  for (const r of existingRows) persistedWords.set(Number(r.blok_id), parseWords(r.highlight))
+  const lockedWordsByBlok = new Map<number, number[]>()
+  for (const r of lockedRows) lockedWordsByBlok.set(Number(r.blok_id), parseWords(r.highlight))
 
+  // Validasi urutan kata (Jurumiyah): kata boleh bertambah hanya jika
+  // membentuk prefix 0..max (gabungan dengan kata terkunci marhalah
+  // sebelumnya). Mengurangi / menghapus kata selalu diizinkan.
+  const skippedBlokIds: number[] = []
   let saved = 0
   for (const item of payload.perBlok) {
     const blokId = Number(item.blokId)
     if (!validIds.has(blokId)) continue
     const words = Array.from(new Set((item.words || []).map(Number).filter(Number.isFinite))).sort((a, b) => a - b)
+    const locked = lockedWordsByBlok.get(blokId) || []
+    const union = Array.from(new Set([...words, ...locked])).sort((a, b) => a - b)
+    const maxIdx = union.length ? union[union.length - 1] : -1
+    const maxPersisted = Math.max(-1, ...(persistedWords.get(blokId) || []), ...locked)
+    if (maxIdx > maxPersisted && (union[0] !== 0 || union.length !== maxIdx + 1)) {
+      skippedBlokIds.push(blokId)
+      continue
+    }
+    await execute('DELETE FROM hafalan_progress WHERE blok_id = ? AND riwayat_pendidikan_id = ?', [blokId, payload.riwayatId])
     if (words.length === 0) continue
     await execute(`
       INSERT INTO hafalan_progress (id, blok_id, riwayat_pendidikan_id, santri_id, kelas_id, marhalah_id, guru_id, status, highlight, tanggal_setor, updated_by, updated_at)
@@ -341,8 +411,8 @@ export async function simpanHafalanHighlightBatch(payload: {
     actor: actorFromSession(session), module: 'guru_hafalan', action: 'update',
     fiturHref: '/dashboard/guru/hafalan', logKind: 'update', entityType: 'hafalan_highlight_batch',
     entityId: `${payload.riwayatId}:${payload.jenis}`, summary: `Menyimpan highlight hafalan ${saved} bab`,
-    details: { kelas_id: payload.kelasId, jenis: payload.jenis, blok: saved },
+    details: { kelas_id: payload.kelasId, jenis: payload.jenis, blok: saved, dilewati_urutan: skippedBlokIds.length },
   })
   revalidatePath('/dashboard/guru/hafalan')
-  return { success: true, saved }
+  return { success: true, saved, skippedBlokIds }
 }
