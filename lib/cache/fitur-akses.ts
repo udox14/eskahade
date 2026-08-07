@@ -79,7 +79,6 @@ async function ensureFiturAksesReady() {
       ('Monitoring Pimpinan', 'Asrama', '/dashboard/pimpinan/asrama', 'Home', '["pimpinan"]', 1, 5),
       ('Monitoring Pimpinan', 'Disiplin', '/dashboard/pimpinan/disiplin', 'ShieldAlert', '["pimpinan"]', 1, 6),
       ('Monitoring Pimpinan', 'Akademik', '/dashboard/pimpinan/akademik', 'BookOpen', '["pimpinan"]', 1, 7),
-      ('Monitoring Pimpinan', 'EHB', '/dashboard/pimpinan/ehb', 'ClipboardList', '["pimpinan"]', 1, 8),
       ('Monitoring Pimpinan', 'PSB', '/dashboard/pimpinan/psb', 'UserPlus', '["pimpinan"]', 1, 9),
       ('Asrama', 'Kamar', '/dashboard/asrama/kamar', 'DoorOpen', '["admin","pengurus_asrama"]', 1, 5),
       ('Asrama', 'Perpindahan Kamar', '/dashboard/asrama/perpindahan-kamar', 'ArrowLeftRight', '["admin","pengurus_asrama"]', 1, 6),
@@ -119,6 +118,9 @@ async function ensureFiturAksesReady() {
 
     // Role pimpinan: pastikan beranda (Dashboard) tetap tampil bagi role pimpinan
     await execute("UPDATE fitur_akses SET roles = replace(roles, ']', ',\"pimpinan\"]') WHERE href = '/dashboard' AND roles NOT LIKE '%pimpinan%'")
+
+    // Monitoring EHB dihapus dari modul pimpinan
+    await execute("DELETE FROM fitur_akses WHERE href = '/dashboard/pimpinan/ehb'")
   } catch {}
 
   fiturSchemaReady = true

@@ -4,7 +4,6 @@ import { getCachedRingkasanPimpinan } from '@/lib/pimpinan/cache'
 import { rupiah, rupiahCompact, labelBulan, currentMonthWib } from '@/lib/pimpinan/helpers'
 import {
   PageHeader,
-  PrintButton,
   KpiCard,
   SectionCard,
   DataTable,
@@ -24,7 +23,6 @@ export default async function PimpinanRingkasanPage() {
       <PageHeader
         title="Ringkasan Pimpinan"
         description={`Pantauan ringkas seluruh bidang pada ${bulanLabel}. Data bersifat baca saja.`}
-        actions={<PrintButton />}
       />
 
       <div className="print-area space-y-5">

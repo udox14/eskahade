@@ -4,7 +4,6 @@ import { getCachedAbsensiSantriMonitoring } from '@/lib/pimpinan/cache'
 import { getAsramaOptions, labelBulan, pct } from '@/lib/pimpinan/helpers'
 import {
   PageHeader,
-  PrintButton,
   KpiCard,
   SectionCard,
   DataTable,
@@ -35,7 +34,6 @@ export default async function PimpinanAbsensiSantriPage({
       <PageHeader
         title="Monitoring Absensi Santri"
         description={`Rekap absensi santri ${labelBulan(data.period.month)}. Data bersifat baca saja.`}
-        actions={<PrintButton />}
       />
 
       <MonthAsramaFilter

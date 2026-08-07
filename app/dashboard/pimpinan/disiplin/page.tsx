@@ -4,7 +4,6 @@ import { getCachedDisiplinMonitoring } from '@/lib/pimpinan/cache'
 import { labelBulan } from '@/lib/pimpinan/helpers'
 import {
   PageHeader,
-  PrintButton,
   KpiCard,
   SectionCard,
   DataTable,
@@ -29,7 +28,6 @@ export default async function PimpinanDisiplinPage({
       <PageHeader
         title="Monitoring Disiplin Santri"
         description={`Rekap pelanggaran dan poin ${labelBulan(data.period.month)}. Data bersifat baca saja.`}
-        actions={<PrintButton />}
       />
 
       <MonthPeriodFilter month={data.period.month} />

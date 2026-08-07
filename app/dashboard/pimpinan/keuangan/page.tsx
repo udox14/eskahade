@@ -4,7 +4,6 @@ import { getCachedKeuanganMonitoring } from '@/lib/pimpinan/cache'
 import { rupiah, rupiahCompact, labelBulan } from '@/lib/pimpinan/helpers'
 import {
   PageHeader,
-  PrintButton,
   KpiCard,
   SectionCard,
   DataTable,
@@ -29,7 +28,6 @@ export default async function PimpinanKeuanganPage({
       <PageHeader
         title="Monitoring Keuangan"
         description={`Rekap keuangan ${labelBulan(data.period.month)}. Data bersifat baca saja.`}
-        actions={<PrintButton />}
       />
 
       <MonthPeriodFilter month={data.period.month} />

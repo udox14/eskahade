@@ -4,7 +4,6 @@ import { getCachedAbsensiGuruMonitoring } from '@/lib/pimpinan/cache'
 import { monthPeriod, pct } from '@/lib/pimpinan/helpers'
 import {
   PageHeader,
-  PrintButton,
   KpiCard,
   SectionCard,
   DataTable,
@@ -38,7 +37,6 @@ export default async function PimpinanAbsensiGuruPage({
       <PageHeader
         title="Monitoring Absensi Guru"
         description={`Rekap kehadiran guru ${data.from} s.d. ${data.to}. Data bersifat baca saja.`}
-        actions={<PrintButton />}
       />
 
       <GuruFilter from={data.from} to={data.to} />

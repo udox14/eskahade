@@ -4,7 +4,6 @@ import { getCachedPsbMonitoring } from '@/lib/pimpinan/cache'
 import { PSB_STATUS_ORDER } from '@/lib/pimpinan/psb'
 import {
   PageHeader,
-  PrintButton,
   KpiCard,
   SectionCard,
   DataTable,
@@ -33,7 +32,6 @@ export default async function PimpinanPsbPage() {
       <PageHeader
         title="Monitoring PSB"
         description="Progress daftar ulang santri baru. Data bersifat baca saja."
-        actions={<PrintButton />}
       />
 
       <div className="print-area space-y-5">

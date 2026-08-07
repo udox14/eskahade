@@ -254,7 +254,6 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/pimpinan/asrama':                       'Pantau isi asrama, perizinan, dan perpulangan.',
   '/dashboard/pimpinan/disiplin':                     'Pantau pelanggaran dan surat perjanjian santri.',
   '/dashboard/pimpinan/akademik':                     'Pantau struktur kelas, nilai rata-rata, dan ranking.',
-  '/dashboard/pimpinan/ehb':                          'Pantau RAB, keuangan, dan kepanitiaan ujian EHB.',
   '/dashboard/pimpinan/psb':                          'Pantau progress daftar ulang santri baru.',
 }
 

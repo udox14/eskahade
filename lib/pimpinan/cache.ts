@@ -17,7 +17,6 @@ import { getKesehatanMonitoring } from './kesehatan'
 import { getAsramaMonitoring } from './asrama'
 import { getDisiplinMonitoring } from './disiplin'
 import { getAkademikMonitoring } from './akademik'
-import { getEhbMonitoring } from './ehb'
 import { getPsbMonitoringPimpinan } from './psb'
 
 export const MONITORING_CACHE_TTL = 60
@@ -69,12 +68,6 @@ export const getCachedDisiplinMonitoring = unstable_cache(
 export const getCachedAkademikMonitoring = unstable_cache(
   async (_scope: string) => getAkademikMonitoring(),
   ['pimpinan-akademik'],
-  { revalidate: MONITORING_CACHE_TTL }
-)
-
-export const getCachedEhbMonitoring = unstable_cache(
-  async (_scope: string) => getEhbMonitoring(),
-  ['pimpinan-ehb'],
   { revalidate: MONITORING_CACHE_TTL }
 )
 

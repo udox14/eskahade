@@ -3,7 +3,6 @@ import { isDemo } from '@/lib/auth/session'
 import { getCachedAkademikMonitoring } from '@/lib/pimpinan/cache'
 import {
   PageHeader,
-  PrintButton,
   KpiCard,
   SectionCard,
   DataTable,
@@ -25,7 +24,6 @@ export default async function PimpinanAkademikPage() {
       <PageHeader
         title="Monitoring Akademik"
         description="Struktur kelas, nilai rata-rata, dan papan ranking kelas."
-        actions={<PrintButton />}
       />
 
       <div className="print-area space-y-5">

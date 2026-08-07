@@ -3,7 +3,6 @@
 import React from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  Printer,
   SearchX,
   Calendar,
   CalendarRange,
@@ -24,7 +23,7 @@ export function PageHeader({
   actions?: React.ReactNode
 }) {
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <DashboardPageHeader title={title} description={description || ''} />
@@ -33,19 +32,6 @@ export function PageHeader({
       </div>
       <PimpinanNav />
     </div>
-  )
-}
-
-export function PrintButton({ label = 'Cetak' }: { label?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={() => window.print()}
-      className="no-print inline-flex items-center gap-2 rounded-xl bg-slate-800 px-5 py-3 text-base font-bold text-white shadow-sm transition hover:bg-slate-700"
-    >
-      <Printer className="h-5 w-5" />
-      {label}
-    </button>
   )
 }
 
@@ -72,10 +58,10 @@ export function KpiCard({
 }) {
   const c = KPI_TONE[tone]
   return (
-    <div className={cn('rounded-xl border px-5 py-4 shadow-sm', c.box)}>
+    <div className={cn('min-w-0 max-w-full rounded-xl border px-5 py-4 shadow-sm', c.box)}>
       <p className={cn('text-xs font-bold uppercase tracking-wide', c.label)}>{label}</p>
-      <p className={cn('mt-1 text-3xl font-black leading-tight sm:text-4xl', c.value)}>{value}</p>
-      {sub && <p className={cn('mt-1 text-xs font-medium', c.label)}>{sub}</p>}
+      <p className={cn('mt-1 break-words text-3xl font-black leading-tight sm:text-4xl', c.value)}>{value}</p>
+      {sub && <p className={cn('mt-1 break-words text-xs font-medium', c.label)}>{sub}</p>}
     </div>
   )
 }
@@ -98,9 +84,9 @@ export function MiniStat({
           ? 'text-red-700'
           : 'text-slate-800'
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+    <div className="min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-4 py-3">
       <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className={cn('mt-0.5 text-2xl font-black', color)}>{value}</p>
+      <p className={cn('mt-0.5 break-words text-2xl font-black', color)}>{value}</p>
     </div>
   )
 }
@@ -119,7 +105,7 @@ export function SectionCard({
   className?: string
 }) {
   return (
-    <section className={cn('rounded-xl border border-slate-200 bg-white shadow-sm', className)}>
+    <section className={cn('min-w-0 max-w-full rounded-xl border border-slate-200 bg-white shadow-sm', className)}>
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
         <div>
           <h2 className="text-base font-black text-slate-800">{title}</h2>
@@ -145,15 +131,15 @@ export function DataTable({
 }) {
   if (empty) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-14 text-center">
+      <div className="flex min-w-0 max-w-full flex-col items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-14 text-center">
         <SearchX className="h-10 w-10 text-slate-300" />
-        <p className="text-sm font-bold text-slate-600">{emptyText}</p>
+        <p className="break-words text-sm font-bold text-slate-600">{emptyText}</p>
       </div>
     )
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+    <div className="max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white">
       <table className="w-full min-w-[720px] text-base">
         <thead>
           <tr className="bg-slate-50 text-xs uppercase text-slate-500">
@@ -185,7 +171,7 @@ export function EmptyState({
   description?: string
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center">
+    <div className="flex min-w-0 max-w-full flex-col items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center">
       <SearchX className="h-12 w-12 text-slate-300" />
       <p className="text-base font-black text-slate-700">{title}</p>
       <p className="max-w-md text-sm text-slate-500">{description}</p>
@@ -313,7 +299,7 @@ export function FilterBar({
   children: React.ReactNode
 }) {
   return (
-    <div className="no-print flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+    <div className="no-print flex min-w-0 max-w-full flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
       {children}
     </div>
   )

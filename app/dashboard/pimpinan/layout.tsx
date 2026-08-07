@@ -13,7 +13,7 @@ export default async function PimpinanLayout({
   if (!session) redirect('/login')
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-5">
+    <div className="mx-auto w-full max-w-7xl space-y-5 overflow-x-clip">
       {children}
     </div>
   )

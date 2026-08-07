@@ -4,7 +4,6 @@ import { getCachedKesehatanMonitoring } from '@/lib/pimpinan/cache'
 import { labelBulan } from '@/lib/pimpinan/helpers'
 import {
   PageHeader,
-  PrintButton,
   KpiCard,
   SectionCard,
   DataTable,
@@ -28,7 +27,6 @@ export default async function PimpinanKesehatanPage({
       <PageHeader
         title="Monitoring Kesehatan & Sakit"
         description={`Data sakit santri dan kunjungan POSKESTREN ${labelBulan(data.period.month)}. Data bersifat baca saja.`}
-        actions={<PrintButton />}
       />
 
       <MonthPeriodFilter month={data.period.month} />

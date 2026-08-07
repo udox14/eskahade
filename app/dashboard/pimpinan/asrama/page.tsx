@@ -4,7 +4,6 @@ import { getCachedAsramaMonitoring } from '@/lib/pimpinan/cache'
 import { labelBulan } from '@/lib/pimpinan/helpers'
 import {
   PageHeader,
-  PrintButton,
   KpiCard,
   SectionCard,
   DataTable,
@@ -31,7 +30,6 @@ export default async function PimpinanAsramaPage({
       <PageHeader
         title="Monitoring Asrama & Perizinan"
         description={`Kondisi asrama dan perizinan ${labelBulan(data.period.month)}. Data bersifat baca saja.`}
-        actions={<PrintButton />}
       />
 
       <MonthPeriodFilter month={data.period.month} />
