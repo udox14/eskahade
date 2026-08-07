@@ -25,6 +25,7 @@ const ROLE_LABEL: Record<string, string> = {
   bendahara: 'Bendahara',
   operator_loket: 'Operator Loket',
   sekpen: 'Sekretaris Pendidikan',
+  pimpinan: 'Pimpinan',
 }
 
 const ROLE_COLOR: Record<string, string> = {
@@ -37,6 +38,7 @@ const ROLE_COLOR: Record<string, string> = {
   bendahara: 'text-emerald-600',
   operator_loket: 'text-cyan-600',
   sekpen: 'text-cyan-600',
+  pimpinan: 'text-indigo-600',
 }
 
 function useClock() {

@@ -48,7 +48,8 @@ import {
   ArrowsLeftRight as ArrowLeftRight,
   Flame,
   Clipboard as ClipboardList,
-  CalendarDots
+  CalendarDots,
+  House as Home,
 } from "@phosphor-icons/react";
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -58,7 +59,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
   Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
   ImageIcon, School, Palette, Archive, Utensils, CalendarDays: Calendar, ArrowLeftRight,
-  Flame, ClipboardList, CalendarDots, CashRegister: Wallet
+  Flame, ClipboardList, CalendarDots, CashRegister: Wallet, Home
 }
 
 function getIcon(name: string): React.ElementType {
@@ -77,6 +78,7 @@ const ALL_ROLES = [
   'bendahara',
   'operator_loket',
   'poskestren',
+  'pimpinan',
   'poskestren:bendahara',
   'jabatan:anggota',
   'jabatan:ketua',
@@ -96,6 +98,7 @@ const ROLE_LABEL: Record<string, string> = {
   bendahara:       'Bendahara',
   operator_loket:  'Operator Loket',
   poskestren:      'POSKESTREN',
+  pimpinan:        'Pimpinan',
   'poskestren:bendahara': 'Bendahara POS',
   'jabatan:anggota':   'Anggota',
   'jabatan:ketua':      'Ketua',
@@ -115,6 +118,7 @@ const ROLE_LABEL_FULL: Record<string, string> = {
   bendahara:       'Bendahara',
   operator_loket:  'Operator Loket',
   poskestren:      'Petugas POSKESTREN',
+  pimpinan:        'Pimpinan',
   'poskestren:bendahara': 'Bendahara POSKESTREN',
   'jabatan:anggota':   'Jabatan Anggota',
   'jabatan:ketua':      'Jabatan Ketua',
@@ -134,6 +138,7 @@ const ROLE_COLOR: Record<string, string> = {
   bendahara:       'bg-yellow-100 text-yellow-700 border-yellow-200',
   operator_loket:  'bg-cyan-100 text-cyan-700 border-cyan-200',
   poskestren:      'bg-emerald-100 text-emerald-700 border-emerald-200',
+  pimpinan:        'bg-indigo-100 text-indigo-700 border-indigo-200',
   'poskestren:bendahara': 'bg-teal-100 text-teal-700 border-teal-200',
   'jabatan:anggota':   'bg-zinc-100 text-zinc-700 border-zinc-200',
   'jabatan:ketua':      'bg-slate-900 text-white border-slate-900',
@@ -153,6 +158,7 @@ const ROLE_BG_SOFT: Record<string, string> = {
   bendahara:       'bg-yellow-50 border-yellow-200',
   operator_loket:  'bg-cyan-50 border-cyan-200',
   poskestren:      'bg-emerald-50 border-emerald-200',
+  pimpinan:        'bg-indigo-50 border-indigo-200',
   'poskestren:bendahara': 'bg-teal-50 border-teal-200',
   'jabatan:anggota':   'bg-zinc-50 border-zinc-200',
   'jabatan:ketua':      'bg-slate-50 border-slate-300',
@@ -172,6 +178,7 @@ const ROLE_HEADER: Record<string, string> = {
   bendahara:       'from-yellow-500 to-yellow-600',
   operator_loket:  'from-cyan-600 to-cyan-700',
   poskestren:      'from-emerald-600 to-emerald-700',
+  pimpinan:        'from-indigo-600 to-indigo-700',
   'poskestren:bendahara': 'from-teal-600 to-teal-700',
   'jabatan:anggota':   'from-zinc-500 to-zinc-600',
   'jabatan:ketua':      'from-slate-700 to-slate-900',
@@ -181,6 +188,7 @@ const ROLE_HEADER: Record<string, string> = {
 
 const GROUP_ORDER = [
   '_standalone',
+  'Monitoring Pimpinan',
   'Data Santri',
   'Kesantrian',
   'Asrama',

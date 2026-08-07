@@ -11,6 +11,7 @@ import {
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrator', wali_kelas: 'Wali Kelas', pengurus_asrama: 'Pengurus Asrama',
   akademik: 'Akademik', keamanan: 'Keamanan', dewan_santri: 'Dewan Santri', guru: 'Guru', bendahara: 'Bendahara', operator_loket: 'Operator Loket',
+  pimpinan: 'Pimpinan',
 }
 const ROLE_COLOR: Record<string, string> = {
   admin: 'bg-red-100 text-red-700 border-red-200',
@@ -22,6 +23,7 @@ const ROLE_COLOR: Record<string, string> = {
   guru: 'bg-indigo-100 text-indigo-700 border-indigo-200',
   bendahara: 'bg-orange-100 text-orange-700 border-orange-200',
   operator_loket: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+  pimpinan: 'bg-indigo-100 text-indigo-700 border-indigo-200',
 }
 
 type ProfilData = {

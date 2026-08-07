@@ -27,6 +27,7 @@ const ROLES = [
   { value: 'wali_kelas', label: 'Wali Kelas' },
   { value: 'guru', label: 'Guru' },
   { value: 'poskestren', label: 'POSKESTREN' },
+  { value: 'pimpinan', label: 'Pimpinan' },
 ]
 
 const ASRAMA_LIST = ["AL-FALAH", "AS-SALAM", "BAHAGIA", "ASY-SYIFA 1", "ASY-SYIFA 2", "ASY-SYIFA 3", "ASY-SYIFA 4", "AL-BAGHORY"]

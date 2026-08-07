@@ -21,6 +21,7 @@ const VALID_USER_ROLES = [
   'wali_kelas',
   'guru',
   'poskestren',
+  'pimpinan',
 ]
 
 type UserSourceType = 'guru' | 'sadesa'

@@ -70,7 +70,17 @@ async function ensureFiturAksesReady() {
   await execute(`
     INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan)
     VALUES
-      ('_standalone', 'Dashboard', '/dashboard', 'LayoutDashboard', '["admin","keamanan","sekpen","dewan_santri","pengurus_asrama","wali_kelas","guru","bendahara"]', 1, 0),
+      ('_standalone', 'Dashboard', '/dashboard', 'LayoutDashboard', '["admin","keamanan","sekpen","dewan_santri","pengurus_asrama","wali_kelas","guru","bendahara","pimpinan"]', 1, 0),
+      ('Monitoring Pimpinan', 'Ringkasan Pimpinan', '/dashboard/pimpinan', 'LayoutDashboard', '["pimpinan"]', 1, 0),
+      ('Monitoring Pimpinan', 'Keuangan', '/dashboard/pimpinan/keuangan', 'Wallet', '["pimpinan"]', 1, 1),
+      ('Monitoring Pimpinan', 'Absensi Santri', '/dashboard/pimpinan/absensi-santri', 'Users', '["pimpinan"]', 1, 2),
+      ('Monitoring Pimpinan', 'Absensi Guru', '/dashboard/pimpinan/absensi-guru', 'School', '["pimpinan"]', 1, 3),
+      ('Monitoring Pimpinan', 'Kesehatan', '/dashboard/pimpinan/kesehatan', 'Stethoscope', '["pimpinan"]', 1, 4),
+      ('Monitoring Pimpinan', 'Asrama', '/dashboard/pimpinan/asrama', 'Home', '["pimpinan"]', 1, 5),
+      ('Monitoring Pimpinan', 'Disiplin', '/dashboard/pimpinan/disiplin', 'ShieldAlert', '["pimpinan"]', 1, 6),
+      ('Monitoring Pimpinan', 'Akademik', '/dashboard/pimpinan/akademik', 'BookOpen', '["pimpinan"]', 1, 7),
+      ('Monitoring Pimpinan', 'EHB', '/dashboard/pimpinan/ehb', 'ClipboardList', '["pimpinan"]', 1, 8),
+      ('Monitoring Pimpinan', 'PSB', '/dashboard/pimpinan/psb', 'UserPlus', '["pimpinan"]', 1, 9),
       ('Asrama', 'Kamar', '/dashboard/asrama/kamar', 'DoorOpen', '["admin","pengurus_asrama"]', 1, 5),
       ('Asrama', 'Perpindahan Kamar', '/dashboard/asrama/perpindahan-kamar', 'ArrowLeftRight', '["admin","pengurus_asrama"]', 1, 6),
       ('Asrama', 'Plotting Kamar Manual', '/dashboard/asrama/plotting-kamar-manual', 'DoorOpen', '["admin","pengurus_asrama"]', 1, 7),
@@ -106,6 +116,9 @@ async function ensureFiturAksesReady() {
 
     // Rename menu title
     await execute("UPDATE fitur_akses SET title = 'Tim & Kepengurusan' WHERE href = '/dashboard/pengaturan/kepanitiaan'")
+
+    // Role pimpinan: pastikan beranda (Dashboard) tetap tampil bagi role pimpinan
+    await execute("UPDATE fitur_akses SET roles = replace(roles, ']', ',\"pimpinan\"]') WHERE href = '/dashboard' AND roles NOT LIKE '%pimpinan%'")
   } catch {}
 
   fiturSchemaReady = true

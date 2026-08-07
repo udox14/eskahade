@@ -246,6 +246,16 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/ehb/cetak':                            'Cetak administrasi EHB: kartu peserta, blanko, jadwal, dan tempelan ruangan.',
   '/dashboard/ehb/kepanitiaan':                       'Kelola susunan panitia EHB dan cetak organigram kepanitiaan.',
   '/dashboard/ehb/keuangan':                          'Susun RAB dan kelola anggaran pelaksanaan EHB.',
+  '/dashboard/pimpinan':                              'Ringkasan pantauan seluruh bidang untuk pimpinan.',
+  '/dashboard/pimpinan/keuangan':                     'Pantau saldo kas, arus kas, alert, dan tunggakan SPP.',
+  '/dashboard/pimpinan/absensi-santri':               'Pantau rekap kehadiran pengajian, berjamaah, dan malam santri.',
+  '/dashboard/pimpinan/absensi-guru':                 'Pantau kinerja kehadiran guru pengajar.',
+  '/dashboard/pimpinan/kesehatan':                    'Pantau santri sakit dan kunjungan POSKESTREN.',
+  '/dashboard/pimpinan/asrama':                       'Pantau isi asrama, perizinan, dan perpulangan.',
+  '/dashboard/pimpinan/disiplin':                     'Pantau pelanggaran dan surat perjanjian santri.',
+  '/dashboard/pimpinan/akademik':                     'Pantau struktur kelas, nilai rata-rata, dan ranking.',
+  '/dashboard/pimpinan/ehb':                          'Pantau RAB, keuangan, dan kepanitiaan ujian EHB.',
+  '/dashboard/pimpinan/psb':                          'Pantau progress daftar ulang santri baru.',
 }
 
 // ── Accent per grup ──────────────────────────────────────────────────────────
@@ -268,6 +278,7 @@ const GROUP_ACCENT: Record<string, { dot: string; line: string; label: string; i
   'EHB':          { dot: 'bg-indigo-500',  line: 'bg-indigo-100',   label: 'text-indigo-600',  iconHover: 'group-hover:text-indigo-600' },
   'Operasional':  { dot: 'bg-cyan-500',    line: 'bg-cyan-100',     label: 'text-cyan-600',    iconHover: 'group-hover:text-cyan-600' },
   'PSB':          { dot: 'bg-indigo-500',  line: 'bg-indigo-100',   label: 'text-indigo-600',  iconHover: 'group-hover:text-indigo-600' },
+  'Monitoring Pimpinan': { dot: 'bg-indigo-400', line: 'bg-indigo-100', label: 'text-indigo-600', iconHover: 'group-hover:text-indigo-600' },
 }
 
 // ── Metadata Kategori Menu (SPA Native Feel) ──────────────────────────────────
@@ -291,6 +302,7 @@ const GROUP_META: Record<string, { label: string; icon: React.ElementType }> = {
   'EHB':          { label: 'Ujian EHB',            icon: ClipboardList },
   'PSB':          { label: 'Pendaftaran PSB',      icon: UserPlus },
   'POSKESTREN':   { label: 'POSKESTREN',           icon: Stethoscope },
+  'Monitoring Pimpinan': { label: 'Monitoring Pimpinan', icon: Eye },
   'Master Data':  { label: 'Master Data',          icon: Database },
 }
 
@@ -319,15 +331,18 @@ const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrator', keamanan: 'Petugas Keamanan', sekpen: 'Sekretaris Pendidikan',
   dewan_santri: 'Dewan Santri', pengurus_asrama: 'Pengurus Asrama', operator_loket: 'Operator Loket',
   wali_kelas: 'Wali Kelas', guru: 'Guru', bendahara: 'Bendahara',
+  pimpinan: 'Pimpinan',
 }
 
 const ROLE_EMOJI: Record<string, string> = {
   admin: '🛡️', keamanan: '🔐', sekpen: '📋',
   dewan_santri: '🏛️', pengurus_asrama: '🏠', wali_kelas: '📚', bendahara: '💰', operator_loket: '🏧',
+  pimpinan: '🧑‍💼',
 }
 
 const GROUP_ORDER = [
   '_standalone',
+  'Monitoring Pimpinan',
   'Data Santri',
   'Kesantrian',
   'Asrama',
@@ -396,6 +411,7 @@ const GROUP_COLORS: Record<string, { bg: string; text: string; hoverText: string
   'Operasional':           { bg: 'bg-cyan-50 text-cyan-600', text: 'text-cyan-600', hoverText: 'group-hover:text-cyan-700' },
   'PSB':                   { bg: 'bg-violet-50 text-violet-600', text: 'text-violet-600', hoverText: 'group-hover:text-violet-700' },
   'POSKESTREN':            { bg: 'bg-red-50 text-red-600', text: 'text-red-600', hoverText: 'group-hover:text-red-700' },
+  'Monitoring Pimpinan':   { bg: 'bg-indigo-50 text-indigo-600', text: 'text-indigo-600', hoverText: 'group-hover:text-indigo-700' },
 }
 
 // renderGroupIcon helper is deleted, using getGroupMeta(group).icon directly

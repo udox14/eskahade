@@ -148,6 +148,7 @@ const GROUP_ICON: Record<string, React.ElementType> = {
   'EHB': ClipboardList,
   'PSB': ClipboardList,
   'POSKESTREN': Stethoscope,
+  'Monitoring Pimpinan': Eye,
   'Master Data': Database,
 };
 
@@ -415,10 +416,12 @@ const ROLE_LABEL: Record<string, string> = {
   bendahara: 'Bendahara',
   operator_loket: 'Operator Loket',
   poskestren: 'POSKESTREN',
+  pimpinan: 'Pimpinan',
 };
 
 const GROUP_ORDER = [
   '_standalone',
+  'Monitoring Pimpinan',
   'Data Santri',
   'Kesantrian',
   'Asrama',
