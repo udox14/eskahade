@@ -65,6 +65,7 @@ export default function NilaiHarianContent() {
   const [rekapData, setRekapData] = useState<any>(null)
   const [rekapLoading, setRekapLoading] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [editingSesi, setEditingSesi] = useState(false)
 
   const kelasIdRef = useRef('')
   const mapelIdRef = useRef<number | null>(null)
@@ -314,6 +315,10 @@ export default function NilaiHarianContent() {
   }
 
   useEffect(() => {
+    setEditingSesi(false)
+  }, [sesiId])
+
+  useEffect(() => {
     if (!kelasId || !mapelId || !sesiId) return
     const seq = ++inputFetchSeqRef.current
     const isNew = sesiId === NEW_SESI
@@ -460,7 +465,6 @@ export default function NilaiHarianContent() {
 
   const switchTab = (next: TabKey) => {
     setTab(next)
-    pushHistory({ view: next })
   }
 
   const switchRekapView = (next: RekapView) => {
@@ -468,7 +472,6 @@ export default function NilaiHarianContent() {
     setRekapSesiId('')
     setRekapMapelId('')
     if (next !== 'sesi') setRekapMapelFilter('')
-    pushHistory({ rekapView: next, view: 'rekap' })
   }
 
   const handleDeleteSesi = async (sesi: any) => {
@@ -509,25 +512,37 @@ export default function NilaiHarianContent() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 pb-28">
-      {tab === 'input' && step === 'home' && (
+      {step === 'home' && tab === 'input' && (
         <DashboardPageHeader
           title="Nilai Harian"
           description="Pilih mapel, lalu buka atau buat sesi penilaian. Nilai tersimpan otomatis."
         />
       )}
+      {step === 'home' && tab === 'rekap' && (
+        <DashboardPageHeader
+          title="Nilai Harian"
+          description="Rekap nilai per sesi, per mapel, dan keseluruhan lengkap dengan analitik."
+        />
+      )}
 
-      {tab === 'input' && step !== 'home' && (
+      {step !== 'home' && (
         <div className="-mx-4 -mt-4 mb-4 border-b border-slate-100 bg-white px-4 pb-3 pt-2 md:-mx-8 md:-mt-8 md:px-8">
           <button onClick={goBack} className="mb-1.5 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700">
             <ArrowLeft className="h-4 w-4" />
-            {step === 'sesi' ? 'Daftar Mapel' : selectedMapel?.nama || 'Kembali'}
+            {tab === 'rekap' ? 'Kembali ke Input' : step === 'sesi' ? 'Daftar Mapel' : selectedMapel?.nama || 'Kembali'}
           </button>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <Crumb on>{selectedMapel?.nama || ''}</Crumb>
-            {step === 'input' && (
+            {selectedMapel && <Crumb on>{selectedMapel.nama}</Crumb>}
+            {step === 'input' && tab === 'input' && (
               <>
                 <Sep />
                 <span className="font-bold text-slate-900">{sesiId === NEW_SESI ? 'Sesi Baru' : selectedSesi?.nama_sesi || 'Sesi'}</span>
+              </>
+            )}
+            {tab === 'rekap' && (
+              <>
+                {selectedMapel && <Sep />}
+                <span className="font-bold text-slate-900">Rekap</span>
               </>
             )}
           </div>
@@ -642,42 +657,61 @@ export default function NilaiHarianContent() {
       )}
 
       {tab === 'input' && step === 'input' && (
-        <div className="grid items-start gap-5 lg:grid-cols-[320px_1fr]">
-          <div className="space-y-4">
-            <div className="rounded-xl border bg-white p-4 shadow-sm">
-              <h2 className="mb-3 flex items-center gap-2 font-bold text-slate-800"><ClipboardList className="h-4 w-4 text-emerald-600" /> Detail Sesi</h2>
+        <div className="space-y-4">
+          <div className="rounded-xl border bg-white p-3 shadow-sm">
+            {!editingSesi ? (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600"><ClipboardList className="h-4 w-4" /></div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-slate-900">{form.namaSesi || 'Sesi Baru'}</p>
+                  <p className="truncate text-xs text-slate-500">
+                    {form.tanggal} · KKM {form.kkm || 0}
+                    {form.deskripsi ? ` · ${form.deskripsi}` : ''}
+                  </p>
+                </div>
+                <button onClick={() => setEditingSesi(true)} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100">
+                  Edit
+                </button>
+              </div>
+            ) : (
               <div className="space-y-3">
-                <input
-                  value={form.namaSesi}
-                  onChange={e => updateForm({ namaSesi: e.target.value })}
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="Nama sesi (mis. Ulangan Harian 1)"
-                />
-                <input
-                  type="date"
-                  value={form.tanggal}
-                  onChange={e => updateForm({ tanggal: e.target.value })}
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={form.kkm}
-                  onChange={e => updateForm({ kkm: e.target.value.replace(/\D/g, '').slice(0, 3) })}
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="KKM"
-                />
+                <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><ClipboardList className="h-4 w-4 text-emerald-600" /> Edit Detail Sesi</h2>
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+                  <input
+                    value={form.namaSesi}
+                    onChange={e => updateForm({ namaSesi: e.target.value })}
+                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="Nama sesi (mis. Ulangan Harian 1)"
+                  />
+                  <input
+                    type="date"
+                    value={form.tanggal}
+                    onChange={e => updateForm({ tanggal: e.target.value })}
+                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={form.kkm}
+                    onChange={e => updateForm({ kkm: e.target.value.replace(/\D/g, '').slice(0, 3) })}
+                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                    placeholder="KKM"
+                  />
+                </div>
                 <textarea
                   value={form.deskripsi}
                   onChange={e => updateForm({ deskripsi: e.target.value })}
-                  className="min-h-20 w-full rounded-lg border border-slate-200 p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="min-h-16 w-full rounded-lg border border-slate-200 p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
                   placeholder="Deskripsi opsional"
                 />
-                <p className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
-                  Nilai kosong = belum dinilai. Perubahan tersimpan otomatis.
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] text-slate-500">Perubahan tersimpan otomatis.</p>
+                  <button onClick={() => setEditingSesi(false)} className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700">
+                    Selesai
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
