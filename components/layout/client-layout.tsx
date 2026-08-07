@@ -26,8 +26,16 @@ interface ClientLayoutProps {
 }
 
 export function ClientLayout({ children, userRole, userRoles, userEmail, userName, avatarUrl, fiturAkses, globalBottomNavEnabled, userShowBottomNav }: ClientLayoutProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMobileOpen, setIsMobileOpen] = useState(false); 
+  // State collapse dipersist ke localStorage agar pilihan user bertahan antar sesi
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem('eskahade_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
   const isFinanceRoute = pathname?.startsWith('/dashboard/keuangan-terpusat');
   const searchParams = useSearchParams();
@@ -47,49 +55,24 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
         isFinanceRoute && "font-['Plus_Jakarta_Sans'] sm:font-sans"
       )}>
       
-      {/* 1. SIDEBAR DESKTOP (FIXED) */}
-      <div 
-        className={cn(
-          "no-print hidden md:flex flex-col fixed inset-y-0 z-50 border-r border-slate-200 transition-all duration-300 ease-in-out",
-          isCollapsed ? "w-16" : "w-60"
-        )}
-      >
-        {/* Background dikosongkan agar dikendalikan langsung oleh komponen Sidebar */}
-        <div className="h-full w-full bg-slate-900 text-white">
-           <Sidebar 
-             userRole={userRole}
-             userRoles={userRoles}
-             fiturAkses={fiturAkses}
-             isCollapsed={isCollapsed} 
-             toggleSidebar={() => setIsCollapsed(!isCollapsed)} 
-           />
-        </div>
-      </div>
-
-      {/* 1.5. SIDEBAR MOBILE (DRAWER) */}
-      {isMobileOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden animate-in fade-in"
-          onClick={() => setIsMobileOpen(false)}
-        />
-      )}
-
-      {/* Drawer Sidebar */}
-      <div 
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 w-60 bg-slate-900 text-white shadow-2xl transform transition-transform duration-300 md:hidden",
-          isMobileOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-         <Sidebar 
-            userRole={userRole}
-            userRoles={userRoles}
-            fiturAkses={fiturAkses}
-            isCollapsed={false}
-            toggleSidebar={() => {}} 
-            onMobileClose={() => setIsMobileOpen(false)} 
-         />
-      </div>
+      {/* 1. SIDEBAR — desktop rail + drawer mobile + overlay dikelola di dalam komponen */}
+      <Sidebar
+        userRole={userRole}
+        userRoles={userRoles}
+        fiturAkses={fiturAkses}
+        isCollapsed={isCollapsed}
+        toggleSidebar={() => {
+          setIsCollapsed(prev => {
+            const next = !prev;
+            try {
+              localStorage.setItem('eskahade_sidebar_collapsed', String(next));
+            } catch {}
+            return next;
+          });
+        }}
+        isMobileOpen={isMobileOpen}
+        onMobileClose={() => setIsMobileOpen(false)}
+      />
 
       {/* 2. AREA KONTEN (DYNAMIC PADDING) */}
       <div 

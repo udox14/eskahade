@@ -15,6 +15,15 @@ import {
 const ARABIC_FONT = '"Scheherazade New", "Amiri", "Traditional Arabic", "Noto Naskh Arabic", serif'
 const QURAN_FONT = '"Amiri Quran", "Scheherazade New", "Traditional Arabic", serif'
 
+function asramaKamarLabel(santri: { asrama?: string | null; kamar?: string | null }) {
+  const asrama = String(santri?.asrama || '').trim()
+  const kamar = String(santri?.kamar || '').trim()
+  if (!asrama && !kamar) return '-'
+  if (!asrama) return kamar
+  if (!kamar) return asrama
+  return `${asrama} / ${kamar}`
+}
+
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 type AutosaveScope = {
@@ -949,7 +958,7 @@ export default function HafalanPageContent() {
                     <button key={s.riwayat_id} onClick={() => selectSantri(s.riwayat_id)} className={`flex w-full items-center gap-2 rounded-2xl border p-3 text-left shadow-sm transition hover:border-emerald-300 ${selectedSantriId === s.riwayat_id ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-bold text-slate-900">{s.nama}</p>
-                        <p className="text-[11px] text-slate-400">{s.nis || '-'}</p>
+                        <p className="text-[11px] text-slate-400">{asramaKamarLabel(s)}</p>
                         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                           <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
                         </div>
@@ -1003,7 +1012,7 @@ export default function HafalanPageContent() {
                         >
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-bold text-slate-900">{s.nama}</span>
-                            <span className="block text-[11px] text-slate-400">{s.nis || '-'}</span>
+                            <span className="block text-[11px] text-slate-400">{asramaKamarLabel(s)}</span>
                           </span>
                           <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
                         </button>
@@ -1037,7 +1046,7 @@ export default function HafalanPageContent() {
                 <button key={s.riwayat_id} onClick={() => selectSantri(s.riwayat_id)} className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left shadow-sm transition hover:border-emerald-300">
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-bold text-slate-900">{s.nama}</p>
-                    <p className="text-xs text-slate-400">{s.nis || '-'}</p>
+                    <p className="text-xs text-slate-400">{asramaKamarLabel(s)}</p>
                     <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                       <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
                     </div>

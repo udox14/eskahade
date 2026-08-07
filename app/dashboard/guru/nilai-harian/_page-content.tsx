@@ -41,6 +41,15 @@ function todayLocal() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function asramaKamarLabel(row: { asrama?: string | null; kamar?: string | null }) {
+  const asrama = String(row?.asrama || '').trim()
+  const kamar = String(row?.kamar || '').trim()
+  if (!asrama && !kamar) return '-'
+  if (!asrama) return kamar
+  if (!kamar) return asrama
+  return `${asrama} / ${kamar}`
+}
+
 export default function NilaiHarianContent() {
   const [tab, setTab] = useState<TabKey>('input')
   const [kelasList, setKelasList] = useState<any[]>([])
@@ -262,6 +271,7 @@ export default function NilaiHarianContent() {
         setSesiId(realSesiId)
         writeHistory(makeSnapshot({ sesiId: realSesiId }), true)
         getNilaiHarianSesi(target.kelasId, target.mapelId).then(setSesiList)
+        rekapCacheRef.current.clear()
         setDirty(false)
         setSaveStatus('saved')
         return
@@ -276,6 +286,7 @@ export default function NilaiHarianContent() {
       if (!latest?.size) {
         pendingChangesRef.current.delete(target.key)
         try { sessionStorage.removeItem(`nilai-harian-draft:${target.kelasId}:${target.sesiId}`) } catch {}
+        rekapCacheRef.current.clear()
         setDirty(false)
         setSaveStatus('saved')
       } else {
@@ -433,6 +444,7 @@ export default function NilaiHarianContent() {
     setSantri([])
     setNilai({})
     setRekapData(null)
+    rekapCacheRef.current.clear()
     writeHistory(makeSnapshot({ kelasId: nextKelasId, mapelId: null, sesiId: null }), true)
   }
 
@@ -479,20 +491,38 @@ export default function NilaiHarianContent() {
     const res = await hapusNilaiHarianSesi(sesi.id, kelasId)
     if ('error' in res) return toast.error(res.error)
     toast.success(`Sesi "${sesi.nama_sesi}" dihapus`)
+    rekapCacheRef.current.clear()
     setSesiList(await getNilaiHarianSesi(kelasId, mapelId ?? undefined))
   }
 
+  const rekapCacheRef = useRef(new Map<string, any>())
+
   useEffect(() => {
     if (tab !== 'rekap' || !kelasId) return
-    setRekapLoading(true)
     const filterMapel = rekapView === 'sesi' ? (rekapMapelFilter ? Number(rekapMapelFilter) : undefined) : undefined
     const selectedMapelForView = rekapView === 'mapel' ? (rekapMapelId ? Number(rekapMapelId) : undefined) : undefined
+    const requestedKey = `${kelasId}|${rekapView}|${rekapSesiId || ''}|${filterMapel ?? selectedMapelForView ?? ''}`
+    const cached = rekapCacheRef.current.get(requestedKey)
+    if (cached) {
+      setRekapData(cached)
+      return
+    }
+    setRekapLoading(true)
     getNilaiHarianRekapData(kelasId, rekapView, rekapSesiId || undefined, filterMapel ?? selectedMapelForView)
       .then(data => {
         setRekapData(data)
         if (data && !('error' in data)) {
-          if (data.selectedSesiId) setRekapSesiId(data.selectedSesiId)
-          if (data.selectedMapelId != null && rekapView === 'mapel') setRekapMapelId(String(data.selectedMapelId))
+          rekapCacheRef.current.set(requestedKey, data)
+          if (data.selectedSesiId) {
+            const canonicalKey = `${kelasId}|${rekapView}|${data.selectedSesiId}|${filterMapel ?? selectedMapelForView ?? ''}`
+            rekapCacheRef.current.set(canonicalKey, data)
+            setRekapSesiId(data.selectedSesiId)
+          }
+          if (data.selectedMapelId != null && rekapView === 'mapel') {
+            const canonicalKey = `${kelasId}|${rekapView}||${data.selectedMapelId}`
+            rekapCacheRef.current.set(canonicalKey, data)
+            setRekapMapelId(String(data.selectedMapelId))
+          }
         }
       })
       .catch(() => setRekapData({ error: 'Gagal memuat rekap.' }))
@@ -747,7 +777,7 @@ export default function NilaiHarianContent() {
                     <div className="min-w-0">
                       <p className="text-[10px] font-bold uppercase text-slate-400">No. {idx + 1}</p>
                       <p className="truncate font-semibold text-slate-800">{row.nama}</p>
-                      <p className="text-xs text-slate-400">{row.nis || '-'}</p>
+                      <p className="text-xs text-slate-400">{asramaKamarLabel(row)}</p>
                     </div>
                     <input
                       type="text"
@@ -780,7 +810,7 @@ export default function NilaiHarianContent() {
                       <td className="px-3 py-2 text-center text-xs text-slate-400">{idx + 1}</td>
                       <td className="px-3 py-2">
                         <p className="font-semibold text-slate-800">{row.nama}</p>
-                        <p className="text-xs text-slate-400">{row.nis || '-'}</p>
+                        <p className="text-xs text-slate-400">{asramaKamarLabel(row)}</p>
                       </td>
                       <td className="px-3 py-2">
                         <input
@@ -896,7 +926,7 @@ export default function NilaiHarianContent() {
                             <div className="min-w-0">
                               <p className="text-[10px] font-bold uppercase text-slate-400">No. {idx + 1}</p>
                               <p className="truncate font-semibold text-slate-800">{row.nama}</p>
-                              <p className="text-xs text-slate-400">{row.nis || '-'}</p>
+                              <p className="text-xs text-slate-400">{asramaKamarLabel(row)}</p>
                             </div>
                             <div className="shrink-0 text-right">
                               <p className={`text-lg font-black ${row.nilai == null ? 'text-slate-300' : row.nilai >= rekapData.selectedSesi.kkm ? 'text-emerald-600' : 'text-rose-500'}`}>{row.nilai ?? '-'}</p>
@@ -925,7 +955,7 @@ export default function NilaiHarianContent() {
                                 <td className="px-3 py-2 text-center text-xs text-slate-400">{idx + 1}</td>
                                 <td className="px-3 py-2">
                                   <p className="font-semibold text-slate-800">{row.nama}</p>
-                                  <p className="text-xs text-slate-400">{row.nis || '-'}</p>
+                                  <p className="text-xs text-slate-400">{asramaKamarLabel(row)}</p>
                                 </td>
                                 <td className="px-3 py-2 text-center font-mono font-bold">{row.nilai ?? '-'}</td>
                                 <td className="px-3 py-2 text-center">
@@ -1186,7 +1216,7 @@ function SantriRankTable({ rows }: { rows: any[] }) {
                 <td className={`px-3 py-2 text-center font-black ${idx < 3 ? 'text-emerald-600' : 'text-slate-400'}`}>{idx + 1}</td>
                 <td className="px-3 py-2">
                   <p className="font-semibold text-slate-800">{row.nama}</p>
-                  <p className="text-[10px] text-slate-400">{row.nis || '-'}</p>
+                  <p className="text-[10px] text-slate-400">{asramaKamarLabel(row)}</p>
                 </td>
                 <td className="px-3 py-2 text-center font-mono">{row.count}</td>
                 <td className="px-3 py-2 text-center font-mono font-bold text-emerald-700">{row.count ? row.avg : '-'}</td>

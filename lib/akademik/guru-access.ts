@@ -474,8 +474,9 @@ export async function canAccessKelas(session: SessionUser | null, kelasId: strin
 }
 
 export async function getSantriForKelas(kelasId: string) {
-  const rows = await query<{ riwayat_id: string; santri_id: string; nis: string | null; nama: string }>(`
-    SELECT rp.id AS riwayat_id, s.id AS santri_id, s.nis, s.nama_lengkap AS nama
+  const rows = await query<{ riwayat_id: string; santri_id: string; nis: string | null; nama: string; asrama: string | null; kamar: string | null }>(`
+    SELECT rp.id AS riwayat_id, s.id AS santri_id, s.nis, s.nama_lengkap AS nama,
+           s.asrama, s.kamar
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
     WHERE rp.kelas_id = ?
@@ -495,8 +496,9 @@ export async function getSantriForKelas(kelasId: string) {
   `, [kelasId])
   if (rows.length > 0) return rows
 
-  return query<{ riwayat_id: string; santri_id: string; nis: string | null; nama: string }>(`
-    SELECT rp.id AS riwayat_id, s.id AS santri_id, s.nis, s.nama_lengkap AS nama
+  return query<{ riwayat_id: string; santri_id: string; nis: string | null; nama: string; asrama: string | null; kamar: string | null }>(`
+    SELECT rp.id AS riwayat_id, s.id AS santri_id, s.nis, s.nama_lengkap AS nama,
+           s.asrama, s.kamar
     FROM riwayat_pendidikan rp
     JOIN santri s ON s.id = rp.santri_id
     WHERE rp.kelas_id = ?

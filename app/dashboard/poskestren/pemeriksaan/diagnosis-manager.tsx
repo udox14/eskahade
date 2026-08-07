@@ -2,6 +2,7 @@
 'use client'
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import { Loader2, Pencil, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -27,7 +28,7 @@ export function DiagnosisManagerButton({ onChanged }: { onChanged?: () => void |
 
   return <>
     <button type="button" onClick={() => setOpen(true)} className={`${secondary} mt-2 w-full`}><Plus className="h-4 w-4" /> Kelola diagnosis</button>
-    {open ? <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-900/45 sm:items-center sm:p-4">
+    {open ? createPortal(<div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-900/45 sm:items-center sm:p-4">
       <div className="max-h-[90vh] w-full overflow-hidden rounded-t-2xl bg-white shadow-xl sm:max-w-2xl sm:rounded-xl">
         <div className="flex items-center justify-between border-b bg-slate-50 px-4 py-3"><h3 className="font-black">Master Diagnosis</h3><button onClick={() => setOpen(false)} className="p-2"><X className="h-4 w-4" /></button></div>
         <div className="max-h-[calc(90vh-56px)] space-y-4 overflow-y-auto p-4">
@@ -51,6 +52,6 @@ export function DiagnosisManagerButton({ onChanged }: { onChanged?: () => void |
           </> : <p className="rounded-lg bg-slate-50 p-6 text-center text-sm text-slate-500">Master diagnosis masih kosong.</p>}
         </div>
       </div>
-    </div> : null}
+    </div>, document.body) : null}
   </>
 }

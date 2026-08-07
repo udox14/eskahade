@@ -56,7 +56,7 @@ function computeStatsPerValue(values: { nilai: number; kkm: number }[]): NilaiHa
 
 function aggregatePerSantri(
   values: { riwayatId: string; nilai: number; kkm: number }[],
-  santriById: Map<string, { riwayat_id: string; nama: string; nis: string | null }>
+  santriById: Map<string, { riwayat_id: string; nama: string; nis: string | null; asrama: string | null; kamar: string | null }>
 ) {
   const byRiwayat = new Map<string, { nilai: number; kkm: number }[]>()
   for (const item of values) {
@@ -68,6 +68,8 @@ function aggregatePerSantri(
     riwayat_id: santri.riwayat_id,
     nama: santri.nama,
     nis: santri.nis,
+    asrama: santri.asrama,
+    kamar: santri.kamar,
     ...computeStatsPerValue(byRiwayat.get(santri.riwayat_id) || []),
   }))
   return rows.sort((a, b) => b.avg - a.avg)
@@ -435,6 +437,8 @@ export async function getNilaiHarianRekapData(
       riwayat_id: row.riwayat_id,
       nama: row.nama,
       nis: row.nis,
+      asrama: row.asrama,
+      kamar: row.kamar,
       nilai: nilaiByRiwayat.get(row.riwayat_id) ?? null,
     }))
     return {
