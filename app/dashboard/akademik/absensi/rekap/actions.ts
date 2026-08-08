@@ -1,7 +1,8 @@
 'use server'
 
 import { execute, query, queryOne } from '@/lib/db'
-import { getSession, hasRole } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getAccessibleKelasForSession } from '@/lib/akademik/guru-access'
 import { countActiveSessions, getDateRange, type SessionType } from '@/lib/absensi/pengajian'
 
 async function ensureLiburPengajianTable() {
@@ -28,19 +29,27 @@ export async function getUserScope() {
   const role = session.role
 
   if (hasRole(session, 'pengurus_asrama')) {
-    return { role, type: 'ASRAMA', value: session.asrama_binaan }
+    return { role, type: 'ASRAMA', value: session.asrama_binaan, locked: true }
   }
 
-  if (hasRole(session, 'wali_kelas')) {
-    const kelas = await queryOne<{ id: string }>(`
-      SELECT k.id FROM kelas k
-      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
-      WHERE k.wali_kelas_id = ? LIMIT 1
-    `, [session.id])
-    return { role, type: 'KELAS', value: kelas?.id }
+  if (
+    hasRole(session, 'guru') ||
+    hasRole(session, 'wali_kelas')
+  ) {
+    const kelas = await getAccessibleKelasForSession(session)
+    const options = (kelas || []).map((k: any) => ({
+      id: String(k.id),
+      nama_kelas: k.nama_kelas,
+    }))
+
+    if (options.length === 1) {
+      return { role, type: 'KELAS', value: options[0].id, locked: true, kelasOptions: options }
+    }
+
+    return { role, type: 'KELAS', value: null, locked: false, kelasOptions: options }
   }
 
-  return { role, type: 'GLOBAL', value: null }
+  return { role, type: 'GLOBAL', value: null, locked: false, kelasOptions: null }
 }
 
 export async function getRekapAbsensi(
@@ -70,8 +79,14 @@ export async function getRekapAbsensi(
     if (!scope.value) return []
     sql += ' AND s.asrama = ?'; params.push(scope.value)
   } else if (scope.type === 'KELAS') {
-    if (!scope.value) return []
-    sql += ' AND rp.kelas_id = ?'; params.push(scope.value)
+    const allowed = (scope.kelasOptions || []).map((k: any) => String(k.id))
+    if (scope.locked) {
+      filterKelasId = scope.value ?? ''
+    } else if (!filterKelasId || !allowed.includes(String(filterKelasId))) {
+      return []
+    }
+    if (!filterKelasId) return []
+    sql += ' AND rp.kelas_id = ?'; params.push(filterKelasId)
   }
 
   if (filterAsrama && scope.type !== 'ASRAMA') { sql += ' AND s.asrama = ?'; params.push(filterAsrama) }
@@ -132,7 +147,9 @@ export async function getRekapAbsensi(
       id: s.id,
       nama: s.nama_lengkap,
       nis: s.nis,
-      info_asrama: `${s.asrama || '-'} - Kamar ${s.kamar || '-'}`,
+      asrama: s.asrama || '-',
+      kamar: s.kamar || '-',
+      info_asrama: `${s.asrama || '-'}/ ${s.kamar || '-'}`,
       info_kelas: s.nama_kelas || '-',
       total_h: hadir,
       total_s: sakit,
@@ -170,14 +187,57 @@ export async function getDetailAbsensiSantri(santriId: string, startDate = '', e
   `, params)
 }
 
-export async function getReferensiFilter() {
-  const kelas = await query<any>(`
-    SELECT k.id, k.nama_kelas
-    FROM kelas k
-    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
-  `)
+export async function getReferensiFilter(asrama = '') {
+  const session = await getSession()
+  const unrestricted = session && (isAdmin(session) || hasAnyRole(session, ['sekpen', 'akademik']))
+
+  let kelas: any[]
+  if (unrestricted) {
+    kelas = await query<any>(`
+      SELECT k.id, k.nama_kelas
+      FROM kelas k
+      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+    `)
+  } else if (session && (hasRole(session, 'guru') || hasRole(session, 'wali_kelas'))) {
+    const accessible = await getAccessibleKelasForSession(session)
+    kelas = (accessible || []).map((k: any) => ({ id: String(k.id), nama_kelas: k.nama_kelas }))
+  } else {
+    kelas = await query<any>(`
+      SELECT k.id, k.nama_kelas
+      FROM kelas k
+      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+    `)
+  }
+
   const sorted = kelas.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )
-  return { kelas: sorted }
+
+  const asramaList = await query<{ asrama: string }>(`
+    SELECT DISTINCT asrama
+    FROM santri
+    WHERE status_global = 'aktif'
+      AND asrama IS NOT NULL AND asrama != ''
+    ORDER BY asrama
+  `).then(rows => rows.map(r => r.asrama))
+
+  let kamarList: string[] = []
+  if (asrama) {
+    kamarList = await query<{ kamar: string }>(`
+      SELECT DISTINCT kamar
+      FROM santri
+      WHERE status_global = 'aktif'
+        AND asrama = ?
+        AND kamar IS NOT NULL AND kamar != ''
+    `, [asrama]).then(rows =>
+      rows.map(r => r.kamar).sort((a, b) => {
+        const na = Number(a)
+        const nb = Number(b)
+        if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb
+        return a.localeCompare(b)
+      })
+    )
+  }
+
+  return { kelas: sorted, asramaList, kamarList }
 }

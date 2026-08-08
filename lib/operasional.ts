@@ -276,9 +276,9 @@ async function ensureOperasionalSchemaOnce() {
       ('Keuangan Santri', 'Kas Operasional Unit', '/dashboard/operasional', 'WalletCards', '["admin","pengurus_asrama","sekpen","keamanan"]', 1, 0),
       ('Keuangan Pusat', 'Operasional Unit', '/dashboard/keuangan/operasional', 'Wallet', '["admin","bendahara"]', 1, 3)
   `)
-  await execute(`UPDATE fitur_akses SET group_name = 'Keuangan Santri', roles = '["admin","pengurus_asrama","sekpen","keamanan"]', updated_at = datetime('now') WHERE href = '/dashboard/operasional'`)
-  await execute(`UPDATE fitur_akses SET group_name = 'Keuangan Pusat', updated_at = datetime('now') WHERE href = '/dashboard/keuangan/operasional'`)
-  await execute(`DELETE FROM fitur_akses WHERE href IN ('/dashboard/operasional/cetak', '/dashboard/keuangan/operasional/cetak')`)
+  // Catatan: UPDATE/DELETE pemindahan grup & penghapusan menu operasional lama
+  // sudah dipindahkan ke migrations/0135_legacy_sidebar_fixes.sql agar tidak
+  // menimpa kustomisasi admin tiap request.
   try {
     revalidateTag('fitur-akses', 'everything')
   } catch {}

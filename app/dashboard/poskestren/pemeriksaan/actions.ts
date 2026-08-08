@@ -588,6 +588,7 @@ export async function getVisits(input: PoskestrenListQuery & { date?: string } =
     practice_session_id: string | null
     started_at: string | null
     completed_at: string | null
+    awaiting_medicine: number
     temperature_celsius: number | null
     systolic_pressure: number | null
     diastolic_pressure: number | null
@@ -605,7 +606,7 @@ export async function getVisits(input: PoskestrenListQuery & { date?: string } =
     `SELECT v.id, v.patient_id, v.queue_date, v.queue_number, v.status, v.source_type,
             v.complaint, v.diagnosis, v.treatment, v.follow_up,
             v.referral_destination, v.referral_notes, v.personnel_id, v.practice_session_id,
-            v.started_at, v.completed_at,
+            v.started_at, v.completed_at, v.awaiting_medicine,
             v.temperature_celsius, v.systolic_pressure, v.diastolic_pressure, v.weight_kg,
             s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
             p.medical_record_no, p.allergies, p.special_conditions,
@@ -777,7 +778,7 @@ export async function cancelVisit(visitId: string, reason: string) {
   const result = await (await getDB()).prepare(
     `UPDATE poskestren_visit
      SET status = 'BATAL', follow_up = ?, updated_at = ?
-     WHERE id = ? AND status IN ('MENUNGGU','DIPERIKSA','OBAT')`
+     WHERE id = ? AND status IN ('MENUNGGU','DIPERIKSA')`
   ).bind(`Batal: ${cleanReason}`, new Date().toISOString(), visitId).run()
   if (!result.meta?.changes) return { success: false as const, error: 'Kunjungan tidak dapat dibatalkan.' }
   await writeAudit(session, 'update', 'poskestren_visit', visitId, 'Membatalkan kunjungan POSKESTREN', { reason: cleanReason })
@@ -890,9 +891,9 @@ export async function completeVisit(input: {
   statements.push(
     db.prepare(
       `UPDATE poskestren_visit
-       SET status = 'OBAT', complaint = ?, diagnosis_id = ?, diagnosis = ?, treatment = ?, follow_up = ?,
+       SET awaiting_medicine = 1, complaint = ?, diagnosis_id = ?, diagnosis = ?, treatment = ?, follow_up = ?,
            referral_destination = ?, referral_notes = ?, updated_by = ?, updated_at = ?
-       WHERE id = ? AND status = 'DIPERIKSA'`
+       WHERE id = ? AND status = 'DIPERIKSA' AND awaiting_medicine = 0`
     ).bind(
       complaint,
       diagnosisRow?.id || null,
@@ -921,7 +922,7 @@ export async function completeVisit(input: {
   refresh()
   revalidatePath(POSKESTREN_HREF.medicine)
   revalidatePath(POSKESTREN_HREF.reports)
-  return { success: true as const, status: 'OBAT' as const }
+  return { success: true as const, status: 'DIPERIKSA' as const, awaitingMedicine: true }
 }
 
 export async function getDeliveryQueue(input: PoskestrenListQuery & { date?: string } = {}) {
@@ -929,7 +930,7 @@ export async function getDeliveryQueue(input: PoskestrenListQuery & { date?: str
   const normalized = normalizePoskestrenListQuery(input)
   const date = input.date ? assertDate(input.date) : toWibDateInputValue()
   const cursor = decodeCursor(normalized.cursor)
-  const where = ['v.queue_date = ?', "v.status = 'OBAT'"]
+  const where = ['v.queue_date = ?', 'v.awaiting_medicine = 1']
   const params: unknown[] = [date]
   if (normalized.q) {
     const like = `%${normalized.q}%`
@@ -985,7 +986,7 @@ export async function getVisitPrescriptionForDelivery(visitId: string) {
      JOIN poskestren_patient p ON p.id = v.patient_id
      JOIN santri s ON s.id = p.santri_id
      LEFT JOIN poskestren_personnel pp ON pp.id = v.personnel_id
-     WHERE v.id = ? AND v.status = 'OBAT'`,
+     WHERE v.id = ? AND v.awaiting_medicine = 1`,
     [visitId]
   )
   if (!visit) return null
@@ -1020,8 +1021,10 @@ export async function deliverVisitMedicines(input: {
     referral_destination: string | null
     nama_lengkap: string
     asrama: string | null
+    awaiting_medicine: number
   }>(
-    `SELECT v.id, v.status, v.queue_date, v.referral_destination, s.nama_lengkap, s.asrama
+    `SELECT v.id, v.status, v.queue_date, v.referral_destination, s.nama_lengkap, s.asrama,
+            v.awaiting_medicine
      FROM poskestren_visit v
      JOIN poskestren_patient p ON p.id = v.patient_id
      JOIN santri s ON s.id = p.santri_id
@@ -1029,7 +1032,7 @@ export async function deliverVisitMedicines(input: {
     [input.visitId]
   )
   if (!visit) return { success: false as const, error: 'Kunjungan tidak ditemukan.' }
-  if (visit.status !== 'OBAT') {
+  if (Number(visit.awaiting_medicine) !== 1) {
     return { success: false as const, error: 'Kunjungan tidak menunggu penyerahan obat.' }
   }
   const prescription = await queryOne<{ id: string; status: string }>(
@@ -1115,8 +1118,8 @@ export async function deliverVisitMedicines(input: {
   statements.push(
     db.prepare(
       `UPDATE poskestren_visit
-       SET status = ?, completed_at = ?, updated_by = ?, updated_at = ?
-       WHERE id = ? AND status = 'OBAT'`
+       SET status = ?, awaiting_medicine = 0, completed_at = ?, updated_by = ?, updated_at = ?
+       WHERE id = ? AND awaiting_medicine = 1`
     ).bind(finalStatus, now, session.id, now, visit.id)
   )
   if (prescription) {

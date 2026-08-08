@@ -2,7 +2,8 @@
 
 import { query, execute, batch, generateId } from '@/lib/db'
 import { getCachedMapelList, getCachedTahunAjaranAktif } from '@/lib/cache/master'
-import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
+import { getSession } from '@/lib/auth/session'
+import { getOwnKelasIds } from '@/lib/akademik/guru-access'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { ensureGuruKitabSchema } from '@/lib/akademik/guru-kitab'
@@ -54,10 +55,12 @@ export async function getKelasListForLeger(tahunAjaranId?: number) {
   `
   const params: any[] = [taId]
 
-  // Wali kelas hanya bisa lihat kelas binaannya
-  if (!hasAnyRole(session, ['admin', 'sekpen', 'akademik']) && hasRole(session, 'wali_kelas')) {
-    sql += ' AND k.wali_kelas_id = ?'
-    params.push(session.id)
+  // Guru/wali_kelas hanya bisa lihat kelas yang diajar / kelas walinya
+  const ownIds = await getOwnKelasIds(session, { tahunAjaranId: taId })
+  if (ownIds !== null) {
+    if (ownIds.length === 0) return []
+    sql += ` AND k.id IN (${ownIds.map(() => '?').join(',')})`
+    params.push(...ownIds)
   }
 
   const data = await query<any>(sql, params)
@@ -66,10 +69,39 @@ export async function getKelasListForLeger(tahunAjaranId?: number) {
   )
 }
 
+// Guard: pastikan semua kelasId yang dikirim adalah milik user (guru/wali_kelas).
+// null dari getOwnKelasIds berarti unrestricted (admin/sekpen/akademik) => lulus.
+async function assertKelasAccess(kelasIds: string[]): Promise<boolean> {
+  const session = await getSession()
+  if (!session || !kelasIds.length) return false
+  const own = await getOwnKelasIds(session)
+  if (own === null) return true
+  return kelasIds.every(id => own.includes(String(id)))
+}
+
+// Guard: pastikan semua riwayat_pendidikan milik kelas yang boleh diakses user.
+async function assertRiwayatAccess(riwayatIds: string[]): Promise<boolean> {
+  const session = await getSession()
+  if (!session || !riwayatIds.length) return false
+  const own = await getOwnKelasIds(session)
+  if (own === null) return true
+  for (let i = 0; i < riwayatIds.length; i += SQL_VAR_CHUNK) {
+    const part = riwayatIds.slice(i, i + SQL_VAR_CHUNK)
+    const ph = part.map(() => '?').join(',')
+    const rows = await query<{ kelas_id: string }>(
+      `SELECT DISTINCT kelas_id FROM riwayat_pendidikan WHERE id IN (${ph})`,
+      part
+    )
+    if (!rows.length || !rows.every(r => own.includes(String(r.kelas_id)))) return false
+  }
+  return true
+}
+
 export async function getMapelPeganganForKelas(kelasId: string, tahunAjaranId?: number) {
   await ensureGuruKitabSchema()
   const session = await getSession()
   if (!session || !kelasId) return []
+  if (!(await assertKelasAccess([kelasId]))) return []
 
   let taId = tahunAjaranId
   if (!taId) {
@@ -121,6 +153,7 @@ export async function getMapelPeganganForKelas(kelasId: string, tahunAjaranId?: 
 }
 
 export async function getLegerData(kelasId: string, semester: number) {
+  if (!(await assertKelasAccess([kelasId]))) return { mapel: [], siswa: [] }
   const mapelList = await getCachedMapelList()
   if (!mapelList.length) return { mapel: [], siswa: [] }
 
@@ -197,6 +230,7 @@ export async function simpanNilaiMatrix(
   const session = await getSession()
   if (!session) return { error: 'Sesi login tidak ditemukan.' }
   if (!data.length) return { error: 'Tidak ada data.' }
+  if (!(await assertRiwayatAccess(data.map(r => r.riwayat_id)))) return { error: 'Akses kelas ditolak.' }
 
   const statements: { sql: string; params?: unknown[] }[] = []
   for (const row of data) {
@@ -232,6 +266,7 @@ export async function simpanNilaiMatrix(
 }
 
 export async function getDataNilaiPerMapel(kelasId: string, mapelId: number, semester: number) {
+  if (!(await assertKelasAccess([kelasId]))) return []
   const rows = await query<any>(`
     SELECT rp.id AS riwayat_id, s.nis, s.nama_lengkap, na.nilai, na.id AS nilai_id
     FROM riwayat_pendidikan rp
@@ -258,6 +293,7 @@ export async function simpanNilaiPerMapel(
   const session = await getSession()
   if (!session) return { error: 'Sesi login tidak ditemukan.' }
   if (!data.length) return { error: 'Tidak ada data.' }
+  if (!(await assertRiwayatAccess(data.map(item => item.riwayat_id)))) return { error: 'Akses kelas ditolak.' }
 
   await batch(data.map(item => ({
     sql: `INSERT INTO nilai_akademik (id, riwayat_pendidikan_id, mapel_id, semester, nilai)
@@ -285,6 +321,7 @@ export async function simpanNilaiPerMapel(
 }
 
 export async function getDataKepribadian(kelasId: string, semester: number) {
+  if (!(await assertKelasAccess([kelasId]))) return []
   const rows = await query<any>(`
     SELECT rp.id AS riwayat_id, s.nis, s.nama_lengkap,
            na.kedisiplinan, na.kebersihan, na.kesopanan, na.ibadah, na.kemandirian
@@ -311,6 +348,7 @@ export async function simpanKepribadian(semester: number, data: any[]) {
   const session = await getSession()
   if (!session) return { error: 'Sesi login tidak ditemukan.' }
   if (!data.length) return { error: 'Tidak ada data.' }
+  if (!(await assertRiwayatAccess(data.map(item => item.riwayat_id)))) return { error: 'Akses kelas ditolak.' }
 
   await batch(data.map(item => ({
     sql: `INSERT INTO nilai_akhlak (id, riwayat_pendidikan_id, semester, kedisiplinan, kebersihan, kesopanan, ibadah, kemandirian)
@@ -349,6 +387,7 @@ export async function simpanKepribadian(semester: number, data: any[]) {
 }
 
 export async function getDataCatatanWali(kelasId: string, semester: number) {
+  if (!(await assertKelasAccess([kelasId]))) return []
   const rows = await query<any>(`
     SELECT rp.id AS riwayat_id, s.nis, s.nama_lengkap, r.catatan_wali_kelas
     FROM riwayat_pendidikan rp
@@ -370,6 +409,7 @@ export async function simpanCatatanWali(semester: number, data: { riwayat_id: st
   const session = await getSession()
   if (!session) return { error: 'Sesi login tidak ditemukan.' }
   if (!data.length) return { error: 'Tidak ada data.' }
+  if (!(await assertRiwayatAccess(data.map(item => item.riwayat_id)))) return { error: 'Akses kelas ditolak.' }
 
   for (const item of data) {
     await execute(`
@@ -398,6 +438,7 @@ export async function simpanCatatanWali(semester: number, data: { riwayat_id: st
 }
 
 export async function getDataSantriPerKelas(kelasId: string) {
+  if (!(await assertKelasAccess([kelasId]))) return []
   const data = await query<any>(`
     SELECT rp.id, s.nis, s.nama_lengkap
     FROM riwayat_pendidikan rp
@@ -420,6 +461,8 @@ export async function simpanNilaiExcelMenyeluruh(
   listMapel: { id: number; nama: string }[]
 ) {
   const session = await getSession()
+  if (!session) return { error: 'Sesi login tidak ditemukan.' }
+  if (!(await assertKelasAccess([kelasId]))) return { error: 'Akses kelas ditolak.' }
   const dataSantri = await getDataSantriPerKelas(kelasId)
   const mapNisToId = new Map<string, string>()
   dataSantri.forEach((s: any) => mapNisToId.set(String(s.nis).trim(), s.riwayat_id))
@@ -521,6 +564,8 @@ export async function hitungDanSimpanLeger(
   opts: { force?: boolean; skipLog?: boolean } = {}
 ) {
   const session = await getSession()
+  if (!session) return { error: 'Sesi login tidak ditemukan.' }
+  if (!(await assertKelasAccess([kelasId]))) return { error: 'Akses kelas ditolak.' }
   const leger = await getLegerData(kelasId, semester)
   const { siswa } = leger
   if (!siswa.length) return { error: 'Tidak ada siswa' }

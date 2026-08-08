@@ -2,13 +2,42 @@
 
 import { query, execute, batch } from '@/lib/db'
 import { getCachedMapelAll, getCachedMarhalahList } from '@/lib/cache/master'
-import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
+import { getSession, hasAnyRole } from '@/lib/auth/session'
+import { getOwnKelasIds } from '@/lib/akademik/guru-access'
 import { assertCrud } from '@/lib/auth/crud'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { normalizeGrade, gradeLabel, type Grade } from '@/lib/akademik/grade'
 import { revalidatePath } from 'next/cache'
 
 const FITUR_HREF = '/dashboard/akademik/grading'
+const SQL_VAR_CHUNK = 90
+
+// Guard: pastikan semua kelasId yang dikirim adalah milik user (guru/wali_kelas).
+// null dari getOwnKelasIds berarti unrestricted (admin/sekpen/akademik) => lulus.
+async function assertKelasAccess(kelasIds: string[]): Promise<boolean> {
+  const session = await getSession()
+  if (!session || !kelasIds.length) return false
+  const own = await getOwnKelasIds(session)
+  if (own === null) return true
+  return kelasIds.every(id => own.includes(String(id)))
+}
+
+async function assertRiwayatAccess(riwayatIds: string[]): Promise<boolean> {
+  const session = await getSession()
+  if (!session || !riwayatIds.length) return false
+  const own = await getOwnKelasIds(session)
+  if (own === null) return true
+  for (let i = 0; i < riwayatIds.length; i += SQL_VAR_CHUNK) {
+    const part = riwayatIds.slice(i, i + SQL_VAR_CHUNK)
+    const ph = part.map(() => '?').join(',')
+    const rows = await query<{ kelas_id: string }>(
+      `SELECT DISTINCT kelas_id FROM riwayat_pendidikan WHERE id IN (${ph})`,
+      part
+    )
+    if (!rows.length || !rows.every(r => own.includes(String(r.kelas_id)))) return false
+  }
+  return true
+}
 
 function naturalCompare(a: string, b: string) {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
@@ -31,6 +60,9 @@ export type GradingKelasStat = {
 
 export async function getStatistikGradingMarhalah(marhalahId: string): Promise<GradingKelasStat[]> {
   if (!marhalahId) return []
+
+  const session = await getSession()
+  const own = await getOwnKelasIds(session, { activeOnly: true })
 
   const rows = await query<any>(`
     SELECT
@@ -65,6 +97,7 @@ export async function getStatistikGradingMarhalah(marhalahId: string): Promise<G
   `, [marhalahId])
 
   return rows
+    .filter((row: any) => own === null || own.includes(String(row.kelas_id)))
     .map((row: any) => {
       const gradeA = Number(row.grade_a || 0)
       const gradeB = Number(row.grade_b || 0)
@@ -87,6 +120,7 @@ export async function getStatistikGradingMarhalah(marhalahId: string): Promise<G
 
 export async function getKelasList() {
   const session = await getSession()
+  if (!session) return []
 
   let sql = `
     SELECT k.id, k.nama_kelas, m.nama AS marhalah_nama
@@ -97,10 +131,12 @@ export async function getKelasList() {
   const params: any[] = []
 
   // Admin/Sekpen/Akademik = akses semua kelas,
-  // Wali kelas = hanya kelas binaannya
-  if (!hasAnyRole(session, ['admin', 'sekpen', 'akademik']) && hasRole(session, 'wali_kelas') && session?.id) {
-    sql += ' WHERE k.wali_kelas_id = ?'
-    params.push(session.id)
+  // Guru/Wali kelas = hanya kelas yang diajar / kelas walinya
+  const ownIds = await getOwnKelasIds(session, { activeOnly: true })
+  if (ownIds !== null) {
+    if (ownIds.length === 0) return []
+    sql += ` WHERE k.id IN (${ownIds.map(() => '?').join(',')})`
+    params.push(...ownIds)
   }
 
   sql += ' ORDER BY k.nama_kelas'
@@ -108,6 +144,7 @@ export async function getKelasList() {
 }
 
 export async function getDataGrading(kelasId: string) {
+  if (!(await assertKelasAccess([kelasId]))) return []
   const listSantri = await query<any>(`
     SELECT rp.id, rp.grade_lanjutan, s.nama_lengkap, s.nis
     FROM riwayat_pendidikan rp
@@ -184,6 +221,7 @@ async function ensureGradeUrutanColumn() {
 
 export async function getGradingSekpen(kelasId: string): Promise<GradingSekpenItem[]> {
   if (!kelasId) return []
+  if (!(await assertKelasAccess([kelasId]))) return []
   await ensureGradeUrutanColumn()
   const rows = await query<any>(`
     SELECT rp.id AS riwayat_id, rp.grade_lanjutan, rp.grade_urutan,
@@ -303,7 +341,11 @@ export async function setGradeSantri(riwayatId: string, grade: Grade | null) {
 
 export async function simpanGradingBatch(payload: { riwayat_id: string; grade: string }[]) {
   const session = await getSession()
+  if (!session) return { error: 'Sesi login tidak ditemukan.' }
   if (payload.length === 0) return { success: true }
+  if (!(await assertRiwayatAccess(payload.map(item => item.riwayat_id)))) {
+    return { error: 'Akses kelas ditolak.' }
+  }
 
   for (const item of payload) {
     await execute(

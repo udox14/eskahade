@@ -2,7 +2,8 @@
 
 import { batch, execute, query, queryOne } from '@/lib/db'
 import { getCachedTahunAjaranAktif } from '@/lib/cache/master'
-import { getSession, hasAnyRole, hasRole } from '@/lib/auth/session'
+import { getSession, hasAnyRole } from '@/lib/auth/session'
+import { getOwnKelasIds } from '@/lib/akademik/guru-access'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import {
@@ -12,6 +13,16 @@ import {
 
 export async function getTahunAjaranList() {
   return query<any>('SELECT id, nama, is_active FROM tahun_ajaran ORDER BY id DESC')
+}
+
+// Guard: pastikan semua kelasId yang dikirim adalah milik user (guru/wali_kelas).
+// null dari getOwnKelasIds berarti unrestricted (admin/sekpen/akademik) => lulus.
+async function assertKelasAccess(kelasIds: string[]): Promise<boolean> {
+  const session = await getSession()
+  if (!session || !kelasIds.length) return false
+  const own = await getOwnKelasIds(session)
+  if (own === null) return true
+  return kelasIds.every(id => own.includes(String(id)))
 }
 
 // D1 batasi maksimal 100 bound parameter per query. Pecah IN (...) jadi chunk
@@ -101,6 +112,7 @@ async function getRaporMapel(kelasId: string, marhalahId?: string | null) {
 }
 
 export async function getDaftarCetakRapor(kelasId: string, semester: number) {
+  if (!(await assertKelasAccess([kelasId]))) return { mapel: [], siswa: [] }
   const listSantri = await query<any>(`
     SELECT rp.id AS riwayat_id, rp.santri_id,
            s.nama_lengkap, s.nis,
@@ -159,6 +171,7 @@ export async function getDaftarCetakRapor(kelasId: string, semester: number) {
 }
 
 export async function getDataRapor(kelasId: string, semester: number) {
+  if (!(await assertKelasAccess([kelasId]))) return []
   const listSantri = await query<any>(`
     SELECT rp.id, rp.santri_id, rp.grade_lanjutan,
            s.nama_lengkap, s.nis, s.nama_ayah,
@@ -350,6 +363,7 @@ export async function getDataRapor(kelasId: string, semester: number) {
 }
 
 export async function getDataIdentitas(kelasId: string) {
+  if (!(await assertKelasAccess([kelasId]))) return []
   const rows = await query<any>(`
     SELECT rp.id AS riwayat_id, rp.santri_id,
            s.nama_lengkap, s.nis, s.nik, s.tempat_lahir, s.tanggal_lahir,
@@ -446,9 +460,7 @@ export async function updateIdentitasSantriRapor(payload: IdentitasForm) {
 
   if (!row) return { error: 'Data santri aktif tidak ditemukan.' }
 
-  const fullAccess = hasAnyRole(session, ['admin', 'sekpen', 'akademik'])
-  const waliOwnClass = hasRole(session, 'wali_kelas') && row.wali_kelas_id === session.id
-  if (!fullAccess && !waliOwnClass) {
+  if (!(await assertKelasAccess([row.kelas_id]))) {
     return { error: 'Anda tidak punya akses mengedit identitas santri ini.' }
   }
 
@@ -562,6 +574,7 @@ export async function updateIdentitasSantriRapor(payload: IdentitasForm) {
 }
 
 export async function getLegerRaporData(kelasId: string, semester: number) {
+  if (!(await assertKelasAccess([kelasId]))) return { mapel: [], siswa: [] }
   const daftar = await getDaftarCetakRapor(kelasId, semester)
   const siswaList = await query<any>(`
     SELECT rp.id AS riwayat_id,
@@ -737,6 +750,7 @@ export async function saveRaporTtdPimpinan(s: TtdPimpinan) {
 type TtdWali = TtdSetting & { user_id: string | null; nama: string | null }
 
 export async function getRaporTtdWali(kelasId: string): Promise<TtdWali | null> {
+  if (!(await assertKelasAccess([kelasId]))) return null
   const kelas = await queryOne<any>(
     `SELECT k.wali_kelas_id, u.full_name AS wali_nama
      FROM kelas k LEFT JOIN users u ON u.id = k.wali_kelas_id
@@ -767,9 +781,7 @@ export async function saveRaporTtdWali(kelasId: string, s: TtdSetting) {
   )
   if (!kelas?.wali_kelas_id) return { error: 'Kelas ini belum punya wali kelas.' }
 
-  const fullAccess = hasAnyRole(session, ['admin', 'sekpen', 'akademik'])
-  const isOwnWali = hasRole(session, 'wali_kelas') && kelas.wali_kelas_id === session.id
-  if (!fullAccess && !isOwnWali) {
+  if (!(await assertKelasAccess([kelasId]))) {
     return { error: 'Anda hanya bisa mengatur tanda tangan untuk kelas yang Anda wali-i.' }
   }
 
@@ -816,6 +828,7 @@ type MapelKitabPilihan = {
 // Daftar mapel yang punya >1 kitab utk kelas ini, beserta pilihan saat ini.
 // Dipakai modal "Atur Kitab Rapor". Mapel berkitab tunggal tidak perlu diatur.
 export async function getKitabPilihanOptions(kelasId: string): Promise<MapelKitabPilihan[]> {
+  if (!(await assertKelasAccess([kelasId]))) return []
   const kelas = await queryOne<any>(
     'SELECT marhalah_id, tahun_ajaran_id FROM kelas WHERE id = ? LIMIT 1', [kelasId]
   )
@@ -859,8 +872,8 @@ export async function saveKitabPilihan(
 ) {
   const session = await getSession()
   if (!session) return { error: 'Sesi login tidak ditemukan.' }
-  if (!hasAnyRole(session, ['admin', 'sekpen', 'akademik']) && !hasRole(session, 'wali_kelas')) {
-    return { error: 'Anda tidak punya akses mengatur kitab rapor.' }
+  if (!(await assertKelasAccess([kelasId]))) {
+    return { error: 'Anda tidak punya akses mengatur kitab rapor untuk kelas ini.' }
   }
   if (!selections.length) return { success: true }
 
@@ -898,16 +911,32 @@ export async function saveKitabPilihan(
 
 
 export async function getKelasList(tahunAjaranId?: number) {
+  const session = await getSession()
+  if (!session) return []
+
   let taId = tahunAjaranId
   if (!taId) {
     const aktif = await getCachedTahunAjaranAktif()
     taId = aktif?.id
   }
 
-  const data = taId
-    ? await query<any>('SELECT id, nama_kelas FROM kelas WHERE tahun_ajaran_id = ?', [taId])
-    : await query<any>('SELECT id, nama_kelas FROM kelas', [])
+  let sql = 'SELECT id, nama_kelas FROM kelas'
+  const params: unknown[] = []
+  if (taId) {
+    sql += ' WHERE tahun_ajaran_id = ?'
+    params.push(taId)
+  }
 
+  // Guru/wali_kelas hanya bisa lihat kelas yang diajar / kelas walinya
+  const ownIds = await getOwnKelasIds(session, { tahunAjaranId: taId })
+  if (ownIds !== null) {
+    if (ownIds.length === 0) return []
+    sql += taId ? ' AND' : ' WHERE'
+    sql += ` id IN (${ownIds.map(() => '?').join(',')})`
+    params.push(...ownIds)
+  }
+
+  const data = await query<any>(sql, params)
   return data.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )

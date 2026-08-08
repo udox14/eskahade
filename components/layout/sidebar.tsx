@@ -269,11 +269,13 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
 
   const minUrutanOf = (group: string) => Math.min(...groupMap.get(group)!.map(i => i.urutan));
 
+  // Semua grup terdaftar (termasuk yang disembunyikan) dianggap "terkonfigurasi"
+  // supaya grup nonaktif TIDAK jatuh ke fallback GROUP_ORDER dan ikut tampil.
+  const configuredSet = new Set(sidebarGroups.map(g => g.group_name));
   const cfgOrdered = [...sidebarGroups]
     .filter(g => g.is_active && groupMap.has(g.group_name))
     .sort((a, b) => (a.urutan - b.urutan) || a.group_name.localeCompare(b.group_name))
     .map(g => g.group_name);
-  const configuredSet = new Set(cfgOrdered);
   const fallbackOrder = GROUP_ORDER.filter(g => groupMap.has(g) && !configuredSet.has(g));
   const fallbackSet = new Set(fallbackOrder);
   const leftoverOrder = Array.from(groupMap.keys())

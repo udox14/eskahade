@@ -1,5 +1,5 @@
 import { execute, query, queryOne } from '@/lib/db'
-import { getSession, hasAnyRole, isAdmin, type SessionUser } from '@/lib/auth/session'
+import { getSession, hasAnyRole, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
 
 export type GuruKelasAccessRow = {
   id: string
@@ -428,8 +428,8 @@ export async function getAccessibleKelasForSession(session?: SessionUser | null)
   const activeSession = session ?? await getSession()
   if (!activeSession) return []
 
-  const unrestricted = isAdmin(activeSession) || hasAnyRole(activeSession, ['sekpen', 'akademik'])
-  if (unrestricted) {
+  const own = await getOwnKelasIds(activeSession, { activeOnly: true })
+  if (own === null) {
     const rows = await query<GuruKelasAccessRow>(`
       SELECT k.id, k.nama_kelas, k.marhalah_id, m.nama AS marhalah_nama,
              k.tahun_ajaran_id, ta.nama AS tahun_ajaran_nama
@@ -439,25 +439,63 @@ export async function getAccessibleKelasForSession(session?: SessionUser | null)
     `)
     return sortKelasNaturally(rows)
   }
+  if (own.length === 0) return []
 
-  const guruId = await getGuruIdForSession(activeSession)
-  if (!guruId) return []
-
+  const ph = own.map(() => '?').join(',')
   const rows = await query<GuruKelasAccessRow>(`
-    SELECT DISTINCT k.id, k.nama_kelas, k.marhalah_id, m.nama AS marhalah_nama,
+    SELECT k.id, k.nama_kelas, k.marhalah_id, m.nama AS marhalah_nama,
            k.tahun_ajaran_id, ta.nama AS tahun_ajaran_nama
     FROM kelas k
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
     LEFT JOIN marhalah m ON m.id = k.marhalah_id
+    WHERE k.id IN (${ph})
+    ORDER BY k.nama_kelas
+  `, own)
+  return sortKelasNaturally(rows)
+}
+
+// Kelas milik user (guru/wali_kelas): gabungan kelas yang diajar
+// (kelas_jadwal_guru_mingguan / guru_shubuh-ashar-maghrib) + kelas walinya.
+// Kembali null bila unrestricted (admin/sekpen/akademik => semua kelas),
+// array string id kelas bila dibatasi.
+export async function getOwnKelasIds(
+  session: SessionUser | null,
+  opts?: { tahunAjaranId?: number | null; activeOnly?: boolean }
+): Promise<string[] | null> {
+  if (!session) return null
+  await ensureGuruFeatureSchema()
+  if (isAdmin(session) || hasAnyRole(session, ['sekpen', 'akademik'])) return null
+
+  const guruId = await getGuruIdForSession(session)
+  const taJoin = opts?.activeOnly
+    ? 'JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1'
+    : ''
+  const taWhere = opts?.tahunAjaranId != null ? 'AND k.tahun_ajaran_id = ?' : ''
+  const taParams = opts?.tahunAjaranId != null ? [opts.tahunAjaranId] : []
+
+  if (!guruId) {
+    if (!hasRole(session, 'wali_kelas') || !session.id) return []
+    const rows = await query<{ id: string }>(`
+      SELECT k.id
+      FROM kelas k ${taJoin}
+      WHERE k.wali_kelas_id = ?
+        ${taWhere}
+    `, [session.id, ...taParams])
+    return rows.map(r => String(r.id))
+  }
+
+  const rows = await query<{ id: string }>(`
+    SELECT DISTINCT k.id
+    FROM kelas k ${taJoin}
     LEFT JOIN kelas_jadwal_guru_mingguan kj ON kj.kelas_id = k.id AND kj.guru_id = ?
-    WHERE kj.id IS NOT NULL
+    WHERE (kj.id IS NOT NULL
        OR k.guru_shubuh_id = ?
        OR k.guru_ashar_id = ?
        OR k.guru_maghrib_id = ?
-    ORDER BY k.nama_kelas
-  `, [guruId, guruId, guruId, guruId])
-
-  return sortKelasNaturally(rows)
+       OR k.wali_kelas_id = ?)
+      ${taWhere}
+  `, [guruId, guruId, guruId, guruId, session.id, ...taParams])
+  return rows.map(r => String(r.id))
 }
 
 function sortKelasNaturally(rows: GuruKelasAccessRow[]) {
@@ -468,9 +506,9 @@ function sortKelasNaturally(rows: GuruKelasAccessRow[]) {
 
 export async function canAccessKelas(session: SessionUser | null, kelasId: string) {
   if (!session || !kelasId) return false
-  if (isAdmin(session) || hasAnyRole(session, ['sekpen', 'akademik'])) return true
-  const kelas = await getAccessibleKelasForSession(session)
-  return kelas.some(item => item.id === kelasId)
+  const own = await getOwnKelasIds(session, { activeOnly: true })
+  if (own === null) return true
+  return own.includes(String(kelasId))
 }
 
 export async function getSantriForKelas(kelasId: string) {

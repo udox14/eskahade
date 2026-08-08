@@ -1,13 +1,43 @@
 'use server'
 
 import { query, execute, batch, generateId } from '@/lib/db'
-import { getSession, hasRole, hasAnyRole } from '@/lib/auth/session'
+import { getSession } from '@/lib/auth/session'
+import { getOwnKelasIds } from '@/lib/akademik/guru-access'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
+const SQL_VAR_CHUNK = 90
+
+// Guard: pastikan semua kelasId yang dikirim adalah milik user (guru/wali_kelas).
+// null dari getOwnKelasIds berarti unrestricted (admin/sekpen/akademik) => lulus.
+async function assertKelasAccess(kelasIds: string[]): Promise<boolean> {
+  const session = await getSession()
+  if (!session || !kelasIds.length) return false
+  const own = await getOwnKelasIds(session)
+  if (own === null) return true
+  return kelasIds.every(id => own.includes(String(id)))
+}
+
+async function assertRiwayatAccess(riwayatIds: string[]): Promise<boolean> {
+  const session = await getSession()
+  if (!session || !riwayatIds.length) return false
+  const own = await getOwnKelasIds(session)
+  if (own === null) return true
+  for (let i = 0; i < riwayatIds.length; i += SQL_VAR_CHUNK) {
+    const part = riwayatIds.slice(i, i + SQL_VAR_CHUNK)
+    const ph = part.map(() => '?').join(',')
+    const rows = await query<{ kelas_id: string }>(
+      `SELECT DISTINCT kelas_id FROM riwayat_pendidikan WHERE id IN (${ph})`,
+      part
+    )
+    if (!rows.length || !rows.every(r => own.includes(String(r.kelas_id)))) return false
+  }
+  return true
+}
+
 /** 
  * Ambil data referensi (Mapel & Kelas)
- * Admin/Sekpen/Akademik = semua kelas. Wali kelas = hanya kelas binaannya.
+ * Admin/Sekpen/Akademik = semua kelas. Guru/wali_kelas = hanya kelasnya.
  */
 export async function getReferensiData() {
   try {
@@ -21,10 +51,10 @@ export async function getReferensiData() {
     const marhalah = await query<any>('SELECT id, nama FROM marhalah ORDER BY urutan')
 
     // ── Kelas ──
-    const isFullAccess = hasAnyRole(session, ['admin', 'sekpen', 'akademik'])
+    const ownIds = await getOwnKelasIds(session, { activeOnly: true })
 
     let kelas: any[]
-    if (isFullAccess) {
+    if (ownIds === null) {
       kelas = await query<any>(`
         SELECT k.id, k.nama_kelas, k.marhalah_id, m.nama AS marhalah_nama
         FROM kelas k
@@ -32,15 +62,16 @@ export async function getReferensiData() {
         JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
         ORDER BY k.nama_kelas
       `)
-    } else if (hasRole(session, 'wali_kelas')) {
+    } else if (ownIds.length > 0) {
+      const ph = ownIds.map(() => '?').join(',')
       kelas = await query<any>(`
         SELECT k.id, k.nama_kelas, k.marhalah_id, m.nama AS marhalah_nama
         FROM kelas k
         LEFT JOIN marhalah m ON m.id = k.marhalah_id
         JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
-        WHERE k.wali_kelas_id = ?
+        WHERE k.id IN (${ph})
         ORDER BY k.nama_kelas
-      `, [session.id])
+      `, ownIds)
     } else {
       kelas = []
     }
@@ -52,6 +83,7 @@ export async function getReferensiData() {
 }
 
 export async function getDataSantriPerKelas(kelasId: string) {
+  if (!(await assertKelasAccess([kelasId]))) return []
   const data = await query<any>(`
     SELECT rp.id, s.nis, s.nama_lengkap
     FROM riwayat_pendidikan rp
@@ -70,6 +102,7 @@ export async function getDataSantriPerKelas(kelasId: string) {
 // ─── NILAI AKADEMIK ─────────────────────────────────────────────────────────
 
 export async function getDataNilaiPerMapel(kelasId: string, mapelId: number, semester: number) {
+  if (!(await assertKelasAccess([kelasId]))) return []
   const rows = await query<any>(`
     SELECT rp.id AS riwayat_id, s.nis, s.nama_lengkap, na.nilai
     FROM riwayat_pendidikan rp
@@ -89,6 +122,7 @@ export async function getDataNilaiPerMapel(kelasId: string, mapelId: number, sem
 }
 
 export async function getJudulKitabNilai(kelasId: string, mapelId: number) {
+  if (!(await assertKelasAccess([kelasId]))) return ''
   const row = await query<any>(`
     SELECT GROUP_CONCAT(nama_kitab, ', ') AS nama_kitab
     FROM (
@@ -112,6 +146,7 @@ export async function simpanNilaiPerMapel(
 ) {
   const session = await getSession()
   if (!data.length) return { error: 'Tidak ada data.' }
+  if (!(await assertRiwayatAccess(data.map(item => item.riwayat_id)))) return { error: 'Akses kelas ditolak.' }
 
   const cleanData = data.map(item => ({
     riwayat_id: item.riwayat_id,
@@ -153,6 +188,8 @@ export async function simpanNilaiExcelMenyeluruh(
   listMapel: { id: number; nama: string }[]
 ) {
   const session = await getSession()
+  if (!session) return { error: 'Sesi login tidak ditemukan.' }
+  if (!(await assertKelasAccess([kelasId]))) return { error: 'Akses kelas ditolak.' }
   const dataSantri = await getDataSantriPerKelas(kelasId)
   const mapNisToId = new Map<string, string>()
   dataSantri.forEach((s: any) => mapNisToId.set(String(s.nis).trim(), s.riwayat_id))
@@ -269,6 +306,7 @@ export async function simpanNilaiExcelMenyeluruh(
 // ─── NILAI KEPRIBADIAN ──────────────────────────────────────────────────────
 
 export async function getDataKepribadian(kelasId: string, semester: number) {
+  if (!(await assertKelasAccess([kelasId]))) return []
   const rows = await query<any>(`
     SELECT rp.id AS riwayat_id, s.nis, s.nama_lengkap,
            na.kedisiplinan, na.kebersihan, na.kesopanan, na.ibadah, na.kemandirian
@@ -295,6 +333,7 @@ export async function getDataKepribadian(kelasId: string, semester: number) {
 export async function simpanKepribadian(semester: number, data: any[]) {
   const session = await getSession()
   if (!data.length) return { error: 'Tidak ada data.' }
+  if (!(await assertRiwayatAccess(data.map(item => item.riwayat_id)))) return { error: 'Akses kelas ditolak.' }
   await batch(data.map(item => ({
     sql: `INSERT INTO nilai_akhlak (id, riwayat_pendidikan_id, semester, kedisiplinan, kebersihan, kesopanan, ibadah, kemandirian)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -325,6 +364,7 @@ export async function simpanKepribadian(semester: number, data: any[]) {
 // ─── CATATAN WALI KELAS ─────────────────────────────────────────────────────
 
 export async function getDataCatatanWali(kelasId: string, semester: number) {
+  if (!(await assertKelasAccess([kelasId]))) return []
   const rows = await query<any>(`
     SELECT rp.id AS riwayat_id, s.nis, s.nama_lengkap, r.catatan_wali_kelas
     FROM riwayat_pendidikan rp
@@ -345,6 +385,7 @@ export async function getDataCatatanWali(kelasId: string, semester: number) {
 export async function simpanCatatanWali(semester: number, data: { riwayat_id: string; catatan: string }[]) {
   const session = await getSession()
   if (!data.length) return { error: 'Tidak ada data.' }
+  if (!(await assertRiwayatAccess(data.map(item => item.riwayat_id)))) return { error: 'Akses kelas ditolak.' }
   for (const item of data) {
     await execute(`
       INSERT INTO ranking (id, riwayat_pendidikan_id, semester, catatan_wali_kelas)

@@ -98,30 +98,10 @@ async function ensureFiturAksesReady() {
       ('UPK', 'Cetak', '/dashboard/akademik/upk/cetak', 'Printer', '["admin","sekpen","panitia_upk"]', 1, 8)
   `)
 
-  // Catatan: Seed awal diisi lewat migrasi database. Programmatic UPDATE dihapus agar kustomisasi admin tidak tertimpa saat startup.
-
-  // Reorganisasi sidebar (idempoten): pindahkan row lama yang sudah ada di DB.
-  try {
-    await execute("UPDATE fitur_akses SET group_name = 'Nilai & Rapor', urutan = 4 WHERE href = '/dashboard/guru/nilai-harian'")
-    await execute("UPDATE fitur_akses SET group_name = 'Nilai & Rapor', urutan = 5 WHERE href = '/dashboard/guru/hafalan'")
-    await execute("UPDATE fitur_akses SET group_name = 'Nilai & Rapor', title = 'Nilai Rapor', icon = 'FileSpreadsheet', is_active = 1, is_bottomnav = 1, bottomnav_urutan = 4, urutan = 1 WHERE href = '/dashboard/akademik/leger'")
-    await execute("UPDATE fitur_akses SET is_active = 0, is_bottomnav = 0 WHERE href = '/dashboard/akademik/nilai/input'")
-    await execute("UPDATE fitur_akses SET group_name = 'Akademik', title = 'Ranking', urutan = 4 WHERE href = '/dashboard/akademik/ranking'")
-    await execute("UPDATE fitur_akses SET group_name = 'Keuangan Pusat', title = 'Keuangan Non-SPP', icon = 'HandCoins', is_active = 1, urutan = 0 WHERE href = '/dashboard/keuangan/non-spp'")
-    await execute("UPDATE fitur_akses SET is_active = 0 WHERE href IN ('/dashboard/keuangan/pembayaran', '/dashboard/keuangan/tarif', '/dashboard/keuangan/laporan')")
-    
-    // Add panitia_upk to UPK features
-    await execute("UPDATE fitur_akses SET roles = replace(roles, ']', ',\"panitia_upk\"]') WHERE href LIKE '/dashboard/akademik/upk%' AND roles NOT LIKE '%panitia_upk%'")
-
-    // Rename menu title
-    await execute("UPDATE fitur_akses SET title = 'Tim & Kepengurusan' WHERE href = '/dashboard/pengaturan/kepanitiaan'")
-
-    // Role pimpinan: pastikan beranda (Dashboard) tetap tampil bagi role pimpinan
-    await execute("UPDATE fitur_akses SET roles = replace(roles, ']', ',\"pimpinan\"]') WHERE href = '/dashboard' AND roles NOT LIKE '%pimpinan%'")
-
-    // Monitoring EHB dihapus dari modul pimpinan
-    await execute("DELETE FROM fitur_akses WHERE href = '/dashboard/pimpinan/ehb'")
-  } catch {}
+  // Catatan: Seed awal diisi lewat migrasi database. Reorganisasi/renumbering
+  // urutan sidebar yang dulu berupa UPDATE di sini sudah dipindahkan ke
+  // migrations/0135_legacy_sidebar_fixes.sql agar tidak menimpa kustomisasi
+  // admin (urutan, nama, grup, status aktif) setiap kali modul dimuat ulang.
 
   fiturSchemaReady = true
 }

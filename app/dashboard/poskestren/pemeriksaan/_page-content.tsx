@@ -682,6 +682,18 @@ function SickCandidatesModal({
   )
 }
 
+function VisitStatusBadge({ visit }: { visit: any }) {
+  const awaiting = Number(visit.awaiting_medicine) === 1
+  const text = awaiting ? 'MENUNGGU OBAT' : visit.status
+  const cls = awaiting
+    ? 'bg-violet-100 text-violet-700'
+    : visit.status === 'MENUNGGU' ? 'bg-amber-100 text-amber-700'
+    : visit.status === 'DIPERIKSA' ? 'bg-blue-100 text-blue-700'
+    : visit.status === 'BATAL' ? 'bg-slate-200 text-slate-600'
+    : 'bg-emerald-100 text-emerald-700'
+  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${cls}`}>{text}</span>
+}
+
 function TodayTab({ onGoToDelivery }: { onGoToDelivery: () => void }) {
   const [date, setDate] = useState(toWibDateInputValue())
   const [q, setQ] = useState('')
@@ -746,8 +758,8 @@ function TodayTab({ onGoToDelivery }: { onGoToDelivery: () => void }) {
     return {
       total: items.length,
       waiting: items.filter((item: any) => item.status === 'MENUNGGU').length,
-      active: items.filter((item: any) => item.status === 'DIPERIKSA').length,
-      medicine: items.filter((item: any) => item.status === 'OBAT').length,
+      active: items.filter((item: any) => item.status === 'DIPERIKSA' && item.awaiting_medicine !== 1).length,
+      medicine: items.filter((item: any) => item.awaiting_medicine === 1).length,
       done: items.filter((item: any) => item.status === 'SELESAI' || item.status === 'DIRUJUK').length,
     }
   }, [result.items])
@@ -825,7 +837,7 @@ function TodayTab({ onGoToDelivery }: { onGoToDelivery: () => void }) {
         <div className="grid gap-3 border-b bg-slate-50/50 p-4 md:grid-cols-[160px_1fr_180px_auto]">
           <input type="date" value={date} onChange={event => setDate(event.target.value)} className={inputClass} />
           <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={q} onChange={event => setQ(event.target.value)} placeholder="Pasien, NIS, asrama, diagnosis..." className={`${inputClass} pl-9`} /></div>
-          <select value={status} onChange={event => setStatus(event.target.value)} className={inputClass}><option value="">Semua status</option>{['MENUNGGU','DIPERIKSA','OBAT','SELESAI','DIRUJUK','BATAL'].map(value => <option key={value}>{value}</option>)}</select>
+          <select value={status} onChange={event => setStatus(event.target.value)} className={inputClass}><option value="">Semua status</option>{['MENUNGGU','DIPERIKSA','SELESAI','DIRUJUK','BATAL'].map(value => <option key={value}>{value}</option>)}</select>
           <PageSizeSelect value={pageSize} onChange={setPageSize} hasFilter={Boolean(q || status || date)} />
         </div>
         {loading ? <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div> : result.items.length ? (
@@ -837,16 +849,16 @@ function TodayTab({ onGoToDelivery }: { onGoToDelivery: () => void }) {
                   <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-lg font-black text-emerald-700">{visit.queue_number}</span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2"><p className="font-bold">{visit.nama_lengkap}</p><span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${visit.status === 'MENUNGGU' ? 'bg-amber-100 text-amber-700' : visit.status === 'DIPERIKSA' ? 'bg-blue-100 text-blue-700' : visit.status === 'OBAT' ? 'bg-violet-100 text-violet-700' : visit.status === 'BATAL' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'}`}>{visit.status}</span>{visit.source_type === 'DATA_SAKIT' ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">DATA SAKIT</span> : null}</div>
+                  <div className="flex flex-wrap items-center gap-2"><p className="font-bold">{visit.nama_lengkap}</p><VisitStatusBadge visit={visit} />{visit.source_type === 'DATA_SAKIT' ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">DATA SAKIT</span> : null}</div>
                   <p className="text-xs text-slate-500">{visit.nis} · {visit.asrama || '—'} / {visit.kamar || '—'} · {visit.medical_record_no}</p>
                   <p className="mt-1 text-sm text-slate-700">{visit.diagnosis || visit.complaint || 'Belum ada keluhan'}</p>
                   {visit.allergies ? <p className="mt-1 text-xs font-bold text-rose-600">Alergi Obat: {visit.allergies}</p> : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {visit.status === 'MENUNGGU' && selectedSessionId ? <button disabled={pending} onClick={() => run(() => beginVisitWithSession({ visitId: visit.id, practiceSessionId: selectedSessionId }), 'Pemeriksaan dimulai.')} className={buttonPrimary}>Periksa</button> : null}
-                  {visit.status === 'DIPERIKSA' ? <button onClick={() => { setExamVisit(visit); setPrescription([]) }} className={buttonPrimary}>Isi pemeriksaan</button> : null}
-                  {visit.status === 'OBAT' ? <button onClick={onGoToDelivery} className={buttonPrimary}><Package className="h-4 w-4" /> Penyerahan obat</button> : null}
-                  {['MENUNGGU','DIPERIKSA','OBAT'].includes(visit.status) ? <button disabled={pending} onClick={() => { const reason = window.prompt('Alasan pembatalan:'); if (reason) run(() => cancelVisit(visit.id, reason), 'Kunjungan dibatalkan.') }} className={buttonSecondary}>Batal</button> : null}
+                  {visit.status === 'DIPERIKSA' && visit.awaiting_medicine !== 1 ? <button onClick={() => { setExamVisit(visit); setPrescription([]) }} className={buttonPrimary}>Isi pemeriksaan</button> : null}
+                  {visit.status === 'DIPERIKSA' && visit.awaiting_medicine === 1 ? <button onClick={onGoToDelivery} className={buttonPrimary}><Package className="h-4 w-4" /> Penyerahan obat</button> : null}
+                  {['MENUNGGU','DIPERIKSA'].includes(visit.status) ? <button disabled={pending} onClick={() => { const reason = window.prompt('Alasan pembatalan:'); if (reason) run(() => cancelVisit(visit.id, reason), 'Kunjungan dibatalkan.') }} className={buttonSecondary}>Batal</button> : null}
                 </div>
               </article>
             ))}
@@ -867,14 +879,14 @@ function TodayTab({ onGoToDelivery }: { onGoToDelivery: () => void }) {
                   <tr key={visit.id} className="hover:bg-slate-50/70">
                     <td className="px-4 py-3"><span className="inline-flex h-9 min-w-9 items-center justify-center rounded-xl bg-emerald-100 px-2 font-black text-emerald-700">{visit.queue_number}</span></td>
                     <td className="px-4 py-3"><p className="font-bold">{visit.nama_lengkap}</p><p className="text-xs text-slate-500">{visit.nis} · {visit.asrama || '—'} / {visit.kamar || '—'}</p>{visit.allergies ? <p className="text-xs font-bold text-rose-600">Alergi Obat: {visit.allergies}</p> : null}</td>
-                    <td className="px-4 py-3"><div className="flex flex-wrap gap-1"><span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${visit.status === 'MENUNGGU' ? 'bg-amber-100 text-amber-700' : visit.status === 'DIPERIKSA' ? 'bg-blue-100 text-blue-700' : visit.status === 'OBAT' ? 'bg-violet-100 text-violet-700' : visit.status === 'BATAL' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'}`}>{visit.status}</span>{visit.source_type === 'DATA_SAKIT' ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">DATA SAKIT</span> : null}</div></td>
+                    <td className="px-4 py-3"><div className="flex flex-wrap gap-1"><VisitStatusBadge visit={visit} />{visit.source_type === 'DATA_SAKIT' ? <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-700">DATA SAKIT</span> : null}</div></td>
                     <td className="max-w-md px-4 py-3 text-slate-700">{visit.diagnosis || visit.complaint || 'Belum ada keluhan'}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
                         {visit.status === 'MENUNGGU' && selectedSessionId ? <button disabled={pending} onClick={() => run(() => beginVisitWithSession({ visitId: visit.id, practiceSessionId: selectedSessionId }), 'Pemeriksaan dimulai.')} className={buttonPrimary}>Periksa</button> : null}
-                        {visit.status === 'DIPERIKSA' ? <button onClick={() => { setExamVisit(visit); setPrescription([]) }} className={buttonPrimary}>Isi pemeriksaan</button> : null}
-                        {visit.status === 'OBAT' ? <button onClick={onGoToDelivery} className={buttonPrimary}><Package className="h-4 w-4" /> Penyerahan obat</button> : null}
-                        {['MENUNGGU','DIPERIKSA','OBAT'].includes(visit.status) ? <button disabled={pending} onClick={() => { const reason = window.prompt('Alasan pembatalan:'); if (reason) run(() => cancelVisit(visit.id, reason), 'Kunjungan dibatalkan.') }} className={buttonSecondary}>Batal</button> : null}
+                        {visit.status === 'DIPERIKSA' && visit.awaiting_medicine !== 1 ? <button onClick={() => { setExamVisit(visit); setPrescription([]) }} className={buttonPrimary}>Isi pemeriksaan</button> : null}
+                        {visit.status === 'DIPERIKSA' && visit.awaiting_medicine === 1 ? <button onClick={onGoToDelivery} className={buttonPrimary}><Package className="h-4 w-4" /> Penyerahan obat</button> : null}
+                        {['MENUNGGU','DIPERIKSA'].includes(visit.status) ? <button disabled={pending} onClick={() => { const reason = window.prompt('Alasan pembatalan:'); if (reason) run(() => cancelVisit(visit.id, reason), 'Kunjungan dibatalkan.') }} className={buttonSecondary}>Batal</button> : null}
                       </div>
                     </td>
                   </tr>
