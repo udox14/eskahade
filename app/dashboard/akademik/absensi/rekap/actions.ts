@@ -100,22 +100,28 @@ export async function getRekapAbsensi(
   if (!santriList.length) return []
 
   const riwayatIds = santriList.map((s: any) => s.riwayat_id)
-  const ph = riwayatIds.map(() => '?').join(',')
-
   const dateWhere = range.start && range.end ? 'AND tanggal >= ? AND tanggal <= ?' : ''
   const dateParams = range.start && range.end ? [range.start, range.end] : []
 
-  const absenList = await query<any>(`
-    SELECT riwayat_pendidikan_id, shubuh, ashar, maghrib
-    FROM absensi_harian
-    WHERE riwayat_pendidikan_id IN (${ph})
-      ${dateWhere}
-      AND (
-        shubuh IN ('A','S','I')
-        OR ashar IN ('A','S','I')
-        OR maghrib IN ('A','S','I')
-      )
-  `, [...riwayatIds, ...dateParams])
+  // D1 batasi maksimal 100 bound param/query — IN (...) dipecah per chunk.
+  const SQL_VAR_CHUNK = 90
+  const absenList: { riwayat_pendidikan_id: string; shubuh: string; ashar: string; maghrib: string }[] = []
+  for (let i = 0; i < riwayatIds.length; i += SQL_VAR_CHUNK) {
+    const part = riwayatIds.slice(i, i + SQL_VAR_CHUNK)
+    const ph = part.map(() => '?').join(',')
+    const rows = await query<{ riwayat_pendidikan_id: string; shubuh: string; ashar: string; maghrib: string }>(`
+      SELECT riwayat_pendidikan_id, shubuh, ashar, maghrib
+      FROM absensi_harian
+      WHERE riwayat_pendidikan_id IN (${ph})
+        ${dateWhere}
+        AND (
+          shubuh IN ('A','S','I')
+          OR ashar IN ('A','S','I')
+          OR maghrib IN ('A','S','I')
+        )
+    `, [...part, ...dateParams])
+    absenList.push(...rows)
+  }
 
   let totalActiveSessions = 0
   if (range.start && range.end) {

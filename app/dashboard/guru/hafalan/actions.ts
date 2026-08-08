@@ -150,15 +150,22 @@ export async function getHafalanInputData(kelasId: string, jenis: string) {
   if (santri.length === 0) return { santri, bab, progress: {}, progressStatus: {}, editableBlokIds }
   const santriIds = santri.map(row => row.santri_id)
   const riwayatBySantri = new Map(santri.map(row => [row.santri_id, row.riwayat_id]))
-  const placeholders = santriIds.map(() => '?').join(',')
-  const progressRows = await query<{ blok_id: number; santri_id: string; status: string; marhalah_id: number | null; highlight: string | null }>(`
-    SELECT hp.blok_id, hp.santri_id, hp.status, hp.marhalah_id, hp.highlight
-    FROM hafalan_progress hp
-    JOIN hafalan_blok hblk ON hblk.id = hp.blok_id
-    JOIN hafalan_bab hb ON hb.id = hblk.bab_id
-    WHERE hb.jenis = ?
-      AND hp.santri_id IN (${placeholders})
-  `, [jenis, ...santriIds])
+  // D1 batasi maksimal 100 bound param/query — IN (...) dipecah per chunk.
+  const SQL_VAR_CHUNK = 90
+  const progressRows: { blok_id: number; santri_id: string; status: string; marhalah_id: number | null; highlight: string | null }[] = []
+  for (let i = 0; i < santriIds.length; i += SQL_VAR_CHUNK) {
+    const part = santriIds.slice(i, i + SQL_VAR_CHUNK)
+    const ph = part.map(() => '?').join(',')
+    const rows = await query<{ blok_id: number; santri_id: string; status: string; marhalah_id: number | null; highlight: string | null }>(`
+      SELECT hp.blok_id, hp.santri_id, hp.status, hp.marhalah_id, hp.highlight
+      FROM hafalan_progress hp
+      JOIN hafalan_blok hblk ON hblk.id = hp.blok_id
+      JOIN hafalan_bab hb ON hb.id = hblk.bab_id
+      WHERE hb.jenis = ?
+        AND hp.santri_id IN (${ph})
+    `, [jenis, ...part])
+    progressRows.push(...rows)
+  }
 
   const progress: Record<string, boolean> = {}
   const progressStatus: Record<string, string> = {}
@@ -239,11 +246,19 @@ export async function simpanHafalanProgressBatch(payload: {
   // Validasi urutan hafalan (berlaku untuk semua jenis): sebuah blok hanya
   // boleh ditandai hafal bila semua blok sebelumnya dalam bab yang sama
   // (urutannya lebih kecil) sudah punya progres. Uncheck selalu diizinkan.
-  const orderRows = await query<{ id: number; bab_id: number; urutan: number }>(`
-    SELECT hblk.id, hblk.bab_id, hblk.urutan
-    FROM hafalan_blok hblk
-    WHERE hblk.id IN (${Array.from(validIds).map(() => '?').join(',')})
-  `, Array.from(validIds))
+  // D1 batasi maksimal 100 bound param/query, jadi IN (...) dipecah per chunk.
+  const SQL_VAR_CHUNK = 90
+  const orderRows: { id: number; bab_id: number; urutan: number }[] = []
+  for (let i = 0; i < Array.from(validIds).length; i += SQL_VAR_CHUNK) {
+    const part = Array.from(validIds).slice(i, i + SQL_VAR_CHUNK)
+    const ph = part.map(() => '?').join(',')
+    const rows = await query<{ id: number; bab_id: number; urutan: number }>(`
+      SELECT hblk.id, hblk.bab_id, hblk.urutan
+      FROM hafalan_blok hblk
+      WHERE hblk.id IN (${ph})
+    `, part)
+    orderRows.push(...rows)
+  }
   const existingRows = await query<{ blok_id: number }>(
     'SELECT blok_id FROM hafalan_progress WHERE riwayat_pendidikan_id = ?',
     [payload.riwayatId],
@@ -279,7 +294,9 @@ export async function simpanHafalanProgressBatch(payload: {
   })
 
   if (applied.length > 0) {
-    await batch(applied.map(change => change.checked
+    // D1 membatasi maksimal 100 statement per batch — pecah agar guru yang
+    // menandai banyak blok sekaligus (mis. target ayat quran) tetap tersimpan.
+    const statements = applied.map(change => change.checked
       ? {
           sql: `
             INSERT INTO hafalan_progress (
@@ -309,7 +326,10 @@ export async function simpanHafalanProgressBatch(payload: {
           `,
           params: [change.blokId, payload.riwayatId],
         }
-    ))
+    )
+    for (let i = 0; i < statements.length; i += SQL_VAR_CHUNK) {
+      await batch(statements.slice(i, i + SQL_VAR_CHUNK))
+    }
   }
 
   const checkedIds = applied.filter(change => change.checked).map(change => change.blokId)
@@ -361,21 +381,32 @@ export async function simpanHafalanHighlightBatch(payload: {
   const guruId = await getGuruIdForSession(session)
 
   const blokIds = Array.from(validIds)
-  const ph = blokIds.map(() => '?').join(',')
   const parseWords = (raw: string | null): number[] => {
     if (!raw) return []
     try { const a = JSON.parse(raw); return Array.isArray(a) ? a.map(Number).filter(Number.isFinite) : [] } catch { return [] }
   }
-  const [existingRows, lockedRows] = await Promise.all([
-    query<{ blok_id: number; highlight: string | null }>(
-      `SELECT blok_id, highlight FROM hafalan_progress WHERE santri_id = ? AND marhalah_id = ? AND blok_id IN (${ph})`,
-      [scope.santri_id, scope.marhalah_id, ...blokIds],
-    ),
-    query<{ blok_id: number; highlight: string | null }>(
-      `SELECT blok_id, highlight FROM hafalan_progress WHERE santri_id = ? AND marhalah_id != ? AND blok_id IN (${ph})`,
-      [scope.santri_id, scope.marhalah_id, ...blokIds],
-    ),
-  ])
+  // D1 batasi maksimal 100 bound param/query — IN (...) dipecah per chunk.
+  const SQL_VAR_CHUNK = 90
+  const chunkedBlokIds: number[][] = []
+  for (let i = 0; i < blokIds.length; i += SQL_VAR_CHUNK) chunkedBlokIds.push(blokIds.slice(i, i + SQL_VAR_CHUNK))
+
+  const existingRows: { blok_id: number; highlight: string | null }[] = []
+  const lockedRows: { blok_id: number; highlight: string | null }[] = []
+  for (const part of chunkedBlokIds) {
+    const ph = part.map(() => '?').join(',')
+    const [ex, lk] = await Promise.all([
+      query<{ blok_id: number; highlight: string | null }>(
+        `SELECT blok_id, highlight FROM hafalan_progress WHERE santri_id = ? AND marhalah_id = ? AND blok_id IN (${ph})`,
+        [scope.santri_id, scope.marhalah_id, ...part],
+      ),
+      query<{ blok_id: number; highlight: string | null }>(
+        `SELECT blok_id, highlight FROM hafalan_progress WHERE santri_id = ? AND marhalah_id != ? AND blok_id IN (${ph})`,
+        [scope.santri_id, scope.marhalah_id, ...part],
+      ),
+    ])
+    existingRows.push(...ex)
+    lockedRows.push(...lk)
+  }
   const persistedWords = new Map<number, number[]>()
   for (const r of existingRows) persistedWords.set(Number(r.blok_id), parseWords(r.highlight))
   const lockedWordsByBlok = new Map<number, number[]>()
