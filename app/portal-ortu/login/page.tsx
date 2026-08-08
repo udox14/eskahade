@@ -13,8 +13,8 @@ export default async function PortalLoginPage() {
 
   return (
     <main className="public-theme min-h-dvh flex flex-col justify-center items-center bg-[#fffdf8] px-4 py-8 relative selection:bg-[#247451] selection:text-white overflow-hidden">
-      {/* Decorative Dot & Geometric Pattern Overlay */}
-      <div className="absolute inset-0 bg-pattern-islamic bg-pattern-sukahideng pointer-events-none z-0 opacity-70" />
+      {/* Decorative Topographic Waves Pattern Overlay */}
+      <div className="absolute inset-0 bg-pattern-waves pointer-events-none z-0 opacity-70" />
       <div className="absolute -left-20 -top-20 w-96 h-96 rounded-full bg-[#12372a]/10 blur-[100px] pointer-events-none animate-blob-1 z-0" />
       <div className="absolute right-0 bottom-0 w-[500px] h-[500px] rounded-full bg-[#247451]/10 blur-[120px] pointer-events-none animate-blob-2 z-0" />
 
@@ -22,9 +22,7 @@ export default async function PortalLoginPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-3 mb-5 transition-opacity hover:opacity-80">
-            <div className="bg-white rounded-xl p-1.5 shadow-sm border border-[#ddd4c3]">
-              <Image src="/logo.png" alt="Logo" width={40} height={40} className="h-10 w-10 object-contain" priority />
-            </div>
+            <Image src="/logo.png" alt="Logo" width={44} height={44} className="h-11 w-11 object-contain" priority />
             <div className="text-left">
               <span className="block text-[10px] font-bold uppercase tracking-widest text-[#247451]">ESKAHADE</span>
               <span className="block text-sm font-extrabold text-[#12372a]">Pesantren Sukahideng</span>

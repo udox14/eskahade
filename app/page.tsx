@@ -50,8 +50,8 @@ export default async function LandingPage() {
   return (
     <div className="public-theme h-[100dvh] w-screen overflow-hidden bg-[#fffdf8] text-[#1c2923] relative flex flex-col justify-between font-sans selection:bg-[#247451] selection:text-white">
       
-      {/* Decorative Dot & Geometric Pattern Overlay */}
-      <div className="absolute inset-0 bg-pattern-islamic bg-pattern-sukahideng pointer-events-none z-10 opacity-70" />
+      {/* Decorative Topographic Waves Pattern Overlay */}
+      <div className="absolute inset-0 bg-pattern-waves pointer-events-none z-10 opacity-70" />
 
       {/* Decorative Glowing Blur Blobs */}
       <div className="absolute -left-20 -top-20 w-96 h-96 rounded-full bg-[#12372a]/10 blur-[100px] pointer-events-none animate-blob-1 z-0" />
@@ -67,27 +67,25 @@ export default async function LandingPage() {
           {/* Column Left: Brand / Title / Hero & Buttons */}
           <div className="lg:col-span-7 flex flex-col justify-center items-center lg:items-start text-center lg:text-left space-y-3.5 sm:space-y-4 lg:space-y-5 max-w-xl mx-auto lg:mx-0">
 
-            {/* Brand Identity */}
+            {/* Brand Identity (Plain Logo) */}
             <div className="flex flex-col lg:flex-row items-center lg:items-center text-center lg:text-left gap-2.5 sm:gap-3">
-              <div className="relative h-12 w-12 sm:h-14 sm:w-14 shrink-0 flex items-center justify-center transition-transform hover:scale-105 duration-300 bg-white rounded-2xl p-1.5 shadow-md shadow-[#12372a]/10 border border-[#ddd4c3]">
+              <div className="relative h-12 w-12 sm:h-14 sm:w-14 shrink-0 flex items-center justify-center transition-transform hover:scale-105 duration-300">
                 <Image
                   src="/logo.png"
                   alt="Logo Sukahideng"
                   width={56}
                   height={56}
-                  className="h-10 w-10 sm:h-12 sm:w-12 object-contain"
+                  className="h-12 w-12 sm:h-14 sm:w-14 object-contain"
                   priority
                 />
               </div>
               <div className="space-y-0.5 sm:space-y-1">
-                <div className="flex items-center justify-center lg:justify-start gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-[#c9952e]" />
-                  <h2 className="text-xs sm:text-sm font-extrabold tracking-[0.18em] text-[#12372a] uppercase">
-                    PONDOK PESANTREN SUKAHIDENG
-                  </h2>
-                </div>
+                <h2 className="text-xs sm:text-sm font-extrabold tracking-[0.18em] text-[#12372a] uppercase leading-tight">
+                  PONDOK PESANTREN <br />
+                  SUKAHIDENG
+                </h2>
                 <p className="text-[10px] sm:text-xs font-semibold text-[#66736c] tracking-wide">
-                  Sukamanah, Sukarapih, Sukarame, Tasikmalaya - Jawa Barat
+                  Sukarapih - Sukarame - Tasikmalaya - Jawa Barat
                 </p>
               </div>
             </div>
@@ -97,9 +95,10 @@ export default async function LandingPage() {
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#12372a] whitespace-nowrap leading-none">
                 ESKAHADE
               </h1>
-              <p className="text-sm sm:text-base lg:text-lg font-bold text-[#247451] tracking-normal leading-snug">
-                Sistem Informasi Manajemen Pondok Pesantren Sukahideng
-              </p>
+              <div className="text-sm sm:text-base lg:text-lg font-bold text-[#247451] tracking-normal leading-snug uppercase">
+                <div>SISTEM INFORMASI MANAJEMEN</div>
+                <div>PONDOK PESANTREN SUKAHIDENG</div>
+              </div>
               
               {/* Dynamic Typing Subtext */}
               <div className="text-xs sm:text-sm lg:text-base min-h-[1.7em] leading-relaxed text-[#66736c] font-semibold px-2 lg:px-0 pt-1">
@@ -146,15 +145,6 @@ export default async function LandingPage() {
                   </Link>
                 </>
               )}
-            </div>
-
-            {/* Footer Features Link & Security badges */}
-            <div className="flex flex-row items-center justify-between lg:justify-start gap-4 sm:gap-6 text-xs font-bold text-[#66736c] pt-3 border-t border-[#ddd4c3]/40 w-full max-w-md mx-auto lg:mx-0">
-              <FeaturesDrawer />
-              <div className="flex items-center gap-1.5 text-[#247451]">
-                <ShieldCheck className="h-4 w-4 text-[#247451]" />
-                <span>Terintegrasi & Aman</span>
-              </div>
             </div>
 
           </div>
@@ -268,8 +258,6 @@ export default async function LandingPage() {
       {/* Screen Footer */}
       <footer className="relative z-30 shrink-0 py-2.5 sm:py-3 border-t border-[#ddd4c3]/40 text-center text-[10px] sm:text-xs font-bold text-[#66736c] bg-[#fffdf8]/80 backdrop-blur-sm">
         <span>&copy; {year} Pondok Pesantren Sukahideng.</span>
-        <span className="mx-2" aria-hidden="true">•</span>
-        <span className="text-[#247451]">Sistem Informasi Manajemen Terpadu</span>
       </footer>
 
     </div>
