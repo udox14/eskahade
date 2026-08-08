@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CalendarX, CaretLeft, CaretRight } from '@phosphor-icons/react/dist/ssr'
+import { CalendarX, CaretLeft, CaretRight, Clock } from '@phosphor-icons/react/dist/ssr'
 import { requirePortalSessionStrict } from '@/lib/portal/session'
 import { getRekapAbsensiAnak } from '@/lib/portal/data'
 import { formatTanggalId, namaBulanId } from '@/lib/portal/format'
@@ -71,6 +71,14 @@ export default async function AbsensiPage({
       </PortalPageHeader>
 
       <div className="px-5 -mt-9 space-y-4">
+        {/* Banner Keterangan Update Data */}
+        <div className="portal-rise flex items-center gap-2.5 rounded-2xl bg-amber-50 border border-amber-200/80 px-4 py-3 text-xs text-amber-900 shadow-sm">
+          <Clock className="w-4 h-4 shrink-0 text-amber-600" />
+          <p className="font-semibold text-amber-800 leading-normal">
+            <span className="font-bold">Informasi Data:</span> Data kehadiran diperbarui setiap <span className="font-extrabold text-amber-950 underline decoration-amber-400">Selasa malam</span> (tidak real-time).
+          </p>
+        </div>
+
         {/* Kartu rekap */}
         <div className="portal-rise portal-rise-1 rounded-3xl bg-[var(--p-card)] border border-[var(--p-line)] p-5 shadow-[0_18px_40px_-18px_rgba(11,94,63,0.3)]">
           <div className="flex items-end justify-between">

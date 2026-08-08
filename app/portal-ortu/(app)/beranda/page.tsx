@@ -159,6 +159,9 @@ export default async function BerandaPage() {
             <p className="mt-1 text-[11px] font-semibold text-emerald-100/90">
               Kehadiran pengajian bulan ini
             </p>
+            <p className="mt-1.5 text-[9.5px] font-medium text-emerald-100/75 bg-black/20 w-fit px-2 py-0.5 rounded-full">
+              Update: Selasa malam
+            </p>
             {(absen.alfa > 0 || absen.izin > 0 || absen.sakit > 0) && (
               <p className="mt-1 text-[10px] text-emerald-100/70">
                 {absen.alfa > 0 ? `${absen.alfa} alfa ` : ''}

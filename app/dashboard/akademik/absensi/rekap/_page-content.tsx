@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { getUserScope, getRekapAbsensi, getDetailAbsensiSantri, getReferensiFilter } from './actions'
-import { Search, Filter, Loader2, X, Calendar, Printer, Palette, Circle, ChevronDown } from 'lucide-react'
+import { Search, Filter, Loader2, X, Calendar, Printer, Palette, Circle, ChevronDown, Clock } from 'lucide-react'
 import { useReactToPrint } from '@/lib/pdf/client'
 import { format, startOfMonth } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
@@ -156,6 +156,12 @@ export default function RekapAbsensiPage() {
           title="Rekap Absensi Santri"
           description="Monitoring kedisiplinan pengajian santri."
         />
+        <div className="flex items-center gap-2.5 rounded-2xl bg-amber-50 border border-amber-200/80 px-4 py-3 text-xs text-amber-900 shadow-sm">
+          <Clock className="w-4 h-4 shrink-0 text-amber-600" />
+          <p className="font-semibold text-amber-800">
+            <span className="font-bold">Informasi:</span> Data rekap absensi diperbarui setiap <span className="font-extrabold text-amber-950 underline decoration-amber-400">Selasa malam</span> (tidak real-time).
+          </p>
+        </div>
       </div>
 
       <div className="bg-white p-4 rounded-xl border shadow-sm space-y-4">

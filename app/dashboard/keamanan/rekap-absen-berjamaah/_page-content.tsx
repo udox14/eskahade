@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getSessionRekap, getRekapBerjamaahAlfaRange, getKamarList, getSantriByAsrama, deleteAbsenBerjamaahRecords } from '../rekap-asrama/actions'
 import ImportBerjamaahModal from '../rekap-asrama/ImportBerjamaahModal'
-import { Flame, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload, Save, Trash2, X, FileSpreadsheet } from 'lucide-react'
+import { Flame, Home, Loader2, ChevronLeft, ChevronRight, Search, Upload, Save, Trash2, X, FileSpreadsheet, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
@@ -288,8 +288,15 @@ export default function RekapAbsenBerjamaahPage() {
             </button>
           )}
         </div>
+        <div className="flex items-center gap-2.5 rounded-2xl bg-amber-50 border border-amber-200/80 px-4 py-3 text-xs text-amber-900 shadow-sm">
+          <Clock className="w-4 h-4 shrink-0 text-amber-600" />
+          <p className="font-semibold text-amber-800">
+            <span className="font-bold">Informasi Data:</span> Data rekap absensi diperbarui setiap <span className="font-extrabold text-amber-950 underline decoration-amber-400">Selasa malam</span> (tidak real-time).
+          </p>
+        </div>
+      </div>
 
-        {/* CONTROLS */}
+      {/* CONTROLS */}
         <div className="space-y-2">
           {/* Baris 1: Week navigator full-width */}
           <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-2 shadow-sm w-full">
@@ -340,7 +347,6 @@ export default function RekapAbsenBerjamaahPage() {
             </button>
           </div>
         </div>
-      </div>
 
       {/* EMPTY / LOADING */}
       {!hasLoaded && !loading && (

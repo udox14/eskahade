@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { getSessionRekap, getRekapAbsenMalam, getKamarList, getRiwayatAlfaAbsenMalam, deleteAbsenMalamRecord } from '../rekap-asrama/actions'
-import { CalendarDays, History, Moon, Home, Loader2, ChevronLeft, ChevronRight, Search, X, FileSpreadsheet } from 'lucide-react'
+import { CalendarDays, History, Moon, Home, Loader2, ChevronLeft, ChevronRight, Search, X, FileSpreadsheet, Clock } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 import { toast } from 'sonner'
@@ -215,78 +215,88 @@ export default function RekapAbsenMalamPage() {
     <div className="space-y-5 max-w-7xl mx-auto pb-16">
 
       {/* HEADER */}
-      <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
-        <DashboardPageHeader
-          title="Rekap Absen Malam"
-          description="Rekap absensi malam per bulan."
-          className="flex-1"
-        />
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-1 shadow-sm">
-            <button onClick={() => handleBulanChange(prevBulan(bulan))} className="p-1.5 hover:bg-slate-100 rounded-lg">
-              <ChevronLeft className="w-4 h-4"/>
-            </button>
-            <span className="text-sm font-bold text-slate-700 min-w-[130px] text-center">{formatBulan(bulan)}</span>
-            <button onClick={() => handleBulanChange(nextBulan(bulan))} disabled={bulan >= bulanIni()}
-              className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30">
-              <ChevronRight className="w-4 h-4"/>
-            </button>
-          </div>
-
-          {sessionInfo?.asrama_binaan
-            ? <span className="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-2 rounded-xl flex items-center gap-1.5">
-                <Home className="w-3.5 h-3.5"/> {sessionInfo.asrama_binaan}
-              </span>
-            : <select value={asrama} onChange={e => setAsrama(e.target.value)}
-                className="border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm">
-                {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-          }
-
-          <div className="flex items-center gap-1 bg-white border rounded-xl px-3 py-2 shadow-sm">
-            <CalendarDays className="h-4 w-4 text-slate-400" />
-            <input
-              type="date"
-              value={tanggal}
-              onChange={e => handleTanggalChange(e.target.value)}
-              className="bg-transparent text-sm font-semibold text-slate-700 outline-none"
-              title="Filter tanggal"
-            />
-            {tanggal ? (
-              <button
-                type="button"
-                onClick={() => setTanggal('')}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                title="Tampilkan semua tanggal bulan ini"
-              >
-                <X className="h-3.5 w-3.5" />
+      <div className="flex flex-col gap-3 border-b pb-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <DashboardPageHeader
+            title="Rekap Absen Malam"
+            description="Rekap absensi malam per bulan."
+            className="flex-1"
+          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1 bg-white border rounded-xl px-2 py-1 shadow-sm">
+              <button onClick={() => handleBulanChange(prevBulan(bulan))} className="p-1.5 hover:bg-slate-100 rounded-lg">
+                <ChevronLeft className="w-4 h-4"/>
               </button>
-            ) : null}
-          </div>
+              <span className="text-sm font-bold text-slate-700 min-w-[130px] text-center">{formatBulan(bulan)}</span>
+              <button onClick={() => handleBulanChange(nextBulan(bulan))} disabled={bulan >= bulanIni()}
+                className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30">
+                <ChevronRight className="w-4 h-4"/>
+              </button>
+            </div>
 
-          <select
-            value={filterKamar}
-            onChange={e => setFilterKamar(e.target.value)}
-            disabled={availableKamars.length === 0}
-            className="border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm disabled:bg-slate-50 disabled:text-slate-400"
-          >
-            <option value="Semua">Semua Kamar</option>
-            {availableKamars.map(k => <option key={k} value={k}>{k === 'Tanpa Kamar' ? k : `Kamar ${k}`}</option>)}
-          </select>
-
-          <button
-            onClick={load}
-            disabled={loading}
-            className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-60 ${
-              !hasLoaded ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {loading
-              ? <><Loader2 className="w-4 h-4 animate-spin"/> Memuat...</>
-              : <><Search className="w-4 h-4"/> {hasLoaded ? 'Perbarui' : 'Tampilkan'}</>
+            {sessionInfo?.asrama_binaan
+              ? <span className="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-2 rounded-xl flex items-center gap-1.5">
+                  <Home className="w-3.5 h-3.5"/> {sessionInfo.asrama_binaan}
+                </span>
+              : <select value={asrama} onChange={e => setAsrama(e.target.value)}
+                  className="border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm">
+                  {ASRAMA_LIST.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
             }
-          </button>
+          </div>
         </div>
+        <div className="flex items-center gap-2.5 rounded-2xl bg-amber-50 border border-amber-200/80 px-4 py-3 text-xs text-amber-900 shadow-sm">
+          <Clock className="w-4 h-4 shrink-0 text-amber-600" />
+          <p className="font-semibold text-amber-800">
+            <span className="font-bold">Informasi Data:</span> Data rekap absensi diperbarui setiap <span className="font-extrabold text-amber-950 underline decoration-amber-400">Selasa malam</span> (tidak real-time).
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1 bg-white border rounded-xl px-3 py-2 shadow-sm">
+          <CalendarDays className="h-4 w-4 text-slate-400" />
+          <input
+            type="date"
+            value={tanggal}
+            onChange={e => handleTanggalChange(e.target.value)}
+            className="bg-transparent text-sm font-semibold text-slate-700 outline-none"
+            title="Filter tanggal"
+          />
+          {tanggal ? (
+            <button
+              type="button"
+              onClick={() => setTanggal('')}
+              className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              title="Tampilkan semua tanggal bulan ini"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
+
+        <select
+          value={filterKamar}
+          onChange={e => setFilterKamar(e.target.value)}
+          disabled={availableKamars.length === 0}
+          className="border rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm disabled:bg-slate-50 disabled:text-slate-400"
+        >
+          <option value="Semua">Semua Kamar</option>
+          {availableKamars.map(k => <option key={k} value={k}>{k === 'Tanpa Kamar' ? k : `Kamar ${k}`}</option>)}
+        </select>
+
+        <button
+          onClick={load}
+          disabled={loading}
+          className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 disabled:opacity-60 ${
+            !hasLoaded ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          {loading
+            ? <><Loader2 className="w-4 h-4 animate-spin"/> Memuat...</>
+            : <><Search className="w-4 h-4"/> {hasLoaded ? 'Perbarui' : 'Tampilkan'}</>
+          }
+        </button>
       </div>
 
       {/* TABS & FILTER */}
