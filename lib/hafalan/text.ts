@@ -72,7 +72,8 @@ export function resolveHafalanText(ref?: string | null): HafalanText | null {
       if (!bab) return null
       if (seg != null) {
         const s = bab.segmen?.[seg]
-        return s ? { arab: s, meta: bab.nama } : null
+        if (s) return { arab: s, meta: bab.nama }
+        // segmen lama yang sudah digabung: fallback ke teks bab utuh
       }
       // bab utuh: gabung semua segmen jadi satu teks (untuk highlight per kata)
       const joined = Object.keys(bab.segmen || {})
