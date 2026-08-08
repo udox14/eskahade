@@ -140,7 +140,7 @@ export default function FeaturesDrawer() {
                         : 'text-slate-600 hover:text-[#12372a]'
                     }`}
                   >
-                    Portal Pengurus & Guru
+                    Portal Internal & Guru
                   </button>
                   <button
                     type="button"

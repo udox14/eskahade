@@ -6,8 +6,8 @@ import type { Metadata } from 'next'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Login Pengurus — ESKAHADE',
-  description: 'Akses pengurus Pondok Pesantren Sukahideng ke dashboard ESKAHADE.',
+  title: 'Login Internal — ESKAHADE',
+  description: 'Akses internal Pondok Pesantren Sukahideng ke dashboard ESKAHADE.',
 }
 
 export default async function LoginPage() {

@@ -39,10 +39,10 @@ export default async function LandingPage() {
     ? '/portal-ortu'
     : '/login'
   const primaryLabel = isStaff
-    ? 'Buka Dashboard Pengurus'
+    ? 'Buka Dashboard Internal'
     : isParent
     ? 'Buka Portal Orang Tua'
-    : 'Masuk Portal Pengurus'
+    : 'Masuk Portal Internal'
 
   const PrimaryIcon = isStaff || isParent ? LayoutDashboard : LogIn
   const year = new Date().getFullYear()
@@ -125,13 +125,13 @@ export default async function LandingPage() {
                 </Link>
               ) : (
                 <>
-                  {/* Login Pengurus */}
+                  {/* Login Internal */}
                   <Link
                     href="/login"
                     className="inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2.5 rounded-xl bg-[#12372a] px-6 text-sm font-extrabold text-white shadow-lg shadow-[#12372a]/20 hover:bg-[#09251c] hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
                   >
                     <LogIn className="h-4.5 w-4.5 text-[#c9952e]" />
-                    <span>Portal Pengurus</span>
+                    <span>Portal Internal</span>
                     <ArrowRight className="h-4 w-4" />
                   </Link>
 
