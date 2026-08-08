@@ -4,6 +4,7 @@
 
 import { query, queryOne } from '@/lib/db'
 import { countActiveSessions, getDateRange, type SessionType } from '@/lib/absensi/pengajian'
+import { toWibDateInputValue } from '@/lib/date/wib'
 
 // ── Absensi pengajian ────────────────────────────────────────
 
@@ -32,6 +33,13 @@ export async function getRekapAbsensiAnak(
   }
   if (!range.start || !range.end) return empty
 
+  // Tanggal yang belum terjadi tidak dihitung (batasi sampai hari ini WIB).
+  const todayStr = toWibDateInputValue()
+  const effectiveRange = {
+    start: range.start,
+    end: range.end > todayStr ? todayStr : range.end,
+  }
+
   const riwayat = await queryOne<{ id: string; nama_kelas: string | null }>(`
     SELECT rp.id, k.nama_kelas
     FROM riwayat_pendidikan rp
@@ -48,7 +56,7 @@ export async function getRekapAbsensiAnak(
       AND tanggal >= ? AND tanggal <= ?
       AND (shubuh IN ('A','S','I') OR ashar IN ('A','S','I') OR maghrib IN ('A','S','I'))
     ORDER BY tanggal DESC
-  `, [riwayat.id, range.start, range.end])
+  `, [riwayat.id, effectiveRange.start, effectiveRange.end])
 
   let sakit = 0, izin = 0, alfa = 0
   detail.forEach(row => {
@@ -61,11 +69,11 @@ export async function getRekapAbsensiAnak(
 
   const liburList = await query<{ tanggal: string; sesi: SessionType }>(`
     SELECT tanggal, sesi FROM pengajian_libur_sesi WHERE tanggal >= ? AND tanggal <= ?
-  `, [range.start, range.end]).catch(() => [] as { tanggal: string; sesi: SessionType }[])
+  `, [effectiveRange.start, effectiveRange.end]).catch(() => [] as { tanggal: string; sesi: SessionType }[])
 
   const totalSesi = countActiveSessions(
-    range.start,
-    range.end,
+    effectiveRange.start,
+    effectiveRange.end,
     new Set(liburList.map(item => `${item.tanggal}-${item.sesi}`))
   )
 

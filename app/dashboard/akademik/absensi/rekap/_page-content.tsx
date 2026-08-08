@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { getUserScope, getRekapAbsensi, getDetailAbsensiSantri, getReferensiFilter } from './actions'
 import { Search, Filter, Loader2, X, Calendar, Printer, Palette, Circle, ChevronDown } from 'lucide-react'
 import { useReactToPrint } from '@/lib/pdf/client'
-import { format, startOfMonth, endOfMonth } from 'date-fns'
+import { format, startOfMonth } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { cn } from '@/lib/utils'
@@ -58,7 +58,7 @@ export default function RekapAbsensiPage() {
     async function init() {
       const now = new Date()
       const awal = format(startOfMonth(now), 'yyyy-MM-dd')
-      const akhir = format(endOfMonth(now), 'yyyy-MM-dd')
+      const akhir = format(now, 'yyyy-MM-dd')
       setStartDate(awal)
       setEndDate(akhir)
 

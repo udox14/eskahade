@@ -1,6 +1,7 @@
 import { query } from '@/lib/db'
 import { currentMonthWib, monthPeriod, pct, safeNumber, type MonthPeriod } from './helpers'
 import { countActiveSessions, isHoliday, VALID_SESI } from '@/lib/absensi/pengajian'
+import { toWibDateInputValue } from '@/lib/date/wib'
 
 export type RingkasanRekap = {
   total: number
@@ -165,16 +166,19 @@ async function getTopAlfa(
 
 async function getWajibSesi(period: MonthPeriod): Promise<number> {
   try {
+    // Tanggal yang belum terjadi tidak dihitung — batasi sampai hari ini (WIB).
+    const todayStr = toWibDateInputValue()
+    const to = period.to > todayStr ? todayStr : period.to
     const liburList = await query<{ tanggal: string; sesi: string }>(
       `SELECT tanggal, sesi FROM pengajian_libur_sesi WHERE tanggal >= ? AND tanggal <= ?`,
-      [period.from, period.to]
+      [period.from, to]
     )
     const liburSet = new Set(
       liburList
         .filter(row => (VALID_SESI as readonly string[]).includes(row.sesi))
         .map(row => `${row.tanggal}-${row.sesi}`)
     )
-    return countActiveSessions(period.from, period.to, liburSet)
+    return countActiveSessions(period.from, to, liburSet)
   } catch {
     return 0
   }

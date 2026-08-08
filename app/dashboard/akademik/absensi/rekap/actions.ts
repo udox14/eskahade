@@ -4,6 +4,7 @@ import { execute, query, queryOne } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
 import { getAccessibleKelasForSession } from '@/lib/akademik/guru-access'
 import { countActiveSessions, getDateRange, type SessionType } from '@/lib/absensi/pengajian'
+import { toWibDateInputValue } from '@/lib/date/wib'
 
 async function ensureLiburPengajianTable() {
   try {
@@ -64,6 +65,14 @@ export async function getRekapAbsensi(
   const scope = await getUserScope()
   const range = getDateRange(startDate, endDate)
 
+  // Tanggal yang belum terjadi TIDAK dihitung: batasi rentang efektif sampai
+  // hari ini (WIB). Tanpa ini, sesi masa depan ikut dihitung sebagai "hadir".
+  const todayStr = toWibDateInputValue()
+  const effectiveRange = {
+    start: range.start,
+    end: range.end && range.end > todayStr ? todayStr : range.end,
+  }
+
   let sql = `
     SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
            rp.id AS riwayat_id,
@@ -100,8 +109,8 @@ export async function getRekapAbsensi(
   if (!santriList.length) return []
 
   const riwayatIds = santriList.map((s: any) => s.riwayat_id)
-  const dateWhere = range.start && range.end ? 'AND tanggal >= ? AND tanggal <= ?' : ''
-  const dateParams = range.start && range.end ? [range.start, range.end] : []
+  const dateWhere = effectiveRange.start && effectiveRange.end ? 'AND tanggal >= ? AND tanggal <= ?' : ''
+  const dateParams = effectiveRange.start && effectiveRange.end ? [effectiveRange.start, effectiveRange.end] : []
 
   // D1 batasi maksimal 100 bound param/query — IN (...) dipecah per chunk.
   const SQL_VAR_CHUNK = 90
@@ -124,15 +133,15 @@ export async function getRekapAbsensi(
   }
 
   let totalActiveSessions = 0
-  if (range.start && range.end) {
+  if (effectiveRange.start && effectiveRange.end) {
     const liburList = await query<{ tanggal: string; sesi: SessionType }>(`
       SELECT tanggal, sesi
       FROM pengajian_libur_sesi
       WHERE tanggal >= ? AND tanggal <= ?
-    `, [range.start, range.end])
+    `, [effectiveRange.start, effectiveRange.end])
     totalActiveSessions = countActiveSessions(
-      range.start,
-      range.end,
+      effectiveRange.start,
+      effectiveRange.end,
       new Set(liburList.map(item => `${item.tanggal}-${item.sesi}`))
     )
   }
@@ -176,8 +185,10 @@ export async function getDetailAbsensiSantri(santriId: string, startDate = '', e
   if (!riwayat) return []
 
   const range = getDateRange(startDate, endDate)
-  const dateWhere = range.start && range.end ? 'AND tanggal >= ? AND tanggal <= ?' : ''
-  const params = range.start && range.end ? [riwayat.id, range.start, range.end] : [riwayat.id]
+  const todayStr = toWibDateInputValue()
+  const effectiveEnd = range.end && range.end > todayStr ? todayStr : range.end
+  const dateWhere = range.start && effectiveEnd ? 'AND tanggal >= ? AND tanggal <= ?' : ''
+  const params = range.start && effectiveEnd ? [riwayat.id, range.start, effectiveEnd] : [riwayat.id]
 
   return query<any>(`
     SELECT tanggal, shubuh, ashar, maghrib
