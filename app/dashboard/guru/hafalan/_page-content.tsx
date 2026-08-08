@@ -69,6 +69,21 @@ export default function HafalanPageContent() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+
+  // ── Undo & Range Selection state/refs ──
+  const [showUndo, setShowUndo] = useState(false)
+  const [undoSeconds, setUndoSeconds] = useState(5)
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const undoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastStateSnapshotRef = useRef<{
+    checked: Set<number>
+    words: Record<number, number[]>
+    scope: AutosaveScope | null
+  } | null>(null)
+
+  const lastClickedBlokRef = useRef<{ babId: number; blokId: number; time: number } | null>(null)
+  const lastClickedWordRef = useRef<{ blokId: number; wordIdx: number; time: number } | null>(null)
+
   const dragRef = useRef<{ add: boolean } | null>(null)
   const wordDragRef = useRef<{ blokId: number; add: boolean } | null>(null)
   const localCheckedRef = useRef(localChecked)
@@ -243,6 +258,7 @@ export default function HafalanPageContent() {
     return () => {
       for (const timer of timers.values()) clearTimeout(timer)
       if (quranTargetTimerRef.current) clearTimeout(quranTargetTimerRef.current)
+      clearUndoTimer()
     }
   }, [])
 
@@ -526,6 +542,87 @@ export default function HafalanPageContent() {
     scheduleAutosave(scope)
   }
 
+  const clearUndoTimer = () => {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current)
+      undoTimerRef.current = null
+    }
+    if (undoIntervalRef.current) {
+      clearInterval(undoIntervalRef.current)
+      undoIntervalRef.current = null
+    }
+  }
+
+  const pushUndoSnapshot = () => {
+    lastStateSnapshotRef.current = {
+      checked: new Set(localCheckedRef.current),
+      words: JSON.parse(JSON.stringify(localWordsRef.current)),
+      scope: saveScope,
+    }
+    clearUndoTimer()
+    setShowUndo(true)
+    setUndoSeconds(5)
+
+    undoIntervalRef.current = setInterval(() => {
+      setUndoSeconds(prev => {
+        if (prev <= 1) {
+          clearUndoTimer()
+          setShowUndo(false)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    undoTimerRef.current = setTimeout(() => {
+      setShowUndo(false)
+      clearUndoTimer()
+    }, 5000)
+  }
+
+  const handleUndo = () => {
+    if (!lastStateSnapshotRef.current) return
+    const { checked: prevChecked, words: prevWords, scope } = lastStateSnapshotRef.current
+
+    const currentChecked = localCheckedRef.current
+    const currentWords = localWordsRef.current
+
+    setLocalChecked(prevChecked)
+    localCheckedRef.current = prevChecked
+    setLocalWords(prevWords)
+    localWordsRef.current = prevWords
+
+    const affectedBlokIds = new Set<number>()
+    for (const id of prevChecked) affectedBlokIds.add(id)
+    for (const id of currentChecked) affectedBlokIds.add(id)
+    for (const idStr of Object.keys(prevWords)) affectedBlokIds.add(Number(idStr))
+    for (const idStr of Object.keys(currentWords)) affectedBlokIds.add(Number(idStr))
+
+    if (scope) {
+      for (const blokId of affectedBlokIds) {
+        if (selectedType?.key === 'jurumiyah') {
+          const oldW = prevWords[blokId] || []
+          const curW = currentWords[blokId] || []
+          const isDiff = oldW.length !== curW.length || !oldW.every(w => curW.includes(w))
+          if (isDiff) {
+            queueAutosave(blokId, oldW.length > 0, scope, oldW)
+          }
+        } else {
+          const oldC = prevChecked.has(blokId)
+          const curC = currentChecked.has(blokId)
+          if (oldC !== curC) {
+            queueAutosave(blokId, oldC, scope)
+          }
+        }
+      }
+    }
+
+    setDirty(true)
+    setShowUndo(false)
+    clearUndoTimer()
+    toast.info('Input terakhir berhasil dibatalkan.')
+  }
+
   const applyQuranTarget = (rawValue: string) => {
     if (!isQuran || !selectedBab) return
     const normalized = rawValue.replace(/\D/g, '')
@@ -544,6 +641,7 @@ export default function HafalanPageContent() {
       return
     }
 
+    pushUndoSnapshot()
     const nextChecked = new Set(localCheckedRef.current)
     const addedIds: number[] = []
     for (const blok of quranAyatRows) {
@@ -595,7 +693,15 @@ export default function HafalanPageContent() {
     return !!blok?.is_editable && !(data.progress[key] && !data.progressEditable?.[key])
   }
 
+  const resetNavigationState = () => {
+    setShowUndo(false)
+    clearUndoTimer()
+    lastClickedBlokRef.current = null
+    lastClickedWordRef.current = null
+  }
+
   const selectKelas = (nextKelasId: string) => {
+    resetNavigationState()
     setKelasId(nextKelasId)
     setSelectedType(null)
     setSelectedSantriId('')
@@ -614,6 +720,7 @@ export default function HafalanPageContent() {
   }
 
   const selectType = (type: any) => {
+    resetNavigationState()
     setSelectedType(type)
     setSelectedSantriId('')
     setSelectedBabId(null)
@@ -628,6 +735,7 @@ export default function HafalanPageContent() {
   }
 
   const selectSantri = (riwayatId: string, recordHistory = true) => {
+    resetNavigationState()
     setMobileSantriSearchOpen(false)
     setSelectedSantriId(riwayatId)
     setBabTab('current')
@@ -716,7 +824,7 @@ export default function HafalanPageContent() {
 
   selectSantriRef.current = selectSantri
 
-  // ── apply / drag-swipe ──
+  // ── apply / drag-swipe / range selection ──
   const applyBlok = (blok: any, val: boolean) => {
     const blocker = val && selectedBab ? firstUncheckedBefore(selectedBab, blok) : null
     if (blocker) {
@@ -733,8 +841,71 @@ export default function HafalanPageContent() {
     queueAutosave(blok.id, val)
   }
 
+  const applyBlokRangeOrSingle = (blok: any) => {
+    if (!canEditBlok(blok) || !selectedBab) {
+      if (!canEditBlok(blok)) toast.info('Progress marhalah sebelumnya hanya bisa dilihat')
+      return
+    }
+    pushUndoSnapshot()
+
+    const ordered = orderedBabBloks(selectedBab.blok)
+    const targetIdx = ordered.findIndex(b => b.id === blok.id)
+    if (targetIdx === -1) return
+
+    const isChecked = localCheckedRef.current.has(blok.id)
+    const targetVal = !isChecked
+
+    let startIdx = targetIdx
+    let endIdx = targetIdx
+
+    if (
+      lastClickedBlokRef.current &&
+      lastClickedBlokRef.current.babId === selectedBab.id &&
+      lastClickedBlokRef.current.blokId !== blok.id
+    ) {
+      const lastIdx = ordered.findIndex(b => b.id === lastClickedBlokRef.current!.blokId)
+      if (lastIdx !== -1) {
+        startIdx = Math.min(lastIdx, targetIdx)
+        endIdx = Math.max(lastIdx, targetIdx)
+      }
+    } else if (targetVal) {
+      const firstUncheckedIdx = ordered.findIndex(b => canEditBlok(b) && !localCheckedRef.current.has(b.id))
+      if (firstUncheckedIdx !== -1 && firstUncheckedIdx < targetIdx) {
+        startIdx = firstUncheckedIdx
+        endIdx = targetIdx
+      }
+    }
+
+    const nextChecked = new Set(localCheckedRef.current)
+    const changedIds: number[] = []
+
+    for (let i = startIdx; i <= endIdx; i++) {
+      const b = ordered[i]
+      if (!canEditBlok(b)) continue
+      if (targetVal && !nextChecked.has(b.id)) {
+        nextChecked.add(b.id)
+        changedIds.push(b.id)
+      } else if (!targetVal && nextChecked.has(b.id)) {
+        nextChecked.delete(b.id)
+        changedIds.push(b.id)
+      }
+    }
+
+    if (changedIds.length > 0) {
+      setLocalChecked(nextChecked)
+      localCheckedRef.current = nextChecked
+      setDirty(true)
+      for (const id of changedIds) {
+        queueAutosave(id, targetVal)
+      }
+    }
+
+    lastClickedBlokRef.current = { babId: selectedBab.id, blokId: blok.id, time: Date.now() }
+  }
+
   const onBlokPointerDown = (blok: any) => {
     if (!canEditBlok(blok)) return toast.info('Progress marhalah sebelumnya hanya bisa dilihat')
+    pushUndoSnapshot()
     const val = !localCheckedRef.current.has(blok.id)
     dragRef.current = { add: val }
     applyBlok(blok, val)
@@ -752,8 +923,7 @@ export default function HafalanPageContent() {
   }
 
   const toggleSingle = (blok: any) => {
-    if (!canEditBlok(blok)) return toast.info('Progress marhalah sebelumnya hanya bisa dilihat')
-    applyBlok(blok, !localCheckedRef.current.has(blok.id))
+    applyBlokRangeOrSingle(blok)
   }
 
   // ── Jurumiyah: highlight kata ──
@@ -773,8 +943,61 @@ export default function HafalanPageContent() {
     queueAutosave(blokId, next.length > 0, saveScope, next)
   }
 
+  const applyWordRangeOrSingle = (blokId: number, wordIdx: number) => {
+    if (lockedWords(blokId).has(wordIdx)) return
+    pushUndoSnapshot()
+
+    const curWords = localWordsRef.current[blokId] || []
+    const isSelected = curWords.includes(wordIdx)
+    const targetVal = !isSelected
+
+    let startIdx = wordIdx
+    let endIdx = wordIdx
+
+    if (
+      lastClickedWordRef.current &&
+      lastClickedWordRef.current.blokId === blokId &&
+      lastClickedWordRef.current.wordIdx !== wordIdx
+    ) {
+      startIdx = Math.min(lastClickedWordRef.current.wordIdx, wordIdx)
+      endIdx = Math.max(lastClickedWordRef.current.wordIdx, wordIdx)
+    } else if (targetVal) {
+      const locked = lockedWords(blokId)
+      let firstUnsel = -1
+      for (let i = 0; i < wordIdx; i++) {
+        if (!curWords.includes(i) && !locked.has(i)) {
+          firstUnsel = i
+          break
+        }
+      }
+      if (firstUnsel !== -1) {
+        startIdx = firstUnsel
+        endIdx = wordIdx
+      }
+    }
+
+    const locked = lockedWords(blokId)
+    const nextSet = new Set(curWords)
+
+    for (let i = startIdx; i <= endIdx; i++) {
+      if (locked.has(i)) continue
+      if (targetVal) nextSet.add(i)
+      else nextSet.delete(i)
+    }
+
+    const nextArr = Array.from(nextSet)
+    const nw = { ...localWordsRef.current, [blokId]: nextArr }
+    localWordsRef.current = nw
+    setLocalWords(nw)
+    setDirty(true)
+    queueAutosave(blokId, nextArr.length > 0, saveScope, nextArr)
+
+    lastClickedWordRef.current = { blokId, wordIdx, time: Date.now() }
+  }
+
   const onWordPointerDown = (blokId: number, wordIdx: number) => {
     if (lockedWords(blokId).has(wordIdx)) return
+    pushUndoSnapshot()
     const has = (localWords[blokId] || []).includes(wordIdx)
     if (dragMode && !has && !isWordReady(blokId, wordIdx)) return
     if (dragMode) wordDragRef.current = { blokId, add: !has }
@@ -793,6 +1016,7 @@ export default function HafalanPageContent() {
 
   const markSelectedBabComplete = () => {
     if (!selectedBab) return
+    pushUndoSnapshot()
     if (isJurumiyah) {
       const blok = selectedBab.blok[0]
       if (!blok || !canEditBlok(blok)) return
@@ -1190,7 +1414,7 @@ export default function HafalanPageContent() {
                     <span
                       key={i}
                       data-word-idx={i}
-                      onClick={() => { if (!dragMode && editable) applyWord(blok.id, i, !isSel) }}
+                      onClick={() => { if (!dragMode && editable) applyWordRangeOrSingle(blok.id, i) }}
                       onPointerDown={() => { if (dragMode && editable) onWordPointerDown(blok.id, i) }}
                       className={`mx-0.5 inline-block cursor-pointer rounded px-1 transition ${
                         isLocked ? 'bg-sky-100 text-sky-700'
@@ -1255,7 +1479,7 @@ export default function HafalanPageContent() {
           onClick={scrollMainToTop}
           aria-label="Scroll ke atas"
           title="Scroll ke atas"
-          className="fixed bottom-24 right-4 z-40 inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg transition hover:border-emerald-300 hover:text-emerald-700 sm:bottom-20 sm:right-6"
+          className="fixed bottom-32 right-4 z-40 inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg transition hover:border-emerald-300 hover:text-emerald-700 sm:bottom-20 sm:right-6"
         >
           <ArrowUp className="h-5 w-5" />
         </button>
@@ -1263,8 +1487,18 @@ export default function HafalanPageContent() {
 
       {/* Sticky save status */}
       {selectedSantriId && step !== 'home' && step !== 'santri' && (
-        <div className="fixed inset-x-0 bottom-14 z-30 mx-auto flex w-fit max-w-[calc(100vw-1.5rem)] items-center gap-2 px-3 sm:bottom-4">
-          <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-lg">
+        <div className="fixed bottom-20 right-4 z-40 flex max-w-[calc(100vw-2rem)] flex-wrap items-center justify-end gap-2 pointer-events-none sm:bottom-6 sm:right-6">
+          {showUndo && (
+            <button
+              type="button"
+              onClick={handleUndo}
+              className="pointer-events-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-500 hover:bg-amber-600 active:scale-95 text-white px-3.5 py-2 text-xs font-black shadow-xl transition-all"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Batalkan ({undoSeconds}s)</span>
+            </button>
+          )}
+          <div className="pointer-events-auto flex shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 shadow-xl">
             <span className={saveStatus === 'error' ? 'text-rose-600' : saveStatus === 'saving' ? 'text-amber-700' : 'text-emerald-700'}>
               {saveStatus === 'error' ? 'Gagal menyimpan' : saveStatus === 'saving' ? 'Menyimpan' : 'Tersimpan'}
             </span>
@@ -1276,9 +1510,9 @@ export default function HafalanPageContent() {
               type="button"
               onClick={resetAllDraft}
               disabled={saving}
-              title="Batalkan perubahan"
-              aria-label="Batalkan perubahan"
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg transition hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-50"
+              title="Reset semua draft"
+              aria-label="Reset semua draft"
+              className="pointer-events-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-xl transition hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-50"
             >
               <RotateCcw className="h-4 w-4" />
             </button>
