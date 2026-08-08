@@ -59,7 +59,7 @@ export default async function LandingPage() {
       <div className="absolute left-1/3 top-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-[#c9952e]/10 blur-[100px] pointer-events-none z-0" />
 
       {/* Main Container */}
-      <main className="relative z-20 flex-1 min-h-0 w-full max-w-7xl mx-auto px-5 sm:px-6 md:px-10 lg:px-12 flex items-center justify-center overflow-hidden py-3 sm:py-4 lg:py-0">
+      <main className="relative z-20 flex-1 min-h-0 w-full max-w-7xl mx-auto px-5 sm:px-8 md:px-10 lg:px-12 flex items-center justify-center overflow-hidden py-3 sm:py-4 lg:py-0">
         
         {/* Responsive Grid */}
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-10 items-center">
@@ -67,41 +67,41 @@ export default async function LandingPage() {
           {/* Column Left: Brand / Title / Hero & Buttons */}
           <div className="lg:col-span-7 flex flex-col justify-center items-center lg:items-start text-center lg:text-left space-y-3.5 sm:space-y-4 lg:space-y-5 max-w-xl mx-auto lg:mx-0">
 
-            {/* Brand Identity (Plain Logo) */}
-            <div className="flex flex-col lg:flex-row items-center lg:items-center text-center lg:text-left gap-2.5 sm:gap-3">
-              <div className="relative h-12 w-12 sm:h-14 sm:w-14 shrink-0 flex items-center justify-center transition-transform hover:scale-105 duration-300">
+            {/* Brand Identity (Plain Bold Logo) */}
+            <div className="flex flex-col lg:flex-row items-center lg:items-center text-center lg:text-left gap-2.5 sm:gap-3.5">
+              <div className="relative h-14 w-14 sm:h-16 sm:w-16 lg:h-20 lg:w-20 shrink-0 flex items-center justify-center transition-transform hover:scale-105 duration-300">
                 <Image
                   src="/logo.png"
                   alt="Logo Sukahideng"
-                  width={56}
-                  height={56}
-                  className="h-12 w-12 sm:h-14 sm:w-14 object-contain"
+                  width={80}
+                  height={80}
+                  className="h-14 w-14 sm:h-16 sm:w-16 lg:h-20 lg:w-20 object-contain"
                   priority
                 />
               </div>
               <div className="space-y-0.5 sm:space-y-1">
-                <h2 className="text-xs sm:text-sm font-extrabold tracking-[0.18em] text-[#12372a] uppercase leading-tight">
-                  PONDOK PESANTREN <br />
+                <h2 className="text-xs sm:text-sm lg:text-base font-black tracking-[0.16em] text-[#12372a] uppercase leading-tight">
+                  PONDOK PESANTREN <br className="hidden lg:block" />
                   SUKAHIDENG
                 </h2>
-                <p className="text-[10px] sm:text-xs font-semibold text-[#66736c] tracking-wide">
+                <p className="text-[11px] sm:text-xs font-semibold text-[#66736c] tracking-wide">
                   Sukarapih - Sukarame - Tasikmalaya - Jawa Barat
                 </p>
               </div>
             </div>
 
-            {/* Main Heading & Subtitle Required by User */}
+            {/* Main Heading & Subtitle */}
             <div className="space-y-1 sm:space-y-1.5 w-full flex flex-col items-center lg:items-start">
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#12372a] whitespace-nowrap leading-none">
                 ESKAHADE
               </h1>
-              <div className="text-sm sm:text-base lg:text-lg font-bold text-[#247451] tracking-normal leading-snug uppercase">
+              <div className="text-xs sm:text-sm lg:text-lg font-extrabold text-[#247451] tracking-wide leading-snug uppercase">
                 <div>SISTEM INFORMASI MANAJEMEN</div>
                 <div>PONDOK PESANTREN SUKAHIDENG</div>
               </div>
               
               {/* Dynamic Typing Subtext */}
-              <div className="text-xs sm:text-sm lg:text-base min-h-[1.7em] leading-relaxed text-[#66736c] font-semibold px-2 lg:px-0 pt-1">
+              <div className="text-xs sm:text-sm lg:text-base min-h-[1.8em] leading-relaxed text-[#66736c] font-semibold px-2 lg:px-0 pt-0.5">
                 <TypingHero />
               </div>
             </div>
@@ -116,32 +116,32 @@ export default async function LandingPage() {
               {staffSession || portalSession ? (
                 <Link
                   href={primaryHref}
-                  className="inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-[#12372a] px-6 text-sm font-extrabold text-white shadow-lg shadow-[#12372a]/20 hover:bg-[#09251c] hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
+                  className="inline-flex h-12 sm:h-13 lg:h-14 w-full sm:w-auto items-center justify-center gap-2.5 rounded-xl sm:rounded-2xl bg-[#12372a] px-7 text-sm sm:text-base font-extrabold text-white shadow-xl shadow-[#12372a]/20 hover:bg-[#09251c] hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
                 >
-                  <PrimaryIcon className="h-4 w-4 text-[#c9952e]" />
+                  <PrimaryIcon className="h-4.5 w-4.5 sm:h-5 sm:w-5 text-[#c9952e]" />
                   <span>{primaryLabel}</span>
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
                 </Link>
               ) : (
                 <>
                   {/* Login Internal */}
                   <Link
                     href="/login"
-                    className="inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2.5 rounded-xl bg-[#12372a] px-6 text-sm font-extrabold text-white shadow-lg shadow-[#12372a]/20 hover:bg-[#09251c] hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
+                    className="inline-flex h-12 sm:h-13 lg:h-14 w-full sm:w-auto items-center justify-center gap-2.5 sm:gap-3 rounded-xl sm:rounded-2xl bg-[#12372a] px-6 sm:px-7 text-sm sm:text-base font-extrabold text-white shadow-xl shadow-[#12372a]/20 hover:bg-[#09251c] hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
                   >
-                    <LogIn className="h-4.5 w-4.5 text-[#c9952e]" />
+                    <LogIn className="h-4.5 w-4.5 sm:h-5 sm:w-5 text-[#c9952e]" />
                     <span>Portal Internal</span>
-                    <ArrowRight className="h-4 w-4" />
+                    <ArrowRight className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
                   </Link>
 
                   {/* Login Orang Tua */}
                   <Link
                     href="/portal-ortu/login"
-                    className="inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2.5 rounded-xl bg-white border border-[#ddd4c3] px-6 text-sm font-extrabold text-[#12372a] shadow-sm hover:bg-[#f7f1e5]/60 hover:border-[#247451]/50 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
+                    className="inline-flex h-12 sm:h-13 lg:h-14 w-full sm:w-auto items-center justify-center gap-2.5 sm:gap-3 rounded-xl sm:rounded-2xl bg-white border border-[#ddd4c3] px-6 sm:px-7 text-sm sm:text-base font-extrabold text-[#12372a] shadow-sm hover:bg-[#f7f1e5]/60 hover:border-[#247451]/50 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200"
                   >
-                    <UsersRound className="h-4.5 w-4.5 text-[#247451]" />
+                    <UsersRound className="h-4.5 w-4.5 sm:h-5 sm:w-5 text-[#247451]" />
                     <span>Portal Orang Tua</span>
-                    <ArrowRight className="h-4 w-4 text-[#66736c]" />
+                    <ArrowRight className="h-4.5 w-4.5 sm:h-5 sm:w-5 text-[#66736c]" />
                   </Link>
                 </>
               )}
@@ -149,11 +149,11 @@ export default async function LandingPage() {
 
           </div>
 
-          {/* Column Right: High-Fidelity Sukahideng Smartphone Mockup */}
+          {/* Column Right: High-Fidelity Sukahideng Smartphone Mockup (Visible on Desktop) */}
           <div className="hidden lg:col-span-5 lg:flex items-center justify-center relative select-none">
             
             {/* Phone Shell Wrapper */}
-            <div className="relative w-full max-w-[285px] max-h-[calc(100dvh-7rem)] aspect-[9/18.5] bg-[#09251c] rounded-[3rem] p-3 shadow-2xl shadow-[#12372a]/30 border-4 border-[#12372a] overflow-hidden animate-float">
+            <div className="relative w-full max-w-[285px] max-h-[calc(100dvh-7rem)] aspect-[9/18.5] bg-[#09251c] rounded-[3rem] p-3.5 shadow-2xl shadow-[#12372a]/30 border-4 border-[#12372a] overflow-hidden animate-float">
               
               {/* Phone Notch */}
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-36 h-6 bg-[#09251c] rounded-b-2xl z-50 flex items-center justify-center">
