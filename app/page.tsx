@@ -1,137 +1,277 @@
-import type { Metadata } from "next";
-import Image from "next/image";
-import Link from "next/link";
+import type { Metadata } from 'next'
+import Image from 'next/image'
+import Link from 'next/link'
+import { getSession } from '@/lib/auth/session'
+import { getPortalSession } from '@/lib/portal/session'
+import TypingHero from '@/components/shared/typing-hero'
+import FeaturesDrawer from '@/components/shared/features-drawer'
 import {
   ArrowRight,
-  BookOpen,
+  LayoutDashboard,
+  LogIn,
+  UsersRound,
+  ShieldCheck,
+  CalendarCheck2,
+  BookOpenCheck,
+  CheckCircle2,
+  Sparkles,
   Building,
-  ChevronRight,
-  FileText,
-  PieChart,
-  Shield,
-  Users,
-} from "lucide-react";
+} from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: "ESKAHADE — Sistem Informasi Pesantren",
+  title: 'ESKAHADE — Sistem Informasi Manajemen Pondok Pesantren Sukahideng',
   description:
-    "Sistem informasi terpadu Pondok Pesantren Sukahideng",
-};
-
-const features = [
-  { icon: Users, title: "Data Santri", desc: "Manajemen data induk santri yang akurat dan terpusat." },
-  { icon: BookOpen, title: "Akademik", desc: "Pemantauan nilai, hafalan, dan absensi kegiatan belajar." },
-  { icon: Building, title: "Asrama", desc: "Pengelolaan kamar, perizinan, dan kedisiplinan santri." },
-  { icon: FileText, title: "Keuangan", desc: "Sistem informasi tagihan dan pencatatan pembayaran." },
-  { icon: Shield, title: "Kesantrian", desc: "Rekam jejak pembinaan karakter dan pelanggaran." },
-  { icon: PieChart, title: "Laporan", desc: "Rekapitulasi otomatis untuk evaluasi kepengurusan." },
-];
-
-export default function LandingPage() {
-  const year = new Date().getFullYear();
-
-  return (
-    <div className="public-theme min-h-dvh flex flex-col bg-[#FBFBFA] selection:bg-[var(--public-leaf)] selection:text-white">
-      {/* HEADER */}
-      <header className="sticky top-0 z-50 bg-[#FBFBFA]/80 backdrop-blur-xl border-b border-black/[0.04]">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-3 transition-opacity hover:opacity-80">
-            <Image src="/logo.png" alt="Logo" width={36} height={36} className="h-9 w-9 object-contain" priority />
-            <span className="text-sm font-bold tracking-tight text-[var(--public-forest)]">ESKAHADE</span>
-          </Link>
-        </div>
-      </header>
-
-      <main className="flex-1">
-        {/* HERO SECTION */}
-        <section className="relative overflow-hidden px-6 pt-24 pb-32 lg:px-8 lg:pt-32 lg:pb-40">
-          <div className="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80" aria-hidden="true">
-            <div className="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[var(--public-leaf-light)] to-[var(--public-gold-light)] opacity-40 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"></div>
-          </div>
-          
-          <div className="mx-auto max-w-3xl text-center public-rise">
-            <div className="mb-8 flex justify-center">
-              <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold text-[var(--public-leaf)] bg-[var(--public-leaf)]/10 ring-1 ring-inset ring-[var(--public-leaf)]/20">
-                Sistem Informasi Terpadu
-              </span>
-            </div>
-            <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl mb-6">
-              Platform Digital <br />
-              <span className="text-[var(--public-forest)]">Pesantren Sukahideng</span>
-            </h1>
-            <p className="mt-6 text-lg leading-8 text-gray-600 max-w-2xl mx-auto">
-              Menghadirkan kemudahan dalam mengelola administrasi kepengurusan dan transparansi informasi bagi orang tua santri.
-            </p>
-            
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/login" className="w-full sm:w-auto rounded-full bg-[var(--public-forest)] px-8 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-[#0d281e] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--public-forest)]">
-                Portal Pengurus
-              </Link>
-              <Link href="/portal-ortu/login" className="w-full sm:w-auto rounded-full bg-white px-8 py-3.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
-                Portal Orang Tua
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* FEATURES SECTION */}
-        <section className="bg-white py-24 sm:py-32 border-y border-black/[0.04]">
-          <div className="mx-auto max-w-6xl px-6 lg:px-8">
-            <div className="mx-auto max-w-2xl text-center mb-16">
-              <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Layanan Terpusat</h2>
-              <p className="mt-4 text-lg text-gray-600">Seluruh aspek manajerial pesantren diakses dari satu tempat.</p>
-            </div>
-            
-            <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
-              <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-12 lg:max-w-none lg:grid-cols-3">
-                {features.map((feature) => (
-                  <div key={feature.title} className="flex flex-col">
-                    <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#FBFBFA] ring-1 ring-black/[0.04]">
-                        <feature.icon className="h-5 w-5 text-[var(--public-leaf)]" aria-hidden="true" />
-                      </div>
-                      {feature.title}
-                    </dt>
-                    <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
-                      <p className="flex-auto">{feature.desc}</p>
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA SECTION */}
-        <section className="relative isolate px-6 py-24 sm:py-32 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Siap mengakses portal?</h2>
-            <p className="mx-auto mt-4 max-w-xl text-lg leading-8 text-gray-600">
-              Pilih portal yang sesuai dengan akses Anda untuk masuk ke dalam sistem.
-            </p>
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/login" className="group flex w-full sm:w-auto items-center justify-center gap-2 rounded-full bg-[var(--public-forest)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#0d281e]">
-                Pengurus <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Link>
-              <Link href="/portal-ortu/login" className="group flex w-full sm:w-auto items-center justify-center gap-2 rounded-full bg-[var(--public-leaf)] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#1d6345]">
-                Orang Tua <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Link>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      {/* FOOTER */}
-      <footer className="bg-white border-t border-black/[0.04]">
-        <div className="mx-auto max-w-6xl px-6 py-8 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Image src="/logo.png" alt="Logo" width={24} height={24} className="h-6 w-6 opacity-80" />
-            <p className="text-sm text-gray-500">© {year} Pondok Pesantren Sukahideng</p>
-          </div>
-          <p className="text-sm text-gray-500">Sistem Informasi Terpadu</p>
-        </div>
-      </footer>
-    </div>
-  );
+    'Satu portal digital terpadu Pondok Pesantren Sukahideng untuk administrasi, akademik, keasramaan, tahfidz, keuangan, dan portal orang tua.',
 }
 
+export const dynamic = 'force-dynamic'
+
+export default async function LandingPage() {
+  const staffSession = await getSession()
+  const portalSession = await getPortalSession()
+
+  const isStaff = Boolean(staffSession)
+  const isParent = Boolean(portalSession)
+
+  const primaryHref = isStaff
+    ? '/dashboard'
+    : isParent
+    ? '/portal-ortu'
+    : '/login'
+  const primaryLabel = isStaff
+    ? 'Buka Dashboard Pengurus'
+    : isParent
+    ? 'Buka Portal Orang Tua'
+    : 'Masuk Portal Pengurus'
+
+  const PrimaryIcon = isStaff || isParent ? LayoutDashboard : LogIn
+  const year = new Date().getFullYear()
+
+  return (
+    <div className="public-theme h-[100dvh] w-screen overflow-hidden bg-[#fffdf8] text-[#1c2923] relative flex flex-col justify-between font-sans selection:bg-[#247451] selection:text-white">
+      
+      {/* Decorative Dot & Geometric Pattern Overlay */}
+      <div className="absolute inset-0 bg-pattern-islamic bg-pattern-sukahideng pointer-events-none z-10 opacity-70" />
+
+      {/* Decorative Glowing Blur Blobs */}
+      <div className="absolute -left-20 -top-20 w-96 h-96 rounded-full bg-[#12372a]/10 blur-[100px] pointer-events-none animate-blob-1 z-0" />
+      <div className="absolute right-0 bottom-0 w-[500px] h-[500px] rounded-full bg-[#247451]/10 blur-[120px] pointer-events-none animate-blob-2 z-0" />
+      <div className="absolute left-1/3 top-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-[#c9952e]/10 blur-[100px] pointer-events-none z-0" />
+
+      {/* Main Container */}
+      <main className="relative z-20 flex-1 min-h-0 w-full max-w-7xl mx-auto px-5 sm:px-6 md:px-10 lg:px-12 flex items-center justify-center overflow-hidden py-3 sm:py-4 lg:py-0">
+        
+        {/* Responsive Grid */}
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-10 items-center">
+          
+          {/* Column Left: Brand / Title / Hero & Buttons */}
+          <div className="lg:col-span-7 flex flex-col justify-center items-center lg:items-start text-center lg:text-left space-y-3.5 sm:space-y-4 lg:space-y-5 max-w-xl mx-auto lg:mx-0">
+
+            {/* Brand Identity */}
+            <div className="flex flex-col lg:flex-row items-center lg:items-center text-center lg:text-left gap-2.5 sm:gap-3">
+              <div className="relative h-12 w-12 sm:h-14 sm:w-14 shrink-0 flex items-center justify-center transition-transform hover:scale-105 duration-300 bg-white rounded-2xl p-1.5 shadow-md shadow-[#12372a]/10 border border-[#ddd4c3]">
+                <Image
+                  src="/logo.png"
+                  alt="Logo Sukahideng"
+                  width={56}
+                  height={56}
+                  className="h-10 w-10 sm:h-12 sm:w-12 object-contain"
+                  priority
+                />
+              </div>
+              <div className="space-y-0.5 sm:space-y-1">
+                <div className="flex items-center justify-center lg:justify-start gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-[#c9952e]" />
+                  <h2 className="text-xs sm:text-sm font-extrabold tracking-[0.18em] text-[#12372a] uppercase">
+                    PONDOK PESANTREN SUKAHIDENG
+                  </h2>
+                </div>
+                <p className="text-[10px] sm:text-xs font-semibold text-[#66736c] tracking-wide">
+                  Sukamanah, Sukarapih, Sukarame, Tasikmalaya - Jawa Barat
+                </p>
+              </div>
+            </div>
+
+            {/* Main Heading & Subtitle Required by User */}
+            <div className="space-y-1 sm:space-y-1.5 w-full flex flex-col items-center lg:items-start">
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#12372a] whitespace-nowrap leading-none">
+                ESKAHADE
+              </h1>
+              <p className="text-sm sm:text-base lg:text-lg font-bold text-[#247451] tracking-normal leading-snug">
+                Sistem Informasi Manajemen Pondok Pesantren Sukahideng
+              </p>
+              
+              {/* Dynamic Typing Subtext */}
+              <div className="text-xs sm:text-sm lg:text-base min-h-[1.7em] leading-relaxed text-[#66736c] font-semibold px-2 lg:px-0 pt-1">
+                <TypingHero />
+              </div>
+            </div>
+
+            {/* Brief Description */}
+            <p className="text-xs sm:text-sm leading-relaxed text-[#66736c] font-medium max-w-md mx-auto lg:mx-0">
+              Platform digital terpadu untuk pengelolaan data santri, presensi shalat berjamaah, perizinan asrama, setoran hafalan, hingga transparansi portal informasi wali santri.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 pt-1 justify-center lg:justify-start w-full max-w-md mx-auto lg:mx-0">
+              {staffSession || portalSession ? (
+                <Link
+                  href={primaryHref}
+                  className="inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-[#12372a] px-6 text-sm font-extrabold text-white shadow-lg shadow-[#12372a]/20 hover:bg-[#09251c] hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
+                >
+                  <PrimaryIcon className="h-4 w-4 text-[#c9952e]" />
+                  <span>{primaryLabel}</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              ) : (
+                <>
+                  {/* Login Pengurus */}
+                  <Link
+                    href="/login"
+                    className="inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2.5 rounded-xl bg-[#12372a] px-6 text-sm font-extrabold text-white shadow-lg shadow-[#12372a]/20 hover:bg-[#09251c] hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
+                  >
+                    <LogIn className="h-4.5 w-4.5 text-[#c9952e]" />
+                    <span>Portal Pengurus</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+
+                  {/* Login Orang Tua */}
+                  <Link
+                    href="/portal-ortu/login"
+                    className="inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2.5 rounded-xl bg-white border border-[#ddd4c3] px-6 text-sm font-extrabold text-[#12372a] shadow-sm hover:bg-[#f7f1e5]/60 hover:border-[#247451]/50 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
+                  >
+                    <UsersRound className="h-4.5 w-4.5 text-[#247451]" />
+                    <span>Portal Orang Tua</span>
+                    <ArrowRight className="h-4 w-4 text-[#66736c]" />
+                  </Link>
+                </>
+              )}
+            </div>
+
+            {/* Footer Features Link & Security badges */}
+            <div className="flex flex-row items-center justify-between lg:justify-start gap-4 sm:gap-6 text-xs font-bold text-[#66736c] pt-3 border-t border-[#ddd4c3]/40 w-full max-w-md mx-auto lg:mx-0">
+              <FeaturesDrawer />
+              <div className="flex items-center gap-1.5 text-[#247451]">
+                <ShieldCheck className="h-4 w-4 text-[#247451]" />
+                <span>Terintegrasi & Aman</span>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Column Right: High-Fidelity Sukahideng Smartphone Mockup */}
+          <div className="hidden lg:col-span-5 lg:flex items-center justify-center relative select-none">
+            
+            {/* Phone Shell Wrapper */}
+            <div className="relative w-full max-w-[285px] max-h-[calc(100dvh-7rem)] aspect-[9/18.5] bg-[#09251c] rounded-[3rem] p-3 shadow-2xl shadow-[#12372a]/30 border-4 border-[#12372a] overflow-hidden animate-float">
+              
+              {/* Phone Notch */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-36 h-6 bg-[#09251c] rounded-b-2xl z-50 flex items-center justify-center">
+                <div className="w-12 h-1 bg-[#12372a] rounded-full" />
+              </div>
+              
+              {/* Screen Interior Content */}
+              <div className="w-full h-full bg-[#f7f1e5]/90 rounded-[2.5rem] overflow-hidden flex flex-col justify-between p-3.5 pt-8 text-[#1c2923] relative">
+                
+                {/* Mock Header */}
+                <div className="flex justify-between items-center mb-2.5 px-1">
+                  <div className="flex items-center gap-1.5">
+                    <Image src="/logo.png" alt="Logo" width={16} height={16} className="h-4 w-4 object-contain" />
+                    <span className="text-[10px] font-black text-[#12372a] tracking-tight">ESKAHADE Mobile</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#247451] animate-ping" />
+                    <span className="text-[7px] font-bold text-[#247451]">Sinkron</span>
+                  </div>
+                </div>
+
+                {/* Widget 1: Shalat Berjamaah & Presensi */}
+                <div className="bg-white rounded-2xl p-3 shadow-sm border border-[#ddd4c3]/60 flex-1 flex flex-col justify-between max-h-[135px] mb-2.5">
+                  <div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[8px] font-bold text-[#66736c] uppercase tracking-wider">HARI INI — SHALAT SUBUH</span>
+                      <span className="text-[7px] font-bold text-[#247451] bg-[#dcecdf] px-1.5 py-0.5 rounded-full">Komplit</span>
+                    </div>
+                    <div className="text-xs font-black text-[#12372a] mt-0.5">Presensi Berjamaah Santri</div>
+                  </div>
+                  
+                  <div className="my-1.5 flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black text-[#12372a]">98.2%</span>
+                    <span className="text-[7px] font-bold text-[#247451] bg-[#dcecdf] px-1.5 py-0.5 rounded">+0.5% dari kemarin</span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[#f7f1e5]/60 border border-[#ddd4c3]/30">
+                      <CheckCircle2 className="h-2.5 w-2.5 text-[#247451]" />
+                      <div className="text-[7px] font-bold text-[#12372a]">1,420 Santri Terabsen Berjamaah</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Widget 2: Setoran Hafalan Al-Qur'an */}
+                <div className="bg-white rounded-2xl p-3 shadow-sm border border-[#ddd4c3]/60 flex-1 flex flex-col justify-between max-h-[115px] mb-2.5">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <span className="text-[8px] font-bold text-[#66736c] uppercase tracking-wider">TAHFIDZ & ZIYADAH</span>
+                    <BookOpenCheck className="h-3.5 w-3.5 text-[#c9952e]" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="text-[9px] font-bold text-[#12372a]">Surah Al-Baqarah: Ayat 120-141</div>
+                    <div className="text-[7px] font-semibold text-[#66736c]">Pembimbing: Ust. Ahmad Fauzi</div>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between">
+                    <span className="text-[7px] font-bold text-[#12372a] bg-[#f7f1e5] border border-[#ddd4c3] px-1.5 py-0.5 rounded">
+                      Capaian: Juz 2
+                    </span>
+                    <span className="text-[7px] font-bold text-[#c9952e] bg-[#f1e2b8]/40 px-1.5 py-0.5 rounded">
+                      Nilai: Mumtaz
+                    </span>
+                  </div>
+                </div>
+
+                {/* Widget 3: Info Pesantren & Asrama */}
+                <div className="rounded-xl bg-[#12372a] p-2.5 text-white shadow-sm flex flex-col justify-between mb-2 border border-[#09251c]">
+                  <div className="flex items-center gap-1">
+                    <Building className="h-3 w-3 text-[#c9952e]" />
+                    <span className="text-[8px] font-bold text-[#f1e2b8] uppercase tracking-wider">INFO KESANTRIAN & ASRAMA</span>
+                  </div>
+                  <p className="text-[8.5px] font-medium leading-tight text-[#dcecdf] mt-1">
+                    Seluruh perizinan santri & data hafalan terpantau real-time oleh pengurus dan wali santri.
+                  </p>
+                </div>
+
+                {/* Screen Bottom Menu */}
+                <div className="pt-2 border-t border-[#ddd4c3]/50 flex justify-around text-[#66736c]">
+                  <div className="flex flex-col items-center gap-0.5 text-[#12372a]">
+                    <LayoutDashboard className="h-3.5 w-3.5" />
+                    <span className="text-[7px] font-extrabold">Beranda</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <Building className="h-3.5 w-3.5" />
+                    <span className="text-[7px] font-extrabold">Asrama</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <UsersRound className="h-3.5 w-3.5" />
+                    <span className="text-[7px] font-extrabold">Portal Ortu</span>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </main>
+
+      {/* Screen Footer */}
+      <footer className="relative z-30 shrink-0 py-2.5 sm:py-3 border-t border-[#ddd4c3]/40 text-center text-[10px] sm:text-xs font-bold text-[#66736c] bg-[#fffdf8]/80 backdrop-blur-sm">
+        <span>&copy; {year} Pondok Pesantren Sukahideng.</span>
+        <span className="mx-2" aria-hidden="true">•</span>
+        <span className="text-[#247451]">Sistem Informasi Manajemen Terpadu</span>
+      </footer>
+
+    </div>
+  )
+}
