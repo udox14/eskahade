@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { VersionWatcher } from '@/components/version-watcher'
+import { PwaInstallPrompt } from '@/components/pwa-install-prompt'
 
 export const metadata: Metadata = {
   title: "ESKAHADE",
@@ -97,6 +98,7 @@ export default function RootLayout({
         {children}
         <Toaster position="top-center" richColors />
         <VersionWatcher />
+        <PwaInstallPrompt />
       </body>
     </html>
   );
