@@ -19,13 +19,16 @@ export async function getFilterOptions() {
     : null
 
   // Guru/wali_kelas: dropdown hanya untuk santri dari kelas yang ia ajar
-  const scope = await getSantriKelasScopeForSession(session)
+  const scope = await getSantriKelasScopeForSession(session, 'santri')
   const scopeSql = scope.condition ? ` AND ${scope.condition}` : ''
   const scopeParams = scope.params
 
   const asramaWhere = asramaBinaan
     ? `WHERE status_global = 'aktif' AND asrama = '${asramaBinaan}'`
     : `WHERE status_global = 'aktif' AND asrama IS NOT NULL`
+
+  const hasKelasScope = scope.kelasIds && scope.kelasIds.length > 0
+  const isNoKelasScope = scope.kelasIds !== null && scope.kelasIds.length === 0
 
   const [asramaList, sekolahList, kelasSekolahList, tahunList, kelasMarhalahList, jasaList] = await Promise.all([
     // 1. Daftar asrama
@@ -65,9 +68,9 @@ export async function getFilterOptions() {
          INNER JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
          WHERE rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
        )
-       ${scope.kelasIds ? `AND k.id IN (${scope.kelasIds.map(() => '?').join(',')})` : ''}
+       ${hasKelasScope ? `AND k.id IN (${scope.kelasIds!.map(() => '?').join(',')})` : isNoKelasScope ? 'AND 1 = 0' : ''}
        ORDER BY m.urutan, k.nama_kelas`,
-      scope.kelasIds ?? []
+      hasKelasScope ? scope.kelasIds! : []
     ),
 
     // 6. Daftar master jasa katering/laundry
@@ -127,8 +130,8 @@ export async function getDataExport(
 
   // Enforce asrama untuk pengurus_asrama
   const forceAsrama = hasRole(session, 'pengurus_asrama') ? session.asrama_binaan : null
-  // Guru/wali_kelas: hanya santri dari kelas yang ia ajar
-  const scope = await getSantriKelasScopeForSession(session)
+  // Guru/wali_kelas: hanya santri dari kelas yang ia ajar (pakai alias 's' sesuai FROM santri s)
+  const scope = await getSantriKelasScopeForSession(session, 's')
   const kategoriEfektifSql = getKategoriSantriEfektifSql('s')
 
   // Helper: build IN clause untuk array filter

@@ -515,8 +515,10 @@ export async function canAccessKelas(session: SessionUser | null, kelasId: strin
 // Hanya berlaku untuk role guru/wali_kelas (bukan admin/demo/pengurus_asrama/dll).
 // - condition kosong => unrestricted (semua santri)
 // - condition '1 = 0' => tidak boleh melihat santri apa pun (tidak punya kelas)
-// Condition memakai nama tabel `santri` agar valid walau query memakai alias.
-export async function getSantriKelasScopeForSession(session?: SessionUser | null): Promise<{
+export async function getSantriKelasScopeForSession(
+  session?: SessionUser | null,
+  tableAlias = 'santri'
+): Promise<{
   condition: string
   params: string[]
   kelasIds: string[] | null
@@ -532,7 +534,7 @@ export async function getSantriKelasScopeForSession(session?: SessionUser | null
 
   const ph = own.map(() => '?').join(',')
   return {
-    condition: `santri.id IN (SELECT rp2.santri_id FROM riwayat_pendidikan rp2 WHERE rp2.kelas_id IN (${ph}) AND lower(trim(COALESCE(rp2.status_riwayat, 'aktif'))) IN ('aktif', 'active', ''))`,
+    condition: `${tableAlias}.id IN (SELECT rp2.santri_id FROM riwayat_pendidikan rp2 WHERE rp2.kelas_id IN (${ph}) AND lower(trim(COALESCE(rp2.status_riwayat, 'aktif'))) IN ('aktif', 'active', ''))`,
     params: own,
     kelasIds: own,
   }
