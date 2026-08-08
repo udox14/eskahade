@@ -4,6 +4,7 @@ import { canCrud } from '@/lib/auth/crud'
 import { query } from '@/lib/db'
 import { getCachedMarhalahList } from '@/lib/cache/master'
 import { getSession, hasRole, isAdmin } from '@/lib/auth/session'
+import { getSantriKelasScopeForSession } from '@/lib/akademik/guru-access'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { SearchInput, LimitSelector, SantriFilter } from './santri-client'
@@ -28,9 +29,14 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
   const isPengurusAsrama = Boolean(session && hasRole(session, 'pengurus_asrama') && !isAdmin(session))
   const userAsrama = isPengurusAsrama ? session?.asrama_binaan ?? null : null
 
+  // Guru / wali kelas: hanya lihat santri dari kelas yang ia ajar
+  const kelasScope = await getSantriKelasScopeForSession(session)
+  const isScopedGuru = kelasScope.condition !== ''
+  const ownKelasSet = kelasScope.kelasIds ? new Set(kelasScope.kelasIds.map(String)) : null
+
   // Data filter (dari cache — ringan, tidak blocking)
-  const scopedWhere = ''
-  const scopedParams: string[] = []
+  const scopedWhere = isScopedGuru ? `WHERE ${kelasScope.condition}` : ''
+  const scopedParams: string[] = isScopedGuru ? kelasScope.params : []
   const appendScopedWhere = (condition: string) => `${scopedWhere ? `${scopedWhere} AND` : 'WHERE'} ${condition}`
 
   const [
@@ -97,9 +103,15 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
       scopedParams
     ),
   ])
-  const kelasList = kelasRaw.sort((a: any, b: any) =>
+  const kelasListRaw = kelasRaw.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )
+  const kelasList = ownKelasSet
+    ? kelasListRaw.filter(k => ownKelasSet.has(String(k.id)))
+    : kelasListRaw
+  const marhalahScoped = ownKelasSet
+    ? marhalahList.filter(m => kelasList.some(k => k.marhalah_id === m.id))
+    : marhalahList
   const filterOptions = {
     asramaKamar: asramaKamarRows,
     asramaList: [...new Set(asramaKamarRows.map(row => row.asrama).filter((value): value is string => Boolean(value)))],
@@ -149,7 +161,9 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
         description={
           isPengurusAsrama
             ? `Daftar seluruh santri. Detail hanya dapat dibuka untuk asrama binaan ${userAsrama || 'yang ditugaskan'}.`
-            : 'Data induk santri Pesantren Sukahideng.'
+            : isScopedGuru
+              ? 'Daftar santri dari kelas yang Anda ajar / bina. Hanya bisa dilihat, tidak bisa diubah.'
+              : 'Data induk santri Pesantren Sukahideng.'
         }
         action={
           !isPengurusAsrama && canCreateSantri ? (
@@ -168,7 +182,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
         <div className="flex gap-2 items-center">
           <div className="flex-1"><SearchInput /></div>
           <SantriFilter
-            marhalahList={marhalahList}
+            marhalahList={marhalahScoped}
             kelasList={kelasList}
             filterOptions={filterOptions}
             userAsrama={null}
@@ -209,6 +223,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
           alamat={alamat}
           userAsrama={userAsrama}
           isPengurusAsrama={isPengurusAsrama}
+          kelasIds={kelasScope.kelasIds}
           canUpdate={canUpdateSantri}
         />
       </Suspense>

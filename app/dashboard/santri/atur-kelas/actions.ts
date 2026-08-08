@@ -2,10 +2,13 @@
 
 import { query } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { assertCrud } from '@/lib/auth/crud'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
 export async function simpanSantriKeKelas(kelasId: string, santriIds: string[]) {
+  const access = await assertCrud('/dashboard/santri', 'update')
+  if ('error' in access) return { error: access.error }
   const session = await getSession()
   if (!kelasId || santriIds.length === 0) return { error: 'Pilih kelas dan minimal satu santri.' }
 
@@ -38,6 +41,8 @@ export async function simpanSantriKeKelas(kelasId: string, santriIds: string[]) 
 }
 
 export async function simpanPenempatanBatch(dataPenempatan: { santri_id: string; kelas_id: string }[]) {
+  const access = await assertCrud('/dashboard/santri', 'update')
+  if ('error' in access) return { error: access.error }
   const session = await getSession()
   if (!dataPenempatan || dataPenempatan.length === 0) return { error: 'Data kosong.' }
 

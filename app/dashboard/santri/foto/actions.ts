@@ -2,6 +2,7 @@
 
 import { query } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { assertCrud } from '@/lib/auth/crud'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { uploadToR2, deleteFromR2 } from '@/lib/r2/upload'
 import { revalidatePath } from 'next/cache'
@@ -29,6 +30,8 @@ export async function getSantriForFoto(search: string, asrama: string, kamar: st
 }
 
 export async function uploadFotoSantri(formData: FormData) {
+  const access = await assertCrud('/dashboard/santri', 'update')
+  if ('error' in access) return { error: access.error }
   const session = await getSession()
   const file = formData.get('file') as File
   const santriId = formData.get('santriId') as string

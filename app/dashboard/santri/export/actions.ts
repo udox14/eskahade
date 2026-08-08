@@ -2,6 +2,7 @@
 
 import { query, queryOne } from '@/lib/db'
 import { getSession, hasRole, hasAnyRole, isAdmin } from '@/lib/auth/session'
+import { getSantriKelasScopeForSession } from '@/lib/akademik/guru-access'
 import type { ExportFilter, SortBy, KolomExport } from './constants'
 import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 
@@ -17,6 +18,11 @@ export async function getFilterOptions() {
     ? session.asrama_binaan ?? null
     : null
 
+  // Guru/wali_kelas: dropdown hanya untuk santri dari kelas yang ia ajar
+  const scope = await getSantriKelasScopeForSession(session)
+  const scopeSql = scope.condition ? ` AND ${scope.condition}` : ''
+  const scopeParams = scope.params
+
   const asramaWhere = asramaBinaan
     ? `WHERE status_global = 'aktif' AND asrama = '${asramaBinaan}'`
     : `WHERE status_global = 'aktif' AND asrama IS NOT NULL`
@@ -26,37 +32,43 @@ export async function getFilterOptions() {
     asramaBinaan
       ? Promise.resolve([asramaBinaan])
       : query<{ v: string }>(
-          `SELECT DISTINCT asrama AS v FROM santri WHERE status_global='aktif' AND asrama IS NOT NULL ORDER BY asrama`
+          `SELECT DISTINCT asrama AS v FROM santri WHERE status_global='aktif' AND asrama IS NOT NULL${scopeSql} ORDER BY asrama`,
+          scopeParams
         ).then(r => r.map(x => x.v)),
 
     // 2. Daftar sekolah
     query<{ v: string }>(
-      `SELECT DISTINCT sekolah AS v FROM santri WHERE status_global='aktif' AND sekolah IS NOT NULL ORDER BY sekolah`
+      `SELECT DISTINCT sekolah AS v FROM santri WHERE status_global='aktif' AND sekolah IS NOT NULL${scopeSql} ORDER BY sekolah`,
+      scopeParams
     ).then(r => r.map(x => x.v)),
 
     // 3. Daftar kelas sekolah
     query<{ v: string }>(
-      `SELECT DISTINCT kelas_sekolah AS v FROM santri WHERE status_global='aktif' AND kelas_sekolah IS NOT NULL ORDER BY CAST(kelas_sekolah AS INTEGER), kelas_sekolah`
+      `SELECT DISTINCT kelas_sekolah AS v FROM santri WHERE status_global='aktif' AND kelas_sekolah IS NOT NULL${scopeSql} ORDER BY CAST(kelas_sekolah AS INTEGER), kelas_sekolah`,
+      scopeParams
     ).then(r => r.map(x => x.v)),
 
     // 4. Daftar tahun masuk
     query<{ v: number }>(
-      `SELECT DISTINCT tahun_masuk AS v FROM santri WHERE status_global='aktif' AND tahun_masuk IS NOT NULL ORDER BY tahun_masuk DESC`
+      `SELECT DISTINCT tahun_masuk AS v FROM santri WHERE status_global='aktif' AND tahun_masuk IS NOT NULL${scopeSql} ORDER BY tahun_masuk DESC`,
+      scopeParams
     ).then(r => r.map(x => x.v)),
 
     // 5. Kelas + marhalah dalam 1 query (gabungan dari 2 query sebelumnya)
     // JOIN ringan — tabel kelas & marhalah kecil, riwayat_pendidikan pakai index
-    query<{ marhalah: string; nama_kelas: string; urutan: number }>(`
-      SELECT DISTINCT m.nama AS marhalah, k.nama_kelas, m.urutan
-      FROM kelas k
-      INNER JOIN marhalah m ON m.id = k.marhalah_id
-      WHERE EXISTS (
-        SELECT 1 FROM riwayat_pendidikan rp
-        INNER JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
-        WHERE rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
-      )
-      ORDER BY m.urutan, k.nama_kelas
-    `),
+    query<{ marhalah: string; nama_kelas: string; urutan: number }>(
+      `SELECT DISTINCT m.nama AS marhalah, k.nama_kelas, m.urutan
+       FROM kelas k
+       INNER JOIN marhalah m ON m.id = k.marhalah_id
+       WHERE EXISTS (
+         SELECT 1 FROM riwayat_pendidikan rp
+         INNER JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
+         WHERE rp.kelas_id = k.id AND rp.status_riwayat = 'aktif'
+       )
+       ${scope.kelasIds ? `AND k.id IN (${scope.kelasIds.map(() => '?').join(',')})` : ''}
+       ORDER BY m.urutan, k.nama_kelas`,
+      scope.kelasIds ?? []
+    ),
 
     // 6. Daftar master jasa katering/laundry
     query<{ id: string; nama_jasa: string; jenis: 'Makan' | 'Cuci' }>(
@@ -115,6 +127,8 @@ export async function getDataExport(
 
   // Enforce asrama untuk pengurus_asrama
   const forceAsrama = hasRole(session, 'pengurus_asrama') ? session.asrama_binaan : null
+  // Guru/wali_kelas: hanya santri dari kelas yang ia ajar
+  const scope = await getSantriKelasScopeForSession(session)
   const kategoriEfektifSql = getKategoriSantriEfektifSql('s')
 
   // Helper: build IN clause untuk array filter
@@ -155,6 +169,12 @@ export async function getDataExport(
 
   const clauses: string[] = ["s.status_global = 'aktif'"]
   const params: any[]     = []
+
+  // Scope guru/wali_kelas: batasi ke santri kelas yang ia ajar
+  if (scope.condition) {
+    clauses.push(scope.condition)
+    params.push(...scope.params)
+  }
 
   addInClause('s.asrama', effectiveAsrama)
   addInClause('s.kamar', filter.kamar)

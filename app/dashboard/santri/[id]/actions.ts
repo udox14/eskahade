@@ -2,8 +2,9 @@
 
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { batch, query, queryOne } from '@/lib/db'
-import { getSession, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
+import { getSession, hasRole, hasAnyRole, isAdmin, isDemo, type SessionUser } from '@/lib/auth/session'
 import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
+import { getSantriKelasScopeForSession } from '@/lib/akademik/guru-access'
 
 type ForeignKeyEdge = {
   childTable: string
@@ -57,14 +58,34 @@ export type SantriDetail = SantriDetailBase & {
 
 async function canViewSantriDetail(session: SessionUser | null, santriId: string) {
   if (!session) return false
-  if (!hasRole(session, 'pengurus_asrama') || isAdmin(session)) return true
-  if (!session.asrama_binaan) return false
+  if (isAdmin(session) || isDemo(session)) return true
 
-  const santri = await queryOne<{ asrama: string | null }>(
-    'SELECT asrama FROM santri WHERE id = ?',
-    [santriId]
-  )
-  return santri?.asrama === session.asrama_binaan
+  if (hasRole(session, 'pengurus_asrama')) {
+    if (!session.asrama_binaan) return false
+    const santri = await queryOne<{ asrama: string | null }>(
+      'SELECT asrama FROM santri WHERE id = ?',
+      [santriId]
+    )
+    return santri?.asrama === session.asrama_binaan
+  }
+
+  // Guru/wali_kelas: hanya santri dari kelas yang ia ajar (read-only)
+  if (hasAnyRole(session, ['guru', 'wali_kelas'])) {
+    const scope = await getSantriKelasScopeForSession(session)
+    if (scope.kelasIds === null) return true
+    if (scope.kelasIds.length === 0) return false
+    const ph = scope.kelasIds.map(() => '?').join(',')
+    const inScope = await queryOne<{ ok: number }>(
+      `SELECT 1 AS ok FROM riwayat_pendidikan rp
+       WHERE rp.santri_id = ? AND rp.kelas_id IN (${ph})
+         AND lower(trim(COALESCE(rp.status_riwayat, 'aktif'))) IN ('aktif', 'active', '')
+       LIMIT 1`,
+      [santriId, ...scope.kelasIds]
+    )
+    return Boolean(inScope)
+  }
+
+  return true
 }
 
 function quoteIdentifier(identifier: string) {

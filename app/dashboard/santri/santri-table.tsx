@@ -27,6 +27,7 @@ interface Props {
   alamat: string
   userAsrama: string | null
   isPengurusAsrama: boolean
+  kelasIds: string[] | null
   canUpdate: boolean
 }
 
@@ -35,6 +36,7 @@ export async function SantriTable({
   status, jenisKelamin, golDarah, tahunMasuk, provinsi, kabKota, kecamatan, jemaah, alamat,
   userAsrama,
   isPengurusAsrama,
+  kelasIds,
   canUpdate
 }: Props) {
   const offset = (page - 1) * limit
@@ -42,6 +44,18 @@ export async function SantriTable({
 
   let whereClauses: string[] = []
   const params: any[] = []
+
+  // Guru/wali_kelas: hanya santri dari kelas yang ia ajar (read-only)
+  const isScopedGuru = kelasIds !== null
+  if (isScopedGuru) {
+    if (kelasIds.length === 0) {
+      whereClauses.push('1 = 0')
+    } else {
+      const ph = kelasIds.map(() => '?').join(',')
+      whereClauses.push(`s.id IN (SELECT rp2.santri_id FROM riwayat_pendidikan rp2 WHERE rp2.kelas_id IN (${ph}) AND lower(trim(COALESCE(rp2.status_riwayat, 'aktif'))) IN ('aktif', 'active', ''))`)
+      params.push(...kelasIds)
+    }
+  }
 
   let joinClause = "LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif' LEFT JOIN kelas k ON k.id = rp.kelas_id"
   if (kelasPesantren) {
@@ -153,7 +167,7 @@ export async function SantriTable({
               </span>
             </div>
             <div className="mt-3 flex gap-2">
-              {!isPengurusAsrama && canUpdate && (
+              {!isPengurusAsrama && !isScopedGuru && canUpdate && (
                 <Link
                   href={`/dashboard/santri/${santri.id}/edit`}
                   className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-2 rounded-lg transition-colors"
@@ -239,7 +253,7 @@ export async function SantriTable({
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {!isPengurusAsrama && canUpdate && (
+                      {!isPengurusAsrama && !isScopedGuru && canUpdate && (
                         <Link
                           href={`/dashboard/santri/${santri.id}/edit`}
                           className="inline-flex items-center gap-1 text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-lg font-medium text-xs transition-colors"

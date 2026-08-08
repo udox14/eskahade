@@ -1,5 +1,5 @@
 import { execute, query, queryOne } from '@/lib/db'
-import { getSession, hasAnyRole, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
+import { getSession, hasAnyRole, hasRole, isAdmin, isDemo, type SessionUser } from '@/lib/auth/session'
 
 export type GuruKelasAccessRow = {
   id: string
@@ -509,6 +509,33 @@ export async function canAccessKelas(session: SessionUser | null, kelasId: strin
   const own = await getOwnKelasIds(session, { activeOnly: true })
   if (own === null) return true
   return own.includes(String(kelasId))
+}
+
+// Scope SQL untuk membatasi data santri ke kelas milik user (guru/wali_kelas).
+// Hanya berlaku untuk role guru/wali_kelas (bukan admin/demo/pengurus_asrama/dll).
+// - condition kosong => unrestricted (semua santri)
+// - condition '1 = 0' => tidak boleh melihat santri apa pun (tidak punya kelas)
+// Condition memakai nama tabel `santri` agar valid walau query memakai alias.
+export async function getSantriKelasScopeForSession(session?: SessionUser | null): Promise<{
+  condition: string
+  params: string[]
+  kelasIds: string[] | null
+}> {
+  const activeSession = session ?? await getSession()
+  if (!activeSession) return { condition: '', params: [], kelasIds: null }
+  if (isAdmin(activeSession) || isDemo(activeSession)) return { condition: '', params: [], kelasIds: null }
+  if (!hasAnyRole(activeSession, ['guru', 'wali_kelas'])) return { condition: '', params: [], kelasIds: null }
+
+  const own = await getOwnKelasIds(activeSession, { activeOnly: true })
+  if (own === null) return { condition: '', params: [], kelasIds: null }
+  if (own.length === 0) return { condition: '1 = 0', params: [], kelasIds: [] }
+
+  const ph = own.map(() => '?').join(',')
+  return {
+    condition: `santri.id IN (SELECT rp2.santri_id FROM riwayat_pendidikan rp2 WHERE rp2.kelas_id IN (${ph}) AND lower(trim(COALESCE(rp2.status_riwayat, 'aktif'))) IN ('aktif', 'active', ''))`,
+    params: own,
+    kelasIds: own,
+  }
 }
 
 export async function getSantriForKelas(kelasId: string) {

@@ -2,6 +2,7 @@
 
 import { query, batch } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { assertCrud } from '@/lib/auth/crud'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 
@@ -12,6 +13,8 @@ type ImportRow = {
 
 // FIX #8: Ganti for...of await query INSERT -> batch()
 export async function importPenempatanKelas(data: ImportRow[]) {
+  const access = await assertCrud('/dashboard/santri', 'update')
+  if ('error' in access) return { error: access.error }
   const session = await getSession()
   if (!data || data.length === 0) return { error: 'Data kosong.' }
 
