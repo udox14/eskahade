@@ -526,7 +526,11 @@ export async function getSantriKelasScopeForSession(
   const activeSession = session ?? await getSession()
   if (!activeSession) return { condition: '', params: [], kelasIds: null }
   if (isAdmin(activeSession) || isDemo(activeSession)) return { condition: '', params: [], kelasIds: null }
-  if (!hasAnyRole(activeSession, ['guru', 'wali_kelas'])) return { condition: '', params: [], kelasIds: null }
+
+  // Hanya batasi jika rolenya MURNI guru / wali_kelas (tidak ada role lain)
+  const baseRoles = activeSession.roles ?? []
+  const isOnlyGuruWali = baseRoles.length > 0 && baseRoles.every(r => r === 'guru' || r === 'wali_kelas')
+  if (!isOnlyGuruWali) return { condition: '', params: [], kelasIds: null }
 
   const own = await getOwnKelasIds(activeSession, { activeOnly: true })
   if (own === null) return { condition: '', params: [], kelasIds: null }

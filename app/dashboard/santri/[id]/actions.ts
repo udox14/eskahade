@@ -2,7 +2,7 @@
 
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { batch, query, queryOne } from '@/lib/db'
-import { getSession, hasRole, hasAnyRole, isAdmin, isDemo, type SessionUser } from '@/lib/auth/session'
+import { getSession, hasRole, isAdmin, isDemo, type SessionUser } from '@/lib/auth/session'
 import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 import { getSantriKelasScopeForSession } from '@/lib/akademik/guru-access'
 
@@ -69,10 +69,9 @@ async function canViewSantriDetail(session: SessionUser | null, santriId: string
     return santri?.asrama === session.asrama_binaan
   }
 
-  // Guru/wali_kelas: hanya santri dari kelas yang ia ajar (read-only)
-  if (hasAnyRole(session, ['guru', 'wali_kelas'])) {
-    const scope = await getSantriKelasScopeForSession(session)
-    if (scope.kelasIds === null) return true
+  // Guru/wali_kelas murni: batasi ke santri dari kelas yang ia ajar
+  const scope = await getSantriKelasScopeForSession(session)
+  if (scope.kelasIds !== null) {
     if (scope.kelasIds.length === 0) return false
     const ph = scope.kelasIds.map(() => '?').join(',')
     const inScope = await queryOne<{ ok: number }>(
