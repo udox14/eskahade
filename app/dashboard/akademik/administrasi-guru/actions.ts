@@ -101,11 +101,9 @@ export async function getAdministrasiGuruBundle(guruId: number): Promise<Adminis
   const kelasRows = naturalSort(await query<{
     id: string
     nama_kelas: string
-    marhalah_nama: string | null
   }>(`
-    SELECT DISTINCT k.id, k.nama_kelas, m.nama AS marhalah_nama
+    SELECT DISTINCT k.id, k.nama_kelas
     FROM kelas k
-    LEFT JOIN marhalah m ON m.id = k.marhalah_id
     LEFT JOIN kelas_jadwal_guru_mingguan j
       ON j.kelas_id = k.id AND j.guru_id = ?
     WHERE k.tahun_ajaran_id = ?

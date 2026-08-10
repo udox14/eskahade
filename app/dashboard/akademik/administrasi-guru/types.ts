@@ -21,7 +21,6 @@ export type AdministrasiStudent = {
 export type AdministrasiClass = {
   id: string
   nama_kelas: string
-  marhalah_nama: string | null
   santri: AdministrasiStudent[]
 }
 

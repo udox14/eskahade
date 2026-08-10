@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react'
 import {
   formatDorm,
   formatSchool,
+  formatStudentName,
   paddedStudentRows,
   teacherDisplayName,
 } from './_document-model'
@@ -17,7 +18,6 @@ function ClassMeta({ page }: { page: Extract<AdministrasiPage, { type: 'form' }>
   return (
     <div className="adm-form-meta">
       <span>KELAS: <b>{page.kelas.nama_kelas}</b></span>
-      <span>MARHALAH: <b>{page.kelas.marhalah_nama || '-'}</b></span>
       {page.chunkCount > 1 ? <span>LANJUTAN {page.chunkIndex + 1}/{page.chunkCount}</span> : null}
     </div>
   )
@@ -25,20 +25,14 @@ function ClassMeta({ page }: { page: Extract<AdministrasiPage, { type: 'form' }>
 
 function FormTitle({ page }: { page: Extract<AdministrasiPage, { type: 'form' }> }) {
   const year = page.bundle.tahunAjaran.nama
-  if (page.kind === 'hafalan') {
-    return (
-      <div className="adm-form-heading adm-form-heading-plain">
-        <span>CATATAN HAFALAN ______________________________</span>
-        <ClassMeta page={page} />
-      </div>
-    )
-  }
-  const title = page.kind === 'absensi'
-    ? `REKAP ABSENSI PENGAJIAN TAHUN ${year}`
-    : `PENILAIAN KEGIATAN BELAJAR TAHUN ${year}`
+  const title = page.kind === 'hafalan'
+    ? 'CATATAN HAFALAN ______________________________'
+    : page.kind === 'absensi'
+      ? `REKAP ABSENSI PENGAJIAN TAHUN ${year}`
+      : `PENILAIAN KEGIATAN BELAJAR TAHUN ${year}`
   return (
-    <div className="adm-form-heading">
-      <div className="adm-title-band">{title}</div>
+    <div className="adm-form-heading adm-form-heading-plain">
+      <span>{title}</span>
       <ClassMeta page={page} />
     </div>
   )
@@ -48,9 +42,9 @@ function IdentityCols() {
   return (
     <>
       <col style={{ width: '7mm' }} />
-      <col style={{ width: '54mm' }} />
-      <col style={{ width: '22mm' }} />
-      <col style={{ width: '24mm' }} />
+      <col style={{ width: '70mm' }} />
+      <col style={{ width: '16mm' }} />
+      <col style={{ width: '16mm' }} />
     </>
   )
 }
@@ -68,15 +62,12 @@ function IdentityHeaders({ rows = 3 }: { rows?: number }) {
 
 function StudentCells({ page }: { page: Extract<AdministrasiPage, { type: 'form' }> }) {
   return paddedStudentRows(page).map(({ student, number }, slot) => {
-    const nameIsLong = (student?.nama_lengkap.length ?? 0) > 42
-    const dormIsLong = formatDorm(student).length > 27
-    const schoolIsLong = formatSchool(student).length > 27
-
+    const studentName = student ? formatStudentName(student.nama_lengkap) : ''
     return <tr key={student?.id || `blank-${slot}`}>
       <td className="adm-center">{number ?? ''}</td>
-      <td className={`adm-student-name${nameIsLong ? ' adm-extra-compact' : ''}`}>{student?.nama_lengkap || ''}</td>
-      <td className={`adm-center adm-identity-small${dormIsLong ? ' adm-extra-compact' : ''}`}>{formatDorm(student)}</td>
-      <td className={`adm-center adm-identity-small${schoolIsLong ? ' adm-extra-compact' : ''}`}>{formatSchool(student)}</td>
+      <td className="adm-student-name"><span className={studentName.length > 38 ? 'adm-name-condensed' : undefined}>{studentName}</span></td>
+      <td className="adm-center adm-identity-small">{formatDorm(student)}</td>
+      <td className="adm-center adm-identity-small">{formatSchool(student)}</td>
       {page.kind === 'absensi'
         ? Array.from({ length: 26 }, (_, index) => <td key={index} />)
         : page.kind === 'hafalan'
@@ -182,7 +173,6 @@ function SeparatorPage({ page }: { page: Extract<AdministrasiPage, { type: 'sepa
       <div className="adm-separator-label">ADMINISTRASI KELAS</div>
       <h2>{page.kelas.nama_kelas}</h2>
       <div className="adm-separator-rule" />
-      <p>{page.kelas.marhalah_nama || 'MARHALAH BELUM DIISI'}</p>
       <div className="adm-separator-footer">
         <span>{teacherDisplayName(page.bundle)}</span>
         <span>TAHUN AJARAN {page.bundle.tahunAjaran.nama}</span>
@@ -234,28 +224,25 @@ export const ADMINISTRASI_PRINT_CSS = `
   .adm-separator-label { font-size: 13pt; font-weight: 700; letter-spacing: 2pt; }
   .adm-separator-page h2 { margin: 3mm 0; font-size: 39pt; line-height: 1; font-weight: 900; text-transform: uppercase; }
   .adm-separator-rule { width: 145mm; border-top: 1mm solid #000; margin: 3mm 0; }
-  .adm-separator-page p { margin: 2mm 0; font-size: 16pt; font-weight: 700; text-transform: uppercase; }
   .adm-separator-footer { position: absolute; bottom: 13mm; left: 15mm; right: 7mm; display: flex; justify-content: space-between; border-top: .35mm solid #000; padding-top: 3mm; font-size: 10pt; font-weight: 700; text-transform: uppercase; }
   .adm-form-page { display: flex; flex-direction: column; }
   .adm-form-heading { display: grid; grid-template-columns: minmax(115mm, 1fr) auto; align-items: stretch; min-height: 9mm; margin-bottom: 1.4mm; }
-  .adm-title-band { display: flex; align-items: center; padding: 1mm 3mm; background: #000; color: #fff; font-size: 12pt; font-weight: 900; }
   .adm-form-heading-plain { border-bottom: .55mm solid #000; font-size: 12pt; font-weight: 900; }
   .adm-form-heading-plain > span { display: flex; align-items: center; padding-left: 1mm; }
   .adm-form-meta { display: flex; align-items: center; gap: 6mm; padding: 0 2mm 0 5mm; font-size: 9pt; white-space: nowrap; }
   .adm-table { width: 100%; border-collapse: collapse; table-layout: fixed; color: #000; }
   .adm-table th, .adm-table td { border: .24mm solid #000; padding: 0 .45mm; vertical-align: middle; line-height: 1; }
-  .adm-table thead th { height: 4.4mm; background: #f2f2f2; text-align: center; font-size: 7pt; font-weight: 900; }
+  .adm-table thead th { height: 4.4mm; background: #f2f2f2; text-align: center; font-size: 7pt; font-weight: 400; }
   .adm-table thead tr:first-child th { border-top-width: .55mm; }
   .adm-table thead th:first-child, .adm-table tbody td:first-child { border-left-width: .55mm; }
   .adm-table thead th:last-child, .adm-table tbody td:last-child { border-right-width: .55mm; }
   .adm-table tbody tr:last-child td { border-bottom-width: .55mm; }
-  .adm-table tbody tr { height: 3.45mm; }
-  .adm-table tbody td { height: 3.45mm; max-height: 3.45mm; font-size: 6.1pt; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .adm-table tbody tr { height: 3.55mm; }
+  .adm-table tbody td { height: 3.55mm; max-height: 3.55mm; font-size: 6.1pt; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .adm-center { text-align: center; }
-  .adm-student-name { padding-left: 1.1mm !important; font-size: 6.7pt !important; }
-  .adm-identity-small { font-size: 5.6pt !important; }
-  .adm-student-name.adm-extra-compact { font-size: 5.2pt !important; letter-spacing: -.08pt; }
-  .adm-identity-small.adm-extra-compact { font-size: 4.7pt !important; letter-spacing: -.08pt; }
+  .adm-student-name { padding-left: 1.1mm !important; font-size: 9pt !important; }
+  .adm-identity-small { font-size: 9pt !important; }
+  .adm-name-condensed { display: inline-block; width: 133.333%; transform: scaleX(.75); transform-origin: left center; }
   .adm-name-header { letter-spacing: 2.5pt; }
   .adm-pair-cell { padding: 0 !important; }
   .adm-pair-cell > span { display: inline-flex; width: 50%; height: 100%; align-items: center; justify-content: center; }

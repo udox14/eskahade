@@ -26,6 +26,7 @@ import {
   buildAdministrasiPages,
   formatDorm,
   formatSchool,
+  formatStudentName,
   paddedStudentRows,
   safeDocumentFilename,
   teacherDisplayName,
@@ -47,7 +48,7 @@ const NO_BORDER: IBorderOptions = { style: BorderStyle.NONE, size: 0, color: WHI
 
 type DocChild = Paragraph | Table
 
-function textRun(text: string, options?: { size?: number; bold?: boolean; color?: string; italic?: boolean }) {
+function textRun(text: string, options?: { size?: number; bold?: boolean; color?: string; italic?: boolean; scale?: number }) {
   return new TextRun({
     text,
     font: FONT,
@@ -55,6 +56,7 @@ function textRun(text: string, options?: { size?: number; bold?: boolean; color?
     bold: options?.bold,
     color: options?.color ?? BLACK,
     italics: options?.italic,
+    scale: options?.scale,
   })
 }
 
@@ -86,6 +88,8 @@ function cell(
     columnSpan?: number
     verticalMerge?: (typeof VerticalMergeType)[keyof typeof VerticalMergeType]
     borders?: ITableCellBorders
+    noWrap?: boolean
+    scale?: number
   }
 ) {
   return new TableCell({
@@ -98,11 +102,13 @@ function cell(
     borders: options?.borders ?? borderSet(),
     children: [new Paragraph({
       alignment: options?.align ?? AlignmentType.CENTER,
+      wordWrap: options?.noWrap === true ? false : undefined,
       spacing: { before: 0, after: 0, line: 180 },
       children: [textRun(text, {
         size: options?.size ?? 6.4,
         bold: options?.bold,
         color: options?.color,
+        scale: options?.scale,
       })],
     })],
   })
@@ -179,7 +185,7 @@ function separatorChildren(page: Extract<AdministrasiPage, { type: 'separator' }
       layout: TableLayoutType.FIXED,
       rows: [new TableRow({ children: [cell('', MM(145), { borders: { top: MEDIUM, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER } })] })],
     }),
-    paragraph((page.kelas.marhalah_nama || 'MARHALAH BELUM DIISI').toUpperCase(), { size: 16, bold: true, alignment: AlignmentType.CENTER, before: 100, after: 700 }),
+    paragraph('', { before: 100, after: 900 }),
     new Table({
       width: { size: CONTENT_WIDTH, type: WidthType.DXA },
       columnWidths: [Math.floor(CONTENT_WIDTH / 2), Math.ceil(CONTENT_WIDTH / 2)],
@@ -194,7 +200,7 @@ function separatorChildren(page: Extract<AdministrasiPage, { type: 'separator' }
 
 function formHeading(page: Extract<AdministrasiPage, { type: 'form' }>) {
   const continuation = page.chunkCount > 1 ? ` | LANJUTAN ${page.chunkIndex + 1}/${page.chunkCount}` : ''
-  const meta = `KELAS: ${page.kelas.nama_kelas} | MARHALAH: ${page.kelas.marhalah_nama || '-'}${continuation}`
+  const meta = `KELAS: ${page.kelas.nama_kelas}${continuation}`
   const title = page.kind === 'absensi'
     ? `REKAP ABSENSI PENGAJIAN TAHUN ${page.bundle.tahunAjaran.nama}`
     : page.kind === 'nilai'
@@ -202,7 +208,6 @@ function formHeading(page: Extract<AdministrasiPage, { type: 'form' }>) {
       : 'CATATAN HAFALAN ______________________________'
   const titleWidth = MM(155)
   const metaWidth = CONTENT_WIDTH - titleWidth
-  const dark = page.kind !== 'hafalan'
   return new Table({
     width: { size: CONTENT_WIDTH, type: WidthType.DXA },
     columnWidths: [titleWidth, metaWidth],
@@ -213,29 +218,29 @@ function formHeading(page: Extract<AdministrasiPage, { type: 'form' }>) {
         cell(title, titleWidth, {
           size: 11,
           bold: true,
-          color: dark ? WHITE : BLACK,
-          fill: dark ? BLACK : WHITE,
+          color: BLACK,
+          fill: WHITE,
           align: AlignmentType.LEFT,
-          borders: dark ? borderSet('medium') : { top: NO_BORDER, bottom: MEDIUM, left: NO_BORDER, right: NO_BORDER },
+          borders: { top: NO_BORDER, bottom: MEDIUM, left: NO_BORDER, right: NO_BORDER },
         }),
         cell(meta, metaWidth, {
           size: 8,
           bold: true,
           align: AlignmentType.RIGHT,
-          borders: { top: NO_BORDER, bottom: dark ? NO_BORDER : MEDIUM, left: NO_BORDER, right: NO_BORDER },
+          borders: { top: NO_BORDER, bottom: MEDIUM, left: NO_BORDER, right: NO_BORDER },
         }),
       ],
     })],
   })
 }
 
-const identityWidths = [MM(7), MM(54), MM(22), MM(24)]
+const identityWidths = [MM(7), MM(70), MM(16), MM(16)]
 
 function identityHeaderCells(row: 'start' | 'continue') {
   if (row === 'continue') return identityWidths.map(blankContinuationCell)
   const labels = ['NO', 'N A M A', 'ASRAMA /\nKAMAR', 'SEKOLAH /\nKELAS']
   return labels.map((label, index) => cell(label, identityWidths[index], {
-    bold: true,
+    bold: false,
     size: index === 1 ? 8 : 7,
     fill: LIGHT_GRAY,
     verticalMerge: VerticalMergeType.RESTART,
@@ -247,25 +252,30 @@ function identityHeaderCells(row: 'start' | 'continue') {
 
 function bodyRows(page: Extract<AdministrasiPage, { type: 'form' }>, variableCount: number, variableWidth: number) {
   return paddedStudentRows(page).map(({ student, number }, rowIndex) => {
+    const studentName = student ? formatStudentName(student.nama_lengkap) : ''
     const bottom = rowIndex === 44 ? MEDIUM : THIN
     const baseBorders = { top: THIN, bottom, left: THIN, right: THIN }
     return new TableRow({
       cantSplit: true,
-      height: { value: MM(3.35), rule: HeightRule.ATLEAST },
+      height: { value: MM(3.55), rule: HeightRule.ATLEAST },
       children: [
         cell(number == null ? '' : String(number), identityWidths[0], { size: 5.8, borders: { ...baseBorders, left: MEDIUM } }),
-        cell(student?.nama_lengkap || '', identityWidths[1], {
-          size: (student?.nama_lengkap.length ?? 0) > 42 ? 5.1 : 6.2,
+        cell(studentName, identityWidths[1], {
+          size: 9,
+          scale: studentName.length > 38 ? 75 : undefined,
           align: AlignmentType.LEFT,
           borders: baseBorders,
+          noWrap: true,
         }),
         cell(formatDorm(student), identityWidths[2], {
-          size: formatDorm(student).length > 27 ? 4.7 : 5.3,
+          size: 9,
           borders: baseBorders,
+          noWrap: true,
         }),
         cell(formatSchool(student), identityWidths[3], {
-          size: formatSchool(student).length > 27 ? 4.7 : 5.3,
+          size: 9,
           borders: baseBorders,
+          noWrap: true,
         }),
         ...Array.from({ length: variableCount }, (_, colIndex) => cell('', variableWidth, {
           borders: { ...baseBorders, right: colIndex === variableCount - 1 ? MEDIUM : THIN },
@@ -287,18 +297,18 @@ function absensiTable(page: Extract<AdministrasiPage, { type: 'form' }>) {
     rows: [
       new TableRow({ height: { value: MM(4.4), rule: HeightRule.ATLEAST }, children: [
         ...identityHeaderCells('start'),
-        cell('GANJIL', variableWidth * 12, { columnSpan: 12, bold: true, size: 8, fill: LIGHT_GRAY, borders: borderSet('medium') }),
-        cell('GENAP', variableWidth * 14, { columnSpan: 14, bold: true, size: 8, fill: LIGHT_GRAY, borders: borderSet('medium') }),
+        cell('GANJIL', variableWidth * 12, { columnSpan: 12, bold: false, size: 8, fill: LIGHT_GRAY, borders: borderSet('medium') }),
+        cell('GENAP', variableWidth * 14, { columnSpan: 14, bold: false, size: 8, fill: LIGHT_GRAY, borders: borderSet('medium') }),
       ] }),
       new TableRow({ height: { value: MM(4.4), rule: HeightRule.ATLEAST }, children: [
         ...identityHeaderCells('continue'),
-        ...monthGroups.map(month => cell(month, variableWidth * 2, { columnSpan: 2, bold: true, size: 6.4, fill: LIGHT_GRAY })),
+        ...monthGroups.map(month => cell(month, variableWidth * 2, { columnSpan: 2, bold: false, size: 6.4, fill: LIGHT_GRAY })),
       ] }),
       new TableRow({ height: { value: MM(4.4), rule: HeightRule.ATLEAST }, children: [
         ...identityHeaderCells('continue'),
         ...Array.from({ length: 13 }, () => [
-          cell('S', variableWidth, { bold: true, size: 6, fill: LIGHT_GRAY }),
-          cell('A', variableWidth, { bold: true, size: 6, fill: LIGHT_GRAY }),
+          cell('S', variableWidth, { bold: false, size: 6, fill: LIGHT_GRAY }),
+          cell('A', variableWidth, { bold: false, size: 6, fill: LIGHT_GRAY }),
         ]).flat(),
       ] }),
       ...bodyRows(page, 26, variableWidth),
@@ -317,7 +327,7 @@ function hafalanTable(page: Extract<AdministrasiPage, { type: 'form' }>) {
     rows: [
       new TableRow({ height: { value: MM(4.8), rule: HeightRule.ATLEAST }, children: [
         ...identityHeaderCells('start'),
-        cell('HAFALAN ............................................................', variableWidth * 34, { columnSpan: 34, bold: true, size: 8, fill: LIGHT_GRAY, borders: borderSet('medium') }),
+        cell('HAFALAN ............................................................', variableWidth * 34, { columnSpan: 34, bold: false, size: 8, fill: LIGHT_GRAY, borders: borderSet('medium') }),
       ] }),
       new TableRow({ height: { value: MM(4.4), rule: HeightRule.ATLEAST }, children: [
         ...identityHeaderCells('continue'),
@@ -340,7 +350,7 @@ function nilaiTable(page: Extract<AdministrasiPage, { type: 'form' }>) {
     rows: [
       new TableRow({ height: { value: MM(4.4), rule: HeightRule.ATLEAST }, children: [
         ...identityHeaderCells('start'),
-        cell('MATA PELAJARAN', variableWidth * 32, { columnSpan: 32, bold: true, size: 8, fill: LIGHT_GRAY, borders: borderSet('medium') }),
+        cell('MATA PELAJARAN', variableWidth * 32, { columnSpan: 32, bold: false, size: 8, fill: LIGHT_GRAY, borders: borderSet('medium') }),
       ] }),
       new TableRow({ height: { value: MM(4.4), rule: HeightRule.ATLEAST }, children: [
         ...identityHeaderCells('continue'),

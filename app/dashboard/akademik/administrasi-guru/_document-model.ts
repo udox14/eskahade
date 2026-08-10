@@ -64,12 +64,34 @@ export function teacherDisplayName(bundle: AdministrasiBundle) {
 
 export function formatDorm(student: AdministrasiStudent | null) {
   if (!student) return ''
-  return [student.asrama, student.kamar].filter(Boolean).join(' / ')
+  const dorm = (student.asrama || '')
+    .toUpperCase()
+    .replace('ASY-SYIFA', 'ASY')
+    .replace('BAHAGIA', 'BHG')
+    .replace('AL-FALAH', 'ALF')
+    .replace('AS-SALAM', 'ASAS')
+    .replace('AL-BAGHORY', 'BGR')
+    .trim()
+  return [dorm, student.kamar].filter(Boolean).join('/')
 }
 
 export function formatSchool(student: AdministrasiStudent | null) {
   if (!student) return ''
-  return [student.sekolah, student.kelas_sekolah].filter(Boolean).join(' / ')
+  const normalized = student.sekolah?.trim().toUpperCase() || ''
+  const school = normalized
+    .replace(/^MADRASAH\s+TSANAWIYAH\b/, 'MTS')
+    .replace(/^MADRASAH\s+ALIYAH\b/, 'MA')
+    .replace(/^SEKOLAH\s+MENENGAH\s+PERTAMA\b/, 'SMP')
+    .replace(/^SEKOLAH\s+MENENGAH\s+ATAS\b/, 'SMA')
+    .split(/\s+/)[0]
+  return [school, student.kelas_sekolah].filter(Boolean).join('/')
+}
+
+export function formatStudentName(name: string) {
+  return name.replace(
+    /\b(?:muhammad|muhamad|mohammad|mohammed|mohamad|mochammad|mochamad|muchammad|muchamad|mukhammad)\b\.?/gi,
+    'M.'
+  )
 }
 
 export function safeDocumentFilename(bundle: AdministrasiBundle) {
