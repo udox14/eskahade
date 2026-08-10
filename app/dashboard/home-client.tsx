@@ -207,6 +207,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/akademik/nilai/input':                 'Dialihkan ke Nilai Rapor terpadu.',
   '/dashboard/akademik/leger':                       'Input nilai rapor, leger, kepribadian, catatan wali, dan import Excel.',
   '/dashboard/akademik/ranking':                     'Lihat peringkat dan prestasi santri per kelas.',
+  '/dashboard/akademik/administrasi-guru':           'Cetak bundle administrasi guru per kelas dalam format PDF atau Word.',
   '/dashboard/laporan/rapor':                        'Cetak rapor santri dalam format PDF siap print.',
   '/dashboard/akademik/absensi':                     'Input absensi pengajian santri secara mingguan.',
   '/dashboard/akademik/absensi/rekap':               'Lihat rekap absensi santri per periode and filter.',
