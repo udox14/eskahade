@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { guardPage } from '@/lib/auth/guard'
 import { financeAsramaScope, requireFinanceAccess } from '@/lib/finance/access'
 import { getFinanceDashboard } from '@/lib/finance/dashboard'
-import { FinanceGuide, FinancePageHeader, MetricCard, SectionPanel, StatusBadge } from './_components/finance-ui'
+import { EmptyState, FINANCE_GLOSSARY, FinanceGuide, FinancePageHeader, MetricCard, SectionPanel, StatusBadge } from './_components/finance-ui'
 import { FinanceNav } from './_components/finance-nav'
 
 export const dynamic = 'force-dynamic'
@@ -90,46 +90,61 @@ export default async function CentralFinancePage() {
   const maxTrend = Math.max(...data.cashTrend.flatMap(row => [Number(row.inflow_rupiah), Number(row.outflow_rupiah)]), 1)
   const scopeLabel = scope ? `Scope asrama: ${scope}` : 'Scope global'
 
-  return <main>
-    <div className="space-y-6 sm:hidden">
-      <FinancePageHeader title="Keuangan Terpusat" description="Pantau posisi dana, alokasi santri, dan pekerjaan yang perlu ditindaklanjuti." eyebrow={scopeLabel} meta="Pembaruan terakhir berdasarkan jurnal terposting" />
-      <FinanceNav />
-      <FinanceGuide title="Cara menggunakan" purpose="Memberi gambaran cepat tentang posisi keuangan dan mengarahkan bendahara ke pekerjaan yang paling mendesak." prerequisites={["Pastikan settlement gateway dan mutasi bank sudah diimpor."]} steps={["Periksa kartu ringkasan.", "Tindak lanjuti mutasi bermasalah.", "Gunakan jurnal untuk penelusuran."]} notes={["Angka hanya berasal dari jurnal terposting."]} />
+  // Satu pohon responsif. Versi mobile dan desktop yang terpisah sebelumnya
+  // membuat setiap perbaikan harus ditulis dua kali dan mudah tertinggal.
+  return <main className="space-y-5">
+    <FinancePageHeader
+      title="Keuangan Terpusat"
+      description="Pantau posisi dana, alokasi santri, dan pekerjaan yang perlu ditindaklanjuti."
+      eyebrow={scopeLabel}
+      meta="Angka di halaman ini hanya berasal dari jurnal yang sudah diposting"
+    />
+    <FinanceNav />
+    <FinanceGuide
+      purpose="Memberi gambaran cepat tentang posisi keuangan dan mengarahkan bendahara ke pekerjaan yang paling mendesak."
+      prerequisites={['Pastikan settlement gateway dan mutasi bank sudah diimpor di halaman Operasi.', 'Perhatikan scope global atau asrama yang tampil di bagian atas.']}
+      steps={[
+        'Periksa empat kartu ringkasan untuk melihat posisi dana.',
+        'Kerjakan antrean "Pengecualian butuh tindakan" dari yang nilainya terbesar.',
+        'Telusuri jurnal dan daftar akun bila ada angka yang terasa janggal.',
+      ]}
+      notes={[
+        'Angka hanya berasal dari jurnal terposting — transaksi yang belum diposting tidak terhitung.',
+        'Jurnal terposting tidak pernah dihapus; koreksi selalu memakai reversal.',
+        'Indikator batas lunak bukan error, hanya penanda agar diperiksa.',
+      ]}
+      commonMistakes={[
+        'Mengira saldo bank di sini sama dengan saldo rekening sebenarnya. Angka ini adalah catatan pembukuan; kesesuaiannya diuji lewat rekonsiliasi.',
+        'Membiarkan antrean pengecualian menumpuk sampai akhir bulan, lalu tutup buku tertahan.',
+        'Menganggap Titipan wali sebagai pendapatan pesantren. Titipan masih milik wali sampai dialokasikan.',
+      ]}
+      glossary={[
+        FINANCE_GLOSSARY.titipan,
+        FINANCE_GLOSSARY.settlement,
+        FINANCE_GLOSSARY.reversal,
+        { term: 'Clearing', meaning: 'Dana yang sudah dibayar wali tapi belum cair dari gateway ke rekening pesantren.' },
+        { term: 'Daftar akun', meaning: 'Seluruh akun pembukuan beserta saldonya. Dasar penelusuran ketika angka terasa janggal.' },
+      ]}
+    />
 
-      <section className="grid grid-cols-2 gap-3">
-        <MetricCard label="Posisi bank & clearing" value={rupiah(bankPosition)} detail="Rekening utama + settlement" icon="landmark" />
-        <MetricCard label="Titipan wali" value={rupiah(guardianFloat)} detail="Dana belum dialokasikan" icon="wallet" tone="blue" />
-        <MetricCard label="Butuh tindakan" value={String(totalAlerts)} detail="Pengecualian menunggu" icon="listChecks" tone={totalAlerts ? 'amber' : 'emerald'} />
-      </section>
+    <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <MetricCard label="Posisi bank & clearing" value={rupiah(bankPosition)} detail="Rekening utama + dana dalam settlement" icon="landmark" />
+      <MetricCard label="Titipan wali" value={rupiah(guardianFloat)} detail="Dana belum dialokasikan oleh wali" icon="wallet" tone="blue" />
+      <MetricCard label="Saldo dompet santri" value={rupiah(walletTotal)} detail={`${data.walletTotals.length} jenis dompet terisi`} icon="layers" tone="slate" />
+      <MetricCard label="Butuh tindakan" value={String(totalAlerts)} detail="Pengecualian belum diselesaikan" icon="listChecks" tone={totalAlerts ? 'amber' : 'emerald'} />
+    </section>
 
+    <section className="grid gap-4 xl:grid-cols-[1.35fr_.9fr]">
       <CashTrendPanel data={data} maxTrend={maxTrend} />
-      <AlertPanel data={data} />
-      <SoftAlertPanel data={data} />
+      <SectionPanel title="Komposisi alokasi dompet" description="Membantu melihat konsentrasi dana santri per kebutuhan.">
+        <div className="space-y-3 p-4">{data.walletTotals.length ? data.walletTotals.map(row => <div key={row.wallet_kind}><div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="font-semibold text-slate-700">{row.wallet_kind}</span><span className="font-bold tabular-nums">{rupiah(Number(row.balance_rupiah))}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-600" style={{ width: `${Number(row.balance_rupiah) / maxWallet * 100}%` }} /></div></div>) : <EmptyState title="Belum ada dana yang dialokasikan" description="Grafik terisi setelah wali mengalokasikan Titipan ke SPP, makan, laundry, atau uang jajan." />}</div>
+      </SectionPanel>
+    </section>
+
+    <section className="grid gap-4 xl:grid-cols-[.8fr_1.2fr]">
+      <div className="space-y-4"><AlertPanel data={data} /><SoftAlertPanel data={data} /></div>
       <ActivityPanel data={data} />
-      <AccountsPanel data={data} />
-    </div>
-
-    <div className="hidden space-y-5 sm:block">
-      <FinancePageHeader title="Keuangan Terpusat" description="Pantau posisi dana, alokasi santri, dan pekerjaan yang perlu ditindaklanjuti." eyebrow="Ledger terpisah dari legacy" meta={`${scopeLabel} · pembaruan terakhir berdasarkan jurnal terposting`} />
-      <FinanceNav />
-      <FinanceGuide purpose="Memberi gambaran cepat tentang posisi keuangan dan mengarahkan bendahara ke pekerjaan yang paling mendesak." prerequisites={["Pastikan settlement gateway dan mutasi bank sudah diimpor.", "Perhatikan scope global atau asrama yang tampil di header."]} steps={["Periksa kartu ringkasan dan antrean pengecualian.", "Tindak lanjuti mutasi, top-up, atau payout bermasalah.", "Gunakan jurnal dan chart of accounts untuk penelusuran audit."]} notes={["Angka hanya berasal dari jurnal terposting.", "Jurnal posted tidak dihapus; koreksi memakai reversal."]} />
-
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Posisi bank & clearing" value={rupiah(bankPosition)} detail="Rekening utama + dana dalam settlement" icon="landmark" />
-        <MetricCard label="Titipan wali" value={rupiah(guardianFloat)} detail="Dana belum dialokasikan oleh wali" icon="wallet" tone="blue" />
-        <MetricCard label="Saldo wallet santri" value={rupiah(walletTotal)} detail={`${data.walletTotals.length} jenis wallet terisi`} icon="layers" tone="slate" />
-        <MetricCard label="Butuh tindakan" value={String(totalAlerts)} detail="Pengecualian belum diselesaikan" icon="listChecks" tone={totalAlerts ? 'amber' : 'emerald'} />
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-[1.35fr_.9fr]">
-        <CashTrendPanel data={data} maxTrend={maxTrend} />
-        <SectionPanel title="Komposisi alokasi wallet" description="Membantu melihat konsentrasi dana santri per kebutuhan.">
-          <div className="space-y-3 p-4">{data.walletTotals.length ? data.walletTotals.map(row => <div key={row.wallet_kind}><div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="font-semibold text-slate-700">{row.wallet_kind}</span><span className="font-bold tabular-nums">{rupiah(Number(row.balance_rupiah))}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-600" style={{ width: `${Number(row.balance_rupiah) / maxWallet * 100}%` }} /></div></div>) : <p className="py-16 text-center text-sm text-slate-500">Belum ada dana yang dialokasikan.</p>}</div>
-        </SectionPanel>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-[.8fr_1.2fr]"><div className="space-y-4"><AlertPanel data={data} /><SoftAlertPanel data={data} /></div><ActivityPanel data={data} /></section>
-      <AccountsPanel data={data} />
-    </div>
+    </section>
+    <AccountsPanel data={data} />
   </main>
 }

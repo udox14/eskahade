@@ -1,5 +1,5 @@
 import { guardPage } from '@/lib/auth/guard'
-import { FinanceGuide, FinancePageHeader, MetricCard } from '../_components/finance-ui'
+import { FINANCE_GLOSSARY, FinanceGuide, FinancePageHeader, MetricCard } from '../_components/finance-ui'
 import { FinanceNav } from '../_components/finance-nav'
 import { getCashUnitManagementData } from './actions'
 import { CashUnitClient } from './_cash-unit-client'
@@ -15,7 +15,33 @@ export default async function CashUnitPage() {
   return <main className="space-y-4 sm:space-y-5">
     <FinancePageHeader title="Unit Kas" description="Atur lokasi kas, saldo tetap, operator, dan review penutupan shift." eyebrow="Khusus bendahara" meta="Operator hanya dapat memakai unit yang ditugaskan" />
     <FinanceNav />
-    <FinanceGuide purpose="Menentukan siapa yang boleh memegang kas fisik dan memastikan setiap shift dapat dipertanggungjawabkan." prerequisites={["Tambahkan role Operator Loket pada akun petugas.","Tentukan scope asrama untuk unit lokal.","Tetapkan saldo kas tetap sebagai acuan pembukaan."]} steps={["Buat Unit Kas.","Tugaskan operator yang berwenang.","Pantau shift dan review setiap selisih."]} notes={["Unit dan assignment dengan shift aktif tidak dapat dinonaktifkan.","Operator tetap wajib menghitung kas fisik.","Review bendahara tidak mengubah nilai selisih."]} />
+    <FinanceGuide
+      purpose="Menentukan siapa yang boleh memegang kas fisik dan memastikan setiap shift dapat dipertanggungjawabkan."
+      prerequisites={['Tambahkan role Operator Loket pada akun petugas lebih dulu.', 'Tentukan scope asrama untuk unit yang melayani satu asrama saja.', 'Tetapkan saldo kas tetap sebagai acuan pembukaan shift.']}
+      steps={[
+        'Buat satu Unit Kas untuk tiap loket fisik.',
+        'Tugaskan operator yang berwenang memegang kasnya.',
+        'Pantau shift berjalan dari daftar riwayat.',
+        'Review setiap shift yang ditutup dengan selisih.',
+      ]}
+      notes={[
+        'Unit dan penugasan dengan shift terbuka tidak dapat dinonaktifkan.',
+        'Operator tetap wajib menghitung kas fisik saat buka dan tutup shift.',
+        'Review bendahara mencatat pemeriksaan, tidak mengubah nilai selisih.',
+      ]}
+      commonMistakes={[
+        'Membuat satu Unit Kas untuk beberapa loket sekaligus. Selisih jadi tidak bisa ditelusuri ke laci kas mana.',
+        'Menugaskan operator tanpa memberi role Operator Loket lebih dulu — penugasannya akan ditolak.',
+        'Mengosongkan scope asrama pada unit yang sebenarnya hanya melayani satu asrama, sehingga santri luar asrama ikut bisa dilayani.',
+        'Menganggap review selisih memperbaiki angka kas. Review hanya mencatat bahwa selisihnya sudah diperiksa.',
+      ]}
+      glossary={[
+        { term: 'Unit Kas', meaning: 'Satu titik layanan loket dengan laci kas sendiri. Menjadi dasar penelusuran setiap rupiah yang keluar.' },
+        { term: 'Saldo kas tetap', meaning: 'Jumlah uang yang biasanya disiapkan di laci saat loket dibuka. Hanya acuan — operator tetap mengisi hasil hitung nyata.' },
+        { term: 'Shift', meaning: 'Satu sesi layanan oleh satu operator di satu terminal. Satu operator hanya boleh punya satu shift terbuka.' },
+        FINANCE_GLOSSARY.makerChecker,
+      ]}
+    />
     <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <MetricCard label="Unit aktif" value={String(activeUnits)} detail={`${data.units.length} total Unit Kas`} icon="wallet" />
       <MetricCard label="Operator tersedia" value={String(data.operators.length)} detail="Memiliki role Operator Loket" icon="layers" tone="blue" />
