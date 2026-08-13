@@ -1,5 +1,6 @@
 import { getFinanceDB as getDB, generateId, financeQueryOne as queryOne } from '@/lib/db'
 import { assertIntegerRupiah, financeError } from './errors'
+import { duplicateOf } from './idempotency'
 import { prepareJournalStatements, prepareWalletStatements } from './ledger'
 import type { WalletKind } from './types'
 
@@ -51,6 +52,14 @@ export async function allocateStudentFunds(input: {
     if(['SPP','USPP','NON_SPP'].includes(input.destination)){
       const billed=(input.billItems||[]).reduce((sum,item)=>sum+Number(item.amountRupiah),0)
       if(billed!==input.amountRupiah)throw new Error('Alokasi tagihan harus terkait item tagihan yang sama nominalnya.')
+      // Pertahanan berlapis di atas trg_finance_allocation_bill_validate: tagihan
+      // yang dialokasikan harus milik santri yang sama.
+      const billIds=(input.billItems||[]).map(item=>item.billId)
+      if(billIds.length){
+        const foreign=await queryOne<{count:number}>(`SELECT COUNT(*) count FROM finance_bills
+          WHERE id IN (${billIds.map(()=>'?').join(',')}) AND santri_id<>?`,[...billIds,input.santriId])
+        if(Number(foreign?.count||0)>0)throw new Error('Tagihan yang dipilih bukan milik santri ini.')
+      }
     }
 
     const db = await getDB()
@@ -82,17 +91,27 @@ export async function allocateStudentFunds(input: {
           input.billingReference || null, initialStatus, cutoffAt, journal.journalId,
           input.actorType, input.actorId || null, initialStatus,
         ),
-      ...(input.billItems||[]).flatMap(item=>[
-        db.prepare(`INSERT INTO finance_allocation_bill_items(allocation_id,bill_id,amount_rupiah) VALUES(?,?,?)`).bind(allocationId,item.billId,item.amountRupiah),
-        db.prepare(`UPDATE finance_bills SET paid_rupiah=paid_rupiah+?,status=CASE WHEN paid_rupiah+?=amount_rupiah THEN 'PAID' ELSE 'PARTIAL' END,updated_at=datetime('now') WHERE id=? AND santri_id=? AND status IN ('OPEN','PARTIAL') AND amount_rupiah-paid_rupiah>=?`).bind(item.amountRupiah,item.amountRupiah,item.billId,input.santriId,item.amountRupiah),
-      ]),
+      // paid_rupiah/status tagihan diterapkan oleh trg_finance_allocation_bill_apply
+      // agar validasi dan penerapannya tidak bisa terpisah.
+      ...(input.billItems||[]).map(item=>
+        db.prepare(`INSERT INTO finance_allocation_bill_items(allocation_id,bill_id,amount_rupiah) VALUES(?,?,?)`).bind(allocationId,item.billId,item.amountRupiah)),
       db.prepare(`UPDATE finance_journals SET status='POSTED',posted_at=datetime('now') WHERE id=? AND status='DRAFT'`).bind(journal.journalId),
       db.prepare(`INSERT INTO finance_outbox(id,event_type,aggregate_type,aggregate_id,payload_json)
         VALUES(?,?,?,?,?)`).bind(generateId(), 'ALLOCATION_CREATED', 'ALLOCATION', allocationId, JSON.stringify({ santriId: input.santriId, destination: input.destination, amountRupiah: input.amountRupiah })),
     ])
     return { success: true as const, allocationId, journalId: journal.journalId }
   } catch (error) {
-    const existing = await queryOne<{ id: string; journal_id: string }>('SELECT id,journal_id FROM finance_allocations WHERE idempotency_key=?', [input.idempotencyKey]).catch(() => null)
+    // Hanya kiriman ulang yang identik yang boleh dilaporkan sebagai duplikat.
+    // Error lain (saldo kurang, periode tertutup, tagihan tidak valid) harus
+    // sampai ke pengguna apa adanya.
+    const existing = await duplicateOf(
+      error,
+      () => queryOne<{ id: string; journal_id: string; santri_id: string; destination_kind: string; amount_rupiah: number }>(
+        'SELECT id,journal_id,santri_id,destination_kind,amount_rupiah FROM finance_allocations WHERE idempotency_key=?', [input.idempotencyKey]),
+      row => row.santri_id === input.santriId
+        && row.destination_kind === input.destination
+        && Number(row.amount_rupiah) === input.amountRupiah,
+    )
     if (existing) return { success: true as const, allocationId: existing.id, journalId: existing.journal_id, duplicate: true }
     return { success: false as const, ...financeError(error) }
   }

@@ -2,10 +2,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { revalidatePath } from 'next/cache'
 import { financeQuery as query,queryOne } from '@/lib/db'
-import { requireFinanceAccess } from '@/lib/finance/access'
+import { financeCapabilities, requireFinanceAccess } from '@/lib/finance/access'
 import { createFinanceBill,voidFinanceBill } from '@/lib/finance/billing'
 import { reviewLateTopup } from '@/lib/finance/payments'
-import { closeFinancePeriod,approvePeriodReopen,reopenFinancePeriod } from '@/lib/finance/periods'
+import { closeFinancePeriod,approvePeriodReopen,financePeriodReadiness,reopenFinancePeriod } from '@/lib/finance/periods'
 import { importBankStatement,manuallyMatchBankTransaction } from '@/lib/finance/reconciliation'
 import { reconcileGatewaySettlement } from '@/lib/finance/settlement'
 import { syncFinanceStudentSnapshot } from '@/lib/finance/snapshots'
@@ -35,10 +35,25 @@ export async function voidBillAction(form:FormData){
   if(r.success)refreshOperations()
   return r
 }
-export async function getOperationsData(){
+/** Prasyarat tutup buku untuk periode tertentu, dipanggil ulang saat bendahara mengganti bulan. */
+export async function getPeriodReadinessAction(periodKey:string){
   await requireFinanceAccess('VIEW')
+  return financePeriodReadiness(periodKey)
+}
+
+export async function getOperationsData(){
+  const session=await requireFinanceAccess('VIEW')
+  const capabilities=await financeCapabilities(session)
+  // Bulan lalu adalah periode yang paling sering ditutup, jadi kesiapannya
+  // dimuat lebih dulu agar checklist langsung terisi tanpa menunggu klik.
+  const jakarta=new Date(Date.now()+7*3600_000)
+  const previous=new Date(Date.UTC(jakarta.getUTCFullYear(),jakarta.getUTCMonth()-1,1))
+  const defaultPeriod=`${previous.getUTCFullYear()}-${String(previous.getUTCMonth()+1).padStart(2,'0')}`
   return{
-    periods:await query<any>(`SELECT p.*,(SELECT COUNT(*) FROM finance_period_reopen_approvals a WHERE a.period_key=p.period_key) approval_count FROM finance_periods p ORDER BY period_key DESC LIMIT 24`),
+    capabilities,
+    defaultPeriod,
+    readiness:await financePeriodReadiness(defaultPeriod),
+    periods:await query<any>(`SELECT p.*,(SELECT COUNT(DISTINCT a.approver_id) FROM finance_period_reopen_approvals a WHERE a.period_key=p.period_key AND a.consumed_at IS NULL) approval_count FROM finance_periods p ORDER BY period_key DESC LIMIT 24`),
     imports:await query<any>(`SELECT i.*,
       SUM(CASE WHEN t.match_status='UNMATCHED' THEN 1 ELSE 0 END) unmatched_count,
       SUM(CASE WHEN t.match_status IN ('AUTO_MATCHED','MANUAL_MATCHED') THEN 1 ELSE 0 END) matched_count

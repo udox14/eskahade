@@ -3,8 +3,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { financeQuery, financeQueryOne, generateId, getFinanceDB, query } from '@/lib/db'
-import { getEffectiveRoles } from '@/lib/auth/session'
-import { requireFinanceAccess } from '@/lib/finance/access'
+import { financeCapabilities, requireFinanceAccess } from '@/lib/finance/access'
 
 const PATH='/dashboard/keuangan-terpusat/kontrol'
 const SETTING_KEYS=new Set(['finance_payment_intent_ttl_hours','finance_soft_alerts','finance_meal_cutoff','finance_laundry_cutoff'])
@@ -69,9 +68,9 @@ export async function revokeFinanceSessionAction(id:string){
 
 export async function getFinanceControlData(){
   const session=await requireFinanceAccess('VIEW')
-  const roles=getEffectiveRoles(session)
-  const canAudit=(roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara'))||roles.includes('admin')||roles.includes('demo')
-  const canConfigure=roles.includes('bendahara')||roles.includes('admin')||roles.includes('demo')
+  const capabilities=await financeCapabilities(session)
+  const canAudit=capabilities.audit
+  const canConfigure=capabilities.configure
   const users=await query<any>(`SELECT id,full_name,email FROM users`)
   const names=new Map(users.map(row=>[row.id,row.full_name||row.email]))
   const settings=await financeQuery<any>(`SELECT * FROM finance_settings ORDER BY key`)
@@ -89,7 +88,7 @@ export async function getFinanceControlData(){
     audit:audit.map(row=>({...row,actor_name:names.get(row.actor_id)||row.actor_id||row.actor_type})),
     canAudit,
     canConfigure,
-    canExecute:roles.includes('bendahara')||roles.includes('admin')||roles.includes('demo'),
+    canExecute:capabilities.execute,
     nowMs:Date.now(),
   }
 }

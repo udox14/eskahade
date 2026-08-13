@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState } from 'react'
 import {
   Bank as Landmark,
   BookOpenText,
@@ -23,6 +24,13 @@ import {
   Warning as AlertTriangle,
   ShieldWarning,
   ShieldCheck,
+  ArrowLeft,
+  ArrowRight,
+  BookBookmark,
+  Compass,
+  Info,
+  X,
+  XCircle,
 } from '@phosphor-icons/react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { cn } from '@/lib/utils'
@@ -75,21 +83,287 @@ export function FinanceNavClient({ allowedHrefs, sandbox = false }: { allowedHre
   </div>
 }
 
-export function FinanceGuide({ title = 'Cara menggunakan halaman ini', purpose, prerequisites = [], steps, notes = [] }: {
-  title?: string; purpose: string; prerequisites?: string[]; steps: string[]; notes?: string[]
+export function FinanceGuide({
+  title = 'Cara menggunakan halaman ini', purpose, prerequisites = [], steps, notes = [],
+  glossary = [], commonMistakes = [], onStartTour,
+}: {
+  title?: string
+  purpose: string
+  prerequisites?: string[]
+  steps: string[]
+  notes?: string[]
+  /** Istilah khas keuangan terpusat yang tidak dikenal pengguna baru. */
+  glossary?: Array<{ term: string; meaning: string }>
+  /** Kesalahan yang paling sering terjadi di halaman ini, ditulis sebagai peringatan konkret. */
+  commonMistakes?: string[]
+  /** Jika diisi, tombol "Pandu saya" muncul untuk menjalankan ulang tour. */
+  onStartTour?: () => void
 }) {
+  // Panel sebelumnya memakai `hidden sm:block`, sehingga justru hilang di layar
+  // kecil — tempat pengguna paling butuh petunjuk. Semua panel kini tampil.
   return <details className="group rounded-xl border border-blue-200 bg-blue-50/60 open:bg-white">
     <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
       <span className="flex items-center gap-2 text-xs font-bold text-slate-800 sm:text-sm"><CircleHelp className="h-4 w-4 text-blue-600" />{title}</span>
       <span className="flex shrink-0 items-center gap-1 text-[10px] font-semibold text-blue-700 sm:text-xs">Buka <span className="hidden sm:inline">petunjuk</span> <ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></span>
     </summary>
-    <div className="grid gap-4 border-t border-blue-100 px-4 py-4 text-xs leading-relaxed text-slate-600 md:grid-cols-2 xl:grid-cols-4">
-      <div><p className="mb-1 font-bold uppercase tracking-wide text-slate-800">Tujuan</p><p>{purpose}</p></div>
-      <div className="hidden sm:block"><p className="mb-1 font-bold uppercase tracking-wide text-slate-800">Sebelum mulai</p>{prerequisites.length ? <ul className="list-disc space-y-1 pl-4">{prerequisites.map(item => <li key={item}>{item}</li>)}</ul> : <p>Tidak ada persiapan khusus.</p>}</div>
-      <div><p className="mb-1 font-bold uppercase tracking-wide text-slate-800">Alur kerja</p><ol className="list-decimal space-y-1 pl-4">{steps.map(item => <li key={item}>{item}</li>)}</ol></div>
-      <div className="hidden sm:block"><p className="mb-1 flex items-center gap-1 font-bold uppercase tracking-wide text-amber-800"><AlertTriangle className="h-3.5 w-3.5" />Catatan penting</p>{notes.length ? <ul className="list-disc space-y-1 pl-4">{notes.map(item => <li key={item}>{item}</li>)}</ul> : <p>Periksa kembali sebelum menyimpan.</p>}</div>
+    <div className="border-t border-blue-100 px-4 py-4">
+      {onStartTour ? <button type="button" onClick={onStartTour} className="mb-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-blue-700 px-3 text-xs font-bold text-white">
+        <Compass className="h-4 w-4" />Pandu saya di layar
+      </button> : null}
+      <div className="grid gap-4 text-xs leading-relaxed text-slate-600 md:grid-cols-2 xl:grid-cols-4">
+        <div><p className="mb-1 font-bold uppercase tracking-wide text-slate-800">Tujuan</p><p>{purpose}</p></div>
+        <div><p className="mb-1 font-bold uppercase tracking-wide text-slate-800">Sebelum mulai</p>{prerequisites.length ? <ul className="list-disc space-y-1 pl-4">{prerequisites.map(item => <li key={item}>{item}</li>)}</ul> : <p>Tidak ada persiapan khusus.</p>}</div>
+        <div><p className="mb-1 font-bold uppercase tracking-wide text-slate-800">Alur kerja</p><ol className="list-decimal space-y-1 pl-4">{steps.map(item => <li key={item}>{item}</li>)}</ol></div>
+        <div><p className="mb-1 flex items-center gap-1 font-bold uppercase tracking-wide text-amber-800"><AlertTriangle className="h-3.5 w-3.5" />Catatan penting</p>{notes.length ? <ul className="list-disc space-y-1 pl-4">{notes.map(item => <li key={item}>{item}</li>)}</ul> : <p>Periksa kembali sebelum menyimpan.</p>}</div>
+      </div>
+      {commonMistakes.length ? <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+        <p className="mb-1 flex items-center gap-1 font-bold uppercase tracking-wide"><AlertTriangle className="h-3.5 w-3.5" />Sering keliru</p>
+        <ul className="list-disc space-y-1 pl-4">{commonMistakes.map(item => <li key={item}>{item}</li>)}</ul>
+      </div> : null}
+      {glossary.length ? <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed">
+        <p className="mb-2 flex items-center gap-1 font-bold uppercase tracking-wide text-slate-800"><BookBookmark className="h-3.5 w-3.5" />Istilah</p>
+        <dl className="grid gap-2 sm:grid-cols-2">{glossary.map(item => <div key={item.term}>
+          <dt className="font-bold text-slate-800">{item.term}</dt><dd className="text-slate-600">{item.meaning}</dd>
+        </div>)}</dl>
+      </div> : null}
     </div>
   </details>
+}
+
+/** Istilah yang berulang di banyak halaman; pakai ulang agar penjelasannya konsisten. */
+export const FINANCE_GLOSSARY: Record<string, { term: string; meaning: string }> = {
+  titipan: { term: 'Titipan', meaning: 'Dana wali yang sudah masuk tapi belum dialokasikan ke kebutuhan tertentu.' },
+  uspp: { term: 'USPP', meaning: 'Tagihan di luar SPP yang boleh dicicil. SPP dan Non-SPP wajib lunas sekaligus.' },
+  makerChecker: { term: 'Maker–checker', meaning: 'Pembuat, pemeriksa, dan pelaksana harus tiga orang berbeda. Ditolak database jika sama.' },
+  suspense: { term: 'Suspense', meaning: 'Akun penampung sementara. Saldonya harus nol sebelum tutup buku.' },
+  settlement: { term: 'Settlement', meaning: 'Pencairan dana gateway ke rekening bank; bruto = neto + biaya provider.' },
+  reversal: { term: 'Reversal', meaning: 'Jurnal lawan untuk mengoreksi. Jurnal terposting tidak pernah dihapus atau diubah.' },
+  cutoff: { term: 'Cutoff', meaning: 'Batas waktu terakhir alokasi Makan/Laundry dapat dikembalikan ke Titipan.' },
+}
+
+export function EmptyState({ title, description, action, icon: Icon = ListChecks }: {
+  title: string; description: string; action?: React.ReactNode; icon?: React.ElementType
+}) {
+  return <div className="grid place-items-center px-6 py-12 text-center">
+    <Icon className="h-9 w-9 text-slate-300" />
+    <p className="mt-3 text-sm font-bold text-slate-700">{title}</p>
+    <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">{description}</p>
+    {action ? <div className="mt-4">{action}</div> : null}
+  </div>
+}
+
+export type FinanceResult = { tone: 'success' | 'duplicate' | 'error'; message: string; detail?: string }
+
+/**
+ * Hasil aksi ditampilkan menetap di dekat form, bukan hanya toast yang lewat.
+ * Nada `duplicate` sengaja dibedakan dari `success`: transaksi yang tidak jadi
+ * diposting karena kiriman ulang tidak boleh terlihat seperti transaksi baru.
+ */
+export function ResultBanner({ result, onDismiss }: { result: FinanceResult | null; onDismiss?: () => void }) {
+  if (!result) return null
+  const style = {
+    success: { box: 'border-emerald-200 bg-emerald-50 text-emerald-900', Icon: CheckCircle2 },
+    duplicate: { box: 'border-blue-200 bg-blue-50 text-blue-900', Icon: Info },
+    error: { box: 'border-red-200 bg-red-50 text-red-900', Icon: XCircle },
+  }[result.tone]
+  return <div role="status" className={cn('flex items-start gap-3 rounded-xl border px-4 py-3 text-xs sm:text-sm', style.box)}>
+    <style.Icon className="mt-0.5 h-5 w-5 shrink-0" />
+    <div className="min-w-0 flex-1"><p className="font-bold">{result.message}</p>{result.detail ? <p className="mt-0.5 leading-5 opacity-90">{result.detail}</p> : null}</div>
+    {onDismiss ? <button type="button" onClick={onDismiss} aria-label="Tutup pesan" className="shrink-0 opacity-60 hover:opacity-100"><X className="h-4 w-4" /></button> : null}
+  </div>
+}
+
+export function FormField({ label, hint, error, children, required }: {
+  label: string; hint?: string; error?: string; children: React.ReactNode; required?: boolean
+}) {
+  const id = useId()
+  return <div className="grid gap-1.5">
+    <label htmlFor={id} className="text-xs font-bold text-slate-800">{label}{required ? <span className="ml-0.5 text-red-600">*</span> : null}</label>
+    {/* Field diberi id lewat cloneElement agar label tetap terhubung tanpa memaksa setiap pemanggil mengurus id sendiri. */}
+    {isValidElement(children) ? cloneElement(children as React.ReactElement<{ id?: string }>, { id }) : children}
+    {error ? <p className="text-[11px] font-semibold text-red-700">{error}</p>
+      : hint ? <p className="text-[11px] leading-4 text-slate-500">{hint}</p> : null}
+  </div>
+}
+
+/**
+ * Konfirmasi untuk tindakan yang tidak dapat dibatalkan. `confirmPhrase`
+ * mewajibkan pengguna mengetik ulang kata kunci untuk aksi paling berat
+ * (tutup buku, reopen periode, eksekusi payout).
+ */
+export function ConfirmAction({ open, title, description, impact = [], confirmLabel = 'Lanjutkan', confirmPhrase, tone = 'amber', pending, onConfirm, onCancel }: {
+  open: boolean
+  title: string
+  description: string
+  impact?: string[]
+  confirmLabel?: string
+  confirmPhrase?: string
+  tone?: 'amber' | 'red'
+  pending?: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  // Dialog dipisah agar state ketikan lahir bersama dialognya dan tidak perlu
+  // direset lewat effect setiap kali dibuka.
+  if (!open) return null
+  return <ConfirmDialog {...{ title, description, impact, confirmLabel, confirmPhrase, tone, pending, onConfirm, onCancel }} />
+}
+
+function ConfirmDialog({ title, description, impact = [], confirmLabel = 'Lanjutkan', confirmPhrase, tone = 'amber', pending, onConfirm, onCancel }: {
+  title: string
+  description: string
+  impact?: string[]
+  confirmLabel?: string
+  confirmPhrase?: string
+  tone?: 'amber' | 'red'
+  pending?: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const [typed, setTyped] = useState('')
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+  const ready = !confirmPhrase || typed.trim().toUpperCase() === confirmPhrase.toUpperCase()
+  const accent = tone === 'red' ? 'bg-red-700' : 'bg-amber-600'
+  return <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4" onClick={onCancel}>
+    <section role="alertdialog" aria-modal="true" aria-label={title} className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
+      <div className="flex items-start gap-3">
+        <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', tone === 'red' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700')}><AlertTriangle className="h-5 w-5" /></span>
+        <div><h2 className="font-bold text-slate-900">{title}</h2><p className="mt-1 text-sm leading-5 text-slate-600">{description}</p></div>
+      </div>
+      {impact.length ? <ul className="mt-4 list-disc space-y-1 rounded-lg bg-slate-50 p-3 pl-7 text-xs leading-5 text-slate-700">{impact.map(item => <li key={item}>{item}</li>)}</ul> : null}
+      {confirmPhrase ? <label className="mt-4 block text-xs font-bold text-slate-800">Ketik <code className="rounded bg-slate-100 px-1">{confirmPhrase}</code> untuk melanjutkan
+        <input autoFocus value={typed} onChange={event => setTyped(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-200 px-3 text-sm" />
+      </label> : null}
+      <div className="mt-5 grid grid-cols-2 gap-2">
+        <button type="button" onClick={onCancel} className="min-h-11 rounded-lg border border-slate-200 text-sm font-bold text-slate-700">Batal</button>
+        <button type="button" disabled={!ready || pending} onClick={onConfirm} className={cn('min-h-11 rounded-lg px-3 text-sm font-bold text-white disabled:opacity-50', accent)}>{confirmLabel}</button>
+      </div>
+    </section>
+  </div>
+}
+
+export type TourStep = {
+  /** Selector elemen yang disorot, biasanya `[data-tour="nama"]`. */
+  target: string
+  title: string
+  body: string
+}
+
+/**
+ * Tour berpandu tanpa dependensi: overlay gelap, sorotan pada elemen target,
+ * dan tooltip berisi penjelasan langkah. Progres disimpan per halaman sehingga
+ * tour hanya berjalan otomatis sekali, tapi selalu bisa dipanggil ulang.
+ */
+export function useFinanceTour(storageKey: string) {
+  const [running, setRunning] = useState(false)
+  const seen = useRef(false)
+  useEffect(() => {
+    if (seen.current) return
+    seen.current = true
+    // Ditunda satu frame supaya elemen target sudah terpasang sebelum diukur,
+    // sekaligus menghindari setState langsung di badan effect.
+    const timer = window.setTimeout(() => {
+      try { if (!localStorage.getItem(`finance-tour:${storageKey}`)) setRunning(true) } catch { /* localStorage bisa diblokir */ }
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [storageKey])
+  const finish = useCallback(() => {
+    setRunning(false)
+    try { localStorage.setItem(`finance-tour:${storageKey}`, new Date().toISOString()) } catch { /* abaikan */ }
+  }, [storageKey])
+  return { running, start: useCallback(() => setRunning(true), []), finish }
+}
+
+export function FinanceTour({ steps, running, onFinish }: { steps: TourStep[]; running: boolean; onFinish: () => void }) {
+  const [index, setIndex] = useState(0)
+  const [rect, setRect] = useState<DOMRect | null>(null)
+  const dialog = useRef<HTMLDivElement>(null)
+  const step = steps[index]
+
+  useEffect(() => {
+    if (!running) return
+    const timer = window.setTimeout(() => setIndex(0), 0)
+    return () => window.clearTimeout(timer)
+  }, [running])
+
+  useEffect(() => {
+    if (!running || !step) return
+    const target = document.querySelector(step.target)
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (!target) {
+      const clear = window.setTimeout(() => setRect(null), 0)
+      return () => window.clearTimeout(clear)
+    }
+    target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' })
+    const measure = () => setRect(target.getBoundingClientRect())
+    // Diukur setelah scroll selesai; pengukuran langsung akan menangkap posisi lama.
+    const first = window.setTimeout(measure, 0)
+    const settled = window.setTimeout(measure, reduced ? 0 : 320)
+    window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, true)
+    return () => {
+      window.clearTimeout(first); window.clearTimeout(settled)
+      window.removeEventListener('resize', measure); window.removeEventListener('scroll', measure, true)
+    }
+  }, [running, step])
+
+  useEffect(() => {
+    if (!running) return
+    dialog.current?.focus()
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { onFinish(); return }
+      // Fokus dikurung di dalam panel tour supaya tab tidak nyasar ke halaman
+      // yang sedang tertutup overlay.
+      if (event.key !== 'Tab' || !dialog.current) return
+      const focusable = dialog.current.querySelectorAll<HTMLElement>('button:not([disabled])')
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [running, onFinish, index])
+
+  if (!running || !step) return null
+  const pad = 8
+  const spotlight = rect ? {
+    top: Math.max(0, rect.top - pad), left: Math.max(0, rect.left - pad),
+    width: rect.width + pad * 2, height: rect.height + pad * 2,
+  } : null
+  // Tooltip diletakkan di bawah sorotan bila muat, jika tidak di atasnya.
+  const below = !spotlight || spotlight.top + spotlight.height + 220 < window.innerHeight
+  const tooltipStyle: React.CSSProperties = spotlight
+    ? below
+      ? { top: spotlight.top + spotlight.height + 12, left: Math.min(Math.max(12, spotlight.left), Math.max(12, window.innerWidth - 340)) }
+      : { top: Math.max(12, spotlight.top - 200), left: Math.min(Math.max(12, spotlight.left), Math.max(12, window.innerWidth - 340)) }
+    : { top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }
+
+  return <div className="fixed inset-0 z-[90]" role="dialog" aria-modal="true" aria-label={`Panduan langkah ${index + 1}: ${step.title}`}>
+    <div className="absolute inset-0 bg-slate-950/60" onClick={onFinish} />
+    {spotlight ? <div aria-hidden className="pointer-events-none absolute rounded-xl ring-4 ring-emerald-400" style={{ ...spotlight, boxShadow: '0 0 0 9999px rgba(2,6,23,.6)' }} /> : null}
+    <div ref={dialog} tabIndex={-1} className="absolute w-[min(20rem,calc(100vw-1.5rem))] rounded-xl bg-white p-4 shadow-2xl outline-none" style={tooltipStyle}>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Langkah {index + 1} dari {steps.length}</p>
+        <button type="button" onClick={onFinish} aria-label="Tutup panduan" className="text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></button>
+      </div>
+      <h3 className="mt-1 text-sm font-bold text-slate-900">{step.title}</h3>
+      <p className="mt-1.5 text-xs leading-5 text-slate-600">{step.body}</p>
+      {!rect ? <p className="mt-2 rounded bg-amber-50 p-2 text-[11px] text-amber-800">Bagian ini belum tampil di layar — biasanya karena datanya belum ada.</p> : null}
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <button type="button" onClick={onFinish} className="text-[11px] font-semibold text-slate-500 hover:text-slate-800">Lewati</button>
+        <div className="flex gap-2">
+          <button type="button" disabled={index === 0} onClick={() => setIndex(current => current - 1)} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 disabled:opacity-40"><ArrowLeft className="h-3.5 w-3.5" />Kembali</button>
+          <button type="button" onClick={() => index + 1 < steps.length ? setIndex(current => current + 1) : onFinish()} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white">{index + 1 < steps.length ? <>Lanjut<ArrowRight className="h-3.5 w-3.5" /></> : 'Selesai'}</button>
+        </div>
+      </div>
+    </div>
+  </div>
 }
 
 const metricIcons = {

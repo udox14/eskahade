@@ -3,8 +3,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { financeQuery, financeQueryOne, generateId, getFinanceDB, queryOne } from '@/lib/db'
-import { getEffectiveRoles } from '@/lib/auth/session'
-import { financeAsramaScope, requireFinanceAccess } from '@/lib/finance/access'
+import { financeAsramaScope, financeCapabilities, requireFinanceAccess } from '@/lib/finance/access'
+import { contentKey } from '@/lib/finance/idempotency'
 import { postJournal, reverseJournal } from '@/lib/finance/ledger'
 import { syncFinanceStudentSnapshot } from '@/lib/finance/snapshots'
 import type { FinanceAccountCode, JournalEntryInput } from '@/lib/finance/types'
@@ -55,9 +55,13 @@ export async function postManualJournalAction(form: FormData) {
   if (reference.length < 3) return { success: false as const, error: 'Referensi dokumen minimal 3 karakter.' }
   const description = String(form.get('description') || '').trim()
   if (description.length < 5) return { success: false as const, error: 'Keterangan jurnal minimal 5 karakter.' }
+  const effectiveDate = String(form.get('effectiveDate') || '')
+  // Nomor dokumen sering dipakai ulang untuk transaksi yang berbeda. Kunci
+  // diikat ke isi jurnal supaya hanya pengiriman ganda yang benar-benar sama
+  // yang ter-dedup, bukan jurnal berbeda yang kebetulan seferensi.
   const result = await postJournal({
-    idempotencyKey: `manual:${reference.toLowerCase()}`,
-    effectiveDate: String(form.get('effectiveDate') || ''),
+    idempotencyKey: await contentKey('manual', reference, { effectiveDate, description, entries }),
+    effectiveDate,
     description,
     sourceType: 'MANUAL',
     externalReference: reference,
@@ -65,12 +69,18 @@ export async function postManualJournalAction(form: FormData) {
     actorId: session.id,
     entries,
   })
-  if (result.success) {
-    if (!result.duplicate) await audit(session.id, 'POST_MANUAL_JOURNAL', result.journalId, { reference, entryCount: entries.length })
-    revalidatePath(PATH)
-    revalidatePath('/dashboard/keuangan-terpusat')
-  }
-  return result
+  if (!result.success) return result
+  if (!result.duplicate) await audit(session.id, 'POST_MANUAL_JOURNAL', result.journalId, { reference, entryCount: entries.length })
+  revalidatePath(PATH)
+  revalidatePath('/dashboard/keuangan-terpusat')
+  // Referensi yang dipakai ulang tetap diposting, tetapi bendahara perlu tahu
+  // agar tidak menganggap satu dokumen mewakili satu jurnal saja.
+  const reused = result.duplicate
+    ? 0
+    : Number((await financeQueryOne<{ count: number }>(
+      `SELECT COUNT(*) count FROM finance_journals WHERE external_reference=? AND id<>?`,
+      [reference, result.journalId]))?.count || 0)
+  return { ...result, referenceReuseCount: reused }
 }
 
 export async function reverseManualJournalAction(form: FormData) {
@@ -114,13 +124,13 @@ export async function getLedgerData() {
   }))
   const entries = entryChunks.flat()
   const accounts = await financeQuery<any>(`SELECT code,name,account_type,normal_balance FROM finance_accounts WHERE is_active=1 ORDER BY code`)
-  const roles = getEffectiveRoles(session)
+  const capabilities = await financeCapabilities(session)
   const countFilter = scope ? `WHERE EXISTS(SELECT 1 FROM finance_journal_entries se WHERE se.journal_id=j.id AND se.asrama_scope=?)` : ''
   return {
     journals,
     entries,
     accounts,
-    canExecute: roles.includes('bendahara') || roles.includes('admin') || roles.includes('demo'),
+    canExecute: capabilities.execute,
     scope,
     totals: {
       posted: await financeQueryOne<{ count: number }>(`SELECT COUNT(*) count FROM finance_journals j ${countFilter} ${countFilter ? 'AND' : 'WHERE'} j.status='POSTED'`, params),

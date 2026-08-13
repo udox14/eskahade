@@ -2,7 +2,7 @@
 import { guardPage } from '@/lib/auth/guard'
 import { getPayoutData } from './actions'
 import { PayoutClient } from './_payout-client'
-import { FinanceGuide, FinancePageHeader, StatusBadge } from '../_components/finance-ui'
+import { FINANCE_GLOSSARY, FinanceGuide, FinancePageHeader, StatusBadge } from '../_components/finance-ui'
 import { FinanceNav } from '../_components/finance-nav'
 
 export const dynamic = 'force-dynamic'
@@ -15,8 +15,34 @@ export default async function PayoutPage() {
   return <main className="space-y-4 sm:space-y-5">
     <FinancePageHeader title="Payout" description="Kelola pengiriman dana melalui alur maker, checker, executor, dan rekonsiliasi." eyebrow="Pemisahan tugas wajib" meta="Payout baru final setelah sukses provider dan cocok dengan mutasi bank" />
     <FinanceNav />
-    <FinanceGuide purpose="Mengirim dana makan, laundry, payroll, atau refund dengan persetujuan berlapis dan jejak audit." prerequisites={["Rekening penerima harus aktif dan melewati cooling period 24 jam.", "Maker dan checker wajib orang berbeda."]} steps={["Maker mengajukan payout.", "Checker memeriksa penerima dan nominal.", "Bendahara mengeksekusi lalu merekonsiliasi."]} notes={["Status sukses provider belum berarti final.", "Transfer manual adalah fallback dan wajib memiliki referensi.", "Tidak ada self-approval."]} />
+    <FinanceGuide
+      purpose="Mengirim dana makan, laundry, payroll, atau refund dengan persetujuan berlapis dan jejak audit."
+      prerequisites={["Rekening penerima sudah didaftarkan, diverifikasi petugas lain, dan lewat masa tenang 24 jam.", "Nomor rekening sudah dikonfirmasi ulang langsung ke pemiliknya.", "Pembuat, pemeriksa, dan pelaksana adalah tiga orang berbeda."]}
+      steps={[
+        "Maker mengajukan payout beserta nominal dan metode.",
+        "Checker memeriksa penerima, nominal, dan biaya, lalu meloloskan.",
+        "Executor mengirim dana — via API atau transfer manual dengan nomor bukti.",
+        "Setelah cocok dengan mutasi rekening, tandai direkonsiliasi.",
+      ]}
+      notes={[
+        "Status sukses provider belum berarti final — payout baru selesai setelah direkonsiliasi.",
+        "Transfer manual dan tunai wajib memiliki nomor referensi atau kuitansi.",
+        "Database menolak bila pembuat, pemeriksa, atau pelaksana adalah orang yang sama.",
+      ]}
+      commonMistakes={[
+        "Menandai direkonsiliasi hanya karena provider bilang sukses, tanpa mencocokkan ke mutasi rekening.",
+        "Mendaftarkan rekening dengan nomor hasil salah ketik. Nomor disimpan terenkripsi dan hanya tampil tersamar, jadi salah ketik sulit terlihat belakangan.",
+        "Mengira masa tenang 24 jam bisa dilewati setelah verifikasi. Verifikasi dan masa tenang adalah dua pengaman terpisah.",
+        "Menyerahkan uang tunai sebelum eksekusi tercatat, sehingga jurnal dan kas tidak sinkron.",
+      ]}
+      glossary={[
+        FINANCE_GLOSSARY.makerChecker,
+        { term: 'Masa tenang 24 jam', meaning: 'Jeda wajib sejak rekening didaftarkan sampai boleh menerima transfer, untuk memberi waktu mendeteksi rekening palsu.' },
+        { term: 'BI-Fast', meaning: 'Kanal transfer antarbank yang dipakai payout API. Berjalan langsung dan tidak bisa dibatalkan dari aplikasi.' },
+        { term: 'Rekonsiliasi payout', meaning: 'Menandai bahwa dana yang keluar sudah terlihat di mutasi rekening yang sebenarnya.' },
+      ]}
+    />
     <div className="flex flex-wrap gap-2 text-xs"><StatusBadge tone={pending ? 'amber' : 'emerald'}>{pending} payout berjalan</StatusBadge><StatusBadge tone="blue">{data.recipients.filter((r: any) => r.status === 'ACTIVE').length} penerima aktif</StatusBadge></div>
-    <PayoutClient payouts={data.payouts} recipients={data.recipients} />
+    <PayoutClient payouts={data.payouts} recipients={data.recipients} apiFeeRupiah={data.apiFeeRupiah} capabilities={data.capabilities} nowMs={data.nowMs} />
   </main>
 }

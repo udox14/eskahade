@@ -23,9 +23,29 @@ export async function handleProviderReversal(input:{paymentIntentId:string;provi
       ...(recoverable>0?prepareWalletStatements(db,journal.journalId,[{idempotencyKey:`provider-reversal-wallet:${intent.id}`,santriId:intent.santri_id,walletKind:'TITIPAN',amountRupiah:-recoverable,movementType:'PROVIDER_REVERSAL',referenceType:'PAYMENT_INTENT',referenceId:intent.id}]):[]),
       db.prepare(`UPDATE finance_journals SET status='POSTED',posted_at=datetime('now') WHERE id=? AND status='DRAFT'`).bind(journal.journalId),
       db.prepare(`UPDATE finance_payment_intents SET status='REVERSED',updated_at=datetime('now') WHERE id=? AND status='PAID'`).bind(intent.id),
-      ...(shortfall>0?[db.prepare(`UPDATE finance_student_wallets SET frozen_at=datetime('now'),freeze_reason='PROVIDER_REVERSAL_RECEIVABLE' WHERE santri_id=?`).bind(intent.santri_id)]:[]),
+      // Beku hanya dompet titipan. Membekukan SPP/MAKAN/LAUNDRY ikut memutus
+      // layanan yang sudah dibayar dan tidak berkaitan dengan piutang ini.
+      ...(shortfall>0?[db.prepare(`UPDATE finance_student_wallets SET frozen_at=datetime('now'),freeze_reason='PROVIDER_REVERSAL_RECEIVABLE' WHERE santri_id=? AND wallet_kind='TITIPAN'`).bind(intent.santri_id)]:[]),
       db.prepare(`INSERT INTO finance_outbox(id,event_type,aggregate_type,aggregate_id,payload_json) VALUES(?,?,?,?,?)`).bind(generateId(),'ACCOUNT_FROZEN_PROVIDER_REVERSAL','PAYMENT_INTENT',intent.id,JSON.stringify({santriId:intent.santri_id,receivableRupiah:shortfall})),
     ])
     return{success:true as const,journalId:journal.journalId,receivableRupiah:shortfall,frozen:shortfall>0}
+  }catch(error){return{success:false as const,...financeError(error)}}
+}
+
+/**
+ * Buka kembali dompet titipan yang dibekukan reversal provider setelah piutang
+ * diselesaikan. Tanpa ini, pembekuan tidak punya jalan keluar dari aplikasi.
+ */
+export async function unfreezeStudentWallet(input:{santriId:string;actorId:string;reason:string}){
+  try{
+    const reason=input.reason.trim()
+    if(reason.length<10)throw new Error('Alasan pembukaan blokir minimal 10 karakter.')
+    const db=await getDB()
+    const result=await db.prepare(`UPDATE finance_student_wallets SET frozen_at=NULL,freeze_reason=NULL,updated_at=datetime('now')
+      WHERE santri_id=? AND frozen_at IS NOT NULL`).bind(input.santriId).run()
+    if(!result.meta?.changes)throw new Error('Tidak ada dompet santri ini yang sedang dibekukan.')
+    await db.prepare(`INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,after_json) VALUES(?,'STAFF',?,'UNFREEZE_WALLET','STUDENT',?,?)`)
+      .bind(generateId(),input.actorId,input.santriId,JSON.stringify({reason})).run()
+    return{success:true as const}
   }catch(error){return{success:false as const,...financeError(error)}}
 }

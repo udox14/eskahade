@@ -1,6 +1,7 @@
 import { getFinanceDB as getDB, generateId, financeQueryOne as queryOne } from '@/lib/db'
 import { resolveCredential, verifyStudentPin } from './credentials'
 import { assertIntegerRupiah, financeError } from './errors'
+import { duplicateOf } from './idempotency'
 import { prepareJournalStatements } from './ledger'
 import type { CredentialKind } from './types'
 
@@ -51,7 +52,14 @@ export async function withdrawPocketMoney(input: {
     ])
     return { success: true as const, withdrawalId, santriId: credential.santri_id }
   } catch (error) {
-    const existing = await queryOne<{ id: string; santri_id: string }>('SELECT id,santri_id FROM finance_withdrawals WHERE idempotency_key=?', [input.idempotencyKey]).catch(() => null)
+    // Penolakan limit, saldo, atau shift harus terlihat operator; hanya klik
+    // ganda dengan nominal sama yang boleh dilaporkan sebagai duplikat.
+    const existing = await duplicateOf(
+      error,
+      () => queryOne<{ id: string; santri_id: string; amount_rupiah: number }>(
+        'SELECT id,santri_id,amount_rupiah FROM finance_withdrawals WHERE idempotency_key=?', [input.idempotencyKey]),
+      row => Number(row.amount_rupiah) === input.amountRupiah,
+    )
     if (existing) return { success: true as const, withdrawalId: existing.id, santriId: existing.santri_id, duplicate: true }
     return { success: false as const, ...financeError(error) }
   }

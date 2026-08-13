@@ -46,8 +46,26 @@ export async function importBankStatement(input:{file:File;bankAccountLabel:stri
       const chunk=rows.slice(offset,offset+75)
       await db.batch(chunk.map(row=>db.prepare(`INSERT INTO finance_bank_transactions(id,import_id,row_number,transaction_at,amount_rupiah,bank_reference,description,raw_json) VALUES(?,?,?,?,?,?,?,?)`).bind(generateId(),importId,row.rowNumber,row.transactionAt,row.amountRupiah,row.reference,row.description,JSON.stringify(row.raw))))
     }
+    // Auto-match hanya untuk pasangan satu-ke-satu: satu referensi harus
+    // memetakan tepat satu mutasi belum cocok ke tepat satu jurnal terposting
+    // yang belum dipakai mutasi lain. Tanpa syarat ini, dua mutasi berreferensi
+    // sama sama-sama ditandai cocok ke jurnal yang sama, sehingga satu mutasi
+    // terlihat beres padahal belum dijelaskan dan tutup buku ikut terbuka.
     await db.batch([
-      db.prepare(`UPDATE finance_bank_transactions SET match_status='AUTO_MATCHED',matched_type='JOURNAL',matched_id=(SELECT j.id FROM finance_journals j WHERE j.external_reference=finance_bank_transactions.bank_reference AND j.status='POSTED' LIMIT 1),matched_at=datetime('now') WHERE import_id=? AND bank_reference IS NOT NULL AND EXISTS(SELECT 1 FROM finance_journals j WHERE j.external_reference=finance_bank_transactions.bank_reference AND j.status='POSTED')`).bind(importId),
+      db.prepare(`UPDATE finance_bank_transactions SET
+          match_status='AUTO_MATCHED',matched_type='JOURNAL',
+          matched_id=(SELECT j.id FROM finance_journals j
+            WHERE j.external_reference=finance_bank_transactions.bank_reference AND j.status='POSTED'),
+          matched_at=datetime('now')
+        WHERE import_id=? AND bank_reference IS NOT NULL AND match_status='UNMATCHED'
+          AND (SELECT COUNT(*) FROM finance_journals j
+            WHERE j.external_reference=finance_bank_transactions.bank_reference AND j.status='POSTED')=1
+          AND (SELECT COUNT(*) FROM finance_bank_transactions t
+            WHERE t.bank_reference=finance_bank_transactions.bank_reference AND t.match_status='UNMATCHED')=1
+          AND NOT EXISTS(SELECT 1 FROM finance_bank_transactions m
+            WHERE m.matched_type='JOURNAL' AND m.match_status IN ('AUTO_MATCHED','MANUAL_MATCHED')
+              AND m.matched_id=(SELECT j.id FROM finance_journals j
+                WHERE j.external_reference=finance_bank_transactions.bank_reference AND j.status='POSTED'))`).bind(importId),
       db.prepare(`UPDATE finance_reconciliation_imports SET status='READY' WHERE id=?`).bind(importId),
     ])
     return{success:true as const,importId,rowCount:rows.length}

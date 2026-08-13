@@ -1,6 +1,7 @@
 import { getFinanceDB as getDB, generateId, financeQueryOne as queryOne } from '@/lib/db'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { assertIntegerRupiah, financeError } from './errors'
+import { duplicateOf } from './idempotency'
 import { prepareJournalStatements } from './ledger'
 import { decryptFinanceValue, encryptFinanceValue } from './encryption'
 import { startDuitkuBifastTransfer, verifyDuitkuDisbursementCallback } from './disbursement/duitku'
@@ -35,7 +36,16 @@ export async function createPayoutRequest(input: {
       ).run()
     return { success: true as const, payoutId: id }
   } catch (error) {
-    const existing = await queryOne<{ id: string }>('SELECT id FROM finance_payouts WHERE idempotency_key=?', [input.idempotencyKey]).catch(() => null)
+    // requestKey datang dari client, jadi kunci yang sama dengan penerima atau
+    // nominal berbeda tidak boleh dibalas sebagai duplikat yang berhasil.
+    const existing = await duplicateOf(
+      error,
+      () => queryOne<{ id: string; recipient_id: string; amount_rupiah: number; payout_type: string }>(
+        'SELECT id,recipient_id,amount_rupiah,payout_type FROM finance_payouts WHERE idempotency_key=?', [input.idempotencyKey]),
+      row => row.recipient_id === input.recipientId
+        && row.payout_type === input.payoutType
+        && Number(row.amount_rupiah) === input.amountRupiah,
+    )
     if (existing) return { success: true as const, payoutId: existing.id, duplicate: true }
     return { success: false as const, ...financeError(error) }
   }

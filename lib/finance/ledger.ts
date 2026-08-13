@@ -2,6 +2,7 @@ import { getFinanceDB as getDB, generateId, financeQueryOne as queryOne } from '
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { JournalInput, WalletMovementInput } from './types'
 import { assertIntegerRupiah, financeError } from './errors'
+import { duplicateOf } from './idempotency'
 
 const ACCOUNT_IDS: Record<string, string> = {
   '1101': 'fa-main-bank', '1102': 'fa-gateway-clearing', '1103': 'fa-central-cash',
@@ -78,7 +79,11 @@ export async function postJournal(input: JournalInput) {
     await db.batch(statements)
     return { success: true as const, journalId, duplicate: false }
   } catch (error) {
-    const existing = await queryOne<{ id: string }>('SELECT id FROM finance_journals WHERE idempotency_key=?', [input.idempotencyKey]).catch(() => null)
+    // Kunci idempotensi yang sudah terpakai hanya boleh diperlakukan sebagai
+    // kiriman ulang bila error-nya memang pelanggaran UNIQUE. Tanpa syarat ini,
+    // jurnal tidak seimbang atau periode tertutup ikut dilaporkan berhasil.
+    const existing = await duplicateOf(error, () =>
+      queryOne<{ id: string }>('SELECT id FROM finance_journals WHERE idempotency_key=?', [input.idempotencyKey]))
     if (existing) return { success: true as const, journalId: existing.id, duplicate: true }
     return { success: false as const, ...financeError(error) }
   }

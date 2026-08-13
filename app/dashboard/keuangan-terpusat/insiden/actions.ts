@@ -3,8 +3,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { financeQuery, query, queryOne } from '@/lib/db'
-import { getEffectiveRoles } from '@/lib/auth/session'
-import { financeAsramaScope, requireFinanceAccess } from '@/lib/finance/access'
+import { financeAsramaScope, financeCapabilities, requireFinanceAccess } from '@/lib/finance/access'
 import { closeIncidentMode, openIncidentMode, recordIncidentTopup } from '@/lib/finance/incidents'
 import { syncFinanceStudentSnapshot } from '@/lib/finance/snapshots'
 
@@ -74,7 +73,7 @@ export async function closeIncidentAction(form: FormData) {
 
 export async function getIncidentData() {
   const session = await requireFinanceAccess('VIEW')
-  const roles = getEffectiveRoles(session)
+  const capabilities = await financeCapabilities(session)
   const scope = financeAsramaScope(session)
   const incidents = await financeQuery<any>(`SELECT m.*,
     (SELECT COUNT(*) FROM finance_incident_receipts r WHERE r.incident_id=m.id) receipt_count,
@@ -100,9 +99,11 @@ export async function getIncidentData() {
     openShifts: openShifts.map(row => ({ ...row, operator_name: names.get(row.operator_id) || row.operator_id })),
     proposers,
     scope,
-    canApprove: (roles.includes('dewan_santri') && roles.includes('jabatan:bendahara')) || roles.includes('admin') || roles.includes('demo'),
-    canCreate: roles.includes('bendahara') || (roles.includes('pengurus_asrama') && roles.includes('jabatan:bendahara')) || roles.includes('admin') || roles.includes('demo'),
-    canClose: roles.includes('bendahara') || roles.includes('admin') || roles.includes('demo'),
+    // Cocokkan dengan izin yang benar-benar dipakai action terkait:
+    // openIncidentAction=CHECK, recordIncidentTopupAction=CREATE, closeIncidentAction=EXECUTE.
+    canApprove: capabilities.check,
+    canCreate: capabilities.create,
+    canClose: capabilities.execute,
     nowMs: Date.now(),
   }
 }

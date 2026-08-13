@@ -3,8 +3,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { financeQuery, query, queryOne } from '@/lib/db'
-import { getEffectiveRoles } from '@/lib/auth/session'
-import { requireFinanceAccess } from '@/lib/finance/access'
+import { financeCapabilities, requireFinanceAccess } from '@/lib/finance/access'
 import {
   approvePayrollPeriod,
   calculatePayrollPeriod,
@@ -105,7 +104,7 @@ export async function deleteTeachingAttendanceAction(id:string){
 
 export async function getPayrollData(){
   const session=await requireFinanceAccess('VIEW')
-  const roles=getEffectiveRoles(session)
+  const capabilities=await financeCapabilities(session)
   const teachers=await query<any>(`SELECT id,nama_lengkap,gelar,kode_guru FROM data_guru ORDER BY nama_lengkap`)
   const teacherNames=new Map(teachers.map(row=>[String(row.id),row.nama_lengkap]))
   const periods=await financeQuery<any>(`SELECT p.*,pol.version policy_version,pol.fixed_salary_mode,
@@ -131,7 +130,7 @@ export async function getPayrollData(){
     attendance:attendance.map(row=>({...row,scheduled_teacher_name:row.scheduled_teacher_name||teacherNames.get(String(row.scheduled_teacher_id))||row.scheduled_teacher_id,actual_teacher_name:row.actual_teacher_name||teacherNames.get(String(row.actual_teacher_id))||row.actual_teacher_id})),
     items:items.map(row=>({...row,teacher_name:row.teacher_name||teacherNames.get(String(row.teacher_id))||row.teacher_id})),
     teachers,
-    canConfigure:roles.includes('bendahara')||roles.includes('admin')||roles.includes('demo'),
-    canCheck:(roles.includes('dewan_santri')&&roles.includes('jabatan:bendahara'))||roles.includes('admin')||roles.includes('demo'),
+    canConfigure:capabilities.configure,
+    canCheck:capabilities.check,
   }
 }

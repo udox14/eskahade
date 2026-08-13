@@ -51,9 +51,12 @@ export async function identifyStudent(shiftId: string, kind: CredentialKind, raw
     `SELECT balance_rupiah FROM finance_student_wallets WHERE santri_id=? AND wallet_kind='JAJAN'`, [master.id])
   const limits = await queryOne<{ daily_rupiah: number | null; weekly_rupiah: number | null; monthly_rupiah: number | null }>(
     `SELECT daily_rupiah,weekly_rupiah,monthly_rupiah FROM finance_withdrawal_limits WHERE santri_id=?`, [master.id])
+  // Rumus jendela mingguan harus sama persis dengan trg_finance_withdrawal_validate
+  // (berjangkar Senin), bukan strftime('%Y-%W'), agar sisa limit yang dilihat
+  // operator sama dengan yang ditegakkan database.
   const spent = await queryOne<{ daily: number; weekly: number; monthly: number }>(`SELECT
       COALESCE(SUM(CASE WHEN date(created_at,'+7 hours')=date('now','+7 hours') THEN amount_rupiah ELSE 0 END),0) daily,
-      COALESCE(SUM(CASE WHEN strftime('%Y-%W',created_at,'+7 hours')=strftime('%Y-%W','now','+7 hours') THEN amount_rupiah ELSE 0 END),0) weekly,
+      COALESCE(SUM(CASE WHEN date(created_at,'+7 hours')>=date('now','+7 hours','-' || ((strftime('%w','now','+7 hours')+6)%7) || ' days') THEN amount_rupiah ELSE 0 END),0) weekly,
       COALESCE(SUM(CASE WHEN strftime('%Y-%m',created_at,'+7 hours')=strftime('%Y-%m','now','+7 hours') THEN amount_rupiah ELSE 0 END),0) monthly
     FROM finance_withdrawals WHERE santri_id=? AND status='SUCCESS'`, [master.id])
 
@@ -128,21 +131,35 @@ export async function closeCashShift(input: { shiftId: string; actualClosingRupi
   const total = await queryOne<{ paid: number }>(`SELECT COALESCE(SUM(amount_rupiah),0) paid
     FROM finance_withdrawals WHERE shift_id=? AND status='SUCCESS'`, [shift.id])
   const paid = Number(total?.paid || 0)
-  const expected = Number(shift.opening_cash_rupiah) - paid
-  const discrepancy = actual - expected
+  const preview = Number(shift.opening_cash_rupiah) - paid
   const note = String(input.note || '').trim()
-  if (discrepancy !== 0 && note.length < 5) return { error: 'Catatan minimal 5 karakter wajib diisi jika terdapat selisih kas.' }
-  const status = discrepancy === 0 ? 'CLOSED_OK' : 'CLOSED_REVIEW'
-  await (await getDB()).prepare(`UPDATE finance_cash_shifts
-    SET expected_closing_rupiah=?,actual_closing_rupiah=?,discrepancy_rupiah=?,
-      operator_closing_note=?,status=?,closed_at=datetime('now')
+  if (actual !== preview && note.length < 5) return { error: 'Catatan minimal 5 karakter wajib diisi jika terdapat selisih kas.' }
+
+  // Kas yang diharapkan dihitung ulang di dalam UPDATE. Pencairan yang masuk
+  // antara pembacaan di atas dan penulisan ini tidak boleh membuat shift
+  // ditutup CLOSED_OK sementara selisihnya nyata.
+  const db = await getDB()
+  const result = await db.prepare(`UPDATE finance_cash_shifts SET
+      expected_closing_rupiah=opening_cash_rupiah-(SELECT COALESCE(SUM(w.amount_rupiah),0) FROM finance_withdrawals w WHERE w.shift_id=finance_cash_shifts.id AND w.status='SUCCESS'),
+      actual_closing_rupiah=?,
+      discrepancy_rupiah=?-(opening_cash_rupiah-(SELECT COALESCE(SUM(w.amount_rupiah),0) FROM finance_withdrawals w WHERE w.shift_id=finance_cash_shifts.id AND w.status='SUCCESS')),
+      operator_closing_note=?,
+      status=CASE WHEN ?=opening_cash_rupiah-(SELECT COALESCE(SUM(w.amount_rupiah),0) FROM finance_withdrawals w WHERE w.shift_id=finance_cash_shifts.id AND w.status='SUCCESS') THEN 'CLOSED_OK' ELSE 'CLOSED_REVIEW' END,
+      closed_at=datetime('now')
     WHERE id=? AND operator_id=? AND status='OPEN'`).bind(
-    expected, actual, discrepancy, note || null, status, shift.id, session.id,
+    actual, actual, note || null, actual, shift.id, session.id,
   ).run()
+  if (!result.meta?.changes) return { error: 'Shift sudah ditutup atau bukan milik operator ini.' }
+
+  const closed = await queryOne<{ expected_closing_rupiah: number; discrepancy_rupiah: number; status: string }>(
+    `SELECT expected_closing_rupiah,discrepancy_rupiah,status FROM finance_cash_shifts WHERE id=?`, [shift.id])
+  const expected = Number(closed?.expected_closing_rupiah ?? preview)
+  const discrepancy = Number(closed?.discrepancy_rupiah ?? actual - preview)
+  const status = closed?.status || 'CLOSED_REVIEW'
   await audit(session.id, 'CLOSE_CASH_SHIFT', 'CASH_SHIFT', shift.id, { expected, actual, discrepancy, status, note: note || null })
   revalidatePath(PATH)
   revalidatePath('/dashboard/keuangan-terpusat/unit-kas')
-  return { success: true as const, expected, discrepancy, status }
+  return { success: true as const, expected, discrepancy, status, previewExpected: preview }
 }
 
 export async function getCashierBootstrap() {
@@ -167,11 +184,21 @@ export async function getCashierBootstrap() {
     FROM finance_withdrawals w
     JOIN finance_student_snapshots s ON s.santri_id=w.santri_id
     WHERE w.shift_id=? ORDER BY w.created_at DESC LIMIT 20`, [shift.id]) : []
+  // Kebijakan kredensial menentukan kelipatan dan batas per transaksi yang
+  // ditegakkan trg_finance_withdrawal_validate. Dikirim ke klien supaya nominal
+  // yang pasti ditolak dapat dicegah sebelum operator menekan tombol.
+  const policy = await queryOne<{ denomination_rupiah: number; per_transaction_cap_rupiah: number; mode: string }>(
+    `SELECT denomination_rupiah,per_transaction_cap_rupiah,mode FROM finance_credential_policy WHERE singleton_id=1`)
   return {
     units,
     shift: shift ? { ...shift, expected_cash_rupiah: Number(shift.opening_cash_rupiah) - Number(shift.paid_rupiah) } : null,
     history,
     operator: { id: session.id, name: session.full_name },
     capabilities: { canConfigure: canConfigureCashUnits(session) },
+    policy: {
+      denominationRupiah: Number(policy?.denomination_rupiah || 5000),
+      perTransactionCapRupiah: Number(policy?.per_transaction_cap_rupiah || 200000),
+      mode: policy?.mode || 'HYBRID',
+    },
   }
 }

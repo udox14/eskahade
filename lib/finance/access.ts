@@ -52,6 +52,44 @@ export async function requireFinanceAccess(permission: FinancePermission): Promi
   return session
 }
 
+export type FinanceCapabilities = Record<Lowercase<FinancePermission>, boolean> & { breakGlass: boolean }
+
+/**
+ * Satu sumber kebenaran untuk tombol yang ditampilkan UI. Sebelumnya tiap
+ * halaman menyusun flag-nya sendiri dengan `roles.includes('admin')`, padahal
+ * `requireFinanceAccess` menolak admin polos tanpa break-glass aktif — admin
+ * melihat tombol yang selalu gagal. Logika di sini mengikuti aturan yang sama
+ * persis dengan `requireFinanceAccess`.
+ */
+export async function financeCapabilities(session: SessionUser): Promise<FinanceCapabilities> {
+  const roles = getEffectiveRoles(session)
+  const all = (value: boolean): FinanceCapabilities =>
+    ({ view: value, create: value, check: value, execute: value, configure: value, audit: value, breakGlass: false })
+
+  if (roles.includes('demo')) return all(true)
+
+  const isCentral = roles.includes('bendahara')
+  const isCouncilChecker = roles.includes('dewan_santri') && roles.includes('jabatan:bendahara')
+  const isDorm = roles.includes('pengurus_asrama') && roles.includes('jabatan:bendahara')
+  const hasNativeFinanceRole = isCentral || isCouncilChecker || isDorm
+
+  if (roles.includes('admin') && !hasNativeFinanceRole) {
+    const breakGlass = await financeQueryOne<{ id: string }>(`SELECT id FROM finance_break_glass
+      WHERE user_id=? AND revoked_at IS NULL AND datetime(expires_at)>datetime('now') ORDER BY starts_at DESC LIMIT 1`, [session.id])
+    return { ...all(Boolean(breakGlass)), breakGlass: Boolean(breakGlass) }
+  }
+
+  return {
+    view: isCentral || isCouncilChecker || isDorm,
+    create: isCentral || isDorm,
+    check: isCouncilChecker,
+    audit: isCouncilChecker,
+    execute: isCentral,
+    configure: isCentral,
+    breakGlass: false,
+  }
+}
+
 export function financeAsramaScope(session: SessionUser): string | null {
   const roles = getEffectiveRoles(session)
   if (roles.includes('pengurus_asrama') && !roles.includes('bendahara') && !roles.includes('dewan_santri')) {
