@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
-import { createJWTToken, ensureUserStructuralJabatanColumn } from '@/lib/auth/session'
+import {
+  createJWTToken,
+  ensureUserStructuralJabatanColumn,
+  SESSION_COOKIE,
+  STAFF_SESSION_COOKIE_MAX_AGE,
+} from '@/lib/auth/session'
 import { logActivity } from '@/lib/activity-log'
 
 export async function POST(request: NextRequest) {
@@ -102,13 +107,13 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({ success: true })
     response.cookies.set({
-      name: 'eskahade_session',
+      name: SESSION_COOKIE,
       value: token,
       httpOnly: true,
       secure: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: STAFF_SESSION_COOKIE_MAX_AGE,
     })
 
     await logActivity({

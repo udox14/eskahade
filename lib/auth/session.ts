@@ -3,8 +3,13 @@
 import { cookies } from 'next/headers'
 import { execute, queryOne } from '@/lib/db'
 
-const SESSION_COOKIE = 'eskahade_session'
-const STAFF_SESSION_MAX_AGE = 60 * 60 * 8
+export const SESSION_COOKIE = 'eskahade_session'
+
+// Sesi staf bersifat persisten. JWT tidak diberi `exp`, sehingga server tidak
+// akan mengakhiri sesi hanya karena waktu berjalan. Cookie tetap diberi umur
+// panjang agar login bertahan setelah browser ditutup.
+export const STAFF_SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 365 * 10
+const STAFF_SESSION_TOKEN_MAX_AGE: number | null = null
 let structuralJabatanColumnReady = false
 const STRUCTURAL_ROLE_VALUES = ['pengurus_asrama', 'sekpen', 'dewan_santri', 'keamanan']
 const DEFAULT_STRUCTURAL_JABATAN = 'anggota'
@@ -90,18 +95,22 @@ function base64urlDecode(data: string): string {
   return atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
 }
 
-export async function createJWTToken(payload: object, maxAgeSeconds = STAFF_SESSION_MAX_AGE): Promise<string> {
+export async function createJWTToken(payload: object, maxAgeSeconds: number | null = STAFF_SESSION_TOKEN_MAX_AGE): Promise<string> {
   return createJWT(payload, maxAgeSeconds)
 }
 
-async function createJWT(payload: object, maxAgeSeconds = STAFF_SESSION_MAX_AGE): Promise<string> {
+async function createJWT(payload: object, maxAgeSeconds: number | null = STAFF_SESSION_TOKEN_MAX_AGE): Promise<string> {
   const secret = getJWTSecret()
   const header = base64urlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
-  const body = base64urlEncode(JSON.stringify({
+  const issuedAt = Math.floor(Date.now() / 1000)
+  const bodyPayload: Record<string, unknown> = {
     ...payload,
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + maxAgeSeconds
-  }))
+    iat: issuedAt,
+  }
+  if (maxAgeSeconds !== null) {
+    bodyPayload.exp = issuedAt + maxAgeSeconds
+  }
+  const body = base64urlEncode(JSON.stringify(bodyPayload))
 
   const enc = new TextEncoder()
   const key = await crypto.subtle.importKey(
@@ -153,7 +162,7 @@ async function verifyJWT(token: string): Promise<SessionUser | null> {
 }
 
 export async function setSession(user: SessionUser): Promise<void> {
-  const token = await createJWT(user, STAFF_SESSION_MAX_AGE)
+  const token = await createJWT(user)
   const cookieStore = await cookies()
   cookieStore.set({
     name: SESSION_COOKIE,
@@ -162,7 +171,7 @@ export async function setSession(user: SessionUser): Promise<void> {
     secure: true,
     sameSite: 'lax',
     path: '/',
-    maxAge: STAFF_SESSION_MAX_AGE
+    maxAge: STAFF_SESSION_COOKIE_MAX_AGE
   })
 }
 

@@ -17,7 +17,9 @@ import { financeQueryOne, queryOne } from '@/lib/db'
 import { createJWTToken, verifyJWTToken } from '@/lib/auth/session'
 
 export const PORTAL_COOKIE = 'eskahade_portal_session'
-const PORTAL_MAX_AGE = 60 * 60 * 24 * 30 // 30 hari (cookie yang membatasi umur session)
+// Portal orang tua juga dibuat persistent agar tidak logout sendiri.
+// JWT-nya tidak diberi exp; cookie hanya menjadi tempat penyimpanan persisten.
+const PORTAL_MAX_AGE = 60 * 60 * 24 * 365 * 10
 
 export type PortalTokenPayload = {
   kind: 'portal_ortu'
@@ -37,7 +39,7 @@ export type PortalSession = PortalTokenPayload & {
 }
 
 export async function createPortalToken(payload: PortalTokenPayload): Promise<string> {
-  return createJWTToken(payload, PORTAL_MAX_AGE)
+  return createJWTToken(payload, null)
 }
 
 export function portalCookieOptions() {
