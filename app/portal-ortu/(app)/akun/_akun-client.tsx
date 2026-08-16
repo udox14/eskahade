@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { CircleNotch, Key, ShieldWarning, SignOut } from '@phosphor-icons/react'
 import { gantiPasswordPortal } from './actions'
 
-export function AkunClient({ mustChangePassword }: { mustChangePassword: boolean }) {
+export function AkunClient({ mustChangePassword, nis }: { mustChangePassword: boolean; nis: string }) {
   const router = useRouter()
   const [passwordLama, setPasswordLama] = useState('')
   const [passwordBaru, setPasswordBaru] = useState('')
@@ -67,6 +67,11 @@ export function AkunClient({ mustChangePassword }: { mustChangePassword: boolean
           <Key className="w-4 h-4 text-[var(--p-emerald)]" />
           <h2 className="portal-display text-lg text-[var(--p-emerald-deep)]">Ganti Password</h2>
         </div>
+        <p className="mt-1 text-[11px] text-[var(--p-muted)]">
+          Ini adalah password login untuk akun <span className="font-bold">NIS {nis}</span>. Jika Anda
+          punya lebih dari satu anak dan baru memakai &ldquo;Ganti Anak&rdquo; di menu Saldo, pastikan NIS di atas
+          benar sebelum menyimpan — password baru hanya berlaku untuk NIS tersebut.
+        </p>
 
         <label className="block mt-4">
           <span className="text-xs font-bold uppercase tracking-wider text-[var(--p-muted)]">Password Lama</span>

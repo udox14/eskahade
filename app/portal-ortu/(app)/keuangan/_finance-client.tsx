@@ -15,8 +15,12 @@ export function FinanceClient({
   methods: string[]
   limits: { daily_rupiah: number | null; weekly_rupiah: number | null; monthly_rupiah: number | null } | null
 }) {
-  const [pending, startTransition] = useTransition()
-  const [amount, setAmount] = useState(100000)
+  const [topupPending, startTopupTransition] = useTransition()
+  const [allocPending, startAllocTransition] = useTransition()
+  const [limitPending, startLimitTransition] = useTransition()
+  const [pinPending, startPinTransition] = useTransition()
+  const [topupAmount, setTopupAmount] = useState(100000)
+  const [allocAmount, setAllocAmount] = useState(50000)
   const [method, setMethod] = useState(methods[0] || '')
   const [destination, setDestination] = useState<'SPP' | 'USPP' | 'NON_SPP' | 'MAKAN' | 'LAUNDRY' | 'JAJAN'>('JAJAN')
   const [daily, setDaily] = useState(limits?.daily_rupiah || 0)
@@ -49,9 +53,9 @@ export function FinanceClient({
                 <button
                   key={preset}
                   type="button"
-                  onClick={() => setAmount(preset)}
+                  onClick={() => setTopupAmount(preset)}
                   className={`rounded-xl border py-2 text-xs font-bold transition active:scale-95 ${
-                    amount === preset
+                    topupAmount === preset
                       ? 'border-[var(--p-emerald)] bg-[var(--p-emerald)] text-white shadow-sm'
                       : 'border-[var(--p-line)] bg-[var(--p-cream)]/60 text-[var(--p-ink)] hover:bg-[var(--p-cream)]'
                   }`}
@@ -64,8 +68,8 @@ export function FinanceClient({
               type="number"
               min={10000}
               step={1000}
-              value={amount || ''}
-              onChange={e => setAmount(Number(e.target.value))}
+              value={topupAmount || ''}
+              onChange={e => setTopupAmount(Number(e.target.value))}
               className={inputCls}
               aria-label="Nominal top up"
               placeholder="Atau ketik nominal custom..."
@@ -92,10 +96,10 @@ export function FinanceClient({
           </div>
 
           <button
-            disabled={pending || !method || amount <= 0}
+            disabled={topupPending || !method || topupAmount <= 0}
             onClick={() =>
-              startTransition(async () => {
-                const result = await createPortalTopup({ amountRupiah: amount, paymentMethod: method })
+              startTopupTransition(async () => {
+                const result = await createPortalTopup({ amountRupiah: topupAmount, paymentMethod: method })
                 if ('error' in result) toast.error(result.error)
                 else if (result.paymentUrl) window.location.href = result.paymentUrl
                 else toast.success('Instruksi pembayaran dibuat.')
@@ -103,8 +107,8 @@ export function FinanceClient({
             }
             className="w-full rounded-2xl bg-[var(--p-emerald)] py-3.5 text-sm font-bold text-white shadow-md active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {pending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
-            {pending ? 'Memproses...' : `Bayar ${formatRupiah(amount)}`}
+            {topupPending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
+            {topupPending ? 'Memproses...' : `Bayar ${formatRupiah(topupAmount)}`}
           </button>
         </div>
       </section>
@@ -142,9 +146,9 @@ export function FinanceClient({
               type="number"
               min={1000}
               step={1000}
-              value={destination === 'SPP' || destination === 'NON_SPP' ? '' : amount || ''}
+              value={destination === 'SPP' || destination === 'NON_SPP' ? '' : allocAmount || ''}
               disabled={destination === 'SPP' || destination === 'NON_SPP'}
-              onChange={e => setAmount(Number(e.target.value))}
+              onChange={e => setAllocAmount(Number(e.target.value))}
               placeholder={destination === 'SPP' || destination === 'NON_SPP' ? 'Dihitung otomatis...' : 'Nominal...'}
               className={inputCls}
             />
@@ -156,12 +160,12 @@ export function FinanceClient({
           </div>
 
           <button
-            disabled={pending}
+            disabled={allocPending}
             onClick={() =>
-              startTransition(async () => {
+              startAllocTransition(async () => {
                 const result = await allocatePortalFunds({
                   destination,
-                  amountRupiah: amount,
+                  amountRupiah: allocAmount,
                   requestKey: crypto.randomUUID(),
                 })
                 if ('error' in result) toast.error(result.error)
@@ -170,8 +174,8 @@ export function FinanceClient({
             }
             className="w-full rounded-2xl border border-[var(--p-emerald)] bg-emerald-50/50 text-[var(--p-emerald-deep)] py-3 text-sm font-bold active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {pending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <ArrowsLeftRight className="w-4 h-4" />}
-            {pending ? 'Proses Alokasi...' : 'Alokasikan Saldo'}
+            {allocPending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <ArrowsLeftRight className="w-4 h-4" />}
+            {allocPending ? 'Proses Alokasi...' : 'Alokasikan Saldo'}
           </button>
         </div>
       </section>
@@ -232,9 +236,9 @@ export function FinanceClient({
           </div>
 
           <button
-            disabled={pending}
+            disabled={limitPending}
             onClick={() =>
-              startTransition(async () => {
+              startLimitTransition(async () => {
                 const result = await updatePortalWithdrawalLimits({
                   dailyRupiah: daily || null,
                   weeklyRupiah: weekly || null,
@@ -250,8 +254,8 @@ export function FinanceClient({
             }
             className="w-full rounded-2xl border border-[var(--p-emerald)] bg-white text-[var(--p-emerald-deep)] py-3 text-sm font-bold active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-emerald-50/50"
           >
-            {pending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <Sliders className="w-4 h-4" />}
-            {pending ? 'Menyimpan...' : 'Simpan Limit Pencairan'}
+            {limitPending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <Sliders className="w-4 h-4" />}
+            {limitPending ? 'Menyimpan...' : 'Simpan Limit Pencairan'}
           </button>
         </div>
       </section>
@@ -291,9 +295,9 @@ export function FinanceClient({
           </div>
 
           <button
-            disabled={pending}
+            disabled={pinPending}
             onClick={() =>
-              startTransition(async () => {
+              startPinTransition(async () => {
                 const result = await resetPortalStudentPin({ accountPassword, newPin })
                 if ('error' in result) toast.error(result.error)
                 else {
@@ -305,8 +309,8 @@ export function FinanceClient({
             }
             className="w-full rounded-2xl border border-[var(--p-emerald)] bg-white text-[var(--p-emerald-deep)] py-3 text-sm font-bold active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-emerald-50/50"
           >
-            {pending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
-            {pending ? 'Menyimpan PIN...' : 'Atur Ulang PIN Santri'}
+            {pinPending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
+            {pinPending ? 'Menyimpan PIN...' : 'Atur Ulang PIN Santri'}
           </button>
         </div>
       </section>

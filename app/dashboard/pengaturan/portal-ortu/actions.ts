@@ -7,6 +7,7 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { hashPassword } from '@/lib/auth/password'
 import { deleteFromR2, uploadToR2 } from '@/lib/r2/upload'
 import { getPaymentChannels, type PortalBank } from '@/lib/portal/data'
+import { syncGuardianPasswordHash } from '@/lib/finance/portal-guardian-sync'
 
 const PATH = '/dashboard/pengaturan/portal-ortu'
 const SETTINGS_KEY = 'portal_payment_channels'
@@ -158,11 +159,25 @@ export async function resetPortalPassword(santriId: string): Promise<{ success: 
     const session = await getSession()
     assertAdmin(session)
 
-    const santri = await queryOne<{ id: string; nama_lengkap: string }>(
-      `SELECT id, nama_lengkap FROM santri WHERE id = ?`, [santriId])
+    const santri = await queryOne<{ id: string; nis: string; nama_lengkap: string }>(
+      `SELECT id, nis, nama_lengkap FROM santri WHERE id = ?`, [santriId])
     if (!santri) return { error: 'Santri tidak ditemukan.' }
 
-    await execute(`DELETE FROM portal_ortu_credentials WHERE santri_id = ?`, [santriId])
+    // Password default baru = NIS (sama seperti provisioning login pertama).
+    // Pakai UPSERT (bukan DELETE) supaya status blokir (is_active) yang sudah
+    // ada tidak ikut ter-reset tanpa sengaja, dan token_version dinaikkan
+    // supaya sesi lama yang mungkin masih dipakai orang lain otomatis logout.
+    const newHash = await hashPassword(santri.nis)
+    await execute(`
+      INSERT INTO portal_ortu_credentials (santri_id, password_hash, must_change_password, is_active, token_version)
+      VALUES (?, ?, 1, 1, 1)
+      ON CONFLICT(santri_id) DO UPDATE SET
+        password_hash = excluded.password_hash,
+        must_change_password = 1,
+        token_version = portal_ortu_credentials.token_version + 1,
+        updated_at = datetime('now')
+    `, [santriId, newHash])
+    await syncGuardianPasswordHash(santriId, newHash).catch(() => {})
 
     await logActivity({
       actor: actorFromSession(session),

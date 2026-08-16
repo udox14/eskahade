@@ -13,6 +13,29 @@ function birthDatePassword(tanggalLahir: string | null): string | null {
   return `${m[3]}${m[2]}${m[1]}`
 }
 
+// Rate limit percobaan login per santri (NIS diketahui publik, password
+// default bisa ditebak dari tanggal lahir) — lihat migrations/0141.
+const MAX_ATTEMPTS = 5
+const LOCK_MINUTES = 15
+
+async function recordFailedAttempt(santriId: string): Promise<void> {
+  await execute(`
+    INSERT INTO portal_login_throttle (santri_id, failed_attempts, locked_until, updated_at)
+    VALUES (?, 1, NULL, datetime('now'))
+    ON CONFLICT(santri_id) DO UPDATE SET
+      failed_attempts = failed_attempts + 1,
+      locked_until = CASE WHEN failed_attempts + 1 >= ? THEN datetime('now', '+' || ? || ' minutes') ELSE locked_until END,
+      updated_at = datetime('now')
+  `, [santriId, MAX_ATTEMPTS, LOCK_MINUTES])
+}
+
+async function resetThrottle(santriId: string): Promise<void> {
+  await execute(`
+    UPDATE portal_login_throttle SET failed_attempts = 0, locked_until = NULL, updated_at = datetime('now')
+    WHERE santri_id = ?
+  `, [santriId])
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -41,6 +64,7 @@ export async function POST(request: NextRequest) {
     )
 
     const fail = async (reason: string, label?: string) => {
+      if (santri) await recordFailedAttempt(santri.id).catch(() => {})
       await logActivity({
         actor: { name: label || nis },
         module: 'portal_ortu',
@@ -58,13 +82,37 @@ export async function POST(request: NextRequest) {
     if (!santri) return fail('santri_not_found')
     if (santri.status_global !== 'aktif') return fail('santri_not_active', santri.nama_lengkap)
 
+    const throttle = await queryOne<{ locked_until: string | null }>(
+      `SELECT locked_until FROM portal_login_throttle WHERE santri_id = ?`,
+      [santri.id]
+    )
+    if (throttle?.locked_until && new Date(throttle.locked_until).getTime() > Date.now()) {
+      await logActivity({
+        actor: { name: santri.nama_lengkap },
+        module: 'portal_ortu',
+        action: 'login',
+        entityType: 'portal_session',
+        entityId: santri.id,
+        entityLabel: santri.nama_lengkap,
+        summary: `Login portal ortu ditolak (rate limit) untuk ${santri.nama_lengkap}`,
+        details: { reason: 'rate_limited', nis, channel: 'portal' },
+        status: 'failed',
+        requestInfo,
+      })
+      return NextResponse.json(
+        { error: 'Terlalu banyak percobaan gagal. Coba lagi dalam beberapa menit.' },
+        { status: 429 }
+      )
+    }
+
     const cred = await queryOne<{
       santri_id: string
       password_hash: string
       is_active: number
       must_change_password: number
+      token_version: number | null
     }>(
-      `SELECT santri_id, password_hash, is_active, must_change_password
+      `SELECT santri_id, password_hash, is_active, must_change_password, token_version
        FROM portal_ortu_credentials WHERE santri_id = ?`,
       [santri.id]
     )
@@ -106,6 +154,8 @@ export async function POST(request: NextRequest) {
       mustChangePassword = true
     }
 
+    await resetThrottle(santri.id).catch(() => {})
+
     await execute(
       `UPDATE portal_ortu_credentials
        SET last_login_at = datetime('now'), updated_at = datetime('now')
@@ -142,6 +192,7 @@ export async function POST(request: NextRequest) {
       santri_id: santri.id,
       nis: santri.nis,
       nama: santri.nama_lengkap,
+      token_version: Number(cred?.token_version ?? 1),
     })
 
     const response = NextResponse.json({ success: true, mustChangePassword })

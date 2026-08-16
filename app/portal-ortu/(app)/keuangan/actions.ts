@@ -7,6 +7,8 @@ import { createTopupIntent } from '@/lib/finance/payments'
 import { financeQuery as query, financeQueryOne as queryOne, getFinanceDB as getDB, generateId, queryOne as mainQueryOne } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
 import { setStudentPin } from '@/lib/finance/credentials'
+import { syncPortalSppBills, syncPortalNonSppBills } from '@/lib/finance/portal-bills-sync'
+import { isAsramaTanpaKamar } from '@/lib/asrama'
 
 async function requirePortalFinanceAccess() {
   const session = await requirePortalSessionAction()
@@ -37,8 +39,12 @@ export async function allocatePortalFunds(input: { destination: 'SPP' | 'USPP' |
   const session = await requirePortalFinanceAccess()
   let amountRupiah=Number(input.amountRupiah),fullOutstandingRupiah:number|null=null,billingReference:string|null=null,billItems:Array<{billId:string;amountRupiah:number}>|undefined
   if(input.destination==='SPP'){
+    const tampilkanSpp=!session.bebas_spp && !isAsramaTanpaKamar(session.asrama)
+    if(!tampilkanSpp)return{error:'Santri ini tidak memiliki kewajiban SPP.'}
+    await syncPortalSppBills(session.santri_id,true)
     const bills=await query<{id:string;remaining:number}>(`SELECT id,amount_rupiah-paid_rupiah remaining FROM finance_bills WHERE santri_id=? AND bill_kind='SPP' AND status='OPEN' ORDER BY due_date,id`,[session.santri_id]);const items=bills.map(item=>({billId:item.id,amountRupiah:Number(item.remaining)}));billItems=items;amountRupiah=items.reduce((sum,item)=>sum+item.amountRupiah,0);fullOutstandingRupiah=amountRupiah;billingReference=`SPP-ALL:${items.map(item=>item.billId).join(',')}`
   }else if(input.destination==='NON_SPP'){
+    await syncPortalNonSppBills(session.santri_id)
     const bills=await query<{id:string;remaining:number}>(`SELECT id,amount_rupiah-paid_rupiah remaining FROM finance_bills WHERE santri_id=? AND bill_kind='NON_SPP' AND status='OPEN' ORDER BY due_date,id`,[session.santri_id]);const items=bills.map(item=>({billId:item.id,amountRupiah:Number(item.remaining)}));billItems=items;amountRupiah=items.reduce((sum,item)=>sum+item.amountRupiah,0);fullOutstandingRupiah=amountRupiah;billingReference=`NONSPP-ALL:${items.map(item=>item.billId).join(',')}`
   }else if(input.destination==='USPP'){
     const bills=await query<{id:string;remaining:number}>(`SELECT id,amount_rupiah-paid_rupiah remaining FROM finance_bills WHERE santri_id=? AND bill_kind='USPP' AND status IN ('OPEN','PARTIAL') ORDER BY due_date,id`,[session.santri_id]);let needed=amountRupiah;const items:Array<{billId:string;amountRupiah:number}>=[];for(const bill of bills){if(needed<=0)break;const applied=Math.min(needed,Number(bill.remaining));if(applied>0){items.push({billId:bill.id,amountRupiah:applied});needed-=applied}}if(needed>0)return{error:'Nominal melebihi sisa tagihan USPP.'};billItems=items;billingReference=`USPP:${items.map(item=>item.billId).join(',')}`
@@ -47,7 +53,7 @@ export async function allocatePortalFunds(input: { destination: 'SPP' | 'USPP' |
   const result = await allocateStudentFunds({
     idempotencyKey: `portal:${session.santri_id}:${input.requestKey}`,
     santriId: session.santri_id, destination: input.destination, amountRupiah,fullOutstandingRupiah,billingReference,billItems,
-    actorType: 'GUARDIAN', actorId: session.santri_id,
+    actorType: 'GUARDIAN', actorId: session.guardian_id || session.santri_id,
   })
   if (result.success) revalidatePath('/portal-ortu/keuangan')
   return result

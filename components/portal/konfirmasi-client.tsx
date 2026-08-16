@@ -76,7 +76,7 @@ export function KonfirmasiPortalClient({
   getList: (statusFilter: string) => Promise<ListResult>
   approve: (id: string) => Promise<ActionResult>
   reject: (id: string, reason: string) => Promise<ActionResult>
-  undo: (id: string, reason: string) => Promise<ActionResult>
+  undo?: (id: string, reason: string) => Promise<ActionResult>
 }) {
   const [statusFilter, setStatusFilter] = useState('menunggu_konfirmasi')
   const [rows, setRows] = useState<KonfirmasiRow[]>([])
@@ -134,6 +134,7 @@ export function KonfirmasiPortalClient({
   }
 
   function handleUndo(row: KonfirmasiRow) {
+    if (!undo) return
     const reason = window.prompt(`Batalkan konfirmasi ${row.nama_lengkap}? Pembayaran yang tercatat akan dihapus. Alasan (min. 5 karakter):`)
     if (reason === null) return
     runAction(row.id, () => undo(row.id, reason), 'Konfirmasi dibatalkan.')
@@ -270,7 +271,7 @@ export function KonfirmasiPortalClient({
                       </button>
                     </>
                   )}
-                  {row.status === 'terkonfirmasi' && (
+                  {row.status === 'terkonfirmasi' && undo && (
                     <button
                       disabled={busy}
                       onClick={() => handleUndo(row)}
@@ -279,6 +280,11 @@ export function KonfirmasiPortalClient({
                       {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
                       Batalkan Konfirmasi
                     </button>
+                  )}
+                  {row.status === 'terkonfirmasi' && !undo && (
+                    <span className="text-[11px] text-slate-400">
+                      Sudah lunas lewat Keuangan Terpusat. Koreksi kesalahan lewat Ledger &amp; Insiden Keuangan.
+                    </span>
                   )}
                   {row.status === 'menunggu_konfirmasi' && !row.bukti_url && (
                     <span className="flex items-center gap-1 text-[11px] text-amber-600">

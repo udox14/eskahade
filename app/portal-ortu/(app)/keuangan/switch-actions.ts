@@ -13,7 +13,11 @@ export async function switchPortalStudent(formData: FormData) {
   if (!link) throw new Error('Santri tidak terhubung dengan akun wali ini.')
   const target = await queryOne<{ id: string; nis: string; nama_lengkap: string }>(`SELECT id,nis,nama_lengkap FROM santri WHERE id=? AND status_global='aktif'`, [santriId])
   if (!target) throw new Error('Santri tidak aktif atau tidak ditemukan.')
-  const token = await createPortalToken({ kind: 'portal_ortu', guardian_id: session.guardian_id, santri_id: target.id, nis: target.nis, nama: target.nama_lengkap })
+  const targetCred = await queryOne<{ token_version: number | null }>(`SELECT token_version FROM portal_ortu_credentials WHERE santri_id=?`, [target.id])
+  const token = await createPortalToken({
+    kind: 'portal_ortu', guardian_id: session.guardian_id, santri_id: target.id, nis: target.nis, nama: target.nama_lengkap,
+    token_version: Number(targetCred?.token_version ?? 1),
+  })
   ;(await cookies()).set({ ...portalCookieOptions(), value: token })
   redirect('/portal-ortu/keuangan')
 }

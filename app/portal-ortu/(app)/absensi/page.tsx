@@ -3,6 +3,7 @@ import { CalendarX, CaretLeft, CaretRight, Clock } from '@phosphor-icons/react/d
 import { requirePortalSessionStrict } from '@/lib/portal/session'
 import { getRekapAbsensiAnak } from '@/lib/portal/data'
 import { formatTanggalId, namaBulanId } from '@/lib/portal/format'
+import { toWibDateInputValue } from '@/lib/date/wib'
 import { PortalPageHeader } from '../../_components/page-header'
 
 export const dynamic = 'force-dynamic'
@@ -14,17 +15,17 @@ const STATUS_STYLE: Record<string, { label: string; cls: string }> = {
   I: { label: 'Izin', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
 }
 
+// Default bulan (tanpa query ?bulan=) mengikuti WIB, bukan waktu server.
 function parseBulanParam(value: string | undefined) {
   const m = String(value || '').match(/^(\d{4})-(\d{2})$/)
-  const nowDate = new Date()
-  const tahun = m ? Number(m[1]) : nowDate.getFullYear()
-  const bulan = m ? Number(m[2]) : nowDate.getMonth() + 1
-  return { tahun, bulan: Math.min(12, Math.max(1, bulan)) }
+  if (m) return { tahun: Number(m[1]), bulan: Math.min(12, Math.max(1, Number(m[2]))) }
+  const [y, mo] = toWibDateInputValue().split('-').map(Number)
+  return { tahun: y, bulan: mo }
 }
 
 function shiftBulan(tahun: number, bulan: number, delta: number) {
-  const d = new Date(tahun, bulan - 1 + delta, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  const d = new Date(Date.UTC(tahun, bulan - 1 + delta, 1))
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
 export default async function AbsensiPage({
@@ -37,7 +38,7 @@ export default async function AbsensiPage({
   const { tahun, bulan } = parseBulanParam(bulanParam)
 
   const start = `${tahun}-${String(bulan).padStart(2, '0')}-01`
-  const lastDay = new Date(tahun, bulan, 0).getDate()
+  const lastDay = new Date(Date.UTC(tahun, bulan, 0)).getUTCDate()
   const end = `${tahun}-${String(bulan).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
 
   const rekap = await getRekapAbsensiAnak(session.santri_id, start, end)

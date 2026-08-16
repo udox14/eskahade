@@ -49,14 +49,43 @@ export async function getRekapAbsensiAnak(
   `, [santriId])
   if (!riwayat) return empty
 
-  const detail = await query<{ tanggal: string; shubuh: string | null; ashar: string | null; maghrib: string | null }>(`
-    SELECT tanggal, shubuh, ashar, maghrib
+  // Alfa mentah belum tentu final: baru dihitung/ditampilkan ke ortu setelah
+  // lolos salah satu jalur verifikasi (Verifikasi Absensi ATAU tahap akhir
+  // Verifikasi Panggilan/Vonis Final Pengajian) — keduanya bermuara ke
+  // verif_<sesi>='OK' pada absensi_harian (lihat app/dashboard/akademik/absensi/verifikasi/actions.ts
+  // dan app/dashboard/keamanan/verifikasi-panggilan/final-vonis.ts). Sakit/izin
+  // sudah final sejak diinput, tidak melalui alur verifikasi ini.
+  const rawDetail = await query<{
+    tanggal: string
+    shubuh: string | null; ashar: string | null; maghrib: string | null
+    verif_shubuh: string | null; verif_ashar: string | null; verif_maghrib: string | null
+  }>(`
+    SELECT tanggal, shubuh, ashar, maghrib, verif_shubuh, verif_ashar, verif_maghrib
     FROM absensi_harian
     WHERE riwayat_pendidikan_id = ?
       AND tanggal >= ? AND tanggal <= ?
-      AND (shubuh IN ('A','S','I') OR ashar IN ('A','S','I') OR maghrib IN ('A','S','I'))
+      AND (
+        shubuh IN ('S','I') OR (shubuh = 'A' AND verif_shubuh = 'OK')
+        OR ashar IN ('S','I') OR (ashar = 'A' AND verif_ashar = 'OK')
+        OR maghrib IN ('S','I') OR (maghrib = 'A' AND verif_maghrib = 'OK')
+      )
     ORDER BY tanggal DESC
   `, [riwayat.id, effectiveRange.start, effectiveRange.end])
+
+  function statusFinal(status: string | null, verif: string | null) {
+    if (status === 'S' || status === 'I') return status
+    if (status === 'A' && verif === 'OK') return 'A'
+    return null
+  }
+
+  const detail = rawDetail
+    .map(row => ({
+      tanggal: row.tanggal,
+      shubuh: statusFinal(row.shubuh, row.verif_shubuh),
+      ashar: statusFinal(row.ashar, row.verif_ashar),
+      maghrib: statusFinal(row.maghrib, row.verif_maghrib),
+    }))
+    .filter(row => row.shubuh || row.ashar || row.maghrib)
 
   let sakit = 0, izin = 0, alfa = 0
   detail.forEach(row => {
@@ -137,12 +166,20 @@ export async function getPendingSubmission(santriId: string, kategori: 'SPP' | '
 }
 
 // Pengajuan ditolak paling baru yang belum digantikan pengajuan lain — untuk
-// banner "upload ulang" di portal.
+// banner "upload ulang" di portal. "Belum digantikan" berarti tidak ada
+// pengajuan lain (kategori sama) yang dibuat setelahnya — kalau ortu sudah
+// membuat pengajuan baru pasca penolakan, banner ini tidak relevan lagi
+// walau baris lama itu sendiri tetap berstatus 'ditolak' selamanya.
 export async function getLatestRejectedSubmission(santriId: string, kategori: 'SPP' | 'NON_SPP') {
   return queryOne<PortalSubmission>(`
-    SELECT * FROM portal_payment_submission
-    WHERE santri_id = ? AND kategori = ? AND status = 'ditolak'
-    ORDER BY datetime(updated_at) DESC
+    SELECT * FROM portal_payment_submission ps
+    WHERE ps.santri_id = ? AND ps.kategori = ? AND ps.status = 'ditolak'
+      AND NOT EXISTS (
+        SELECT 1 FROM portal_payment_submission newer
+        WHERE newer.santri_id = ps.santri_id AND newer.kategori = ps.kategori
+          AND datetime(newer.created_at) > datetime(ps.created_at)
+      )
+    ORDER BY datetime(ps.updated_at) DESC
     LIMIT 1
   `, [santriId, kategori])
 }

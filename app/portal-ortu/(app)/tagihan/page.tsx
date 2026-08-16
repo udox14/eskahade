@@ -1,6 +1,7 @@
 import { requirePortalSessionStrict } from '@/lib/portal/session'
-import { getTunggakanSppSantri } from '@/lib/spp/tunggakan'
-import { getNonSppOutstandingSantri } from '@/lib/keuangan/non-spp-outstanding'
+import {
+  syncPortalSppBills, syncPortalNonSppBills, getPortalOpenBills, sppBillSublabel, nonSppBillSublabel,
+} from '@/lib/finance/portal-bills-sync'
 import { getPaymentChannels, getPendingSubmission } from '@/lib/portal/data'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
 import { PortalPageHeader } from '../../_components/page-header'
@@ -8,40 +9,36 @@ import { TagihanClient, type TagihanItem } from './_tagihan-client'
 
 export const dynamic = 'force-dynamic'
 
-const NON_SPP_LABEL: Record<string, string> = {
-  BANGUNAN: 'Uang Bangunan',
-  KESEHATAN: 'Kesehatan',
-  EHB: 'EHB (Evaluasi Hasil Belajar)',
-  EKSKUL: 'Ekstrakurikuler',
-}
-
 export default async function TagihanPage() {
   const session = await requirePortalSessionStrict()
   const tampilkanSpp = !session.bebas_spp && !isAsramaTanpaKamar(session.asrama)
 
-  const [spp, nonSpp, channels, pendingSpp, pendingNonSpp] = await Promise.all([
-    tampilkanSpp ? getTunggakanSppSantri(session.santri_id) : Promise.resolve(null),
-    getNonSppOutstandingSantri(session.santri_id),
+  await Promise.all([
+    syncPortalSppBills(session.santri_id, tampilkanSpp),
+    syncPortalNonSppBills(session.santri_id),
+  ])
+
+  const [sppBills, nonSppBills, channels, pendingSpp, pendingNonSpp] = await Promise.all([
+    tampilkanSpp ? getPortalOpenBills(session.santri_id, 'SPP') : Promise.resolve([]),
+    getPortalOpenBills(session.santri_id, 'NON_SPP'),
     getPaymentChannels(),
     getPendingSubmission(session.santri_id, 'SPP'),
     getPendingSubmission(session.santri_id, 'NON_SPP'),
   ])
 
-  const sppItems: TagihanItem[] = (spp?.items ?? []).map(item => ({
-    key: item.source === 'HISTORIS' ? `H:${item.id}` : `B:${item.tahun}-${item.bulan}`,
-    label: item.label,
-    sublabel: item.source === 'HISTORIS' ? 'Tunggakan lama' : null,
-    nominal: item.nominal,
+  const sppItems: TagihanItem[] = sppBills.map(bill => ({
+    key: bill.id,
+    label: bill.title,
+    sublabel: sppBillSublabel(bill.period_key),
+    nominal: Number(bill.amount_rupiah),
   }))
 
-  const nonSppItems: TagihanItem[] = (nonSpp?.items ?? [])
-    .filter(item => item.sisa > 0)
-    .map(item => ({
-      key: item.jenis,
-      label: NON_SPP_LABEL[item.jenis] || item.jenis,
-      sublabel: item.paid > 0 ? `Sudah dibayar sebagian` : item.jenis === 'BANGUNAN' ? 'Sekali selama mondok' : `Tahun ajaran ${nonSpp?.tahunAjaranNama ?? ''}`,
-      nominal: item.sisa,
-    }))
+  const nonSppItems: TagihanItem[] = nonSppBills.map(bill => ({
+    key: bill.id,
+    label: bill.title,
+    sublabel: nonSppBillSublabel(bill.period_key),
+    nominal: Number(bill.amount_rupiah),
+  }))
 
   return (
     <div>

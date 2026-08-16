@@ -15,7 +15,7 @@ export default async function AkunPage() {
         subtitle={`NIS ${session.nis}${session.asrama ? ` • Asrama ${session.asrama}` : ''}${session.kamar ? ` • Kamar ${session.kamar}` : ''}`}
       />
       <div className="px-5 -mt-8">
-        <AkunClient mustChangePassword={session.must_change_password} />
+        <AkunClient mustChangePassword={session.must_change_password} nis={session.nis} />
       </div>
     </div>
   )

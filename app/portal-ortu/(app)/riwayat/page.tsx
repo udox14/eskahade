@@ -1,26 +1,15 @@
 import { requirePortalSessionStrict } from '@/lib/portal/session'
 import { getRiwayatSubmissions } from '@/lib/portal/data'
-import { namaBulanId } from '@/lib/portal/format'
 import { PortalPageHeader } from '../../_components/page-header'
 import { RiwayatClient, type RiwayatItem } from './_riwayat-client'
 
 export const dynamic = 'force-dynamic'
 
-const NON_SPP_LABEL: Record<string, string> = {
-  BANGUNAN: 'Uang Bangunan',
-  KESEHATAN: 'Kesehatan',
-  EHB: 'EHB',
-  EKSKUL: 'Ekstrakurikuler',
-}
-
-function parseDetail(kategori: string, detailJson: string): string[] {
+function parseDetail(detailJson: string): string[] {
   try {
     const parsed = JSON.parse(detailJson)
     if (!Array.isArray(parsed)) return []
-    if (kategori === 'SPP') {
-      return parsed.map((item: any) => `${namaBulanId(Number(item.bulan))} ${item.tahun}`)
-    }
-    return parsed.map((item: any) => NON_SPP_LABEL[item.jenis_biaya] || String(item.jenis_biaya))
+    return parsed.map((item: any) => String(item.title || item.jenis_biaya || ''))
   } catch {
     return []
   }
@@ -33,7 +22,7 @@ export default async function RiwayatPage() {
   const items: RiwayatItem[] = rows.map(row => ({
     id: row.id,
     kategori: row.kategori,
-    rincian: parseDetail(row.kategori, row.detail_json),
+    rincian: parseDetail(row.detail_json),
     jumlah: row.jumlah,
     metode: row.metode,
     bank: (() => {

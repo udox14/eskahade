@@ -19,8 +19,14 @@ export function getDateRange(startDate: string, endDate: string) {
 }
 
 // Libur mingguan tetap: Selasa & Kamis maghrib, Jumat shubuh+ashar
+//
+// Dijangkarkan di tengah hari UTC (T12:00:00Z, pola yang sama dipakai
+// app/dashboard/keamanan/verifikasi-panggilan/actions.ts) supaya hasil
+// getDay()/iterasi tanggal tidak bergeser tergantung timezone lokal server —
+// di Workers produksi (UTC) tidak berubah, tapi di dev lokal WIB sebelumnya
+// bisa mundur satu hari karena new Date(...).toISOString() melewati UTC.
 export function isHoliday(dateStr: string, session: SessionType) {
-  const day = new Date(`${dateStr}T00:00:00`).getDay()
+  const day = new Date(`${dateStr}T12:00:00Z`).getUTCDay()
   if (day === 2 && session === 'maghrib') return true
   if (day === 4 && session === 'maghrib') return true
   if (day === 5 && (session === 'shubuh' || session === 'ashar')) return true
@@ -29,8 +35,8 @@ export function isHoliday(dateStr: string, session: SessionType) {
 
 export function countActiveSessions(startDate: string, endDate: string, liburSet: Set<string>) {
   if (!startDate || !endDate) return 0
-  const current = new Date(`${startDate}T00:00:00`)
-  const end = new Date(`${endDate}T00:00:00`)
+  const current = new Date(`${startDate}T12:00:00Z`)
+  const end = new Date(`${endDate}T12:00:00Z`)
   let total = 0
 
   while (current <= end) {
@@ -38,7 +44,7 @@ export function countActiveSessions(startDate: string, endDate: string, liburSet
     VALID_SESI.forEach(session => {
       if (!isHoliday(dateStr, session) && !liburSet.has(`${dateStr}-${session}`)) total++
     })
-    current.setDate(current.getDate() + 1)
+    current.setUTCDate(current.getUTCDate() + 1)
   }
 
   return total

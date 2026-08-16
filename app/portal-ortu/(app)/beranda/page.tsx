@@ -3,22 +3,23 @@ import {
   CalendarCheck, CaretRight, Clock, Receipt, ShieldWarning, Sparkle, XCircle,
 } from '@phosphor-icons/react/dist/ssr'
 import { requirePortalSessionStrict } from '@/lib/portal/session'
-import { getTunggakanSppSantri } from '@/lib/spp/tunggakan'
-import { getNonSppOutstandingSantri } from '@/lib/keuangan/non-spp-outstanding'
+import { syncPortalSppBills, syncPortalNonSppBills, getPortalOpenBills } from '@/lib/finance/portal-bills-sync'
 import {
   getLatestRejectedSubmission, getPelanggaranAnak, getPendingSubmission, getRekapAbsensiAnak,
 } from '@/lib/portal/data'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
 import { formatRupiah } from '@/lib/portal/format'
+import { toWibDateInputValue } from '@/lib/date/wib'
 
 export const dynamic = 'force-dynamic'
 
-function monthRange(date = new Date()) {
-  const y = date.getFullYear()
-  const m = date.getMonth()
-  const start = `${y}-${String(m + 1).padStart(2, '0')}-01`
-  const lastDay = new Date(y, m + 1, 0).getDate()
-  const end = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+// "Bulan ini" harus mengikuti WIB, bukan waktu server — di dev lokal (WIB)
+// new Date() polos bisa menyimpang dari tanggal WIB yang sebenarnya.
+function monthRange() {
+  const [y, m] = toWibDateInputValue().split('-').map(Number)
+  const start = `${y}-${String(m).padStart(2, '0')}-01`
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate()
+  const end = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
   return { start, end }
 }
 
@@ -27,10 +28,15 @@ export default async function BerandaPage() {
   const tampilkanSpp = !session.bebas_spp && !isAsramaTanpaKamar(session.asrama)
   const { start, end } = monthRange()
 
-  const [spp, nonSpp, absen, pelanggaran, pendingSpp, pendingNonSpp, rejectedSpp, rejectedNonSpp] =
+  await Promise.all([
+    syncPortalSppBills(session.santri_id, tampilkanSpp),
+    syncPortalNonSppBills(session.santri_id),
+  ])
+
+  const [sppBills, nonSppBills, absen, pelanggaran, pendingSpp, pendingNonSpp, rejectedSpp, rejectedNonSpp] =
     await Promise.all([
-      tampilkanSpp ? getTunggakanSppSantri(session.santri_id) : Promise.resolve(null),
-      getNonSppOutstandingSantri(session.santri_id),
+      tampilkanSpp ? getPortalOpenBills(session.santri_id, 'SPP') : Promise.resolve([]),
+      getPortalOpenBills(session.santri_id, 'NON_SPP'),
       getRekapAbsensiAnak(session.santri_id, start, end),
       getPelanggaranAnak(session.santri_id),
       getPendingSubmission(session.santri_id, 'SPP'),
@@ -39,10 +45,15 @@ export default async function BerandaPage() {
       getLatestRejectedSubmission(session.santri_id, 'NON_SPP'),
     ])
 
+  const totalSpp = sppBills.reduce((sum, bill) => sum + Number(bill.amount_rupiah), 0)
+  const totalNonSpp = nonSppBills.reduce((sum, bill) => sum + Number(bill.amount_rupiah), 0)
   const totalPoin = pelanggaran.reduce((sum, p) => sum + p.poin, 0)
-  const totalTagihan = (spp?.total ?? 0) + (nonSpp?.totalSisa ?? 0)
+  const totalTagihan = totalSpp + totalNonSpp
   const pendingCount = (pendingSpp ? 1 : 0) + (pendingNonSpp ? 1 : 0)
   const rejected = rejectedSpp || rejectedNonSpp
+  // pelanggaran (kartu ringkasan) sengaja all-time; banner "bersih" di bawah
+  // harus dihitung khusus bulan berjalan supaya klaim "bulan ini" akurat.
+  const pelanggaranBulanIni = pelanggaran.filter(p => p.tanggal >= start && p.tanggal <= end)
 
   return (
     <div>
@@ -99,16 +110,16 @@ export default async function BerandaPage() {
             <div className="rounded-2xl bg-[var(--p-cream)] px-3.5 py-3">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">SPP Bulanan</p>
               <p className="mt-0.5 text-sm font-extrabold text-[var(--p-ink)]">
-                {tampilkanSpp ? formatRupiah(spp?.total ?? 0) : 'Bebas SPP'}
+                {tampilkanSpp ? formatRupiah(totalSpp) : 'Bebas SPP'}
               </p>
-              {tampilkanSpp && (spp?.totalBulan ?? 0) > 0 && (
-                <p className="text-[10px] text-[var(--p-muted)]">{spp!.totalBulan} bulan belum dibayar</p>
+              {tampilkanSpp && sppBills.length > 0 && (
+                <p className="text-[10px] text-[var(--p-muted)]">{sppBills.length} bulan belum dibayar</p>
               )}
             </div>
             <div className="rounded-2xl bg-[var(--p-cream)] px-3.5 py-3">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">Non-SPP</p>
               <p className="mt-0.5 text-sm font-extrabold text-[var(--p-ink)]">
-                {formatRupiah(nonSpp?.totalSisa ?? 0)}
+                {formatRupiah(totalNonSpp)}
               </p>
               <p className="text-[10px] text-[var(--p-muted)]">Bangunan, kesehatan, dst.</p>
             </div>
@@ -197,7 +208,7 @@ export default async function BerandaPage() {
           <CaretRight className="w-4 h-4 text-[var(--p-muted)]" />
         </Link>
 
-        {pelanggaran.length === 0 && absen.alfa === 0 && (
+        {pelanggaranBulanIni.length === 0 && absen.alfa === 0 && (
           <div className="flex items-center gap-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3">
             <Sparkle className="w-4 h-4 text-[var(--p-emerald)]" />
             <p className="text-xs font-semibold text-emerald-800">
