@@ -377,7 +377,17 @@ function InlinePaymentRow({ row, tahunAjaranId, onChanged }: { row: any; tahunAj
               <div className="space-y-2">
                 <input value={nominalBangunan} onChange={(event) => setNominalBangunan(event.target.value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.'))} className="h-10 w-full rounded border border-slate-200 px-3 text-right font-mono text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder={rp(row.bangunan.sisa)} />
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => bayar('BANGUNAN', intFromInput(nominalBangunan))} disabled={saving === 'BANGUNAN'} className="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">{saving === 'BANGUNAN' ? '...' : 'Bayar Cicil'}</button>
+                  <button
+                    onClick={() => {
+                      const nominal = intFromInput(nominalBangunan)
+                      if (nominal <= 0) return toast.warning('Isi nominal cicilan terlebih dahulu.')
+                      bayar('BANGUNAN', nominal)
+                    }}
+                    disabled={saving === 'BANGUNAN'}
+                    className="rounded bg-slate-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                  >
+                    {saving === 'BANGUNAN' ? '...' : 'Bayar Cicil'}
+                  </button>
                   <button onClick={() => bayar('BANGUNAN')} disabled={saving === 'BANGUNAN'} className="rounded bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Lunasi</button>
                 </div>
               </div>
@@ -403,8 +413,10 @@ function InlinePaymentRow({ row, tahunAjaranId, onChanged }: { row: any; tahunAj
                     </div>
                     {item.lunas ? item.paymentIds[0] ? (
                       <button onClick={() => voidPayment(item.paymentIds[0])} className="rounded border border-red-200 px-2 py-1 text-xs font-bold text-red-700 hover:bg-red-50">Void</button>
+                    ) : item.hasPsbPayment && item.psbReceiptId ? (
+                      <Link href={`/dashboard/psb/kuitansi/${item.psbReceiptId}`} target="_blank" className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100">Daftar Ulang PSB</Link>
                     ) : (
-                      <span className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">{item.hasPsbPayment ? 'Daftar Ulang PSB' : 'Lunas'}</span>
+                      <span className="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-700">Lunas</span>
                     ) : item.sisa > 0 ? (
                       <button onClick={() => bayar(jenis)} disabled={saving === jenis || item.sisa <= 0} className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">Bayar</button>
                     ) : row.is_legacy_settled ? (

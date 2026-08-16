@@ -437,6 +437,7 @@ async function loadMonitoringRows(filters: {
         lunas: tarif[jenis] > 0 ? sisa <= 0 : false,
         paymentIds: jenisRows.filter((p) => !p.psb_receipt_id).map((p) => p.id),
         hasPsbPayment: jenisRows.some((p) => !!p.psb_receipt_id),
+        psbReceiptId: jenisRows.find((p) => !!p.psb_receipt_id)?.psb_receipt_id ?? null,
       }]
     }))
 

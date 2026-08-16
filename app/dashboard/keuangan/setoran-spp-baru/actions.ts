@@ -21,6 +21,8 @@ export async function getSetoranSppBaru(tahun: number) {
              SUM(sl.nominal_bayar) AS target_sistem
       FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
       WHERE sl.tahun = ? AND sl.bulan = 7
+        AND s.status_global = 'aktif'
+        AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
         AND (
           sl.tujuan_setoran = 'BENDAHARA_PUSAT'
           OR ${getKategoriSantriEfektifSql('s')} = 'BARU'
@@ -41,6 +43,8 @@ export async function getSetoranSppBaru(tahun: number) {
            s.nama_lengkap, s.nis, COALESCE(NULLIF(TRIM(s.asrama), ''), 'LAINNYA') AS unit_setor
     FROM spp_log sl JOIN santri s ON s.id = sl.santri_id
     WHERE sl.tahun = ? AND sl.bulan = 7
+      AND s.status_global = 'aktif'
+      AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
       AND (
         sl.tujuan_setoran = 'BENDAHARA_PUSAT'
         OR ${getKategoriSantriEfektifSql('s')} = 'BARU'
