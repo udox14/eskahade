@@ -1,16 +1,17 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  Bank, Buildings, CaretRight, CheckCircle, CircleNotch, Clock, Copy, Money,
-  QrCode, X,
+  Bank, Buildings, CaretRight, CheckCircle, CircleNotch, Clock, Copy, Lightning, Money,
+  QrCode, Receipt, X,
 } from '@phosphor-icons/react'
 import type { PortalPaymentChannels } from '@/lib/portal/data'
 import { formatRupiah } from '@/lib/portal/format'
-import { createSubmission } from './actions'
+import { createSubmission } from './tagihan-actions'
+import { allocatePortalFunds } from './actions'
 import { UploadBukti } from './_upload-bukti'
 
 export type TagihanItem = {
@@ -20,6 +21,11 @@ export type TagihanItem = {
   nominal: number
 }
 
+export type UsppTagihanItem = TagihanItem & {
+  sisaRupiah: number
+  status: 'OPEN' | 'PARTIAL'
+}
+
 type Kategori = 'SPP' | 'NON_SPP'
 type Step = 1 | 2 | 3
 
@@ -27,7 +33,9 @@ export function TagihanClient(props: {
   tampilkanSpp: boolean
   sppItems: TagihanItem[]
   nonSppItems: TagihanItem[]
+  usppItems: UsppTagihanItem[]
   channels: PortalPaymentChannels
+  walletBalance: number
   pendingSpp: boolean
   pendingSppSudahUpload: boolean
   pendingNonSpp: boolean
@@ -44,7 +52,9 @@ export function TagihanClient(props: {
           icon={<Money className="w-5 h-5 text-[var(--p-ink)]" />}
           title="SPP Bulanan"
           subtitle="Syahriah pengajian & asrama"
+          kategori="SPP"
           items={props.sppItems}
+          walletBalance={props.walletBalance}
           pending={props.pendingSpp}
           pendingSudahUpload={props.pendingSppSudahUpload}
           onPay={() => setWizard('SPP')}
@@ -58,12 +68,22 @@ export function TagihanClient(props: {
         icon={<Buildings className="w-5 h-5 text-[var(--p-red)]" />}
         title="Biaya Tahunan (Non-SPP)"
         subtitle="Bangunan, kesehatan, EHB, ekskul"
+        kategori="NON_SPP"
         items={props.nonSppItems}
+        walletBalance={props.walletBalance}
         pending={props.pendingNonSpp}
         pendingSudahUpload={props.pendingNonSppSudahUpload}
         onPay={() => setWizard('NON_SPP')}
         emptyText="Tidak ada tagihan Non-SPP tersisa. Jazakumullah khairan."
       />
+
+      {props.usppItems.length > 0 && (
+        <UsppCard
+          index={props.tampilkanSpp ? '03' : '02'}
+          items={props.usppItems}
+          walletBalance={props.walletBalance}
+        />
+      )}
 
       {wizard && (
         <WizardModal
@@ -83,13 +103,35 @@ function BillCard(props: {
   icon: React.ReactNode
   title: string
   subtitle: string
+  kategori: Kategori
   items: TagihanItem[]
+  walletBalance: number
   pending: boolean
   pendingSudahUpload: boolean
   onPay: () => void
   emptyText: string
 }) {
+  const router = useRouter()
+  const [quickPaying, startQuickPay] = useTransition()
   const total = props.items.reduce((sum, item) => sum + item.nominal, 0)
+  const cukupSaldo = props.walletBalance >= total
+
+  function handleQuickPay() {
+    if (quickPaying) return
+    startQuickPay(async () => {
+      const result = await allocatePortalFunds({
+        destination: props.kategori,
+        amountRupiah: total,
+        requestKey: crypto.randomUUID(),
+      })
+      if ('error' in result) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(`${props.title} berhasil dilunasi dari saldo titipan.`)
+      router.refresh()
+    })
+  }
 
   return (
     <div className={`portal-rise ${props.rise} portal-card p-5`}>
@@ -130,22 +172,163 @@ function BillCard(props: {
             </div>
             {props.pending ? (
               <Link
-                href="/portal-ortu/riwayat"
+                href="/portal-ortu/keuangan?tab=riwayat"
                 className="portal-badge portal-badge-warning !py-2.5 !px-4 !text-xs"
               >
                 <Clock className="w-3.5 h-3.5" />
                 {props.pendingSudahUpload ? 'Menunggu konfirmasi' : 'Lanjutkan upload'}
               </Link>
             ) : (
-              <button
-                onClick={props.onPay}
-                className="portal-btn portal-btn-accent"
-              >
-                Bayar <CaretRight className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex flex-col items-end gap-1.5">
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleQuickPay}
+                    disabled={!cukupSaldo || quickPaying}
+                    className="portal-btn portal-btn-outline !py-2.5 !px-3.5 !text-xs disabled:opacity-40"
+                  >
+                    {quickPaying ? <CircleNotch className="w-3.5 h-3.5 animate-spin" /> : <Lightning className="w-3.5 h-3.5" />}
+                    Bayar Cepat
+                  </button>
+                  <button
+                    onClick={props.onPay}
+                    className="portal-btn portal-btn-accent"
+                  >
+                    Bayar <CaretRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {!cukupSaldo && (
+                  <p className="text-[10px] text-[var(--p-muted)]">
+                    Saldo titipan kurang {formatRupiah(total - props.walletBalance)} untuk Bayar Cepat.
+                  </p>
+                )}
+              </div>
             )}
           </div>
         </>
+      )}
+    </div>
+  )
+}
+
+// ── Kartu USPP: bisa dilunasi penuh atau dicicil ────────────
+
+function UsppCard(props: { index: string; items: UsppTagihanItem[]; walletBalance: number }) {
+  const router = useRouter()
+  const [paying, startPay] = useTransition()
+  const [cicilOpen, setCicilOpen] = useState(false)
+  const [cicilAmount, setCicilAmount] = useState(0)
+  const sisaTotal = props.items.reduce((sum, item) => sum + item.sisaRupiah, 0)
+  const cukupSaldo = props.walletBalance >= sisaTotal
+
+  function bayar(amount: number) {
+    if (paying || amount <= 0) return
+    if (amount > sisaTotal) {
+      toast.error('Nominal melebihi sisa tagihan USPP.')
+      return
+    }
+    if (amount > props.walletBalance) {
+      toast.error('Saldo titipan tidak mencukupi.')
+      return
+    }
+    startPay(async () => {
+      const result = await allocatePortalFunds({
+        destination: 'USPP',
+        amountRupiah: amount,
+        requestKey: crypto.randomUUID(),
+      })
+      if ('error' in result) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Pembayaran USPP berhasil diproses dari saldo titipan.')
+      setCicilOpen(false)
+      setCicilAmount(0)
+      router.refresh()
+    })
+  }
+
+  return (
+    <div className="portal-rise portal-rise-3 portal-card p-5">
+      <div className="flex items-center gap-3">
+        <span className="flex w-10 h-10 items-center justify-center bg-[var(--p-paper)] border border-[var(--p-line)] shrink-0">
+          <Receipt className="w-5 h-5 text-[var(--p-ink)]" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="portal-index text-[var(--p-muted)]">{props.index}</span>
+            <h2 className="portal-display text-lg leading-tight text-[var(--p-ink)]">USPP / Uang Bangunan</h2>
+          </div>
+          <p className="text-[11px] text-[var(--p-muted)]">Bisa dilunasi sekaligus atau dicicil</p>
+        </div>
+      </div>
+
+      <div className="mt-4 max-h-44 overflow-y-auto pr-1 divide-y divide-[var(--p-line)]">
+        {props.items.map(item => (
+          <div key={item.key} className="flex items-center justify-between py-2.5">
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[var(--p-ink)] truncate">{item.label}</p>
+              {item.status === 'PARTIAL' && (
+                <span className="portal-badge portal-badge-warning mt-1 !py-0.5 !px-2 !text-[9px]">Cicilan berjalan</span>
+              )}
+            </div>
+            <p className="text-xs font-extrabold text-[var(--p-ink)] shrink-0 ml-3">{formatRupiah(item.sisaRupiah)}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 flex items-center justify-between border-t-2 border-[var(--p-ink)] pt-3.5">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">Sisa Tagihan</p>
+          <p className="portal-display text-xl leading-none text-[var(--p-ink)]">{formatRupiah(sisaTotal)}</p>
+        </div>
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCicilOpen(v => !v)}
+              className="portal-btn portal-btn-outline !py-2.5 !px-3.5 !text-xs"
+            >
+              Cicil
+            </button>
+            <button
+              onClick={() => bayar(sisaTotal)}
+              disabled={!cukupSaldo || paying}
+              className="portal-btn portal-btn-accent disabled:opacity-40"
+            >
+              {paying ? <CircleNotch className="w-3.5 h-3.5 animate-spin" /> : <Lightning className="w-3.5 h-3.5" />}
+              Bayar Cepat
+            </button>
+          </div>
+          {!cukupSaldo && (
+            <p className="text-[10px] text-[var(--p-muted)]">
+              Saldo titipan kurang {formatRupiah(sisaTotal - props.walletBalance)} untuk lunas sekaligus.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {cicilOpen && (
+        <div className="mt-3.5 rounded-[var(--p-radius-md)] border border-[var(--p-line)] bg-white p-3.5">
+          <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">Nominal Cicilan (Rp)</label>
+          <div className="mt-1.5 flex gap-2">
+            <input
+              type="number"
+              min={1000}
+              step={1000}
+              max={sisaTotal}
+              value={cicilAmount || ''}
+              onChange={e => setCicilAmount(Number(e.target.value))}
+              className="portal-field"
+              placeholder="Nominal yang ingin dibayar..."
+            />
+            <button
+              onClick={() => bayar(cicilAmount)}
+              disabled={paying || cicilAmount <= 0}
+              className="portal-btn portal-btn-primary shrink-0"
+            >
+              {paying ? <CircleNotch className="w-3.5 h-3.5 animate-spin" /> : 'Bayar'}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -220,6 +403,11 @@ function WizardModal({
   function handleClose() {
     onClose()
     router.refresh()
+  }
+
+  function handleLihatRiwayat() {
+    onClose()
+    router.push('/portal-ortu/keuangan?tab=riwayat')
   }
 
   async function copyRekening() {
@@ -428,10 +616,10 @@ function WizardModal({
               <UploadBukti submissionId={submissionId} onDone={handleFinish} />
             </div>
             <button
-              onClick={handleClose}
+              onClick={handleLihatRiwayat}
               className="mt-3 w-full text-center text-[11px] font-bold text-[var(--p-muted)]"
             >
-              Unggah nanti lewat menu Riwayat
+              Unggah nanti lewat tab Riwayat
             </button>
           </div>
         )}
@@ -444,7 +632,7 @@ function WizardModal({
             </span>
             <h3 className="portal-display mt-4 text-xl text-[var(--p-ink)]">Bukti terkirim</h3>
             <p className="mt-1.5 text-xs text-[var(--p-muted)] max-w-[17rem] mx-auto leading-relaxed">
-              Pengajuan Anda sedang menunggu pemeriksaan petugas. Status bisa dipantau di menu Riwayat.
+              Pengajuan Anda sedang menunggu pemeriksaan petugas. Status bisa dipantau di tab Riwayat.
             </p>
             <button
               onClick={handleClose}

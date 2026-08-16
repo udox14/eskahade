@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Camera, CircleNotch, CloudArrowUp } from '@phosphor-icons/react'
-import { uploadBukti } from './actions'
+import { uploadBukti } from './tagihan-actions'
 
 // Kompresi client-side: resize maks 1280px, encode WebP, turunkan kualitas
 // bertahap sampai ≤ ~350KB (server menolak > 2MB).

@@ -2,15 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bank, CalendarCheck, House, Receipt, ShieldWarning, User } from '@phosphor-icons/react'
+import { Bank, CalendarCheck, House, ShieldWarning, User } from '@phosphor-icons/react'
 
 const TABS = [
   { n: '01', href: '/portal-ortu/beranda', label: 'Beranda', icon: House },
   { n: '02', href: '/portal-ortu/absensi', label: 'Pengajian', icon: CalendarCheck },
-  { n: '03', href: '/portal-ortu/tagihan', label: 'Tagihan', icon: Receipt },
-  { n: '04', href: '/portal-ortu/keuangan', label: 'Saldo', icon: Bank },
-  { n: '05', href: '/portal-ortu/pelanggaran', label: 'Keamanan', icon: ShieldWarning },
-  { n: '06', href: '/portal-ortu/akun', label: 'Akun', icon: User },
+  { n: '03', href: '/portal-ortu/keuangan', label: 'Keuangan', icon: Bank },
+  { n: '04', href: '/portal-ortu/pelanggaran', label: 'Keamanan', icon: ShieldWarning },
+  { n: '05', href: '/portal-ortu/akun', label: 'Akun', icon: User },
 ]
 
 export function BottomNav() {
@@ -18,7 +17,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-full max-w-md bg-[var(--p-ink)] border-t border-white/10 pb-[env(safe-area-inset-bottom)]">
-      <div className="grid grid-cols-6">
+      <div className="grid grid-cols-5">
         {TABS.map(tab => {
           const active = pathname === tab.href || pathname.startsWith(tab.href + '/')
           const Icon = tab.icon

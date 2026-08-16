@@ -15,7 +15,7 @@ import { financeError } from './errors'
 import { duplicateOf } from './idempotency'
 import { allocateStudentFunds } from './wallet'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
-import type { PortalBillDetailItem } from '@/app/portal-ortu/(app)/tagihan/actions'
+import type { PortalBillDetailItem } from '@/app/portal-ortu/(app)/keuangan/tagihan-actions'
 
 export type PortalSubmissionRow = {
   id: string

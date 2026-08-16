@@ -17,8 +17,7 @@ const REVALIDATE_PATHS = [
   PATH,
   '/dashboard/keuangan-terpusat',
   '/dashboard/keuangan-terpusat/ledger',
-  '/portal-ortu/tagihan',
-  '/portal-ortu/riwayat',
+  '/portal-ortu/keuangan',
   '/portal-ortu/beranda',
 ]
 

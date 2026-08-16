@@ -61,7 +61,7 @@ export async function syncFinanceTeacherSnapshots(teacherIds: string[]): Promise
 
 export async function financeStudentIdsForGuardian(guardianId: string): Promise<string[]> {
   const rows = await financeQuery<{ santri_id: string }>(
-    `SELECT santri_id FROM finance_guardian_students WHERE guardian_id=? ORDER BY linked_at`,
+    `SELECT santri_id FROM finance_guardian_students WHERE guardian_id=? ORDER BY created_at`,
     [guardianId],
   )
   return rows.map(row => row.santri_id)

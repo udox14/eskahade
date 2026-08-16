@@ -22,7 +22,7 @@ export function FinanceClient({
   const [topupAmount, setTopupAmount] = useState(100000)
   const [allocAmount, setAllocAmount] = useState(50000)
   const [method, setMethod] = useState(methods[0] || '')
-  const [destination, setDestination] = useState<'SPP' | 'USPP' | 'NON_SPP' | 'MAKAN' | 'LAUNDRY' | 'JAJAN'>('JAJAN')
+  const [destination, setDestination] = useState<'USPP' | 'MAKAN' | 'LAUNDRY' | 'JAJAN'>('JAJAN')
   const [daily, setDaily] = useState(limits?.daily_rupiah || 0)
   const [weekly, setWeekly] = useState(limits?.weekly_rupiah || 0)
   const [monthly, setMonthly] = useState(limits?.monthly_rupiah || 0)
@@ -117,7 +117,7 @@ export function FinanceClient({
           <h2 className="portal-display text-lg text-[var(--p-ink)]">Alokasikan Saldo Titipan</h2>
         </div>
         <p className="text-xs text-[var(--p-muted)] leading-relaxed">
-          Pindahkan dana dari Saldo Titipan ke Kantong Khusus atau pelunasan tagihan santri.
+          Pindahkan dana dari Saldo Titipan ke kantong khusus santri. Untuk membayar tagihan SPP/Non-SPP/USPP, gunakan tab Tagihan.
         </p>
 
         <div className="space-y-3">
@@ -131,9 +131,7 @@ export function FinanceClient({
               <option value="JAJAN">Uang Jajan Santri</option>
               <option value="MAKAN">Uang Makan Santri</option>
               <option value="LAUNDRY">Laundry Santri</option>
-              <option value="SPP">Lunasi seluruh SPP</option>
-              <option value="NON_SPP">Lunasi seluruh Non-SPP</option>
-              <option value="USPP">USPP / Uang Bangunan</option>
+              <option value="USPP">USPP / Uang Bangunan (nominal bebas)</option>
             </select>
           </div>
 
@@ -143,17 +141,11 @@ export function FinanceClient({
               type="number"
               min={1000}
               step={1000}
-              value={destination === 'SPP' || destination === 'NON_SPP' ? '' : allocAmount || ''}
-              disabled={destination === 'SPP' || destination === 'NON_SPP'}
+              value={allocAmount || ''}
               onChange={e => setAllocAmount(Number(e.target.value))}
-              placeholder={destination === 'SPP' || destination === 'NON_SPP' ? 'Dihitung otomatis...' : 'Nominal...'}
+              placeholder="Nominal..."
               className="portal-field"
             />
-            {(destination === 'SPP' || destination === 'NON_SPP') && (
-              <p className="mt-1.5 text-[11px] text-[var(--p-muted)] italic">
-                * Nominal dihitung otomatis dari total tunggakan aktif dan harus dilunasi penuh.
-              </p>
-            )}
           </div>
 
           <button

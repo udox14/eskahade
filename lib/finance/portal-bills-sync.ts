@@ -129,6 +129,26 @@ export async function getPortalOpenBills(santriId: string, billKind: 'SPP' | 'NO
   )
 }
 
+export type PortalUsppBill = {
+  id: string
+  title: string
+  amount_rupiah: number
+  paid_rupiah: number
+  status: 'OPEN' | 'PARTIAL'
+}
+
+// USPP tidak disinkron dari legacy (dibuat manual oleh staff lewat
+// createFinanceBill) — di sini hanya membaca apa yang sudah staff buat,
+// tidak ada sisi tulis/sync sama sekali.
+export async function getPortalOpenUsppBills(santriId: string): Promise<PortalUsppBill[]> {
+  return financeQuery<PortalUsppBill>(
+    `SELECT id,title,amount_rupiah,paid_rupiah,status FROM finance_bills
+     WHERE santri_id=? AND bill_kind='USPP' AND status IN ('OPEN','PARTIAL')
+     ORDER BY due_date,id`,
+    [santriId],
+  )
+}
+
 export function sppBillSublabel(periodKey: string | null) {
   return periodKey?.startsWith('PORTAL_SPP:H:') ? 'Tunggakan lama' : null
 }

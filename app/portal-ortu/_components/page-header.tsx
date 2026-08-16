@@ -10,12 +10,14 @@ export function PortalPageHeader({
   title,
   subtitle,
   children,
+  tabs,
 }: {
   index?: string
   kicker: string
   title: string
   subtitle?: string
   children?: React.ReactNode
+  tabs?: React.ReactNode
 }) {
   return (
     <div className="relative bg-[var(--p-ink)] pl-7 pr-6 pt-10 pb-8 border-l-4 border-[var(--p-red)]">
@@ -27,6 +29,7 @@ export function PortalPageHeader({
         <h1 className="portal-display mt-1.5 text-[1.85rem] leading-[1.05] text-white">{title}</h1>
         {subtitle && <p className="mt-1.5 text-xs text-white/65 max-w-[26rem]">{subtitle}</p>}
         {children}
+        {tabs}
       </div>
     </div>
   )

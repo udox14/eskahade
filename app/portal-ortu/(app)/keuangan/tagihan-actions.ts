@@ -9,7 +9,7 @@ import { syncPortalSppBills, syncPortalNonSppBills, getPortalOpenBills } from '@
 import { getPaymentChannels, getPendingSubmission } from '@/lib/portal/data'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
 
-const PORTAL_PATHS = ['/portal-ortu/tagihan', '/portal-ortu/riwayat', '/portal-ortu/beranda']
+const PORTAL_PATHS = ['/portal-ortu/keuangan', '/portal-ortu/beranda']
 
 // Detail item yang disimpan di detail_json — nominal SELALU hasil hitung server.
 // billId merujuk ke finance_bills (Keuangan Terpusat) — lihat lib/finance/portal-bills-sync.ts.

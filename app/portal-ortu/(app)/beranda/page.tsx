@@ -89,7 +89,7 @@ export default async function BerandaPage() {
 
       {/* Strip total tagihan — full-bleed, angka besar, menyambung langsung dari header */}
       <Link
-        href="/portal-ortu/tagihan"
+        href="/portal-ortu/keuangan?tab=tagihan"
         className="portal-rise portal-rise-1 block border-b border-[var(--p-line)] bg-[var(--p-white)] px-5 py-5"
       >
         <div className="flex items-end justify-between gap-3">
@@ -127,7 +127,7 @@ export default async function BerandaPage() {
         {/* Banner pengajuan pending */}
         {pendingCount > 0 && (
           <Link
-            href="/portal-ortu/riwayat"
+            href="/portal-ortu/keuangan?tab=riwayat"
             className="portal-rise portal-rise-2 flex items-center gap-3 border-l-4 border-[var(--p-warning)] bg-[var(--p-warning-soft)] px-4 py-3.5"
           >
             <Clock className="w-4 h-4 shrink-0 text-[var(--p-warning)]" />
@@ -142,7 +142,7 @@ export default async function BerandaPage() {
         {/* Banner pengajuan ditolak */}
         {rejected && (
           <Link
-            href="/portal-ortu/riwayat"
+            href="/portal-ortu/keuangan?tab=riwayat"
             className="portal-rise portal-rise-2 flex items-center gap-3 border-l-4 border-[var(--p-red)] bg-[var(--p-danger-soft)] px-4 py-3.5"
           >
             <XCircle className="w-4 h-4 shrink-0 text-[var(--p-red)]" />
@@ -196,7 +196,7 @@ export default async function BerandaPage() {
 
         {/* Pintasan riwayat */}
         <Link
-          href="/portal-ortu/riwayat"
+          href="/portal-ortu/keuangan?tab=riwayat"
           className="portal-rise portal-rise-4 flex items-center gap-3 border border-[var(--p-line)] px-5 py-4"
         >
           <span className="flex w-9 h-9 items-center justify-center bg-[var(--p-paper)] border border-[var(--p-line)] shrink-0">

@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { CheckCircle, CircleNotch, Clock, Question, XCircle } from '@phosphor-icons/react'
 import { formatRupiah, formatTanggalId } from '@/lib/portal/format'
-import { cancelSubmission } from '../tagihan/actions'
-import { UploadBukti } from '../tagihan/_upload-bukti'
+import { cancelSubmission } from './tagihan-actions'
+import { UploadBukti } from './_upload-bukti'
 
 export type RiwayatItem = {
   id: string
@@ -68,7 +69,11 @@ export function RiwayatClient({ items }: { items: RiwayatItem[] }) {
       <div className="portal-rise portal-rise-1 portal-card flex items-center gap-3 px-5 py-6">
         <Question className="w-6 h-6 shrink-0 text-[var(--p-muted)]" />
         <p className="text-xs font-semibold text-[var(--p-muted)]">
-          Belum ada pengajuan pembayaran. Buka menu Tagihan untuk mulai membayar.
+          Belum ada pengajuan pembayaran.{' '}
+          <Link href="/portal-ortu/keuangan?tab=tagihan" className="underline decoration-[var(--p-muted)] underline-offset-2">
+            Buka tab Tagihan
+          </Link>{' '}
+          untuk mulai membayar.
         </p>
       </div>
     )
