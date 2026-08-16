@@ -603,19 +603,24 @@ export default function MonitoringSetoranPage() {
           </select>
         )}
 
-        <form onSubmit={handleSimpanBillingStart} className="flex items-center gap-2 flex-1 min-w-[220px]">
-          <CalendarCheck className="w-4 h-4 text-blue-600 shrink-0" />
-          <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Mulai Tagihan</span>
-          <input
-            type="month"
-            value={billingStartInput}
-            onChange={e => setBillingStartInput(e.target.value)}
-            className="h-9 flex-1 min-w-0 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button type="submit" disabled={savingBillingStart} className="h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-black disabled:opacity-50" title="Simpan mulai tagihan">
-            {savingBillingStart ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          </button>
-        </form>
+        <div className="flex flex-1 min-w-[220px] flex-col gap-1">
+          <form onSubmit={handleSimpanBillingStart} className="flex items-center gap-2">
+            <CalendarCheck className="w-4 h-4 text-blue-600 shrink-0" />
+            <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Mulai Tagihan</span>
+            <input
+              type="month"
+              value={billingStartInput}
+              onChange={e => setBillingStartInput(e.target.value)}
+              className="h-9 flex-1 min-w-0 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button type="submit" disabled={savingBillingStart} className="h-9 w-9 shrink-0 inline-flex items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-black disabled:opacity-50" title="Simpan mulai tagihan">
+              {savingBillingStart ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            </button>
+          </form>
+          <p className="text-[11px] font-semibold text-amber-700">
+            Pengaturan ini sudah pindah ke Keuangan Terpusat → Tarif Layanan — form di sini tidak lagi berpengaruh.
+          </p>
+        </div>
 
         <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
           <button onClick={() => load()} disabled={loading} className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${!hasLoaded ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>

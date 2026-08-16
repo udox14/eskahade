@@ -59,8 +59,8 @@ const DESTINATION_LABEL: Record<AllocationRiwayatItem['destinationKind'], string
   SPP: 'Bayar Cepat SPP',
   NON_SPP: 'Bayar Cepat Non-SPP',
   USPP: 'Bayar USPP',
-  MAKAN: 'Top Up Uang Makan',
-  LAUNDRY: 'Top Up Uang Laundry',
+  MAKAN: 'Bayar Uang Makan',
+  LAUNDRY: 'Bayar Uang Laundry',
   JAJAN: 'Top Up Uang Jajan',
 }
 

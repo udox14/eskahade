@@ -9,14 +9,13 @@ import {
 } from '@phosphor-icons/react'
 import type { PortalPaymentChannels } from '@/lib/portal/data'
 import type { SppMonthCell, SppMonthStatus } from '@/lib/spp/tunggakan'
-import type { NonSppOutstanding, NonSppJenis } from '@/lib/keuangan/non-spp-outstanding'
+import type { NonSppOutstanding, NonSppOutstandingItem, NonSppJenis } from '@/lib/keuangan/non-spp-outstanding'
 import { formatRupiah } from '@/lib/portal/format'
 import { BottomSheet } from '../../_components/bottom-sheet'
 import { RupiahInput } from '../../_components/rupiah-input'
 import { createSubmission } from './tagihan-actions'
 import { allocatePortalFunds } from './actions'
 import { UploadBukti } from './_upload-bukti'
-import { WalletTopupModal } from './_wallet-topup-modal'
 
 export type TagihanItem = {
   key: string
@@ -30,9 +29,15 @@ export type UsppTagihanItem = TagihanItem & {
   status: 'OPEN' | 'PARTIAL'
 }
 
+export type ServiceBillSummary = {
+  items: TagihanItem[]
+  totalOutstanding: number
+  exempted: boolean
+}
+
 type Kategori = 'SPP' | 'NON_SPP'
 type Step = 1 | 2 | 3
-type ModalKind = 'spp' | 'nonspp' | 'uspp' | 'makan' | 'laundry' | null
+type ModalKind = 'spp' | 'uspp' | 'makan' | 'laundry' | null
 
 const NON_SPP_LABEL: Record<NonSppJenis, string> = {
   BANGUNAN: 'Uang Bangunan',
@@ -45,6 +50,8 @@ function statusChipMeta(status: SppMonthStatus | 'LUNAS' | 'BELUM_LUNAS') {
   switch (status) {
     case 'LUNAS':
       return { label: 'Lunas', cls: 'portal-badge-success' }
+    case 'DIBEBASKAN':
+      return { label: 'Dibebaskan', cls: 'portal-badge-neutral' }
     case 'DITIADAKAN':
       return { label: 'Ditiadakan', cls: 'portal-badge-neutral' }
     case 'BELUM_ADA_TAGIHAN':
@@ -65,8 +72,8 @@ export function TagihanClient(props: {
   nonSppOutstanding: NonSppOutstanding | null
   nonSppTahunanJenis: readonly NonSppJenis[]
   usppItems: UsppTagihanItem[]
-  makanBalance: number
-  laundryBalance: number
+  makanSummary: ServiceBillSummary
+  laundrySummary: ServiceBillSummary
   channels: PortalPaymentChannels
   walletBalance: number
   pendingSpp: boolean
@@ -75,14 +82,21 @@ export function TagihanClient(props: {
   pendingNonSppSudahUpload: boolean
 }) {
   const [modal, setModal] = useState<ModalKind>(null)
+  const [nonSppJenisModal, setNonSppJenisModal] = useState<NonSppJenis | null>(null)
   const [wizard, setWizard] = useState<Kategori | null>(null)
 
   const tahunanItems = props.nonSppOutstanding?.items.filter(item => props.nonSppTahunanJenis.includes(item.jenis)) || []
   const bangunanItem = props.nonSppOutstanding?.items.find(item => item.jenis === 'BANGUNAN') || null
+  const nonSppOpenItem = props.nonSppOutstanding?.items.find(item => item.jenis === nonSppJenisModal) || null
 
   function openWizard(kategori: Kategori) {
     setModal(null)
     setWizard(kategori)
+  }
+
+  function closeWizard() {
+    setWizard(null)
+    setNonSppJenisModal(null)
   }
 
   return (
@@ -105,20 +119,20 @@ export function TagihanClient(props: {
         <TagihanRow
           icon={<ForkKnife className="w-4.5 h-4.5 text-[var(--p-ink)]" />}
           label="Uang Makan"
-          status={{ label: 'Saldo', cls: 'portal-badge-neutral' }}
-          value={formatRupiah(props.makanBalance)}
+          status={statusChipMeta(props.makanSummary.exempted ? 'DIBEBASKAN' : props.makanSummary.totalOutstanding > 0 ? 'BELUM_LUNAS' : 'LUNAS')}
+          value={!props.makanSummary.exempted && props.makanSummary.totalOutstanding > 0 ? formatRupiah(props.makanSummary.totalOutstanding) : null}
           onClick={() => setModal('makan')}
         />
         <TagihanRow
           icon={<TShirt className="w-4.5 h-4.5 text-[var(--p-ink)]" />}
           label="Uang Laundry"
-          status={{ label: 'Saldo', cls: 'portal-badge-neutral' }}
-          value={formatRupiah(props.laundryBalance)}
+          status={statusChipMeta(props.laundrySummary.exempted ? 'DIBEBASKAN' : props.laundrySummary.totalOutstanding > 0 ? 'BELUM_LUNAS' : 'LUNAS')}
+          value={!props.laundrySummary.exempted && props.laundrySummary.totalOutstanding > 0 ? formatRupiah(props.laundrySummary.totalOutstanding) : null}
           onClick={() => setModal('laundry')}
         />
       </GroupCard>
 
-      {/* Grup Tahunan */}
+      {/* Grup Tahunan — tiap jenis independen, bisa dibayar satu-satu */}
       <GroupCard index="02" title="Tahunan" subtitle="Kesehatan, EHB, Ekstrakurikuler">
         {tahunanItems.length > 0 ? (
           tahunanItems.map(item => (
@@ -126,9 +140,9 @@ export function TagihanClient(props: {
               key={item.jenis}
               icon={<Buildings className="w-4.5 h-4.5 text-[var(--p-ink)]" />}
               label={NON_SPP_LABEL[item.jenis]}
-              status={statusChipMeta(item.sisa > 0 ? 'BELUM_LUNAS' : 'LUNAS')}
-              value={formatRupiah(item.sisa > 0 ? item.sisa : item.tarif)}
-              onClick={() => setModal('nonspp')}
+              status={statusChipMeta(item.exempted ? 'DIBEBASKAN' : item.sisa > 0 ? 'BELUM_LUNAS' : 'LUNAS')}
+              value={!item.exempted ? formatRupiah(item.sisa > 0 ? item.sisa : item.tarif) : null}
+              onClick={() => setNonSppJenisModal(item.jenis)}
             />
           ))
         ) : (
@@ -143,9 +157,9 @@ export function TagihanClient(props: {
             <TagihanRow
               icon={<Buildings className="w-4.5 h-4.5 text-[var(--p-red)]" />}
               label={NON_SPP_LABEL.BANGUNAN}
-              status={statusChipMeta(bangunanItem.sisa > 0 ? 'BELUM_LUNAS' : 'LUNAS')}
-              value={formatRupiah(bangunanItem.sisa > 0 ? bangunanItem.sisa : bangunanItem.tarif)}
-              onClick={() => setModal('nonspp')}
+              status={statusChipMeta(bangunanItem.exempted ? 'DIBEBASKAN' : bangunanItem.sisa > 0 ? 'BELUM_LUNAS' : 'LUNAS')}
+              value={!bangunanItem.exempted ? formatRupiah(bangunanItem.sisa > 0 ? bangunanItem.sisa : bangunanItem.tarif) : null}
+              onClick={() => setNonSppJenisModal('BANGUNAN')}
             />
           )}
           {props.usppItems.length > 0 && (
@@ -174,11 +188,11 @@ export function TagihanClient(props: {
         />
       )}
 
-      {/* Modal Non-SPP (Tahunan + Bangunan) */}
-      <NonSppDetailModal
-        open={modal === 'nonspp'}
-        onClose={() => setModal(null)}
-        outstanding={props.nonSppOutstanding}
+      {/* Modal Non-SPP — satu jenis per modal, bisa dibayar terpisah */}
+      <NonSppItemDetailModal
+        open={!!nonSppJenisModal}
+        onClose={() => setNonSppJenisModal(null)}
+        item={nonSppOpenItem}
         walletBalance={props.walletBalance}
         pending={props.pendingNonSpp}
         pendingSudahUpload={props.pendingNonSppSudahUpload}
@@ -193,28 +207,36 @@ export function TagihanClient(props: {
         walletBalance={props.walletBalance}
       />
 
-      {/* Modal top up Makan / Laundry */}
-      <WalletTopupModal
+      {/* Modal tagihan Makan / Laundry */}
+      <ServiceBillDetailModal
         open={modal === 'makan'}
         onClose={() => setModal(null)}
-        destination="MAKAN"
         title="Uang Makan"
-        currentBalance={props.makanBalance}
+        destination="MAKAN"
+        summary={props.makanSummary}
+        walletBalance={props.walletBalance}
       />
-      <WalletTopupModal
+      <ServiceBillDetailModal
         open={modal === 'laundry'}
         onClose={() => setModal(null)}
-        destination="LAUNDRY"
         title="Uang Laundry"
-        currentBalance={props.laundryBalance}
+        destination="LAUNDRY"
+        summary={props.laundrySummary}
+        walletBalance={props.walletBalance}
       />
 
       {wizard && (
         <WizardModal
           kategori={wizard}
-          items={wizard === 'SPP' ? props.sppItems : props.nonSppItems}
+          items={
+            wizard === 'SPP'
+              ? props.sppItems
+              : nonSppJenisModal
+                ? props.nonSppItems.filter(item => item.label === NON_SPP_LABEL[nonSppJenisModal])
+                : props.nonSppItems
+          }
           channels={props.channels}
-          onClose={() => setWizard(null)}
+          onClose={closeWizard}
         />
       )}
     </div>
@@ -337,6 +359,9 @@ function SppDetailModal(props: {
         {props.cell.status === 'LUNAS' && props.cell.tanggalBayar && (
           <p className="mt-1 text-[11px] text-[var(--p-muted)]">Dibayar {new Date(props.cell.tanggalBayar).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
         )}
+        {props.cell.status === 'DIBEBASKAN' && (
+          <p className="mt-1 text-[11px] text-[var(--p-muted)]">Dibebaskan dari SPP — tidak ada tagihan.</p>
+        )}
       </div>
 
       {belumLunas && (
@@ -376,12 +401,13 @@ function SppDetailModal(props: {
   )
 }
 
-// ── Modal detail Non-SPP (Tahunan + Bangunan, satu bucket) ────
+// ── Modal detail Non-SPP — satu jenis (Bangunan/Kesehatan/EHB/Ekskul) per
+// modal, bisa dibayar terpisah dari jenis lain ────────────────────────────
 
-function NonSppDetailModal(props: {
+function NonSppItemDetailModal(props: {
   open: boolean
   onClose: () => void
-  outstanding: NonSppOutstanding | null
+  item: NonSppOutstandingItem | null
   walletBalance: number
   pending: boolean
   pendingSudahUpload: boolean
@@ -389,49 +415,120 @@ function NonSppDetailModal(props: {
 }) {
   const router = useRouter()
   const [paying, startPay] = useTransition()
-  const items = props.outstanding?.items || []
-  const total = props.outstanding?.totalSisa || 0
-  const cukupSaldo = props.walletBalance >= total
+  const item = props.item
+  const sisa = item?.sisa ?? 0
+  const exempted = item?.exempted ?? false
+  const cukupSaldo = props.walletBalance >= sisa
 
   function bayarCepat() {
-    if (paying || total <= 0) return
+    if (paying || !item || sisa <= 0) return
     startPay(async () => {
-      const result = await allocatePortalFunds({ destination: 'NON_SPP', amountRupiah: total, requestKey: crypto.randomUUID() })
+      const result = await allocatePortalFunds({ destination: 'NON_SPP', jenis: item.jenis, amountRupiah: sisa, requestKey: crypto.randomUUID() })
       if ('error' in result) {
         toast.error(result.error)
         return
       }
-      toast.success('Tagihan Non-SPP berhasil dilunasi dari saldo titipan.')
+      toast.success(`${NON_SPP_LABEL[item.jenis]} berhasil dilunasi dari saldo titipan.`)
       props.onClose()
       router.refresh()
     })
   }
 
   return (
-    <BottomSheet open={props.open} onClose={props.onClose} title="Tagihan Non-SPP">
-      <p className="text-[11px] text-[var(--p-muted)] leading-relaxed">
-        Pembayaran Non-SPP melunasi semua kategori sekaligus (Bangunan, Kesehatan, EHB, Ekstrakurikuler) — tidak bisa dipilih sebagian.
-      </p>
-
-      <div className="mt-3 divide-y divide-[var(--p-line)] rounded-[var(--p-radius-md)] border border-[var(--p-line)] bg-white px-4">
-        {items.map(item => (
-          <div key={item.jenis} className="flex items-center justify-between py-2.5">
-            <span className="text-xs font-semibold text-[var(--p-ink)]">{NON_SPP_LABEL[item.jenis]}</span>
-            <span className={`text-xs font-bold ${item.sisa > 0 ? 'text-[var(--p-ink)]' : 'text-[var(--p-success)]'}`}>
-              {item.sisa > 0 ? formatRupiah(item.sisa) : 'Lunas'}
-            </span>
+    <BottomSheet open={props.open} onClose={props.onClose} title={item ? NON_SPP_LABEL[item.jenis] : 'Tagihan Non-SPP'}>
+      {!item ? (
+        <p className="text-xs text-[var(--p-muted)]">Tidak ada tagihan.</p>
+      ) : exempted ? (
+        <p className="rounded-[var(--p-radius-md)] bg-[var(--p-success-soft)] border border-[#cde3d4] px-4 py-3 text-xs font-semibold text-[var(--p-success)]">
+          Dibebaskan dari {NON_SPP_LABEL[item.jenis].toLowerCase()} — tidak ada tagihan.
+        </p>
+      ) : sisa <= 0 ? (
+        <p className="rounded-[var(--p-radius-md)] bg-[var(--p-success-soft)] border border-[#cde3d4] px-4 py-3 text-xs font-semibold text-[var(--p-success)]">
+          Alhamdulillah, {NON_SPP_LABEL[item.jenis].toLowerCase()} sudah lunas.
+        </p>
+      ) : (
+        <>
+          <div className="rounded-[var(--p-radius-md)] border border-[var(--p-line)] bg-white px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">Sisa Tagihan</p>
+            <p className="portal-display mt-1 text-2xl leading-none text-[var(--p-ink)]">{formatRupiah(sisa)}</p>
           </div>
-        ))}
-        {items.length === 0 && <p className="py-3 text-xs text-[var(--p-muted)]">Tidak ada tagihan Non-SPP.</p>}
-      </div>
+          {props.pending ? (
+            <div className="mt-4 rounded-[var(--p-radius-md)] bg-[var(--p-warning-soft)] border border-[#f0dcae] px-4 py-3 text-xs font-semibold text-[var(--p-ink)]">
+              <Clock className="w-3.5 h-3.5 inline mr-1.5" />
+              {props.pendingSudahUpload ? 'Menunggu konfirmasi petugas.' : 'Pengajuan dibuat, lanjutkan upload bukti di tab Riwayat.'}
+            </div>
+          ) : (
+            <div className="mt-4 space-y-2">
+              <button
+                onClick={bayarCepat}
+                disabled={paying || !cukupSaldo}
+                className="portal-btn portal-btn-accent w-full disabled:opacity-40"
+              >
+                {paying ? <CircleNotch className="w-4 h-4 animate-spin" /> : <Lightning className="w-4 h-4" />}
+                Bayar Cepat {formatRupiah(sisa)}
+              </button>
+              {!cukupSaldo && (
+                <p className="text-center text-[10px] text-[var(--p-muted)]">Saldo titipan tidak cukup untuk Bayar Cepat.</p>
+              )}
+              <button onClick={props.onOpenWizard} className="portal-btn portal-btn-outline w-full">
+                Transfer Bank / QRIS
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </BottomSheet>
+  )
+}
 
-      {total > 0 && (
-        props.pending ? (
-          <div className="mt-4 rounded-[var(--p-radius-md)] bg-[var(--p-warning-soft)] border border-[#f0dcae] px-4 py-3 text-xs font-semibold text-[var(--p-ink)]">
-            <Clock className="w-3.5 h-3.5 inline mr-1.5" />
-            {props.pendingSudahUpload ? 'Menunggu konfirmasi petugas.' : 'Pengajuan dibuat, lanjutkan upload bukti di tab Riwayat.'}
+// ── Modal detail tagihan Makan / Laundry (lunas penuh per bulan) ──
+
+function ServiceBillDetailModal(props: {
+  open: boolean
+  onClose: () => void
+  title: string
+  destination: 'MAKAN' | 'LAUNDRY'
+  summary: ServiceBillSummary
+  walletBalance: number
+}) {
+  const router = useRouter()
+  const [paying, startPay] = useTransition()
+  const belumLunas = !props.summary.exempted && props.summary.totalOutstanding > 0
+  const cukupSaldo = props.walletBalance >= props.summary.totalOutstanding
+
+  function bayarCepat() {
+    if (paying || !belumLunas) return
+    startPay(async () => {
+      const result = await allocatePortalFunds({
+        destination: props.destination,
+        amountRupiah: props.summary.totalOutstanding,
+        requestKey: crypto.randomUUID(),
+      })
+      if ('error' in result) {
+        toast.error(result.error)
+        return
+      }
+      toast.success(`${props.title} berhasil dilunasi dari saldo titipan.`)
+      props.onClose()
+      router.refresh()
+    })
+  }
+
+  return (
+    <BottomSheet open={props.open} onClose={props.onClose} title={props.title}>
+      {belumLunas ? (
+        <>
+          <div className="divide-y divide-[var(--p-line)] rounded-[var(--p-radius-md)] border border-[var(--p-line)] bg-white px-4">
+            {props.summary.items.map(item => (
+              <div key={item.key} className="flex items-center justify-between py-2.5">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-[var(--p-ink)] truncate">{item.label}</p>
+                  {item.sublabel && <p className="text-[10px] text-[var(--p-muted)]">{item.sublabel}</p>}
+                </div>
+                <p className="text-xs font-extrabold text-[var(--p-ink)] shrink-0 ml-3">{formatRupiah(item.nominal)}</p>
+              </div>
+            ))}
           </div>
-        ) : (
           <div className="mt-4 space-y-2">
             <button
               onClick={bayarCepat}
@@ -439,16 +536,19 @@ function NonSppDetailModal(props: {
               className="portal-btn portal-btn-accent w-full disabled:opacity-40"
             >
               {paying ? <CircleNotch className="w-4 h-4 animate-spin" /> : <Lightning className="w-4 h-4" />}
-              Bayar Cepat {formatRupiah(total)}
+              Bayar Cepat {formatRupiah(props.summary.totalOutstanding)}
             </button>
             {!cukupSaldo && (
               <p className="text-center text-[10px] text-[var(--p-muted)]">Saldo titipan tidak cukup untuk Bayar Cepat.</p>
             )}
-            <button onClick={props.onOpenWizard} className="portal-btn portal-btn-outline w-full">
-              Transfer Bank / QRIS
-            </button>
           </div>
-        )
+        </>
+      ) : (
+        <p className="rounded-[var(--p-radius-md)] bg-[var(--p-success-soft)] border border-[#cde3d4] px-4 py-3 text-xs font-semibold text-[var(--p-success)]">
+          {props.summary.exempted
+            ? `Dibebaskan dari ${props.title.toLowerCase()} — tidak ada tagihan.`
+            : `Alhamdulillah, ${props.title.toLowerCase()} sudah lunas.`}
+        </p>
       )}
     </BottomSheet>
   )

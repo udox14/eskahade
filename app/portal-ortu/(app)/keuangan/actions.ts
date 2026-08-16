@@ -9,6 +9,7 @@ import { verifyPassword } from '@/lib/auth/password'
 import { setStudentPin } from '@/lib/finance/credentials'
 import { syncPortalSppBills, syncPortalNonSppBills } from '@/lib/finance/portal-bills-sync'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
+import { NON_SPP_JENIS_ALL, type NonSppJenis } from '@/lib/keuangan/non-spp-outstanding'
 
 async function requirePortalFinanceAccess() {
   const session = await requirePortalSessionAction()
@@ -35,7 +36,7 @@ export async function createPortalTopup(input: { amountRupiah: number; paymentMe
   return result
 }
 
-export async function allocatePortalFunds(input: { destination: 'SPP' | 'USPP' | 'NON_SPP' | 'MAKAN' | 'LAUNDRY' | 'JAJAN'; amountRupiah: number; requestKey: string }) {
+export async function allocatePortalFunds(input: { destination: 'SPP' | 'USPP' | 'NON_SPP' | 'MAKAN' | 'LAUNDRY' | 'JAJAN'; amountRupiah: number; requestKey: string; jenis?: NonSppJenis }) {
   const session = await requirePortalFinanceAccess()
   let amountRupiah=Number(input.amountRupiah),fullOutstandingRupiah:number|null=null,billingReference:string|null=null,billItems:Array<{billId:string;amountRupiah:number}>|undefined
   if(input.destination==='SPP'){
@@ -45,9 +46,15 @@ export async function allocatePortalFunds(input: { destination: 'SPP' | 'USPP' |
     const bills=await query<{id:string;remaining:number}>(`SELECT id,amount_rupiah-paid_rupiah remaining FROM finance_bills WHERE santri_id=? AND bill_kind='SPP' AND status='OPEN' ORDER BY due_date,id`,[session.santri_id]);const items=bills.map(item=>({billId:item.id,amountRupiah:Number(item.remaining)}));billItems=items;amountRupiah=items.reduce((sum,item)=>sum+item.amountRupiah,0);fullOutstandingRupiah=amountRupiah;billingReference=`SPP-ALL:${items.map(item=>item.billId).join(',')}`
   }else if(input.destination==='NON_SPP'){
     await syncPortalNonSppBills(session.santri_id)
-    const bills=await query<{id:string;remaining:number}>(`SELECT id,amount_rupiah-paid_rupiah remaining FROM finance_bills WHERE santri_id=? AND bill_kind='NON_SPP' AND status='OPEN' ORDER BY due_date,id`,[session.santri_id]);const items=bills.map(item=>({billId:item.id,amountRupiah:Number(item.remaining)}));billItems=items;amountRupiah=items.reduce((sum,item)=>sum+item.amountRupiah,0);fullOutstandingRupiah=amountRupiah;billingReference=`NONSPP-ALL:${items.map(item=>item.billId).join(',')}`
+    // jenis diisi → lunasi satu jenis Non-SPP tahunan saja (period_key sudah
+    // per jenis dari syncPortalNonSppBills), bukan diri sekaligus dengan yang lain.
+    const jenisOk = input.jenis && (NON_SPP_JENIS_ALL as readonly string[]).includes(input.jenis)
+    const periodPrefix = jenisOk ? `PORTAL_NONSPP:${input.jenis}:` : 'PORTAL_NONSPP:'
+    const bills=await query<{id:string;remaining:number}>(`SELECT id,amount_rupiah-paid_rupiah remaining FROM finance_bills WHERE santri_id=? AND bill_kind='NON_SPP' AND status='OPEN' AND period_key LIKE ? ORDER BY due_date,id`,[session.santri_id,`${periodPrefix}%`]);const items=bills.map(item=>({billId:item.id,amountRupiah:Number(item.remaining)}));billItems=items;amountRupiah=items.reduce((sum,item)=>sum+item.amountRupiah,0);fullOutstandingRupiah=amountRupiah;billingReference=`NONSPP-${jenisOk?input.jenis:'ALL'}:${items.map(item=>item.billId).join(',')}`
   }else if(input.destination==='USPP'){
     const bills=await query<{id:string;remaining:number}>(`SELECT id,amount_rupiah-paid_rupiah remaining FROM finance_bills WHERE santri_id=? AND bill_kind='USPP' AND status IN ('OPEN','PARTIAL') ORDER BY due_date,id`,[session.santri_id]);let needed=amountRupiah;const items:Array<{billId:string;amountRupiah:number}>=[];for(const bill of bills){if(needed<=0)break;const applied=Math.min(needed,Number(bill.remaining));if(applied>0){items.push({billId:bill.id,amountRupiah:applied});needed-=applied}}if(needed>0)return{error:'Nominal melebihi sisa tagihan USPP.'};billItems=items;billingReference=`USPP:${items.map(item=>item.billId).join(',')}`
+  }else if(input.destination==='MAKAN' || input.destination==='LAUNDRY'){
+    const bills=await query<{id:string;remaining:number}>(`SELECT id,amount_rupiah-paid_rupiah remaining FROM finance_bills WHERE santri_id=? AND bill_kind=? AND status='OPEN' ORDER BY due_date,id`,[session.santri_id,input.destination]);const items=bills.map(item=>({billId:item.id,amountRupiah:Number(item.remaining)}));billItems=items;amountRupiah=items.reduce((sum,item)=>sum+item.amountRupiah,0);fullOutstandingRupiah=amountRupiah;billingReference=`${input.destination}-ALL:${items.map(item=>item.billId).join(',')}`
   }
   if(amountRupiah<=0)return{error:'Tidak ada tagihan/saldo alokasi yang valid.'}
   const result = await allocateStudentFunds({

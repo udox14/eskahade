@@ -4,13 +4,15 @@ import { syncFinanceStudentSnapshot, syncFinanceStudentsByIds, financeStudentIds
 import {
   syncPortalSppBills, syncPortalNonSppBills, getPortalOpenBills, getPortalOpenUsppBills,
 } from '@/lib/finance/portal-bills-sync'
+import { getOpenServiceBills, getServiceArrearsHistoris } from '@/lib/finance/service-billing'
 import { getPaymentChannels, getPendingSubmission, getRiwayatSubmissions } from '@/lib/portal/data'
 import { getPortalAllocationHistory } from '@/lib/finance/portal-history'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
 import { getSppMonthlyGrid, getTunggakanSppSantri } from '@/lib/spp/tunggakan'
+import { getExemptionsForSantri } from '@/lib/finance/exemptions'
 import { getNonSppOutstandingSantri, NON_SPP_JENIS_TAHUNAN } from '@/lib/keuangan/non-spp-outstanding'
 import { FinanceClient } from './_finance-client'
-import { TagihanClient, type TagihanItem, type UsppTagihanItem } from './_tagihan-client'
+import { TagihanClient, type TagihanItem, type UsppTagihanItem, type ServiceBillSummary } from './_tagihan-client'
 import { RiwayatClient, type RiwayatItem, type WithdrawalItem } from './_riwayat-client'
 import { KeuanganTabBar, type KeuanganTab } from './_tab-bar'
 import { switchPortalStudent } from './switch-actions'
@@ -55,8 +57,6 @@ export default async function PortalKeuanganPage({
   const balanceOf = (kind: string) => Number(balances.find(row => row.wallet_kind === kind)?.balance_rupiah || 0)
   const titipanBalance = balanceOf('TITIPAN')
   const jajanBalance = balanceOf('JAJAN')
-  const makanBalance = balanceOf('MAKAN')
-  const laundryBalance = balanceOf('LAUNDRY')
 
   const methods = (process.env.DUITKU_PAYMENT_METHODS || '').split(',').map(x => x.trim()).filter(Boolean)
   const qrisMethod = process.env.DUITKU_QRIS_METHOD || null
@@ -122,11 +122,8 @@ export default async function PortalKeuanganPage({
         {tab === 'tagihan' && (
           <TagihanTab
             santriId={session.santri_id}
-            bebasSpp={session.bebas_spp}
             asrama={session.asrama}
             titipanBalance={titipanBalance}
-            makanBalance={makanBalance}
-            laundryBalance={laundryBalance}
             tahun={selectedTahun}
             bulan={selectedBulan}
           />
@@ -185,31 +182,32 @@ async function SaldoTab({
 
 async function TagihanTab({
   santriId,
-  bebasSpp,
   asrama,
   titipanBalance,
-  makanBalance,
-  laundryBalance,
   tahun,
   bulan,
 }: {
   santriId: string
-  bebasSpp: boolean
   asrama: string | null
   titipanBalance: number
-  makanBalance: number
-  laundryBalance: number
   tahun: number
   bulan: number
 }) {
-  const tampilkanSpp = !bebasSpp && !isAsramaTanpaKamar(asrama)
+  // bebasSpp TIDAK lagi menyembunyikan tab — santri tetap melihat barisnya
+  // dengan badge "Dibebaskan" (lihat getSppMonthlyGrid, status DIBEBASKAN).
+  // isAsramaTanpaKamar tetap menyembunyikan karena itu bukan pembebasan,
+  // melainkan santri asrama ini memang tidak punya kewajiban SPP sama sekali.
+  const tampilkanSpp = !isAsramaTanpaKamar(asrama)
 
   await Promise.all([
     syncPortalSppBills(santriId, tampilkanSpp),
     syncPortalNonSppBills(santriId),
   ])
 
-  const [sppBills, nonSppBills, usppBills, channels, pendingSpp, pendingNonSpp, sppGrid, sppTunggakan, nonSppOutstanding] = await Promise.all([
+  const [
+    sppBills, nonSppBills, usppBills, channels, pendingSpp, pendingNonSpp, sppGrid, sppTunggakan, nonSppOutstanding,
+    makanBills, laundryBills, makanArrears, laundryArrears, exemptions,
+  ] = await Promise.all([
     tampilkanSpp ? getPortalOpenBills(santriId, 'SPP') : Promise.resolve([]),
     getPortalOpenBills(santriId, 'NON_SPP'),
     getPortalOpenUsppBills(santriId),
@@ -219,6 +217,11 @@ async function TagihanTab({
     tampilkanSpp ? getSppMonthlyGrid(santriId, tahun) : Promise.resolve([]),
     tampilkanSpp ? getTunggakanSppSantri(santriId) : Promise.resolve(null),
     getNonSppOutstandingSantri(santriId),
+    getOpenServiceBills(santriId, 'MAKAN'),
+    getOpenServiceBills(santriId, 'LAUNDRY'),
+    getServiceArrearsHistoris(santriId, 'MAKAN'),
+    getServiceArrearsHistoris(santriId, 'LAUNDRY'),
+    getExemptionsForSantri(santriId),
   ])
 
   const sppItems: TagihanItem[] = sppBills.map(bill => ({
@@ -244,6 +247,27 @@ async function TagihanTab({
     status: bill.status,
   }))
 
+  function buildServiceSummary(
+    bills: { id: string; title: string; amount_rupiah: number; paid_rupiah: number }[],
+    arrears: { id: string; label: string; amount_rupiah: number; status: 'BELUM_LUNAS' | 'LUNAS' }[],
+    exempted: boolean
+  ): ServiceBillSummary {
+    const billItems: TagihanItem[] = bills.map(bill => ({
+      key: bill.id,
+      label: bill.title,
+      sublabel: null,
+      nominal: Number(bill.amount_rupiah) - Number(bill.paid_rupiah),
+    }))
+    const arrearsItems: TagihanItem[] = arrears
+      .filter(row => row.status === 'BELUM_LUNAS')
+      .map(row => ({ key: row.id, label: row.label, sublabel: 'Tunggakan lama', nominal: Number(row.amount_rupiah) }))
+    const items = [...billItems, ...arrearsItems]
+    return { items, totalOutstanding: items.reduce((sum, item) => sum + item.nominal, 0), exempted }
+  }
+
+  const makanSummary = buildServiceSummary(makanBills, makanArrears, exemptions.MAKAN)
+  const laundrySummary = buildServiceSummary(laundryBills, laundryArrears, exemptions.LAUNDRY)
+
   const sppCell = sppGrid.find(cell => cell.bulan === bulan) || null
 
   return (
@@ -259,8 +283,8 @@ async function TagihanTab({
         nonSppOutstanding={nonSppOutstanding}
         nonSppTahunanJenis={NON_SPP_JENIS_TAHUNAN}
         usppItems={usppItems}
-        makanBalance={makanBalance}
-        laundryBalance={laundryBalance}
+        makanSummary={makanSummary}
+        laundrySummary={laundrySummary}
         channels={channels}
         walletBalance={titipanBalance}
         pendingSpp={!!pendingSpp}

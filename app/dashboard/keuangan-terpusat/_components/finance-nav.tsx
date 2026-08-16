@@ -15,6 +15,7 @@ const href={
   control:'/dashboard/keuangan-terpusat/kontrol',
   breakGlass:'/dashboard/keuangan-terpusat/break-glass',
   operations:'/dashboard/keuangan-terpusat/operasi',
+  tariffs:'/dashboard/keuangan-terpusat/tarif-layanan',
 } as const
 
 export async function FinanceNav(){
@@ -36,7 +37,7 @@ export async function FinanceNav(){
     Object.values(href).forEach(item=>allowed.add(item))
     if(!admin)allowed.delete(href.breakGlass)
   }
-  if(council)[href.home,href.payout,href.payroll,href.ledger,href.allocation,href.incident,href.control,href.breakGlass,href.operations].forEach(item=>allowed.add(item))
+  if(council)[href.home,href.payout,href.payroll,href.ledger,href.allocation,href.incident,href.control,href.breakGlass,href.operations,href.tariffs].forEach(item=>allowed.add(item))
   if(dorm)[href.home,href.payout,href.ledger,href.allocation,href.incident].forEach(item=>allowed.add(item))
   if(operator)allowed.add(href.cashier)
   if(admin)allowed.add(href.breakGlass)

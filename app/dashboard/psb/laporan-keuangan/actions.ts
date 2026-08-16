@@ -251,7 +251,7 @@ export async function getPsbFinancialReport(filters: PsbFinancialFilters = {}) {
     const key = `${row.tahun_angkatan}:${row.jenis_biaya}`
     if (!tarifMap.has(key)) tarifMap.set(key, toInt(row.nominal))
   })
-  const sppJuliTarif = await getNominalSppForYear(tahunTagihan)
+  const sppJuliTarif = await getNominalSppForYear(tahunTagihan, SPP_JULI_BULAN)
 
   const paymentsBySantri = new Map<string, PaymentRow[]>()
   ;([...nonSppPayments, ...sppPayments] as PaymentRow[]).forEach((payment) => {

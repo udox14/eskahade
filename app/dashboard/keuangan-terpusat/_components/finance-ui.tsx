@@ -20,6 +20,7 @@ import {
   Receipt as ReceiptText,
   Scan as ScanLine,
   Stack as Layers3,
+  Tag,
   Wallet as WalletCards,
   Warning as AlertTriangle,
   ShieldWarning,
@@ -48,6 +49,7 @@ const financeNav = [
   { href: '/dashboard/keuangan-terpusat/kontrol', label: 'Kontrol', icon: ShieldCheck },
   { href: '/dashboard/keuangan-terpusat/break-glass', label: 'Break-glass', icon: ShieldWarning },
   { href: '/dashboard/keuangan-terpusat/operasi', label: 'Operasi', icon: Settings2 },
+  { href: '/dashboard/keuangan-terpusat/tarif-layanan', label: 'Tarif Layanan', icon: Tag },
 ]
 
 export function FinancePageHeader({ title, description, eyebrow, meta, action }: {

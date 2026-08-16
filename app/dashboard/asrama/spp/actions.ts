@@ -124,8 +124,8 @@ export async function getClientRestriction(): Promise<SppClientScope | null> {
   }
 }
 
-export async function getNominalSPP(tahun: number) {
-  return getNominalSppForYear(tahun)
+export async function getNominalSPP(tahun: number, bulan: number) {
+  return getNominalSppForYear(tahun, bulan)
 }
 
 export async function getSppBillingStart() {

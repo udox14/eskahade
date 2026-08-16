@@ -301,7 +301,7 @@ async function getPaymentInfoForRows(rows: SantriPsbRow[], tahunTagihan: number)
   }
 
   const tarif = await query<any>('SELECT tahun_angkatan, jenis_biaya, nominal FROM biaya_settings')
-  const sppJuliNominal = await getNominalSppForYear(tahunTagihan)
+  const sppJuliNominal = await getNominalSppForYear(tahunTagihan, SPP_JULI_BULAN)
   const sppJuliPaidSet = new Set(sppJuliPaid.map((row) => row.santri_id))
   const tarifMap = new Map<string, number>()
   tarif.forEach((row) => tarifMap.set(`${row.tahun_angkatan}:${row.jenis_biaya}`, Number(row.nominal ?? 0)))
@@ -812,7 +812,7 @@ export async function bayarPsbBatch(input: {
     )
     if (sppWaived) return { error: 'SPP bulan Juli berstatus TIDAK ADA TAGIHAN.' }
 
-    sppJuliNominal = await getNominalSppForYear(tahunTagihan)
+    sppJuliNominal = await getNominalSppForYear(tahunTagihan, SPP_JULI_BULAN)
     if (sppJuliNominal <= 0) return { error: `Tarif SPP tahun ${tahunTagihan} belum diatur` }
   }
 

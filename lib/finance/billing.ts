@@ -1,5 +1,6 @@
-import { getFinanceDB as getDB, generateId, queryOne } from '@/lib/db'
+import { getFinanceDB as getDB, generateId } from '@/lib/db'
 import { assertIntegerRupiah, financeError } from './errors'
+import { getExemptionsForSantri } from './exemptions'
 
 export async function createFinanceBill(input: {
   santriId: string
@@ -14,15 +15,14 @@ export async function createFinanceBill(input: {
     assertIntegerRupiah(input.amountRupiah)
     if (!input.title.trim()) throw new Error('Nama tagihan wajib diisi.')
 
-    // Fix #7: cek status bebas_spp sebelum membuat tagihan SPP
-    // Mencegah santri yang dibebaskan SPP tetap mendapat tagihan di modul Keuangan Terpusat
-    if (input.billKind === 'SPP') {
-      const santri = await queryOne<{ bebas_spp: number | null }>(
-        `SELECT COALESCE(bebas_spp, 0) AS bebas_spp FROM santri WHERE id = ?`,
-        [input.santriId]
-      )
-      if ((santri?.bebas_spp ?? 0) === 1) {
-        return { success: false as const, error: 'Santri berstatus bebas SPP dan tidak dapat ditagih.' }
+    // Fix #7: cek status pembebasan sebelum membuat tagihan SPP/USPP —
+    // mencegah santri yang dibebaskan tetap mendapat tagihan manual dari
+    // Keuangan Terpusat. Makan/Laundry tidak lewat sini (dibuat lewat
+    // generateMonthlyServiceBills), Non-SPP tahunan pakai mekanisme sendiri.
+    if (input.billKind === 'SPP' || input.billKind === 'USPP') {
+      const exemptions = await getExemptionsForSantri(input.santriId)
+      if (exemptions[input.billKind]) {
+        return { success: false as const, error: `Santri berstatus bebas ${input.billKind} dan tidak dapat ditagih.` }
       }
     }
 

@@ -121,7 +121,7 @@ export default function SPPPage() {
 
   // Init
   useEffect(() => {
-    getNominalSPP(tahun).then(setNominal)
+    getNominalSPP(tahun, viewMonth).then(setNominal)
     getSppBillingStart().then(setBillingStart)
     getClientRestriction()
       .then(res => {
@@ -133,7 +133,7 @@ export default function SPPPage() {
       .catch((error: any) => {
         toast.error(error?.message || 'Gagal memuat batas akses SPP.')
       })
-  }, [tahun])
+  }, [tahun, viewMonth])
 
   // Load setoran info for current month (independent of main data load)
   useEffect(() => {

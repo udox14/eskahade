@@ -43,13 +43,13 @@ export async function allocateStudentFunds(input: {
 }) {
   try {
     assertIntegerRupiah(input.amountRupiah)
-    if ((input.destination === 'SPP' || input.destination === 'NON_SPP')) {
+    if (['SPP', 'NON_SPP', 'MAKAN', 'LAUNDRY'].includes(input.destination)) {
       if (!Number.isSafeInteger(input.fullOutstandingRupiah) || input.fullOutstandingRupiah !== input.amountRupiah) {
-        throw new Error('SPP dan Non-SPP harus dialokasikan lunas penuh.')
+        throw new Error('Tagihan bulanan harus dialokasikan lunas penuh.')
       }
       if (!input.billingReference) throw new Error('Referensi tagihan wajib diisi.')
     }
-    if(['SPP','USPP','NON_SPP'].includes(input.destination)){
+    if(['SPP','USPP','NON_SPP','MAKAN','LAUNDRY'].includes(input.destination)){
       const billed=(input.billItems||[]).reduce((sum,item)=>sum+Number(item.amountRupiah),0)
       if(billed!==input.amountRupiah)throw new Error('Alokasi tagihan harus terkait item tagihan yang sama nominalnya.')
       // Pertahanan berlapis di atas trg_finance_allocation_bill_validate: tagihan

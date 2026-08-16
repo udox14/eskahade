@@ -23,6 +23,9 @@ export type NonSppOutstandingItem = {
   tahun_ajaran_id: number
   // NULL untuk BANGUNAN (sekali seumur mondok), tahun berjalan untuk tahunan
   tahun_tagihan: number | null
+  // Marker nominal_bayar=0 (catatBebasPembayaran) — dibedakan dari "sudah
+  // lunas beneran" supaya portal bisa tampilkan badge "Dibebaskan", bukan "Lunas".
+  exempted: boolean
 }
 
 export type NonSppOutstanding = {
@@ -143,6 +146,7 @@ export async function getNonSppOutstandingSantri(
       sisa: isExempted ? 0 : Math.max(0, tarif.BANGUNAN - paid),
       tahun_ajaran_id: tahunAjaran.id,
       tahun_tagihan: null,
+      exempted: isExempted,
     })
   }
 
@@ -168,6 +172,7 @@ export async function getNonSppOutstandingSantri(
       sisa: isExempted ? 0 : Math.max(0, tarif[jenis] - paid),
       tahun_ajaran_id: tahunAjaran.id,
       tahun_tagihan: tahunTagihan,
+      exempted: isExempted,
     })
   }
 
