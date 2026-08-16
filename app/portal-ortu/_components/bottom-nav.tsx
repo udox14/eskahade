@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import Link, { useLinkStatus } from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Bank, CalendarCheck, House, ShieldWarning, User } from '@phosphor-icons/react'
 
@@ -11,6 +11,16 @@ const TABS = [
   { n: '04', href: '/portal-ortu/pelanggaran', label: 'Keamanan', icon: ShieldWarning },
   { n: '05', href: '/portal-ortu/akun', label: 'Akun', icon: User },
 ]
+
+function NavPendingOverlay() {
+  const { pending } = useLinkStatus()
+  if (!pending) return null
+  return (
+    <span className="absolute inset-0 flex items-center justify-center bg-[var(--p-ink)]/70">
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+    </span>
+  )
+}
 
 export function BottomNav() {
   const pathname = usePathname()
@@ -36,6 +46,7 @@ export function BottomNav() {
               <span className={`text-[9px] leading-none ${active ? 'font-bold' : 'font-medium'}`}>
                 {tab.label}
               </span>
+              <NavPendingOverlay />
             </Link>
           )
         })}

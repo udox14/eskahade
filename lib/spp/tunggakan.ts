@@ -256,6 +256,88 @@ export async function getTunggakanSppSantri(santriId: string, asOf = new Date())
   }
 }
 
+export type SppMonthStatus = 'LUNAS' | 'DITIADAKAN' | 'BELUM_LUNAS' | 'BELUM_ADA_TAGIHAN'
+
+export type SppMonthCell = {
+  bulan: number
+  nama_bulan: string
+  status: SppMonthStatus
+  nominal: number
+  tanggalBayar: string | null
+}
+
+/**
+ * Versi portal-safe dari getStatusSPP/getTagihanDitiadakanSPP di
+ * app/dashboard/asrama/spp/actions.ts — keduanya digerbangi sesi staff
+ * (assertSantriAccess) sehingga tidak bisa dipanggil dari context Portal
+ * Ortu. Fungsi ini melakukan query yang sama tapi diberi santriId langsung
+ * dari sesi portal, tanpa gerbang staff.
+ *
+ * Sengaja TIDAK menyentuh spp_tunggakan_historis — persis seperti grid 12
+ * bulan di app/dashboard/asrama/spp/_page-content.tsx (lihat `riwayatBayar`/
+ * `tagihanDitiadakan`), tunggakan historis merepresentasikan bulan SEBELUM
+ * awal tagihan sistem sehingga bukan konsep "sel bulan tahun berjalan" —
+ * historis tetap ikut dihitung di total pembayaran lewat getTunggakanSppSantri,
+ * hanya tidak diplot ke grid ini.
+ */
+export async function getSppMonthlyGrid(santriId: string, tahun: number): Promise<SppMonthCell[]> {
+  const billingStart = await getSppBillingStartSetting()
+  const santri = await queryOne<SppStudentEnrollmentDates>(
+    `SELECT tanggal_masuk, created_at FROM santri WHERE id = ?`,
+    [santriId]
+  )
+  const studentBillingStart = getSppStudentBillingStart(santri ?? {}, billingStart)
+
+  const now = new Date()
+  const currentKey = periodKey(now.getFullYear(), now.getMonth() + 1)
+
+  const paidRows = await query<{ bulan: number; nominal_bayar: number; tanggal_bayar: string }>(
+    `SELECT bulan, nominal_bayar, tanggal_bayar FROM spp_log WHERE santri_id = ? AND tahun = ?`,
+    [santriId, tahun]
+  )
+  const paidByMonth = new Map(paidRows.map(row => [row.bulan, row]))
+
+  const waivedRows = await query<{ bulan: number }>(
+    `SELECT bulan FROM spp_tagihan_ditiadakan WHERE santri_id = ? AND tahun = ? AND is_active = 1`,
+    [santriId, tahun]
+  )
+  const waivedMonths = new Set(waivedRows.map(row => row.bulan))
+
+  const nominalTahun = await getNominalSppForYear(tahun)
+
+  const cells: SppMonthCell[] = []
+  for (let bulan = 1; bulan <= 12; bulan++) {
+    const key = periodKey(tahun, bulan)
+    const billable = isSppBillablePeriod(tahun, bulan, studentBillingStart)
+    const paid = paidByMonth.get(bulan)
+
+    let status: SppMonthStatus
+    let nominal = nominalTahun
+
+    if (!billable) {
+      status = 'BELUM_ADA_TAGIHAN'
+    } else if (paid) {
+      status = 'LUNAS'
+      nominal = Number(paid.nominal_bayar)
+    } else if (waivedMonths.has(bulan)) {
+      status = 'DITIADAKAN'
+    } else if (key > currentKey) {
+      status = 'BELUM_ADA_TAGIHAN'
+    } else {
+      status = 'BELUM_LUNAS'
+    }
+
+    cells.push({
+      bulan,
+      nama_bulan: BULAN_SPP[bulan - 1],
+      status,
+      nominal: status === 'LUNAS' || status === 'BELUM_LUNAS' ? nominal : 0,
+      tanggalBayar: paid?.tanggal_bayar ?? null,
+    })
+  }
+  return cells
+}
+
 export async function getJumlahTunggakanHistorisBySantri(santriIds: string[]) {
   if (santriIds.length === 0) return new Map<string, number>()
 

@@ -1,18 +1,22 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  Bank, Buildings, CaretRight, CheckCircle, CircleNotch, Clock, Copy, Lightning, Money,
-  QrCode, Receipt, X,
+  Bank, Buildings, CalendarBlank, CaretLeft, CaretRight, CaretRight as ChevronRight, CheckCircle,
+  CircleNotch, Clock, Copy, ForkKnife, Lightning, Money, QrCode, Receipt, TShirt, X,
 } from '@phosphor-icons/react'
 import type { PortalPaymentChannels } from '@/lib/portal/data'
+import type { SppMonthCell, SppMonthStatus } from '@/lib/spp/tunggakan'
+import type { NonSppOutstanding, NonSppJenis } from '@/lib/keuangan/non-spp-outstanding'
 import { formatRupiah } from '@/lib/portal/format'
+import { BottomSheet } from '../../_components/bottom-sheet'
+import { RupiahInput } from '../../_components/rupiah-input'
 import { createSubmission } from './tagihan-actions'
 import { allocatePortalFunds } from './actions'
 import { UploadBukti } from './_upload-bukti'
+import { WalletTopupModal } from './_wallet-topup-modal'
 
 export type TagihanItem = {
   key: string
@@ -28,12 +32,41 @@ export type UsppTagihanItem = TagihanItem & {
 
 type Kategori = 'SPP' | 'NON_SPP'
 type Step = 1 | 2 | 3
+type ModalKind = 'spp' | 'nonspp' | 'uspp' | 'makan' | 'laundry' | null
+
+const NON_SPP_LABEL: Record<NonSppJenis, string> = {
+  BANGUNAN: 'Uang Bangunan',
+  KESEHATAN: 'Kesehatan',
+  EHB: 'EHB (Evaluasi Hasil Belajar)',
+  EKSKUL: 'Ekstrakurikuler',
+}
+
+function statusChipMeta(status: SppMonthStatus | 'LUNAS' | 'BELUM_LUNAS') {
+  switch (status) {
+    case 'LUNAS':
+      return { label: 'Lunas', cls: 'portal-badge-success' }
+    case 'DITIADAKAN':
+      return { label: 'Ditiadakan', cls: 'portal-badge-neutral' }
+    case 'BELUM_ADA_TAGIHAN':
+      return { label: 'Belum ada tagihan', cls: 'portal-badge-neutral' }
+    default:
+      return { label: 'Belum Lunas', cls: 'portal-badge-warning' }
+  }
+}
 
 export function TagihanClient(props: {
+  tahun: number
+  bulan: number
   tampilkanSpp: boolean
+  sppCell: SppMonthCell | null
   sppItems: TagihanItem[]
+  sppTunggakanTotal: number
   nonSppItems: TagihanItem[]
+  nonSppOutstanding: NonSppOutstanding | null
+  nonSppTahunanJenis: readonly NonSppJenis[]
   usppItems: UsppTagihanItem[]
+  makanBalance: number
+  laundryBalance: number
   channels: PortalPaymentChannels
   walletBalance: number
   pendingSpp: boolean
@@ -41,49 +74,140 @@ export function TagihanClient(props: {
   pendingNonSpp: boolean
   pendingNonSppSudahUpload: boolean
 }) {
+  const [modal, setModal] = useState<ModalKind>(null)
   const [wizard, setWizard] = useState<Kategori | null>(null)
+
+  const tahunanItems = props.nonSppOutstanding?.items.filter(item => props.nonSppTahunanJenis.includes(item.jenis)) || []
+  const bangunanItem = props.nonSppOutstanding?.items.find(item => item.jenis === 'BANGUNAN') || null
+
+  function openWizard(kategori: Kategori) {
+    setModal(null)
+    setWizard(kategori)
+  }
 
   return (
     <div className="space-y-4">
       {props.tampilkanSpp && (
-        <BillCard
-          index="01"
-          rise="portal-rise-1"
-          icon={<Money className="w-5 h-5 text-[var(--p-ink)]" />}
-          title="SPP Bulanan"
-          subtitle="Syahriah pengajian & asrama"
-          kategori="SPP"
-          items={props.sppItems}
+        <MonthSelector tahun={props.tahun} bulan={props.bulan} />
+      )}
+
+      {/* Grup Bulanan */}
+      <GroupCard index="01" title="Bulanan" subtitle="SPP, uang makan, dan laundry">
+        {props.tampilkanSpp && props.sppCell && (
+          <TagihanRow
+            icon={<Money className="w-4.5 h-4.5 text-[var(--p-ink)]" />}
+            label={`SPP ${props.sppCell.nama_bulan} ${props.tahun}`}
+            status={statusChipMeta(props.sppCell.status)}
+            value={props.sppCell.status === 'LUNAS' || props.sppCell.status === 'BELUM_LUNAS' ? formatRupiah(props.sppCell.nominal) : null}
+            onClick={() => setModal('spp')}
+          />
+        )}
+        <TagihanRow
+          icon={<ForkKnife className="w-4.5 h-4.5 text-[var(--p-ink)]" />}
+          label="Uang Makan"
+          status={{ label: 'Saldo', cls: 'portal-badge-neutral' }}
+          value={formatRupiah(props.makanBalance)}
+          onClick={() => setModal('makan')}
+        />
+        <TagihanRow
+          icon={<TShirt className="w-4.5 h-4.5 text-[var(--p-ink)]" />}
+          label="Uang Laundry"
+          status={{ label: 'Saldo', cls: 'portal-badge-neutral' }}
+          value={formatRupiah(props.laundryBalance)}
+          onClick={() => setModal('laundry')}
+        />
+      </GroupCard>
+
+      {/* Grup Tahunan */}
+      <GroupCard index="02" title="Tahunan" subtitle="Kesehatan, EHB, Ekstrakurikuler">
+        {tahunanItems.length > 0 ? (
+          tahunanItems.map(item => (
+            <TagihanRow
+              key={item.jenis}
+              icon={<Buildings className="w-4.5 h-4.5 text-[var(--p-ink)]" />}
+              label={NON_SPP_LABEL[item.jenis]}
+              status={statusChipMeta(item.sisa > 0 ? 'BELUM_LUNAS' : 'LUNAS')}
+              value={formatRupiah(item.sisa > 0 ? item.sisa : item.tarif)}
+              onClick={() => setModal('nonspp')}
+            />
+          ))
+        ) : (
+          <p className="px-1 py-3 text-xs text-[var(--p-muted)]">Belum ada tagihan tahunan aktif.</p>
+        )}
+      </GroupCard>
+
+      {/* Grup Lainnya */}
+      {(bangunanItem || props.usppItems.length > 0) && (
+        <GroupCard index="03" title="Lainnya" subtitle="Uang bangunan & USPP">
+          {bangunanItem && (
+            <TagihanRow
+              icon={<Buildings className="w-4.5 h-4.5 text-[var(--p-red)]" />}
+              label={NON_SPP_LABEL.BANGUNAN}
+              status={statusChipMeta(bangunanItem.sisa > 0 ? 'BELUM_LUNAS' : 'LUNAS')}
+              value={formatRupiah(bangunanItem.sisa > 0 ? bangunanItem.sisa : bangunanItem.tarif)}
+              onClick={() => setModal('nonspp')}
+            />
+          )}
+          {props.usppItems.length > 0 && (
+            <TagihanRow
+              icon={<Receipt className="w-4.5 h-4.5 text-[var(--p-ink)]" />}
+              label="USPP"
+              status={statusChipMeta('BELUM_LUNAS')}
+              value={formatRupiah(props.usppItems.reduce((sum, item) => sum + item.sisaRupiah, 0))}
+              onClick={() => setModal('uspp')}
+            />
+          )}
+        </GroupCard>
+      )}
+
+      {/* Modal SPP */}
+      {props.tampilkanSpp && props.sppCell && (
+        <SppDetailModal
+          open={modal === 'spp'}
+          onClose={() => setModal(null)}
+          cell={props.sppCell}
+          tunggakanTotal={props.sppTunggakanTotal}
           walletBalance={props.walletBalance}
           pending={props.pendingSpp}
           pendingSudahUpload={props.pendingSppSudahUpload}
-          onPay={() => setWizard('SPP')}
-          emptyText="Alhamdulillah, SPP sudah lunas sampai bulan ini."
+          onOpenWizard={() => openWizard('SPP')}
         />
       )}
 
-      <BillCard
-        index={props.tampilkanSpp ? '02' : '01'}
-        rise="portal-rise-2"
-        icon={<Buildings className="w-5 h-5 text-[var(--p-red)]" />}
-        title="Biaya Tahunan (Non-SPP)"
-        subtitle="Bangunan, kesehatan, EHB, ekskul"
-        kategori="NON_SPP"
-        items={props.nonSppItems}
+      {/* Modal Non-SPP (Tahunan + Bangunan) */}
+      <NonSppDetailModal
+        open={modal === 'nonspp'}
+        onClose={() => setModal(null)}
+        outstanding={props.nonSppOutstanding}
         walletBalance={props.walletBalance}
         pending={props.pendingNonSpp}
         pendingSudahUpload={props.pendingNonSppSudahUpload}
-        onPay={() => setWizard('NON_SPP')}
-        emptyText="Tidak ada tagihan Non-SPP tersisa. Jazakumullah khairan."
+        onOpenWizard={() => openWizard('NON_SPP')}
       />
 
-      {props.usppItems.length > 0 && (
-        <UsppCard
-          index={props.tampilkanSpp ? '03' : '02'}
-          items={props.usppItems}
-          walletBalance={props.walletBalance}
-        />
-      )}
+      {/* Modal USPP */}
+      <UsppDetailModal
+        open={modal === 'uspp'}
+        onClose={() => setModal(null)}
+        items={props.usppItems}
+        walletBalance={props.walletBalance}
+      />
+
+      {/* Modal top up Makan / Laundry */}
+      <WalletTopupModal
+        open={modal === 'makan'}
+        onClose={() => setModal(null)}
+        destination="MAKAN"
+        title="Uang Makan"
+        currentBalance={props.makanBalance}
+      />
+      <WalletTopupModal
+        open={modal === 'laundry'}
+        onClose={() => setModal(null)}
+        destination="LAUNDRY"
+        title="Uang Laundry"
+        currentBalance={props.laundryBalance}
+      />
 
       {wizard && (
         <WizardModal
@@ -97,122 +221,242 @@ export function TagihanClient(props: {
   )
 }
 
-function BillCard(props: {
-  index: string
-  rise: string
+// ── Komponen tampilan ───────────────────────────────────────
+
+function GroupCard(props: { index: string; title: string; subtitle: string; children: React.ReactNode }) {
+  return (
+    <div className="portal-card p-4">
+      <div className="flex items-center gap-2 px-1 pb-2">
+        <span className="portal-index text-[var(--p-muted)]">{props.index}</span>
+        <div>
+          <h2 className="portal-display text-base leading-tight text-[var(--p-ink)]">{props.title}</h2>
+          <p className="text-[10px] text-[var(--p-muted)]">{props.subtitle}</p>
+        </div>
+      </div>
+      <div className="divide-y divide-[var(--p-line)]">{props.children}</div>
+    </div>
+  )
+}
+
+function TagihanRow(props: {
   icon: React.ReactNode
-  title: string
-  subtitle: string
-  kategori: Kategori
-  items: TagihanItem[]
+  label: string
+  status: { label: string; cls: string }
+  value: string | null
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      className="w-full flex items-center gap-3 py-3 px-1 text-left transition active:scale-[0.99]"
+    >
+      <span className="flex w-9 h-9 shrink-0 items-center justify-center bg-[var(--p-paper)] border border-[var(--p-line)]">
+        {props.icon}
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-xs font-bold text-[var(--p-ink)] truncate">{props.label}</span>
+        <span className={`portal-badge ${props.status.cls} mt-1 !py-0.5 !px-2 !text-[9px]`}>{props.status.label}</span>
+      </span>
+      {props.value && <span className="text-xs font-extrabold text-[var(--p-ink)] shrink-0">{props.value}</span>}
+      <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--p-muted)]" />
+    </button>
+  )
+}
+
+function MonthSelector({ tahun, bulan }: { tahun: number; bulan: number }) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+
+  function go(delta: number) {
+    let nextBulan = bulan + delta
+    let nextTahun = tahun
+    if (nextBulan < 1) { nextBulan = 12; nextTahun -= 1 }
+    if (nextBulan > 12) { nextBulan = 1; nextTahun += 1 }
+    startTransition(() => {
+      router.push(`/portal-ortu/keuangan?tab=tagihan&bulan=${nextTahun}-${String(nextBulan).padStart(2, '0')}`)
+    })
+  }
+
+  const label = new Date(tahun, bulan - 1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+
+  return (
+    <div className="flex items-center justify-between rounded-[var(--p-radius-md)] border border-[var(--p-line)] bg-white px-3 py-2.5">
+      <button type="button" onClick={() => go(-1)} disabled={pending} className="p-1.5 disabled:opacity-40" aria-label="Bulan sebelumnya">
+        <CaretLeft className="w-4 h-4 text-[var(--p-ink)]" />
+      </button>
+      <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--p-ink)]">
+        {pending ? <CircleNotch className="w-3.5 h-3.5 animate-spin" /> : <CalendarBlank className="w-3.5 h-3.5" />}
+        {label}
+      </span>
+      <button type="button" onClick={() => go(1)} disabled={pending} className="p-1.5 disabled:opacity-40" aria-label="Bulan berikutnya">
+        <CaretRight className="w-4 h-4 text-[var(--p-ink)]" />
+      </button>
+    </div>
+  )
+}
+
+// ── Modal detail SPP ─────────────────────────────────────────
+
+function SppDetailModal(props: {
+  open: boolean
+  onClose: () => void
+  cell: SppMonthCell
+  tunggakanTotal: number
   walletBalance: number
   pending: boolean
   pendingSudahUpload: boolean
-  onPay: () => void
-  emptyText: string
+  onOpenWizard: () => void
 }) {
   const router = useRouter()
-  const [quickPaying, startQuickPay] = useTransition()
-  const total = props.items.reduce((sum, item) => sum + item.nominal, 0)
-  const cukupSaldo = props.walletBalance >= total
+  const [paying, startPay] = useTransition()
+  const belumLunas = props.cell.status === 'BELUM_LUNAS'
+  const cukupSaldo = props.walletBalance >= props.tunggakanTotal
 
-  function handleQuickPay() {
-    if (quickPaying) return
-    startQuickPay(async () => {
-      const result = await allocatePortalFunds({
-        destination: props.kategori,
-        amountRupiah: total,
-        requestKey: crypto.randomUUID(),
-      })
+  function bayarCepat() {
+    if (paying) return
+    startPay(async () => {
+      const result = await allocatePortalFunds({ destination: 'SPP', amountRupiah: props.tunggakanTotal, requestKey: crypto.randomUUID() })
       if ('error' in result) {
         toast.error(result.error)
         return
       }
-      toast.success(`${props.title} berhasil dilunasi dari saldo titipan.`)
+      toast.success('SPP berhasil dilunasi dari saldo titipan.')
+      props.onClose()
       router.refresh()
     })
   }
 
   return (
-    <div className={`portal-rise ${props.rise} portal-card p-5`}>
-      <div className="flex items-center gap-3">
-        <span className="flex w-10 h-10 items-center justify-center bg-[var(--p-paper)] border border-[var(--p-line)] shrink-0">
-          {props.icon}
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="portal-index text-[var(--p-muted)]">{props.index}</span>
-            <h2 className="portal-display text-lg leading-tight text-[var(--p-ink)]">{props.title}</h2>
-          </div>
-          <p className="text-[11px] text-[var(--p-muted)]">{props.subtitle}</p>
-        </div>
+    <BottomSheet open={props.open} onClose={props.onClose} title={`SPP ${props.cell.nama_bulan}`}>
+      <div className={`rounded-[var(--p-radius-md)] border px-4 py-3 ${belumLunas ? 'border-[#f0dcae] bg-[var(--p-warning-soft)]' : 'border-[var(--p-line)] bg-[var(--p-paper)]'}`}>
+        <p className={`portal-badge ${statusChipMeta(props.cell.status).cls}`}>{statusChipMeta(props.cell.status).label}</p>
+        {(props.cell.status === 'LUNAS' || belumLunas) && (
+          <p className="portal-display mt-2 text-2xl leading-none text-[var(--p-ink)]">{formatRupiah(props.cell.nominal)}</p>
+        )}
+        {props.cell.status === 'LUNAS' && props.cell.tanggalBayar && (
+          <p className="mt-1 text-[11px] text-[var(--p-muted)]">Dibayar {new Date(props.cell.tanggalBayar).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+        )}
       </div>
 
-      {props.items.length === 0 ? (
-        <p className="mt-4 rounded-[var(--p-radius-md)] bg-[var(--p-success-soft)] border border-[#cde3d4] px-4 py-3 text-xs font-semibold text-[var(--p-success)]">
-          {props.emptyText}
-        </p>
-      ) : (
+      {belumLunas && (
         <>
-          <div className="mt-4 max-h-44 overflow-y-auto pr-1 divide-y divide-[var(--p-line)]">
-            {props.items.map(item => (
-              <div key={item.key} className="flex items-center justify-between py-2.5">
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-[var(--p-ink)] truncate">{item.label}</p>
-                  {item.sublabel && <p className="text-[10px] text-[var(--p-muted)]">{item.sublabel}</p>}
-                </div>
-                <p className="text-xs font-extrabold text-[var(--p-ink)] shrink-0 ml-3">{formatRupiah(item.nominal)}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 flex items-center justify-between border-t-2 border-[var(--p-ink)] pt-3.5">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">Total Tagihan</p>
-              <p className="portal-display text-xl leading-none text-[var(--p-ink)]">{formatRupiah(total)}</p>
+          {props.tunggakanTotal > props.cell.nominal && (
+            <p className="mt-3 text-[11px] text-[var(--p-muted)] leading-relaxed">
+              Ada tunggakan SPP bulan lain juga. Total keseluruhan tunggakan SPP: <span className="font-bold text-[var(--p-ink)]">{formatRupiah(props.tunggakanTotal)}</span>. Bayar Cepat akan melunasi semuanya sekaligus.
+            </p>
+          )}
+
+          {props.pending ? (
+            <div className="mt-4 rounded-[var(--p-radius-md)] bg-[var(--p-warning-soft)] border border-[#f0dcae] px-4 py-3 text-xs font-semibold text-[var(--p-ink)]">
+              <Clock className="w-3.5 h-3.5 inline mr-1.5" />
+              {props.pendingSudahUpload ? 'Menunggu konfirmasi petugas.' : 'Pengajuan dibuat, lanjutkan upload bukti di tab Riwayat.'}
             </div>
-            {props.pending ? (
-              <Link
-                href="/portal-ortu/keuangan?tab=riwayat"
-                className="portal-badge portal-badge-warning !py-2.5 !px-4 !text-xs"
+          ) : (
+            <div className="mt-4 space-y-2">
+              <button
+                onClick={bayarCepat}
+                disabled={paying || !cukupSaldo}
+                className="portal-btn portal-btn-accent w-full disabled:opacity-40"
               >
-                <Clock className="w-3.5 h-3.5" />
-                {props.pendingSudahUpload ? 'Menunggu konfirmasi' : 'Lanjutkan upload'}
-              </Link>
-            ) : (
-              <div className="flex flex-col items-end gap-1.5">
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleQuickPay}
-                    disabled={!cukupSaldo || quickPaying}
-                    className="portal-btn portal-btn-outline !py-2.5 !px-3.5 !text-xs disabled:opacity-40"
-                  >
-                    {quickPaying ? <CircleNotch className="w-3.5 h-3.5 animate-spin" /> : <Lightning className="w-3.5 h-3.5" />}
-                    Bayar Cepat
-                  </button>
-                  <button
-                    onClick={props.onPay}
-                    className="portal-btn portal-btn-accent"
-                  >
-                    Bayar <CaretRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                {!cukupSaldo && (
-                  <p className="text-[10px] text-[var(--p-muted)]">
-                    Saldo titipan kurang {formatRupiah(total - props.walletBalance)} untuk Bayar Cepat.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
+                {paying ? <CircleNotch className="w-4 h-4 animate-spin" /> : <Lightning className="w-4 h-4" />}
+                Bayar Cepat {formatRupiah(props.tunggakanTotal)}
+              </button>
+              {!cukupSaldo && (
+                <p className="text-center text-[10px] text-[var(--p-muted)]">Saldo titipan tidak cukup untuk Bayar Cepat.</p>
+              )}
+              <button onClick={props.onOpenWizard} className="portal-btn portal-btn-outline w-full">
+                Transfer Bank / QRIS
+              </button>
+            </div>
+          )}
         </>
       )}
-    </div>
+    </BottomSheet>
   )
 }
 
-// ── Kartu USPP: bisa dilunasi penuh atau dicicil ────────────
+// ── Modal detail Non-SPP (Tahunan + Bangunan, satu bucket) ────
 
-function UsppCard(props: { index: string; items: UsppTagihanItem[]; walletBalance: number }) {
+function NonSppDetailModal(props: {
+  open: boolean
+  onClose: () => void
+  outstanding: NonSppOutstanding | null
+  walletBalance: number
+  pending: boolean
+  pendingSudahUpload: boolean
+  onOpenWizard: () => void
+}) {
+  const router = useRouter()
+  const [paying, startPay] = useTransition()
+  const items = props.outstanding?.items || []
+  const total = props.outstanding?.totalSisa || 0
+  const cukupSaldo = props.walletBalance >= total
+
+  function bayarCepat() {
+    if (paying || total <= 0) return
+    startPay(async () => {
+      const result = await allocatePortalFunds({ destination: 'NON_SPP', amountRupiah: total, requestKey: crypto.randomUUID() })
+      if ('error' in result) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Tagihan Non-SPP berhasil dilunasi dari saldo titipan.')
+      props.onClose()
+      router.refresh()
+    })
+  }
+
+  return (
+    <BottomSheet open={props.open} onClose={props.onClose} title="Tagihan Non-SPP">
+      <p className="text-[11px] text-[var(--p-muted)] leading-relaxed">
+        Pembayaran Non-SPP melunasi semua kategori sekaligus (Bangunan, Kesehatan, EHB, Ekstrakurikuler) — tidak bisa dipilih sebagian.
+      </p>
+
+      <div className="mt-3 divide-y divide-[var(--p-line)] rounded-[var(--p-radius-md)] border border-[var(--p-line)] bg-white px-4">
+        {items.map(item => (
+          <div key={item.jenis} className="flex items-center justify-between py-2.5">
+            <span className="text-xs font-semibold text-[var(--p-ink)]">{NON_SPP_LABEL[item.jenis]}</span>
+            <span className={`text-xs font-bold ${item.sisa > 0 ? 'text-[var(--p-ink)]' : 'text-[var(--p-success)]'}`}>
+              {item.sisa > 0 ? formatRupiah(item.sisa) : 'Lunas'}
+            </span>
+          </div>
+        ))}
+        {items.length === 0 && <p className="py-3 text-xs text-[var(--p-muted)]">Tidak ada tagihan Non-SPP.</p>}
+      </div>
+
+      {total > 0 && (
+        props.pending ? (
+          <div className="mt-4 rounded-[var(--p-radius-md)] bg-[var(--p-warning-soft)] border border-[#f0dcae] px-4 py-3 text-xs font-semibold text-[var(--p-ink)]">
+            <Clock className="w-3.5 h-3.5 inline mr-1.5" />
+            {props.pendingSudahUpload ? 'Menunggu konfirmasi petugas.' : 'Pengajuan dibuat, lanjutkan upload bukti di tab Riwayat.'}
+          </div>
+        ) : (
+          <div className="mt-4 space-y-2">
+            <button
+              onClick={bayarCepat}
+              disabled={paying || !cukupSaldo}
+              className="portal-btn portal-btn-accent w-full disabled:opacity-40"
+            >
+              {paying ? <CircleNotch className="w-4 h-4 animate-spin" /> : <Lightning className="w-4 h-4" />}
+              Bayar Cepat {formatRupiah(total)}
+            </button>
+            {!cukupSaldo && (
+              <p className="text-center text-[10px] text-[var(--p-muted)]">Saldo titipan tidak cukup untuk Bayar Cepat.</p>
+            )}
+            <button onClick={props.onOpenWizard} className="portal-btn portal-btn-outline w-full">
+              Transfer Bank / QRIS
+            </button>
+          </div>
+        )
+      )}
+    </BottomSheet>
+  )
+}
+
+// ── Modal detail USPP: bisa dilunasi penuh atau dicicil ───────
+
+function UsppDetailModal(props: { open: boolean; onClose: () => void; items: UsppTagihanItem[]; walletBalance: number }) {
   const router = useRouter()
   const [paying, startPay] = useTransition()
   const [cicilOpen, setCicilOpen] = useState(false)
@@ -231,11 +475,7 @@ function UsppCard(props: { index: string; items: UsppTagihanItem[]; walletBalanc
       return
     }
     startPay(async () => {
-      const result = await allocatePortalFunds({
-        destination: 'USPP',
-        amountRupiah: amount,
-        requestKey: crypto.randomUUID(),
-      })
+      const result = await allocatePortalFunds({ destination: 'USPP', amountRupiah: amount, requestKey: crypto.randomUUID() })
       if ('error' in result) {
         toast.error(result.error)
         return
@@ -243,26 +483,14 @@ function UsppCard(props: { index: string; items: UsppTagihanItem[]; walletBalanc
       toast.success('Pembayaran USPP berhasil diproses dari saldo titipan.')
       setCicilOpen(false)
       setCicilAmount(0)
+      props.onClose()
       router.refresh()
     })
   }
 
   return (
-    <div className="portal-rise portal-rise-3 portal-card p-5">
-      <div className="flex items-center gap-3">
-        <span className="flex w-10 h-10 items-center justify-center bg-[var(--p-paper)] border border-[var(--p-line)] shrink-0">
-          <Receipt className="w-5 h-5 text-[var(--p-ink)]" />
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="portal-index text-[var(--p-muted)]">{props.index}</span>
-            <h2 className="portal-display text-lg leading-tight text-[var(--p-ink)]">USPP / Uang Bangunan</h2>
-          </div>
-          <p className="text-[11px] text-[var(--p-muted)]">Bisa dilunasi sekaligus atau dicicil</p>
-        </div>
-      </div>
-
-      <div className="mt-4 max-h-44 overflow-y-auto pr-1 divide-y divide-[var(--p-line)]">
+    <BottomSheet open={props.open} onClose={props.onClose} title="USPP">
+      <div className="divide-y divide-[var(--p-line)] rounded-[var(--p-radius-md)] border border-[var(--p-line)] bg-white px-4">
         {props.items.map(item => (
           <div key={item.key} className="flex items-center justify-between py-2.5">
             <div className="min-w-0">
@@ -276,50 +504,34 @@ function UsppCard(props: { index: string; items: UsppTagihanItem[]; walletBalanc
         ))}
       </div>
 
-      <div className="mt-4 flex items-center justify-between border-t-2 border-[var(--p-ink)] pt-3.5">
+      <div className="mt-4 flex items-center justify-between">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">Sisa Tagihan</p>
           <p className="portal-display text-xl leading-none text-[var(--p-ink)]">{formatRupiah(sisaTotal)}</p>
         </div>
-        <div className="flex flex-col items-end gap-1.5">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setCicilOpen(v => !v)}
-              className="portal-btn portal-btn-outline !py-2.5 !px-3.5 !text-xs"
-            >
-              Cicil
-            </button>
-            <button
-              onClick={() => bayar(sisaTotal)}
-              disabled={!cukupSaldo || paying}
-              className="portal-btn portal-btn-accent disabled:opacity-40"
-            >
-              {paying ? <CircleNotch className="w-3.5 h-3.5 animate-spin" /> : <Lightning className="w-3.5 h-3.5" />}
-              Bayar Cepat
-            </button>
-          </div>
-          {!cukupSaldo && (
-            <p className="text-[10px] text-[var(--p-muted)]">
-              Saldo titipan kurang {formatRupiah(sisaTotal - props.walletBalance)} untuk lunas sekaligus.
-            </p>
-          )}
+        <div className="flex gap-2">
+          <button onClick={() => setCicilOpen(v => !v)} className="portal-btn portal-btn-outline !py-2.5 !px-3.5 !text-xs">
+            Cicil
+          </button>
+          <button
+            onClick={() => bayar(sisaTotal)}
+            disabled={!cukupSaldo || paying}
+            className="portal-btn portal-btn-accent disabled:opacity-40"
+          >
+            {paying ? <CircleNotch className="w-3.5 h-3.5 animate-spin" /> : <Lightning className="w-3.5 h-3.5" />}
+            Bayar Cepat
+          </button>
         </div>
       </div>
+      {!cukupSaldo && (
+        <p className="mt-1.5 text-right text-[10px] text-[var(--p-muted)]">Saldo titipan kurang {formatRupiah(sisaTotal - props.walletBalance)} untuk lunas sekaligus.</p>
+      )}
 
       {cicilOpen && (
         <div className="mt-3.5 rounded-[var(--p-radius-md)] border border-[var(--p-line)] bg-white p-3.5">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">Nominal Cicilan (Rp)</label>
+          <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">Nominal Cicilan</label>
           <div className="mt-1.5 flex gap-2">
-            <input
-              type="number"
-              min={1000}
-              step={1000}
-              max={sisaTotal}
-              value={cicilAmount || ''}
-              onChange={e => setCicilAmount(Number(e.target.value))}
-              className="portal-field"
-              placeholder="Nominal yang ingin dibayar..."
-            />
+            <RupiahInput value={cicilAmount} onChange={setCicilAmount} max={sisaTotal} placeholder="Nominal yang ingin dibayar..." />
             <button
               onClick={() => bayar(cicilAmount)}
               disabled={paying || cicilAmount <= 0}
@@ -330,11 +542,11 @@ function UsppCard(props: { index: string; items: UsppTagihanItem[]; walletBalanc
           </div>
         </div>
       )}
-    </div>
+    </BottomSheet>
   )
 }
 
-// ── Wizard 3 langkah ─────────────────────────────────────────
+// ── Wizard 3 langkah (transfer/QRIS manual) ───────────────────
 
 function WizardModal({
   kategori,

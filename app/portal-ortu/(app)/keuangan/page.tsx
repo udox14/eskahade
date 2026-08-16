@@ -3,18 +3,22 @@ import { financeQuery as query, financeQueryOne as queryOne, query as mainQuery 
 import { syncFinanceStudentSnapshot, syncFinanceStudentsByIds, financeStudentIdsForGuardian } from '@/lib/finance/snapshots'
 import {
   syncPortalSppBills, syncPortalNonSppBills, getPortalOpenBills, getPortalOpenUsppBills,
-  sppBillSublabel, nonSppBillSublabel,
 } from '@/lib/finance/portal-bills-sync'
 import { getPaymentChannels, getPendingSubmission, getRiwayatSubmissions } from '@/lib/portal/data'
+import { getPortalAllocationHistory } from '@/lib/finance/portal-history'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
+import { getSppMonthlyGrid, getTunggakanSppSantri } from '@/lib/spp/tunggakan'
+import { getNonSppOutstandingSantri, NON_SPP_JENIS_TAHUNAN } from '@/lib/keuangan/non-spp-outstanding'
 import { FinanceClient } from './_finance-client'
 import { TagihanClient, type TagihanItem, type UsppTagihanItem } from './_tagihan-client'
-import { RiwayatClient, type RiwayatItem } from './_riwayat-client'
+import { RiwayatClient, type RiwayatItem, type WithdrawalItem } from './_riwayat-client'
 import { KeuanganTabBar, type KeuanganTab } from './_tab-bar'
 import { switchPortalStudent } from './switch-actions'
+import { SwitchStudentButton } from './_switch-student-button'
+import { IsiSaldoTrigger } from './_isi-saldo-trigger'
 import { PortalPageHeader } from '../../_components/page-header'
 import { formatRupiah } from '@/lib/portal/format'
-import { ClockCounterClockwise, ForkKnife, ShoppingBag, TShirt, Wallet } from '@phosphor-icons/react/dist/ssr'
+import { Wallet } from '@phosphor-icons/react/dist/ssr'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,19 +35,31 @@ function parseDetail(detailJson: string): string[] {
 export default async function PortalKeuanganPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{ tab?: string; bulan?: string }>
 }) {
-  const { tab: rawTab } = await searchParams
+  const { tab: rawTab, bulan: rawBulan } = await searchParams
   const tab: KeuanganTab = rawTab === 'tagihan' || rawTab === 'riwayat' ? rawTab : 'saldo'
+
+  const now = new Date()
+  const bulanMatch = /^(\d{4})-(\d{2})$/.exec(rawBulan || '')
+  const selectedTahun = bulanMatch ? Number(bulanMatch[1]) : now.getFullYear()
+  const selectedBulan = bulanMatch ? Number(bulanMatch[2]) : now.getMonth() + 1
 
   const session = await requirePortalSessionStrict()
   await syncFinanceStudentSnapshot(session.santri_id)
 
-  const titipan = await queryOne<{ balance_rupiah: number }>(
-    `SELECT balance_rupiah FROM finance_student_wallets WHERE santri_id=? AND wallet_kind='TITIPAN'`,
+  const balances = await query<{ wallet_kind: string; balance_rupiah: number }>(
+    `SELECT wallet_kind,balance_rupiah FROM finance_student_wallets WHERE santri_id=? ORDER BY wallet_kind`,
     [session.santri_id]
   )
-  const titipanBalance = Number(titipan?.balance_rupiah || 0)
+  const balanceOf = (kind: string) => Number(balances.find(row => row.wallet_kind === kind)?.balance_rupiah || 0)
+  const titipanBalance = balanceOf('TITIPAN')
+  const jajanBalance = balanceOf('JAJAN')
+  const makanBalance = balanceOf('MAKAN')
+  const laundryBalance = balanceOf('LAUNDRY')
+
+  const methods = (process.env.DUITKU_PAYMENT_METHODS || '').split(',').map(x => x.trim()).filter(Boolean)
+  const qrisMethod = process.env.DUITKU_QRIS_METHOD || null
 
   if (session.guardian_id) await syncFinanceStudentsByIds(await financeStudentIdsForGuardian(session.guardian_id))
 
@@ -88,21 +104,31 @@ export default async function PortalKeuanganPage({
                 </option>
               ))}
             </select>
-            <button className="shrink-0 rounded-[var(--p-radius-sm)] bg-white/20 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-white/30 active:scale-95 transition">
-              Ganti Anak
-            </button>
+            <SwitchStudentButton />
           </form>
         )}
       </PortalPageHeader>
 
       <div className="pb-28">
-        {tab === 'saldo' && <SaldoTab santriId={session.santri_id} titipanBalance={titipanBalance} />}
+        {tab === 'saldo' && (
+          <SaldoTab
+            santriId={session.santri_id}
+            titipanBalance={titipanBalance}
+            jajanBalance={jajanBalance}
+            methods={methods}
+            qrisMethod={qrisMethod}
+          />
+        )}
         {tab === 'tagihan' && (
           <TagihanTab
             santriId={session.santri_id}
             bebasSpp={session.bebas_spp}
             asrama={session.asrama}
             titipanBalance={titipanBalance}
+            makanBalance={makanBalance}
+            laundryBalance={laundryBalance}
+            tahun={selectedTahun}
+            bulan={selectedBulan}
           />
         )}
         {tab === 'riwayat' && <RiwayatTab santriId={session.santri_id} />}
@@ -111,24 +137,28 @@ export default async function PortalKeuanganPage({
   )
 }
 
-async function SaldoTab({ santriId, titipanBalance }: { santriId: string; titipanBalance: number }) {
-  const balances = await query<{ wallet_kind: string; balance_rupiah: number }>(
-    `SELECT wallet_kind,balance_rupiah FROM finance_student_wallets WHERE santri_id=? ORDER BY wallet_kind`,
-    [santriId]
-  )
-  const methods = (process.env.DUITKU_PAYMENT_METHODS || '').split(',').map(x => x.trim()).filter(Boolean)
+async function SaldoTab({
+  santriId,
+  titipanBalance,
+  jajanBalance,
+  methods,
+  qrisMethod,
+}: {
+  santriId: string
+  titipanBalance: number
+  jajanBalance: number
+  methods: string[]
+  qrisMethod: string | null
+}) {
   const limits = (await query<{ daily_rupiah: number | null; weekly_rupiah: number | null; monthly_rupiah: number | null }>(
     `SELECT daily_rupiah,weekly_rupiah,monthly_rupiah FROM finance_withdrawal_limits WHERE santri_id=?`,
     [santriId]
   ))[0] || null
-  const withdrawals = await query<{ id: string; amount_rupiah: number; credential_kind: string; created_at: string }>(
-    `SELECT id,amount_rupiah,credential_kind,created_at FROM finance_withdrawals WHERE santri_id=? AND status='SUCCESS' ORDER BY created_at DESC LIMIT 30`,
+  const security = await queryOne<{ has_pin: number }>(
+    `SELECT (pin_hash IS NOT NULL) AS has_pin FROM finance_student_security WHERE santri_id=?`,
     [santriId]
   )
-
-  const jajanBalance = Number(balances.find(row => row.wallet_kind === 'JAJAN')?.balance_rupiah || 0)
-  const makanBalance = Number(balances.find(row => row.wallet_kind === 'MAKAN')?.balance_rupiah || 0)
-  const laundryBalance = Number(balances.find(row => row.wallet_kind === 'LAUNDRY')?.balance_rupiah || 0)
+  const hasPin = !!security?.has_pin
 
   return (
     <>
@@ -141,84 +171,13 @@ async function SaldoTab({ santriId, titipanBalance }: { santriId: string; titipa
           <p className="portal-display text-[2.1rem] leading-none text-white">
             {formatRupiah(titipanBalance)}
           </p>
-          <span className="mb-1 rounded-[var(--p-radius-sm)] bg-[var(--p-red)] px-3 py-1 text-[11px] font-bold text-white shrink-0">
-            Utama
-          </span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 divide-x divide-[var(--p-line)] border-b border-[var(--p-line)] bg-[var(--p-white)] text-center">
-        <div className="p-3">
-          <div className="flex items-center justify-center gap-1 text-[var(--p-muted)]">
-            <ShoppingBag className="w-3.5 h-3.5 text-[var(--p-ink)]" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Jajan</span>
-          </div>
-          <p className="portal-display mt-1.5 text-xs font-bold text-[var(--p-ink)] truncate">
-            {formatRupiah(jajanBalance)}
-          </p>
-        </div>
-
-        <div className="p-3">
-          <div className="flex items-center justify-center gap-1 text-[var(--p-muted)]">
-            <ForkKnife className="w-3.5 h-3.5 text-[var(--p-ink)]" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Makan</span>
-          </div>
-          <p className="portal-display mt-1.5 text-xs font-bold text-[var(--p-ink)] truncate">
-            {formatRupiah(makanBalance)}
-          </p>
-        </div>
-
-        <div className="p-3">
-          <div className="flex items-center justify-center gap-1 text-[var(--p-muted)]">
-            <TShirt className="w-3.5 h-3.5 text-[var(--p-ink)]" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Laundry</span>
-          </div>
-          <p className="portal-display mt-1.5 text-xs font-bold text-[var(--p-ink)] truncate">
-            {formatRupiah(laundryBalance)}
-          </p>
+          <IsiSaldoTrigger methods={methods} qrisMethod={qrisMethod} />
         </div>
       </div>
 
       <p className="portal-section-label px-5 mt-5 mb-3">02 — Alokasi &amp; Pengaturan</p>
       <div className="px-5 space-y-4">
-        <FinanceClient methods={methods} limits={limits} />
-
-        {/* Riwayat Pencairan */}
-        <div className="portal-rise portal-rise-4 portal-card p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <ClockCounterClockwise className="w-4 h-4 text-[var(--p-ink)]" />
-            <h2 className="portal-display text-lg text-[var(--p-ink)]">Riwayat Pencairan</h2>
-          </div>
-
-          {withdrawals.length > 0 ? (
-            <div className="divide-y divide-[var(--p-line)]">
-              {withdrawals.map(item => (
-                <div key={item.id} className="flex items-center justify-between py-3 text-xs first:pt-1 last:pb-0">
-                  <div>
-                    <p className="font-semibold text-[var(--p-ink)]">
-                      {new Date(item.created_at).toLocaleString('id-ID', {
-                        timeZone: 'Asia/Jakarta',
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })} WIB
-                    </p>
-                    <span className="inline-block mt-0.5 rounded-full bg-[var(--p-paper)] border border-[var(--p-line)] px-2 py-0.5 text-[10px] font-bold text-[var(--p-muted)] uppercase tracking-wider">
-                      {item.credential_kind}
-                    </span>
-                  </div>
-                  <p className="portal-display text-sm text-[var(--p-ink)] font-bold">
-                    {formatRupiah(Number(item.amount_rupiah))}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-2 text-xs text-[var(--p-muted)]">Belum ada riwayat pencairan saldo santri.</p>
-          )}
-        </div>
+        <FinanceClient jajanBalance={jajanBalance} limits={limits} hasPin={hasPin} />
       </div>
     </>
   )
@@ -229,11 +188,19 @@ async function TagihanTab({
   bebasSpp,
   asrama,
   titipanBalance,
+  makanBalance,
+  laundryBalance,
+  tahun,
+  bulan,
 }: {
   santriId: string
   bebasSpp: boolean
   asrama: string | null
   titipanBalance: number
+  makanBalance: number
+  laundryBalance: number
+  tahun: number
+  bulan: number
 }) {
   const tampilkanSpp = !bebasSpp && !isAsramaTanpaKamar(asrama)
 
@@ -242,26 +209,29 @@ async function TagihanTab({
     syncPortalNonSppBills(santriId),
   ])
 
-  const [sppBills, nonSppBills, usppBills, channels, pendingSpp, pendingNonSpp] = await Promise.all([
+  const [sppBills, nonSppBills, usppBills, channels, pendingSpp, pendingNonSpp, sppGrid, sppTunggakan, nonSppOutstanding] = await Promise.all([
     tampilkanSpp ? getPortalOpenBills(santriId, 'SPP') : Promise.resolve([]),
     getPortalOpenBills(santriId, 'NON_SPP'),
     getPortalOpenUsppBills(santriId),
     getPaymentChannels(),
     getPendingSubmission(santriId, 'SPP'),
     getPendingSubmission(santriId, 'NON_SPP'),
+    tampilkanSpp ? getSppMonthlyGrid(santriId, tahun) : Promise.resolve([]),
+    tampilkanSpp ? getTunggakanSppSantri(santriId) : Promise.resolve(null),
+    getNonSppOutstandingSantri(santriId),
   ])
 
   const sppItems: TagihanItem[] = sppBills.map(bill => ({
     key: bill.id,
     label: bill.title,
-    sublabel: sppBillSublabel(bill.period_key),
+    sublabel: null,
     nominal: Number(bill.amount_rupiah),
   }))
 
   const nonSppItems: TagihanItem[] = nonSppBills.map(bill => ({
     key: bill.id,
     label: bill.title,
-    sublabel: nonSppBillSublabel(bill.period_key),
+    sublabel: null,
     nominal: Number(bill.amount_rupiah),
   }))
 
@@ -274,13 +244,23 @@ async function TagihanTab({
     status: bill.status,
   }))
 
+  const sppCell = sppGrid.find(cell => cell.bulan === bulan) || null
+
   return (
     <div className="px-5 pt-5">
       <TagihanClient
+        tahun={tahun}
+        bulan={bulan}
         tampilkanSpp={tampilkanSpp}
+        sppCell={sppCell}
         sppItems={sppItems}
+        sppTunggakanTotal={sppTunggakan?.total || 0}
         nonSppItems={nonSppItems}
+        nonSppOutstanding={nonSppOutstanding}
+        nonSppTahunanJenis={NON_SPP_JENIS_TAHUNAN}
         usppItems={usppItems}
+        makanBalance={makanBalance}
+        laundryBalance={laundryBalance}
         channels={channels}
         walletBalance={titipanBalance}
         pendingSpp={!!pendingSpp}
@@ -293,9 +273,17 @@ async function TagihanTab({
 }
 
 async function RiwayatTab({ santriId }: { santriId: string }) {
-  const rows = await getRiwayatSubmissions(santriId)
+  const [rows, allocationRows, withdrawalRows] = await Promise.all([
+    getRiwayatSubmissions(santriId),
+    getPortalAllocationHistory(santriId),
+    query<{ id: string; amount_rupiah: number; credential_kind: string; created_at: string }>(
+      `SELECT id,amount_rupiah,credential_kind,created_at FROM finance_withdrawals WHERE santri_id=? AND status='SUCCESS' ORDER BY created_at DESC LIMIT 30`,
+      [santriId]
+    ),
+  ])
 
-  const items: RiwayatItem[] = rows.map(row => ({
+  const submissionItems: RiwayatItem[] = rows.map(row => ({
+    source: 'submission',
     id: row.id,
     kategori: row.kategori,
     rincian: parseDetail(row.detail_json),
@@ -315,9 +303,29 @@ async function RiwayatTab({ santriId }: { santriId: string }) {
     createdAt: row.created_at,
   }))
 
+  const allocationItems: RiwayatItem[] = allocationRows.map(row => ({
+    source: 'allocation',
+    id: row.id,
+    destinationKind: row.destination_kind,
+    jumlah: Number(row.amount_rupiah),
+    status: row.status,
+    createdAt: row.created_at,
+  }))
+
+  const feed = [...submissionItems, ...allocationItems].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )
+
+  const withdrawals: WithdrawalItem[] = withdrawalRows.map(row => ({
+    id: row.id,
+    amountRupiah: Number(row.amount_rupiah),
+    credentialKind: row.credential_kind,
+    createdAt: row.created_at,
+  }))
+
   return (
     <div className="px-5 pt-5">
-      <RiwayatClient items={items} />
+      <RiwayatClient feed={feed} withdrawals={withdrawals} />
     </div>
   )
 }
