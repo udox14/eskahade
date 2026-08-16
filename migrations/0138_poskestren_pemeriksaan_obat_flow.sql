@@ -1,5 +1,8 @@
 -- ============================================================
--- Migration 0135: POSKESTREN Pemeriksaan - alur pendaftaran → pemeriksaan → penyerahan obat.
+-- Migration 0138: POSKESTREN Pemeriksaan - alur pendaftaran → pemeriksaan → penyerahan obat.
+-- (Semula bernomor 0135, direnumber karena bentrok dengan
+-- 0135_legacy_sidebar_fixes.sql yang sudah lebih dulu memakai nomor itu.
+-- Isi migrasi tidak berubah.)
 -- Strategi: TANPA rebuild tabel (aman terhadap foreign key di D1).
 -- 1. Tanda vital pendaftaran disimpan pada kunjungan.
 -- 2. Kolom awaiting_medicine=1 menandakan pemeriksaan dokter selesai

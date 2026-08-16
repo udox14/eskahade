@@ -283,13 +283,19 @@ export async function deletePersonnel(id: string) {
   )
   if (!personnel) return { success: false as const, error: 'Personel tidak ditemukan.' }
 
-  // Cek apakah personel punya riwayat pemeriksaan atau transaksi keuangan
-  const hasVisit = await queryOne<{ cnt: number }>(
-    'SELECT COUNT(*) AS cnt FROM poskestren_visit WHERE personnel_id = ?',
-    [id]
+  // Cek apakah personel punya riwayat pemeriksaan, sesi praktik, atau program
+  // preventif — ketiga tabel itu punya FK personnel_id tanpa ON DELETE, jadi
+  // DELETE akan gagal dengan "FOREIGN KEY constraint failed" mentah kalau
+  // tidak dicek lebih dulu.
+  const usage = await queryOne<{ visits: number; sessions: number; programs: number }>(
+    `SELECT
+       (SELECT COUNT(*) FROM poskestren_visit WHERE personnel_id = ?) AS visits,
+       (SELECT COUNT(*) FROM poskestren_practice_session WHERE personnel_id = ?) AS sessions,
+       (SELECT COUNT(*) FROM poskestren_preventive_program WHERE personnel_id = ?) AS programs`,
+    [id, id, id]
   )
-  if (hasVisit && Number(hasVisit.cnt) > 0) {
-    return { success: false as const, error: `Personel ini memiliki ${hasVisit.cnt} riwayat pemeriksaan dan tidak dapat dihapus. Nonaktifkan saja.` }
+  if (usage && (Number(usage.visits) > 0 || Number(usage.sessions) > 0 || Number(usage.programs) > 0)) {
+    return { success: false as const, error: `Personel ini memiliki riwayat pemeriksaan, sesi praktik, atau program preventif (${usage.visits} kunjungan, ${usage.sessions} sesi, ${usage.programs} program) dan tidak dapat dihapus. Nonaktifkan saja.` }
   }
 
   const db = await getDB()

@@ -294,14 +294,14 @@ export async function createDormStockTransfer(input: {
       db.prepare(`INSERT OR IGNORE INTO poskestren_medicine_location_stock(medicine_id, location_id, quantity_base) VALUES (?, ?, 0)`).bind(item.medicineId, destination.id),
       db.prepare(
         `UPDATE poskestren_medicine_location_stock
-         SET quantity_base = ?, updated_at = datetime('now')
-         WHERE medicine_id = ? AND location_id = ? AND quantity_base = ?`
-      ).bind(sourceAfter, item.medicineId, source.id, sourceBefore),
+         SET quantity_base = quantity_base - ?, updated_at = datetime('now')
+         WHERE medicine_id = ? AND location_id = ? AND quantity_base - ? >= 0`
+      ).bind(item.quantity, item.medicineId, source.id, item.quantity),
       db.prepare(
         `UPDATE poskestren_medicine_location_stock
-         SET quantity_base = ?, updated_at = datetime('now')
-         WHERE medicine_id = ? AND location_id = ? AND quantity_base = ?`
-      ).bind(destinationAfter, item.medicineId, destination.id, destinationBefore),
+         SET quantity_base = quantity_base + ?, updated_at = datetime('now')
+         WHERE medicine_id = ? AND location_id = ?`
+      ).bind(item.quantity, item.medicineId, destination.id),
       db.prepare(
         `INSERT INTO poskestren_stock_transfer_item(
            id, transfer_id, medicine_id, quantity_base, source_before, source_after,
@@ -661,13 +661,13 @@ export async function receiveMedicineOrder(input: {
       db.prepare(`INSERT OR IGNORE INTO poskestren_medicine_location_stock(medicine_id, location_id, quantity_base) VALUES (?, 'pos-location-central', 0)`).bind(orderItem.medicine_id),
       db.prepare(
         `UPDATE poskestren_medicine_location_stock
-         SET quantity_base = ?, updated_at = datetime('now')
-         WHERE medicine_id = ? AND location_id = 'pos-location-central' AND quantity_base = ?`
-      ).bind(centralAfter, orderItem.medicine_id, centralBefore),
+         SET quantity_base = quantity_base + ?, updated_at = datetime('now')
+         WHERE medicine_id = ? AND location_id = 'pos-location-central'`
+      ).bind(item.quantity, orderItem.medicine_id),
       db.prepare(
-        `UPDATE poskestren_medicine SET total_stock_base = ?, updated_at = datetime('now')
-         WHERE id = ? AND total_stock_base = ?`
-      ).bind(after, orderItem.medicine_id, before),
+        `UPDATE poskestren_medicine SET total_stock_base = total_stock_base + ?, updated_at = datetime('now')
+         WHERE id = ?`
+      ).bind(item.quantity, orderItem.medicine_id),
       db.prepare(
         `INSERT INTO poskestren_stock_movement(
            id, medicine_id, batch_id, movement_date, movement_type, quantity_delta,

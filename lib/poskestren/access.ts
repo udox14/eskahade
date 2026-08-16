@@ -99,3 +99,21 @@ export async function requirePoskestrenFeature(
   return session
 }
 
+/**
+ * Sama seperti requirePoskestrenFeature, tapi menolak dewan_santri/pengurus_asrama
+ * (mode SUMMARY_ALL/SUMMARY_ASRAMA). Sejak 0126 kedua role itu punya akses fitur
+ * href pemeriksaan (untuk tab Rekam Medis yang sudah diredaksi di clinical-actions.ts),
+ * tapi endpoint operasional klinik penuh (antrian, pemeriksaan, resep, obat) harus
+ * tetap terbatas untuk petugas POSKESTREN/admin saja.
+ */
+export async function requirePoskestrenStaffFeature(
+  href: string,
+  action: FeatureAction = 'read'
+): Promise<SessionUser> {
+  const session = await requirePoskestrenFeature(href, action)
+  if (!isSuperAccess(session) && !hasPoskestrenRole(session)) {
+    throw new PoskestrenAccessError('Hanya petugas POSKESTREN yang dapat mengakses data klinis penuh.')
+  }
+  return session
+}
+

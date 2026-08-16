@@ -155,23 +155,30 @@ export async function cleanupSampleVisits(input: { visitIds: string[]; reason: s
   if (visits.length !== visitIds.length) {
     return { success: false as const, error: 'Ada data yang tidak valid atau bukan pendaftaran manual.' }
   }
+  // Ambil lokasi & jumlah asli dari stock_movement penyerahan obat itu sendiri
+  // (bukan cuma dispensed_quantity_base), supaya reversal dikembalikan ke
+  // lokasi yang benar-benar dipotong — bukan selalu ke Gudang Pusat.
   const prescriptionRows = await query<any>(
-    `SELECT rx.id AS prescription_id, rxi.id AS prescription_item_id,
-            rxi.medicine_id, m.name AS medicine_name,
-            rxi.dispensed_quantity_base
+    `SELECT rxi.medicine_id, m.name AS medicine_name,
+            COALESCE(sm.location_id, 'pos-location-central') AS location_id,
+            COALESCE(-sm.quantity_delta, rxi.dispensed_quantity_base) AS quantity
      FROM poskestren_prescription rx
      JOIN poskestren_prescription_item rxi ON rxi.prescription_id = rx.id
      JOIN poskestren_medicine m ON m.id = rxi.medicine_id
+     LEFT JOIN poskestren_stock_movement sm
+       ON sm.reference_type = 'PRESCRIPTION_ITEM' AND sm.reference_id = rxi.id
+      AND sm.medicine_id = rxi.medicine_id
      WHERE rx.visit_id IN (${placeholders})`,
     visitIds
   )
-  const grouped = new Map<string, { name: string; quantity: number }>()
+  const grouped = new Map<string, { medicineId: string; name: string; locationId: string; quantity: number }>()
   for (const row of prescriptionRows) {
-    const current = grouped.get(row.medicine_id) || { name: row.medicine_name, quantity: 0 }
-    current.quantity += Number(row.dispensed_quantity_base || 0)
-    grouped.set(row.medicine_id, current)
+    const key = `${row.medicine_id}|${row.location_id}`
+    const current = grouped.get(key) || { medicineId: row.medicine_id, name: row.medicine_name, locationId: row.location_id, quantity: 0 }
+    current.quantity += Number(row.quantity || 0)
+    grouped.set(key, current)
   }
-  const medicineIds = [...grouped.keys()]
+  const medicineIds = [...new Set([...grouped.values()].map(item => item.medicineId))]
   const stocks = medicineIds.length
     ? await query<{ id: string; total_stock_base: number }>(
       `SELECT id, total_stock_base FROM poskestren_medicine
@@ -183,19 +190,20 @@ export async function cleanupSampleVisits(input: { visitIds: string[]; reason: s
   const cleanupId = generateId()
   const db = await getDB()
   const statements: D1PreparedStatement[] = []
-  for (const [medicineId, item] of grouped) {
+  for (const [key, item] of grouped) {
     if (item.quantity <= 0) continue
     const mutation = await prepareStockMutationFromSnapshot(db, {
-      medicineId,
+      medicineId: item.medicineId,
       medicineName: item.name,
-      stockBefore: stockMap.get(medicineId) || 0,
+      stockBefore: stockMap.get(item.medicineId) || 0,
       quantityDelta: item.quantity,
       movementType: 'REVERSAL',
       movementDate: new Date().toISOString().slice(0, 10),
       referenceType: 'SAMPLE_CLEANUP',
-      referenceId: `${cleanupId}:${medicineId}`,
+      referenceId: `${cleanupId}:${key}`,
       actorId: session.id,
       notes: reason,
+      locationId: item.locationId,
     })
     statements.push(...mutation.statements)
   }
@@ -204,12 +212,22 @@ export async function cleanupSampleVisits(input: { visitIds: string[]; reason: s
     db.prepare(`DELETE FROM poskestren_visit_revision WHERE visit_id IN (${placeholders})`).bind(...visitIds),
     db.prepare(`DELETE FROM poskestren_prescription WHERE visit_id IN (${placeholders})`).bind(...visitIds),
     db.prepare(`DELETE FROM poskestren_visit WHERE id IN (${placeholders})`).bind(...visitIds),
-    db.prepare(
-      `INSERT INTO app_settings(key, value, updated_at) VALUES (?, '1', datetime('now'))
-       ON CONFLICT(key) DO UPDATE SET value = '1', updated_at = datetime('now')`
-    ).bind(CLEANUP_SETTING)
   )
   await db.batch(statements)
+
+  // Kunci flag cleanup HANYA kalau sudah tidak ada lagi data sampel yang
+  // memenuhi syarat — seleksi parsial (mis. admin membersihkan bertahap)
+  // tidak boleh mengunci tombol ini secara permanen sebelum semua sampel habis.
+  const remaining = await queryOne<{ cnt: number }>(
+    `SELECT COUNT(*) AS cnt FROM poskestren_visit
+     WHERE source_type = 'MANUAL' AND status IN ('SELESAI','DIRUJUK','BATAL')`
+  )
+  if (!remaining || Number(remaining.cnt) === 0) {
+    await (await getDB()).prepare(
+      `INSERT INTO app_settings(key, value, updated_at) VALUES (?, '1', datetime('now'))
+       ON CONFLICT(key) DO UPDATE SET value = '1', updated_at = datetime('now')`
+    ).bind(CLEANUP_SETTING).run()
+  }
   await logActivity({
     actor: actorFromSession(session),
     module: 'poskestren_pemeriksaan',

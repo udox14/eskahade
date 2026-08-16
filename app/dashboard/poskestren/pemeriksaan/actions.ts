@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { generateId, getDB, query, queryOne } from '@/lib/db'
 import { toWibDateInputValue } from '@/lib/date/wib'
-import { requirePoskestrenFeature } from '@/lib/poskestren/access'
+import { requirePoskestrenStaffFeature } from '@/lib/poskestren/access'
 import {
   assertDate,
   cleanText,
@@ -55,7 +55,7 @@ function patientRecordNo(nis: string) {
 }
 
 async function writeAudit(
-  session: Awaited<ReturnType<typeof requirePoskestrenFeature>>,
+  session: Awaited<ReturnType<typeof requirePoskestrenStaffFeature>>,
   action: string,
   entityType: string,
   entityId: string,
@@ -76,7 +76,7 @@ async function writeAudit(
 }
 
 export async function searchActiveSantri(keyword: string) {
-  await requirePoskestrenFeature(PATH)
+  await requirePoskestrenStaffFeature(PATH)
   const q = String(keyword || '').trim().slice(0, 60)
   if (q.length < 2) return []
   const like = `%${q}%`
@@ -109,7 +109,7 @@ export async function searchPreventiveTargets(input: {
   kamar?: string
   kelas?: string
 }) {
-  await requirePoskestrenFeature(PATH)
+  await requirePoskestrenStaffFeature(PATH)
   const asrama = cleanText(input.asrama, 100)
   const kamar = cleanText(input.kamar, 100)
   const kelas = cleanText(input.kelas, 100)
@@ -148,7 +148,7 @@ export async function createPatient(input: {
   emergencyContact?: string
   notes?: string
 }) {
-  const session = await requirePoskestrenFeature(PATH, 'create')
+  const session = await requirePoskestrenStaffFeature(PATH, 'create')
   const santri = await queryOne<{ id: string; nis: string; nama_lengkap: string; poskestren_code: string | null }>(
     `SELECT id, nis, nama_lengkap, poskestren_code
      FROM santri
@@ -173,7 +173,7 @@ export async function createPatient(input: {
     id,
     santri.id,
     santri.poskestren_code || patientRecordNo(santri.nis),
-    null,
+    cleanText(input.bloodType, 10),
     cleanText(input.allergies),
     cleanText(input.specialConditions),
     cleanText(input.routineMedicines),
@@ -198,7 +198,7 @@ export async function updatePatient(input: {
   emergencyContact?: string
   notes?: string
 }) {
-  const session = await requirePoskestrenFeature(PATH, 'update')
+  const session = await requirePoskestrenStaffFeature(PATH, 'update')
   const patient = await queryOne<{ id: string; nama_lengkap: string }>(
     `SELECT p.id, s.nama_lengkap
      FROM poskestren_patient p JOIN santri s ON s.id = p.santri_id
@@ -209,13 +209,15 @@ export async function updatePatient(input: {
 
   await (await getDB()).prepare(
     `UPDATE poskestren_patient
-     SET allergies = ?, special_conditions = ?, routine_medicines = ?,
-         notes = ?, updated_at = datetime('now')
+     SET blood_type = ?, allergies = ?, special_conditions = ?, routine_medicines = ?,
+         emergency_contact = ?, notes = ?, updated_at = datetime('now')
      WHERE id = ?`
   ).bind(
+    cleanText(input.bloodType, 10),
     cleanText(input.allergies),
     cleanText(input.specialConditions),
     cleanText(input.routineMedicines),
+    cleanText(input.emergencyContact, 200),
     cleanText(input.notes),
     input.id
   ).run()
@@ -226,7 +228,7 @@ export async function updatePatient(input: {
 }
 
 export async function getPatients(input: PoskestrenListQuery = {}): Promise<PoskestrenListResult<PatientRow>> {
-  await requirePoskestrenFeature(PATH)
+  await requirePoskestrenStaffFeature(PATH)
   const normalized = normalizePoskestrenListQuery(input)
   const cursor = decodeCursor(normalized.cursor)
   const where = ['1=1']
@@ -267,7 +269,7 @@ export async function getPatients(input: PoskestrenListQuery = {}): Promise<Posk
 }
 
 export async function getSickCandidates(input: { q?: string; gender?: string; asrama?: string; dateFrom?: string; dateTo?: string } = {}) {
-  await requirePoskestrenFeature(PATH)
+  await requirePoskestrenStaffFeature(PATH)
   const q = String(input.q || '').trim().slice(0, 60)
   const like = `%${q}%`
   const where = [`s.status_global = 'aktif'`, `NOT EXISTS (SELECT 1 FROM poskestren_visit v WHERE v.source_episode_id = le.episode_id)`]
@@ -421,11 +423,20 @@ function patientAnamnesisStatement(
   allergies?: string,
   diseaseHistory?: string
 ) {
+  // Hanya timpa kolom yang benar-benar dikirim pemanggil — kalau salah satu
+  // field (misal diseaseHistory) tidak disertakan, kolom itu harus tetap
+  // apa adanya, bukan ditimpa NULL.
   return db.prepare(
     `UPDATE poskestren_patient
-     SET allergies = ?, special_conditions = ?, updated_at = datetime('now')
+     SET allergies = CASE WHEN ? THEN ? ELSE allergies END,
+         special_conditions = CASE WHEN ? THEN ? ELSE special_conditions END,
+         updated_at = datetime('now')
      WHERE id = ?`
-  ).bind(cleanText(allergies), cleanText(diseaseHistory), patientId)
+  ).bind(
+    allergies !== undefined ? 1 : 0, cleanText(allergies),
+    diseaseHistory !== undefined ? 1 : 0, cleanText(diseaseHistory),
+    patientId
+  )
 }
 
 export async function registerManualVisit(input: {
@@ -439,7 +450,7 @@ export async function registerManualVisit(input: {
   diseaseHistory?: string
   allergies?: string
 }) {
-  const session = await requirePoskestrenFeature(PATH, 'create')
+  const session = await requirePoskestrenStaffFeature(PATH, 'create')
   const complaint = cleanText(input.complaint)
   if (!complaint) return { success: false as const, error: 'Keluhan wajib diisi saat pendaftaran.' }
   const vitals = parseVitals(input)
@@ -486,7 +497,7 @@ export async function importSickEpisode(input: {
   diseaseHistory?: string
   allergies?: string
 }) {
-  const session = await requirePoskestrenFeature(PATH, 'create')
+  const session = await requirePoskestrenStaffFeature(PATH, 'create')
   if (!input.episodeId || !input.absenSakitId) {
     return { success: false as const, error: 'Data episode tidak lengkap.' }
   }
@@ -552,7 +563,7 @@ export async function importSickEpisode(input: {
 
 
 export async function getVisits(input: PoskestrenListQuery & { date?: string } = {}) {
-  await requirePoskestrenFeature(PATH)
+  await requirePoskestrenStaffFeature(PATH)
   const normalized = normalizePoskestrenListQuery(input)
   const date = input.date ? assertDate(input.date) : toWibDateInputValue()
   const cursor = decodeCursor(normalized.cursor)
@@ -632,7 +643,7 @@ export async function getVisits(input: PoskestrenListQuery & { date?: string } =
 }
 
 export async function getExaminationHistory(input: PoskestrenListQuery = {}) {
-  await requirePoskestrenFeature(PATH)
+  await requirePoskestrenStaffFeature(PATH)
   const normalized = normalizePoskestrenListQuery(input)
   const cursor = decodeCursor(normalized.cursor)
   const where = ["v.status IN ('SELESAI','DIRUJUK')"]
@@ -702,7 +713,7 @@ async function getMedicalPersonnelForSession(userId: string) {
 }
 
 export async function getMyPracticeSession() {
-  const session = await requirePoskestrenFeature(PATH)
+  const session = await requirePoskestrenStaffFeature(PATH)
   const personnel = await getMedicalPersonnelForSession(session.id)
   if (!personnel) return { personnel: null, practice: null }
   const practice = await queryOne<any>(
@@ -716,7 +727,7 @@ export async function getMyPracticeSession() {
 }
 
 export async function startPracticeSession(notes?: string) {
-  const session = await requirePoskestrenFeature(PATH, 'create')
+  const session = await requirePoskestrenStaffFeature(PATH, 'create')
   const personnel = await getMedicalPersonnelForSession(session.id)
   if (!personnel) return { success: false as const, error: 'Akun belum ditautkan ke tenaga medis aktif.' }
   const open = await queryOne<{ id: string }>(
@@ -736,7 +747,7 @@ export async function startPracticeSession(notes?: string) {
 }
 
 export async function closePracticeSession(id: string) {
-  const session = await requirePoskestrenFeature(PATH, 'update')
+  const session = await requirePoskestrenStaffFeature(PATH, 'update')
   const personnel = await getMedicalPersonnelForSession(session.id)
   if (!personnel) return { success: false as const, error: 'Tenaga medis tidak ditemukan.' }
   const result = await (await getDB()).prepare(
@@ -751,7 +762,7 @@ export async function closePracticeSession(id: string) {
 }
 
 export async function beginVisit(visitId: string) {
-  const session = await requirePoskestrenFeature(PATH, 'update')
+  const session = await requirePoskestrenStaffFeature(PATH, 'update')
   const personnel = await getMedicalPersonnelForSession(session.id)
   if (!personnel) return { success: false as const, error: 'Akun belum ditautkan ke tenaga medis aktif.' }
   const practice = await queryOne<{ id: string }>(
@@ -772,7 +783,7 @@ export async function beginVisit(visitId: string) {
 }
 
 export async function cancelVisit(visitId: string, reason: string) {
-  const session = await requirePoskestrenFeature(PATH, 'update')
+  const session = await requirePoskestrenStaffFeature(PATH, 'update')
   const cleanReason = cleanText(reason, 300)
   if (!cleanReason) return { success: false as const, error: 'Alasan pembatalan wajib diisi.' }
   const result = await (await getDB()).prepare(
@@ -787,7 +798,7 @@ export async function cancelVisit(visitId: string, reason: string) {
 }
 
 export async function getMedicineOptions() {
-  await requirePoskestrenFeature(PATH)
+  await requirePoskestrenStaffFeature(PATH)
   return query<{
     id: string
     name: string
@@ -814,7 +825,7 @@ export async function completeVisit(input: {
   referralNotes?: string
   prescriptionItems?: PrescriptionDraftItem[]
 }) {
-  const session = await requirePoskestrenFeature(PATH, 'update')
+  const session = await requirePoskestrenStaffFeature(PATH, 'update')
   const complaint = cleanText(input.complaint)
   const diagnosis = cleanText(input.diagnosis)
   const diagnosisRow = input.diagnosisId
@@ -926,7 +937,7 @@ export async function completeVisit(input: {
 }
 
 export async function getDeliveryQueue(input: PoskestrenListQuery & { date?: string } = {}) {
-  await requirePoskestrenFeature(PATH)
+  await requirePoskestrenStaffFeature(PATH)
   const normalized = normalizePoskestrenListQuery(input)
   const date = input.date ? assertDate(input.date) : toWibDateInputValue()
   const cursor = decodeCursor(normalized.cursor)
@@ -974,7 +985,7 @@ export async function getDeliveryQueue(input: PoskestrenListQuery & { date?: str
 }
 
 export async function getVisitPrescriptionForDelivery(visitId: string) {
-  await requirePoskestrenFeature(PATH)
+  await requirePoskestrenStaffFeature(PATH)
   const visit = await queryOne<any>(
     `SELECT v.id, v.queue_number, v.queue_date, v.status, v.complaint, v.diagnosis,
             v.referral_destination, v.referral_notes, v.temperature_celsius,
@@ -1013,7 +1024,7 @@ export async function deliverVisitMedicines(input: {
   visitId: string
   items: Array<{ medicineId: string; quantity: number }>
 }) {
-  const session = await requirePoskestrenFeature(PATH, 'update')
+  const session = await requirePoskestrenStaffFeature(PATH, 'update')
   const visit = await queryOne<{
     id: string
     status: PoskestrenVisitStatus
@@ -1161,12 +1172,12 @@ export async function reviseCompletedVisit(input: {
   referralDestination?: string
   referralNotes?: string
 }) {
-  const session = await requirePoskestrenFeature(PATH, 'update')
+  const session = await requirePoskestrenStaffFeature(PATH, 'update')
   const reason = cleanText(input.reason, 500)
   const diagnosis = cleanText(input.diagnosis)
   if (!reason || !diagnosis) return { success: false as const, error: 'Alasan revisi dan diagnosis wajib diisi.' }
   const before = await queryOne<any>(
-    `SELECT id, status, complaint, diagnosis, treatment, follow_up,
+    `SELECT id, status, complaint, diagnosis, diagnosis_id, treatment, follow_up,
             referral_destination, referral_notes, revision_no
      FROM poskestren_visit
      WHERE id = ? AND status IN ('SELESAI','DIRUJUK')`,
@@ -1184,8 +1195,9 @@ export async function reviseCompletedVisit(input: {
     ).bind(generateId(), input.visitId, revisionNo, JSON.stringify(before), reason, session.id),
     db.prepare(
       `UPDATE poskestren_visit
-       SET status = ?, diagnosis = ?, treatment = ?, follow_up = ?,
-           referral_destination = ?, referral_notes = ?, revision_no = ?, updated_at = ?
+       SET status = ?, diagnosis_id = NULL, diagnosis = ?, treatment = ?, follow_up = ?,
+           referral_destination = ?, referral_notes = ?, revision_no = ?,
+           updated_by = ?, updated_at = ?
        WHERE id = ?`
     ).bind(
       finalStatus,
@@ -1195,6 +1207,7 @@ export async function reviseCompletedVisit(input: {
       cleanText(input.referralDestination, 200),
       cleanText(input.referralNotes),
       revisionNo,
+      session.id,
       new Date().toISOString(),
       input.visitId
     ),
@@ -1213,7 +1226,7 @@ export async function reviseCompletedVisit(input: {
 }
 
 export async function getPreventiveData(input: PoskestrenListQuery = {}) {
-  await requirePoskestrenFeature(PATH)
+  await requirePoskestrenStaffFeature(PATH)
   const normalized = normalizePoskestrenListQuery(input)
   const where = ['1=1']
   const params: unknown[] = []
@@ -1264,7 +1277,7 @@ export async function getPreventiveData(input: PoskestrenListQuery = {}) {
 }
 
 export async function createPreventiveType(name: string) {
-  const session = await requirePoskestrenFeature(PATH, 'create')
+  const session = await requirePoskestrenStaffFeature(PATH, 'create')
   const cleanName = cleanText(name, 100)
   if (!cleanName) return { success: false as const, error: 'Nama jenis program wajib diisi.' }
   const id = generateId()
@@ -1291,7 +1304,7 @@ export async function createPreventiveProgram(input: {
   personnelId?: string
   participantIds?: string[]
 }) {
-  const session = await requirePoskestrenFeature(PATH, 'create')
+  const session = await requirePoskestrenStaffFeature(PATH, 'create')
   const title = cleanText(input.title, 200)
   if (!title) return { success: false as const, error: 'Judul program wajib diisi.' }
   const date = assertDate(input.programDate)
@@ -1343,7 +1356,7 @@ export async function createPreventiveProgram(input: {
 }
 
 export async function getPreventiveParticipants(programId: string) {
-  await requirePoskestrenFeature(PATH)
+  await requirePoskestrenStaffFeature(PATH)
   return query<any>(
     `SELECT pt.id, pt.santri_id, pt.attendance, pt.result, pt.follow_up, pt.notes,
             s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah
@@ -1362,7 +1375,7 @@ export async function updatePreventiveParticipant(input: {
   followUp?: string
   notes?: string
 }) {
-  const session = await requirePoskestrenFeature(PATH, 'update')
+  const session = await requirePoskestrenStaffFeature(PATH, 'update')
   if (!['PENDING', 'PRESENT', 'ABSENT'].includes(input.attendance)) {
     return { success: false as const, error: 'Status kehadiran tidak valid.' }
   }
@@ -1388,7 +1401,7 @@ export async function updatePreventiveStatus(
   id: string,
   status: 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED'
 ) {
-  const session = await requirePoskestrenFeature(PATH, 'update')
+  const session = await requirePoskestrenStaffFeature(PATH, 'update')
   if (!['DRAFT', 'ACTIVE', 'COMPLETED', 'CANCELLED'].includes(status)) {
     return { success: false as const, error: 'Status program tidak valid.' }
   }

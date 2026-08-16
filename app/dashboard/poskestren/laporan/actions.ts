@@ -132,11 +132,9 @@ export async function getMonthlyReport(month: string) {
                         WHERE sl.location_type = 'CENTRAL'), 0) AS central_units,
               COALESCE((SELECT SUM(quantity_base) FROM poskestren_medicine_location_stock mls
                         JOIN poskestren_stock_location sl ON sl.id = mls.location_id
-                        WHERE sl.location_type = 'DORM' AND sl.is_active = 1), 0) AS dorm_units,
-              (SELECT COUNT(*) FROM poskestren_medicine_batch
-               WHERE remaining_quantity > 0 AND expires_on IS NOT NULL AND expires_on <= ?) AS expired_batches
+                        WHERE sl.location_type = 'DORM' AND sl.is_active = 1), 0) AS dorm_units
        FROM poskestren_medicine WHERE is_active = 1`,
-      [to]
+      []
     ),
     query<any>(
       `SELECT sl.name AS location_name, sl.location_type,
@@ -268,8 +266,10 @@ export async function getPayrollReport(month: string) {
          GROUP BY rated.personnel_id, rated.event_type, rated.event_date, rated.rate
        ) e ON e.personnel_id = p.id
        WHERE p.personnel_type = 'MEDICAL'
+         AND (p.employment_start IS NULL OR p.employment_start <= ?)
+         AND (p.employment_end IS NULL OR p.employment_end >= ?)
        ORDER BY p.full_name, e.event_type, e.event_date`,
-      [from, to, from, to, from, to]
+      [from, to, from, to, from, to, to, from]
     ),
     query<any>(
       `SELECT p.id, p.full_name, p.position_name,

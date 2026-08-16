@@ -493,12 +493,20 @@ export async function createDormVisit(input: {
       cleanText(input.notes),
       session.id
     ),
-    db.prepare(
-      `UPDATE poskestren_patient
-       SET special_conditions = ?, updated_at = datetime('now')
-       WHERE id = ?`
-    ).bind(cleanText(input.diseaseHistory), patientId),
   ]
+  // Field riwayat penyakit di form Visit Asrama sering dibiarkan kosong
+  // (petugas hanya mau catat keluhan hari itu). Kosong bukan berarti riwayat
+  // penyakit pasien dihapus — hanya timpa data master kalau benar-benar diisi.
+  const diseaseHistoryText = cleanText(input.diseaseHistory)
+  if (diseaseHistoryText) {
+    statements.push(
+      db.prepare(
+        `UPDATE poskestren_patient
+         SET special_conditions = ?, updated_at = datetime('now')
+         WHERE id = ?`
+      ).bind(diseaseHistoryText, patientId)
+    )
+  }
   for (const item of medicines) {
     const itemId = generateId()
     let medicineName = item.medicineName

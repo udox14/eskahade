@@ -94,8 +94,8 @@ export async function prepareStockMutation(
     }
   }
   locationId ||= 'pos-location-central'
-  const location = await queryOne<{ id: string; is_active: number }>(
-    `SELECT id, is_active FROM poskestren_stock_location WHERE id = ?`,
+  const location = await queryOne<{ id: string; name: string; is_active: number }>(
+    `SELECT id, name, is_active FROM poskestren_stock_location WHERE id = ?`,
     [locationId]
   )
   if (!location || Number(location.is_active) !== 1) {
@@ -131,7 +131,10 @@ export async function prepareStockMutation(
   const after = before + input.quantityDelta
   const locationBefore = Number(locationStock?.quantity_base || 0)
   const locationAfter = locationBefore + input.quantityDelta
-  if (after < 0 || locationAfter < 0) {
+  if (locationAfter < 0) {
+    throw new Error(`Stok ${medicine.name} di ${location.name} tidak cukup. Tersedia ${locationBefore}.`)
+  }
+  if (after < 0) {
     throw new Error(`Stok ${medicine.name} tidak cukup. Tersedia ${before}.`)
   }
   const movementId = generateId()
@@ -152,14 +155,14 @@ export async function prepareStockMutation(
       ).bind(medicine.id, locationId),
       db.prepare(
         `UPDATE poskestren_medicine_location_stock
-         SET quantity_base = ?, updated_at = datetime('now')
-         WHERE medicine_id = ? AND location_id = ? AND quantity_base = ?`
-      ).bind(locationAfter, medicine.id, locationId, locationBefore),
+         SET quantity_base = quantity_base + ?, updated_at = datetime('now')
+         WHERE medicine_id = ? AND location_id = ? AND quantity_base + ? >= 0`
+      ).bind(input.quantityDelta, medicine.id, locationId, input.quantityDelta),
       db.prepare(
         `UPDATE poskestren_medicine
-         SET total_stock_base = ?, updated_at = datetime('now')
-         WHERE id = ? AND total_stock_base = ?`
-      ).bind(after, medicine.id, before),
+         SET total_stock_base = total_stock_base + ?, updated_at = datetime('now')
+         WHERE id = ? AND total_stock_base + ? >= 0`
+      ).bind(input.quantityDelta, medicine.id, input.quantityDelta),
       db.prepare(
         `INSERT INTO poskestren_stock_movement(
            id, medicine_id, batch_id, movement_date, movement_type, quantity_delta,

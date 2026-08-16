@@ -378,15 +378,14 @@ export async function createAndReceiveSimplePurchase(input: {
       ).bind(item.medicineId),
       db.prepare(
         `UPDATE poskestren_medicine_location_stock
-         SET quantity_base = ?, updated_at = datetime('now')
-         WHERE medicine_id = ? AND location_id = 'pos-location-central'
-           AND quantity_base = ?`
-      ).bind(centralAfter, item.medicineId, centralBefore),
+         SET quantity_base = quantity_base + ?, updated_at = datetime('now')
+         WHERE medicine_id = ? AND location_id = 'pos-location-central'`
+      ).bind(item.quantity, item.medicineId),
       db.prepare(
         `UPDATE poskestren_medicine
-         SET total_stock_base = ?, updated_at = datetime('now')
-         WHERE id = ? AND total_stock_base = ?`
-      ).bind(after, item.medicineId, before),
+         SET total_stock_base = total_stock_base + ?, updated_at = datetime('now')
+         WHERE id = ?`
+      ).bind(item.quantity, item.medicineId),
       db.prepare(
         `INSERT INTO poskestren_stock_movement(
            id, medicine_id, batch_id, movement_date, movement_type, quantity_delta,
@@ -476,7 +475,7 @@ export async function getSimpleStockMovements(
     params.push(cursor[0], cursor[0], cursor[1], cursor[0], cursor[1], cursor[2])
   }
   const rows = input.movementType === 'TRANSFER' ? [] : await query<any>(
-    `SELECT sm.id, sm.movement_date, sm.movement_type, sm.quantity_delta,
+    `SELECT sm.id, sm.id AS sort_id, sm.movement_date, sm.movement_type, sm.quantity_delta,
             sm.stock_before, sm.stock_after, sm.reference_type, sm.reference_id,
             sm.location_id, sl.name AS location_name,
             sm.notes, sm.created_at, m.name AS medicine_name, m.form,
@@ -507,8 +506,16 @@ export async function getSimpleStockMovements(
     transferWhere.push('(m.name LIKE ? OR t.notes LIKE ? OR sl.name LIKE ? OR dl.name LIKE ?)')
     transferParams.push(like, like, like, like)
   }
+  // Kartu Stok menggabungkan dua sumber (movement + transfer) di satu cursor
+  // gabungan, jadi cursor 3-bagian yang sama harus diterapkan ke KEDUA query,
+  // memakai id mentah masing-masing tabel (ti.id, bukan id gabungan 'transfer-...').
+  if (cursor?.length === 3) {
+    transferWhere.push(`(t.transfer_date < ? OR (t.transfer_date = ? AND t.created_at < ?)
+      OR (t.transfer_date = ? AND t.created_at = ? AND ti.id < ?))`)
+    transferParams.push(cursor[0], cursor[0], cursor[1], cursor[0], cursor[1], cursor[2])
+  }
   const transfers = input.movementType && input.movementType !== 'TRANSFER' ? [] : await query<any>(
-    `SELECT 'transfer-' || ti.id AS id, t.transfer_date AS movement_date,
+    `SELECT 'transfer-' || ti.id AS id, ti.id AS sort_id, t.transfer_date AS movement_date,
             'TRANSFER' AS movement_type, ti.quantity_base AS quantity_delta,
             0 AS stock_before, 0 AS stock_after, 'STOCK_TRANSFER' AS reference_type,
             t.id AS reference_id, t.source_location_id AS location_id,
@@ -530,7 +537,7 @@ export async function getSimpleStockMovements(
     const date = String(right.movement_date).localeCompare(String(left.movement_date))
     if (date) return date
     const created = String(right.created_at).localeCompare(String(left.created_at))
-    return created || String(right.id).localeCompare(String(left.id))
+    return created || String(right.sort_id).localeCompare(String(left.sort_id))
   })
   const items = combined.slice(0, normalized.limit)
   const last = items.at(-1)
@@ -538,7 +545,7 @@ export async function getSimpleStockMovements(
     items,
     hasMore: combined.length > normalized.limit,
     nextCursor: combined.length > normalized.limit && last
-      ? encodeCursor([last.movement_date, last.created_at, last.id])
+      ? encodeCursor([last.movement_date, last.created_at, last.sort_id])
       : null,
   }
 }

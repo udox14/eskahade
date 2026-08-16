@@ -84,14 +84,14 @@ export async function prepareStockMutationFromSnapshot(
       ).bind(input.medicineId, locationId),
       db.prepare(
         `UPDATE poskestren_medicine_location_stock
-         SET quantity_base = ?, updated_at = datetime('now')
-         WHERE medicine_id = ? AND location_id = ? AND quantity_base = ?`
-      ).bind(locationAfter, input.medicineId, locationId, locationBefore),
+         SET quantity_base = quantity_base + ?, updated_at = datetime('now')
+         WHERE medicine_id = ? AND location_id = ? AND quantity_base + ? >= 0`
+      ).bind(input.quantityDelta, input.medicineId, locationId, input.quantityDelta),
       db.prepare(
         `UPDATE poskestren_medicine
-         SET total_stock_base = ?, updated_at = datetime('now')
-         WHERE id = ? AND total_stock_base = ?`
-      ).bind(after, input.medicineId, input.stockBefore),
+         SET total_stock_base = total_stock_base + ?, updated_at = datetime('now')
+         WHERE id = ? AND total_stock_base + ? >= 0`
+      ).bind(input.quantityDelta, input.medicineId, input.quantityDelta),
       db.prepare(
         `INSERT INTO poskestren_stock_movement(
            id, medicine_id, batch_id, movement_date, movement_type, quantity_delta,
