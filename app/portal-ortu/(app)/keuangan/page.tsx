@@ -1,5 +1,5 @@
 import { requirePortalSessionStrict } from '@/lib/portal/session'
-import { financeQuery as query, financeQueryOne as queryOne } from '@/lib/db'
+import { financeQuery as query, financeQueryOne as queryOne, query as mainQuery } from '@/lib/db'
 import { syncFinanceStudentSnapshot, syncFinanceStudentsByIds, financeStudentIdsForGuardian } from '@/lib/finance/snapshots'
 import {
   syncPortalSppBills, syncPortalNonSppBills, getPortalOpenBills, getPortalOpenUsppBills,
@@ -60,7 +60,7 @@ export default async function PortalKeuanganPage({
       `SELECT COUNT(*) count FROM finance_bills WHERE santri_id=? AND status='OPEN' AND period_key LIKE 'PORTAL_%'`,
       [session.santri_id]
     ).then(rows => Number(rows[0]?.count || 0)),
-    query<{ count: number }>(
+    mainQuery<{ count: number }>(
       `SELECT COUNT(*) count FROM portal_payment_submission WHERE santri_id=? AND status='menunggu_konfirmasi'`,
       [session.santri_id]
     ).then(rows => Number(rows[0]?.count || 0)),
