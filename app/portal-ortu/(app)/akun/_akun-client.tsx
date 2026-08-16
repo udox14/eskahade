@@ -44,15 +44,12 @@ export function AkunClient({ mustChangePassword, nis }: { mustChangePassword: bo
     router.refresh()
   }
 
-  const inputCls =
-    'mt-1.5 w-full rounded-2xl border border-[var(--p-line)] bg-[var(--p-cream)] px-4 py-3.5 text-sm font-semibold outline-none focus:border-[var(--p-emerald)] focus:ring-2 focus:ring-[var(--p-emerald)]/15'
-
   return (
     <div className="space-y-4">
       {mustChangePassword && (
-        <div className="portal-rise flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3.5">
-          <ShieldWarning className="mt-0.5 w-4 h-4 shrink-0 text-amber-600" />
-          <p className="text-xs leading-relaxed text-amber-800">
+        <div className="portal-rise flex items-start gap-3 rounded-[var(--p-radius-md)] border-l-4 border-[var(--p-warning)] bg-[var(--p-warning-soft)] px-4 py-3.5">
+          <ShieldWarning className="mt-0.5 w-4 h-4 shrink-0 text-[var(--p-warning)]" />
+          <p className="text-xs leading-relaxed text-[var(--p-ink)]">
             <span className="font-bold">Demi keamanan, ganti password default Anda</span> sebelum
             menggunakan fitur portal lainnya.
           </p>
@@ -61,11 +58,11 @@ export function AkunClient({ mustChangePassword, nis }: { mustChangePassword: bo
 
       <form
         onSubmit={handleGanti}
-        className="portal-rise portal-rise-1 rounded-3xl border border-[var(--p-line)] bg-[var(--p-card)] p-5 shadow-sm"
+        className="portal-rise portal-rise-1 portal-card p-5"
       >
         <div className="flex items-center gap-2">
-          <Key className="w-4 h-4 text-[var(--p-emerald)]" />
-          <h2 className="portal-display text-lg text-[var(--p-emerald-deep)]">Ganti Password</h2>
+          <Key className="w-4 h-4 text-[var(--p-ink)]" />
+          <h2 className="portal-display text-lg text-[var(--p-ink)]">Ganti Password</h2>
         </div>
         <p className="mt-1 text-[11px] text-[var(--p-muted)]">
           Ini adalah password login untuk akun <span className="font-bold">NIS {nis}</span>. Jika Anda
@@ -80,7 +77,7 @@ export function AkunClient({ mustChangePassword, nis }: { mustChangePassword: bo
             autoComplete="current-password"
             value={passwordLama}
             onChange={e => setPasswordLama(e.target.value)}
-            className={inputCls}
+            className="portal-field"
             required
           />
         </label>
@@ -92,7 +89,7 @@ export function AkunClient({ mustChangePassword, nis }: { mustChangePassword: bo
             value={passwordBaru}
             onChange={e => setPasswordBaru(e.target.value)}
             minLength={6}
-            className={inputCls}
+            className="portal-field"
             required
           />
         </label>
@@ -104,7 +101,7 @@ export function AkunClient({ mustChangePassword, nis }: { mustChangePassword: bo
             value={konfirmasi}
             onChange={e => setKonfirmasi(e.target.value)}
             minLength={6}
-            className={inputCls}
+            className="portal-field"
             required
           />
         </label>
@@ -112,7 +109,7 @@ export function AkunClient({ mustChangePassword, nis }: { mustChangePassword: bo
         <button
           type="submit"
           disabled={saving}
-          className="mt-5 w-full rounded-2xl bg-[var(--p-emerald)] py-3.5 text-sm font-bold text-white active:scale-[0.98] transition disabled:opacity-60 flex items-center justify-center gap-2"
+          className="portal-btn portal-btn-primary w-full mt-5"
         >
           {saving && <CircleNotch className="w-4 h-4 animate-spin" />}
           {saving ? 'Menyimpan…' : 'Simpan Password Baru'}
@@ -122,7 +119,7 @@ export function AkunClient({ mustChangePassword, nis }: { mustChangePassword: bo
       <button
         onClick={handleLogout}
         disabled={loggingOut}
-        className="portal-rise portal-rise-2 w-full rounded-2xl border border-rose-200 bg-rose-50 py-3.5 text-sm font-bold text-rose-700 active:scale-[0.98] transition disabled:opacity-60 flex items-center justify-center gap-2"
+        className="portal-btn portal-btn-danger-outline w-full portal-rise portal-rise-2"
       >
         <SignOut className="w-4 h-4" />
         {loggingOut ? 'Keluar…' : 'Keluar dari Portal'}

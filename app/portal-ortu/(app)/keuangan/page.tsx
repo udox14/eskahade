@@ -48,7 +48,7 @@ export default async function PortalFinancePage() {
         subtitle={`Keuangan ${session.nama}${session.nis ? ` • NIS ${session.nis}` : ''}`}
       >
         {children.length > 1 && (
-          <form action={switchPortalStudent} className="mt-4 flex items-center gap-2 rounded-2xl bg-white/10 border border-white/15 p-1.5 backdrop-blur-sm">
+          <form action={switchPortalStudent} className="mt-4 flex items-center gap-2 rounded-[var(--p-radius-md)] bg-white/10 border border-white/15 p-1.5">
             <select
               name="santriId"
               defaultValue={session.santri_id}
@@ -60,7 +60,7 @@ export default async function PortalFinancePage() {
                 </option>
               ))}
             </select>
-            <button className="shrink-0 rounded-xl bg-white/20 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-white/30 active:scale-95 transition">
+            <button className="shrink-0 rounded-[var(--p-radius-sm)] bg-white/20 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-white/30 active:scale-95 transition">
               Ganti Anak
             </button>
           </form>
@@ -69,17 +69,17 @@ export default async function PortalFinancePage() {
 
       <div className="px-5 -mt-9 space-y-4 pb-28">
         {/* Main Hero Card: Saldo Titipan & Sub Wallet */}
-        <div className="portal-rise portal-rise-1 rounded-3xl bg-[var(--p-card)] border border-[var(--p-line)] p-5 shadow-[0_18px_40px_-18px_rgba(11,94,63,0.3)]">
+        <div className="portal-rise portal-rise-1 portal-card p-5">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--p-muted)] flex items-center gap-1.5">
-                <Wallet className="w-3.5 h-3.5 text-[var(--p-emerald)]" /> Saldo Titipan Utama
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--p-muted)] flex items-center gap-1.5">
+                <Wallet className="w-3.5 h-3.5 text-[var(--p-ink)]" /> Saldo Titipan Utama
               </p>
-              <p className="portal-display mt-1 text-[1.85rem] leading-none text-[var(--p-emerald-deep)]">
+              <p className="portal-display mt-1 text-[1.85rem] leading-none text-[var(--p-ink)]">
                 {formatRupiah(titipanBalance)}
               </p>
             </div>
-            <span className="rounded-full bg-[var(--p-gold-soft)] px-3 py-1 text-[11px] font-bold text-[#7a5a17]">
+            <span className="rounded-[var(--p-radius-sm)] bg-[var(--p-red)] px-3 py-1 text-[11px] font-bold text-white">
               Utama
             </span>
           </div>
@@ -88,10 +88,10 @@ export default async function PortalFinancePage() {
             Dapat dialokasikan ke Uang Jajan, Uang Makan, Laundry, SPP &amp; Non-SPP.
           </p>
 
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-2xl bg-[var(--p-cream)] p-3 border border-[var(--p-line)]/50">
+          <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--p-line)] rounded-[var(--p-radius-md)] border border-[var(--p-line)] text-center overflow-hidden">
+            <div className="p-3">
               <div className="flex items-center justify-center gap-1 text-[var(--p-muted)]">
-                <ShoppingBag className="w-3.5 h-3.5 text-[var(--p-gold)]" />
+                <ShoppingBag className="w-3.5 h-3.5 text-[var(--p-ink)]" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">Jajan</span>
               </div>
               <p className="portal-display mt-1.5 text-xs font-bold text-[var(--p-ink)] truncate">
@@ -99,9 +99,9 @@ export default async function PortalFinancePage() {
               </p>
             </div>
 
-            <div className="rounded-2xl bg-[var(--p-cream)] p-3 border border-[var(--p-line)]/50">
+            <div className="p-3">
               <div className="flex items-center justify-center gap-1 text-[var(--p-muted)]">
-                <ForkKnife className="w-3.5 h-3.5 text-[var(--p-gold)]" />
+                <ForkKnife className="w-3.5 h-3.5 text-[var(--p-ink)]" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">Makan</span>
               </div>
               <p className="portal-display mt-1.5 text-xs font-bold text-[var(--p-ink)] truncate">
@@ -109,9 +109,9 @@ export default async function PortalFinancePage() {
               </p>
             </div>
 
-            <div className="rounded-2xl bg-[var(--p-cream)] p-3 border border-[var(--p-line)]/50">
+            <div className="p-3">
               <div className="flex items-center justify-center gap-1 text-[var(--p-muted)]">
-                <TShirt className="w-3.5 h-3.5 text-[var(--p-gold)]" />
+                <TShirt className="w-3.5 h-3.5 text-[var(--p-ink)]" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">Laundry</span>
               </div>
               <p className="portal-display mt-1.5 text-xs font-bold text-[var(--p-ink)] truncate">
@@ -125,10 +125,10 @@ export default async function PortalFinancePage() {
         <FinanceClient methods={methods} limits={limits} />
 
         {/* Riwayat Pencairan */}
-        <div className="portal-rise portal-rise-4 rounded-3xl bg-[var(--p-card)] border border-[var(--p-line)] p-5 shadow-sm space-y-3">
+        <div className="portal-rise portal-rise-4 portal-card p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <ClockCounterClockwise className="w-4 h-4 text-[var(--p-emerald)]" />
-            <h2 className="portal-display text-lg text-[var(--p-emerald-deep)]">Riwayat Pencairan</h2>
+            <ClockCounterClockwise className="w-4 h-4 text-[var(--p-ink)]" />
+            <h2 className="portal-display text-lg text-[var(--p-ink)]">Riwayat Pencairan</h2>
           </div>
 
           {withdrawals.length > 0 ? (
@@ -146,11 +146,11 @@ export default async function PortalFinancePage() {
                         minute: '2-digit',
                       })} WIB
                     </p>
-                    <span className="inline-block mt-0.5 rounded-full bg-[var(--p-cream)] px-2 py-0.5 text-[10px] font-bold text-[var(--p-muted)] uppercase tracking-wider">
+                    <span className="inline-block mt-0.5 rounded-full bg-[var(--p-paper)] border border-[var(--p-line)] px-2 py-0.5 text-[10px] font-bold text-[var(--p-muted)] uppercase tracking-wider">
                       {item.credential_kind}
                     </span>
                   </div>
-                  <p className="portal-display text-sm text-[var(--p-emerald-deep)] font-bold">
+                  <p className="portal-display text-sm text-[var(--p-ink)] font-bold">
                     {formatRupiah(Number(item.amount_rupiah))}
                   </p>
                 </div>

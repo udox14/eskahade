@@ -95,11 +95,11 @@ export function UploadBukti({
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="w-full rounded-2xl border-2 border-dashed border-[var(--p-line)] bg-[var(--p-cream)] p-4 text-center active:scale-[0.99] transition"
+        className="w-full rounded-[var(--p-radius-md)] border-2 border-dashed border-[var(--p-ink)]/30 bg-white p-4 text-center transition active:scale-[0.99]"
       >
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="Pratinjau bukti" className="mx-auto max-h-56 rounded-xl object-contain" />
+          <img src={preview} alt="Pratinjau bukti" className="mx-auto max-h-56 rounded-[var(--p-radius-sm)] object-contain" />
         ) : (
           <div className="py-5">
             <Camera className="mx-auto w-7 h-7 text-[var(--p-muted)]" />
@@ -114,7 +114,7 @@ export function UploadBukti({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="mt-2 w-full text-center text-[11px] font-bold text-[var(--p-emerald)]"
+          className="mt-2 w-full text-center text-[11px] font-bold text-[var(--p-ink)] underline decoration-[var(--p-line)] underline-offset-2"
         >
           Ganti foto
         </button>
@@ -124,7 +124,7 @@ export function UploadBukti({
         type="button"
         disabled={!file || sending}
         onClick={handleSubmit}
-        className="mt-4 w-full rounded-2xl bg-[var(--p-emerald)] py-3.5 text-sm font-bold text-white active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2"
+        className="portal-btn portal-btn-accent w-full mt-4"
       >
         {sending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <CloudArrowUp className="w-4 h-4" />}
         {sending ? 'Mengunggah…' : buttonLabel}

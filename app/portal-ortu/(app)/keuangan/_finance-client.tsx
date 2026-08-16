@@ -30,16 +30,13 @@ export function FinanceClient({
   const [accountPassword, setAccountPassword] = useState('')
   const [newPin, setNewPin] = useState('')
 
-  const inputCls =
-    'mt-1.5 w-full rounded-2xl border border-[var(--p-line)] bg-[var(--p-cream)]/50 px-4 py-3 text-sm font-semibold text-[var(--p-ink)] outline-none focus:border-[var(--p-emerald)] focus:ring-2 focus:ring-[var(--p-emerald)]/15 transition disabled:bg-slate-100 disabled:text-slate-400'
-
   return (
     <div className="space-y-4">
       {/* Top Up / Isi Saldo Card */}
-      <section className="portal-rise portal-rise-2 rounded-3xl bg-[var(--p-card)] border border-[var(--p-line)] p-5 shadow-sm space-y-4">
+      <section className="portal-rise portal-rise-2 portal-card p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <CreditCard className="w-4 h-4 text-[var(--p-emerald)]" />
-          <h2 className="portal-display text-lg text-[var(--p-emerald-deep)]">Isi Saldo Titipan</h2>
+          <CreditCard className="w-4 h-4 text-[var(--p-ink)]" />
+          <h2 className="portal-display text-lg text-[var(--p-ink)]">Isi Saldo Titipan</h2>
         </div>
         <p className="text-xs text-[var(--p-muted)] leading-relaxed">
           Dana masuk ke saldo titipan terlebih dahulu. Biaya payment gateway ditambahkan saat proses pembayaran.
@@ -54,10 +51,10 @@ export function FinanceClient({
                   key={preset}
                   type="button"
                   onClick={() => setTopupAmount(preset)}
-                  className={`rounded-xl border py-2 text-xs font-bold transition active:scale-95 ${
+                  className={`rounded-[var(--p-radius-sm)] border py-2 text-xs font-bold transition active:scale-95 ${
                     topupAmount === preset
-                      ? 'border-[var(--p-emerald)] bg-[var(--p-emerald)] text-white shadow-sm'
-                      : 'border-[var(--p-line)] bg-[var(--p-cream)]/60 text-[var(--p-ink)] hover:bg-[var(--p-cream)]'
+                      ? 'border-[var(--p-ink)] bg-[var(--p-ink)] text-white'
+                      : 'border-[var(--p-line)] bg-white text-[var(--p-ink)] hover:bg-[var(--p-paper)]'
                   }`}
                 >
                   {preset >= 1000000 ? `${preset / 1000000} Jt` : `${preset / 1000}rb`}
@@ -70,7 +67,7 @@ export function FinanceClient({
               step={1000}
               value={topupAmount || ''}
               onChange={e => setTopupAmount(Number(e.target.value))}
-              className={inputCls}
+              className="portal-field"
               aria-label="Nominal top up"
               placeholder="Atau ketik nominal custom..."
             />
@@ -81,7 +78,7 @@ export function FinanceClient({
             <select
               value={method}
               onChange={e => setMethod(e.target.value)}
-              className={inputCls}
+              className="portal-field"
             >
               {methods.length ? (
                 methods.map(code => (
@@ -105,7 +102,7 @@ export function FinanceClient({
                 else toast.success('Instruksi pembayaran dibuat.')
               })
             }
-            className="w-full rounded-2xl bg-[var(--p-emerald)] py-3.5 text-sm font-bold text-white shadow-md active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2"
+            className="portal-btn portal-btn-accent w-full"
           >
             {topupPending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
             {topupPending ? 'Memproses...' : `Bayar ${formatRupiah(topupAmount)}`}
@@ -114,10 +111,10 @@ export function FinanceClient({
       </section>
 
       {/* Alokasi Saldo Card */}
-      <section className="portal-rise portal-rise-3 rounded-3xl bg-[var(--p-card)] border border-[var(--p-line)] p-5 shadow-sm space-y-4">
+      <section className="portal-rise portal-rise-3 portal-card p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <ArrowsLeftRight className="w-4 h-4 text-[var(--p-emerald)]" />
-          <h2 className="portal-display text-lg text-[var(--p-emerald-deep)]">Alokasikan Saldo Titipan</h2>
+          <ArrowsLeftRight className="w-4 h-4 text-[var(--p-ink)]" />
+          <h2 className="portal-display text-lg text-[var(--p-ink)]">Alokasikan Saldo Titipan</h2>
         </div>
         <p className="text-xs text-[var(--p-muted)] leading-relaxed">
           Pindahkan dana dari Saldo Titipan ke Kantong Khusus atau pelunasan tagihan santri.
@@ -129,7 +126,7 @@ export function FinanceClient({
             <select
               value={destination}
               onChange={e => setDestination(e.target.value as typeof destination)}
-              className={inputCls}
+              className="portal-field"
             >
               <option value="JAJAN">Uang Jajan Santri</option>
               <option value="MAKAN">Uang Makan Santri</option>
@@ -150,7 +147,7 @@ export function FinanceClient({
               disabled={destination === 'SPP' || destination === 'NON_SPP'}
               onChange={e => setAllocAmount(Number(e.target.value))}
               placeholder={destination === 'SPP' || destination === 'NON_SPP' ? 'Dihitung otomatis...' : 'Nominal...'}
-              className={inputCls}
+              className="portal-field"
             />
             {(destination === 'SPP' || destination === 'NON_SPP') && (
               <p className="mt-1.5 text-[11px] text-[var(--p-muted)] italic">
@@ -172,7 +169,7 @@ export function FinanceClient({
                 else toast.success('Saldo berhasil dialokasikan.')
               })
             }
-            className="w-full rounded-2xl border border-[var(--p-emerald)] bg-emerald-50/50 text-[var(--p-emerald-deep)] py-3 text-sm font-bold active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2"
+            className="portal-btn portal-btn-outline w-full"
           >
             {allocPending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <ArrowsLeftRight className="w-4 h-4" />}
             {allocPending ? 'Proses Alokasi...' : 'Alokasikan Saldo'}
@@ -181,10 +178,10 @@ export function FinanceClient({
       </section>
 
       {/* Limit Pencairan Santri */}
-      <section className="portal-rise portal-rise-4 rounded-3xl bg-[var(--p-card)] border border-[var(--p-line)] p-5 shadow-sm space-y-4">
+      <section className="portal-rise portal-rise-4 portal-card p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <Sliders className="w-4 h-4 text-[var(--p-emerald)]" />
-          <h2 className="portal-display text-lg text-[var(--p-emerald-deep)]">Limit Pencairan Anak</h2>
+          <Sliders className="w-4 h-4 text-[var(--p-ink)]" />
+          <h2 className="portal-display text-lg text-[var(--p-ink)]">Limit Pencairan Anak</h2>
         </div>
         <p className="text-xs text-[var(--p-muted)] leading-relaxed">
           Batas pencairan saldo jajan/makan di pesantren (RFID/QR). Isi 0 untuk tidak memberlakukan limit pada periode tersebut.
@@ -199,7 +196,7 @@ export function FinanceClient({
                 value={daily || ''}
                 onChange={e => setDaily(Number(e.target.value))}
                 placeholder="0"
-                className={inputCls}
+                className="portal-field"
               />
             </div>
             <div>
@@ -209,7 +206,7 @@ export function FinanceClient({
                 value={weekly || ''}
                 onChange={e => setWeekly(Number(e.target.value))}
                 placeholder="0"
-                className={inputCls}
+                className="portal-field"
               />
             </div>
             <div>
@@ -219,7 +216,7 @@ export function FinanceClient({
                 value={monthly || ''}
                 onChange={e => setMonthly(Number(e.target.value))}
                 placeholder="0"
-                className={inputCls}
+                className="portal-field"
               />
             </div>
           </div>
@@ -231,7 +228,7 @@ export function FinanceClient({
               value={reauth}
               onChange={e => setReauth(e.target.value)}
               placeholder="Wajib diisi jika menaikkan limit..."
-              className={inputCls}
+              className="portal-field"
             />
           </div>
 
@@ -252,7 +249,7 @@ export function FinanceClient({
                 }
               })
             }
-            className="w-full rounded-2xl border border-[var(--p-emerald)] bg-white text-[var(--p-emerald-deep)] py-3 text-sm font-bold active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-emerald-50/50"
+            className="portal-btn portal-btn-outline w-full"
           >
             {limitPending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <Sliders className="w-4 h-4" />}
             {limitPending ? 'Menyimpan...' : 'Simpan Limit Pencairan'}
@@ -261,10 +258,10 @@ export function FinanceClient({
       </section>
 
       {/* PIN Pencairan Santri */}
-      <section className="portal-rise portal-rise-4 rounded-3xl bg-[var(--p-card)] border border-[var(--p-line)] p-5 shadow-sm space-y-4">
+      <section className="portal-rise portal-rise-4 portal-card p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <Key className="w-4 h-4 text-[var(--p-emerald)]" />
-          <h2 className="portal-display text-lg text-[var(--p-emerald-deep)]">Atur PIN Pencairan Santri</h2>
+          <Key className="w-4 h-4 text-[var(--p-ink)]" />
+          <h2 className="portal-display text-lg text-[var(--p-ink)]">Atur PIN Pencairan Santri</h2>
         </div>
         <p className="text-xs text-[var(--p-muted)] leading-relaxed">
           PIN 4–8 digit wajib untuk verifikasi keamanan saat santri mengambil tunai/transaksi di pos pesantren.
@@ -278,7 +275,7 @@ export function FinanceClient({
               value={accountPassword}
               onChange={e => setAccountPassword(e.target.value)}
               placeholder="Masukkan password akun portal Anda..."
-              className={inputCls}
+              className="portal-field"
             />
           </div>
 
@@ -290,7 +287,7 @@ export function FinanceClient({
               value={newPin}
               onChange={e => setNewPin(e.target.value)}
               placeholder="Contoh: 123456"
-              className={inputCls}
+              className="portal-field"
             />
           </div>
 
@@ -307,7 +304,7 @@ export function FinanceClient({
                 }
               })
             }
-            className="w-full rounded-2xl border border-[var(--p-emerald)] bg-white text-[var(--p-emerald-deep)] py-3 text-sm font-bold active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-emerald-50/50"
+            className="portal-btn portal-btn-outline w-full"
           >
             {pinPending ? <CircleNotch className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
             {pinPending ? 'Menyimpan PIN...' : 'Atur Ulang PIN Santri'}
