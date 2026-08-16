@@ -146,10 +146,11 @@ body {
   --p-warning-soft: #fbf0dc;
   --p-danger: #e32219;
   --p-danger-soft: #fbe7e5;
+  --p-radius-card: 2px;
   --p-radius-sm: 8px;
   --p-radius-md: 12px;
   --p-radius-lg: 20px;
-  --p-shadow-card: 0 2px 0 rgba(17, 17, 17, 0.06), 0 8px 20px -12px rgba(17, 17, 17, 0.18);
+  --p-shadow-card: 0 1px 0 rgba(17, 17, 17, 0.05);
   --p-shadow-pop: 0 4px 0 rgba(17, 17, 17, 0.08), 0 16px 32px -16px rgba(17, 17, 17, 0.28);
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   color: var(--p-ink);
@@ -165,9 +166,45 @@ body {
 
 .portal-grid-bg {
   background-image:
-    linear-gradient(rgba(17, 17, 17, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(17, 17, 17, 0.05) 1px, transparent 1px);
-  background-size: 24px 24px;
+    linear-gradient(rgba(17, 17, 17, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 17, 17, 0.06) 1px, transparent 1px);
+  background-size: 100% 32px, 32px 100%;
+}
+
+/* Label indeks ala katalog/konferensi Swiss: "N° 02" */
+.portal-index {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: .75rem;
+  letter-spacing: .04em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Label seksi bernomor: "01 — RINGKASAN" */
+.portal-section-label {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .16em;
+  color: var(--p-muted);
+}
+.portal-section-label::before {
+  content: '';
+  width: 14px;
+  height: 2px;
+  background: var(--p-red);
+  flex-shrink: 0;
+}
+
+/* Blok struktural (header, strip data, panel besar): siku, hairline, tanpa shadow lembut.
+   Radius lembut sengaja disisakan hanya untuk elemen sentuh (tombol/input/badge/modal). */
+.portal-theme .portal-panel {
+  background: var(--p-white);
+  border: 1px solid var(--p-line);
+  border-radius: var(--p-radius-card);
 }
 
 @keyframes portal-rise {
@@ -189,7 +226,8 @@ body {
 .portal-theme .portal-card {
   background: var(--p-white);
   border: 1px solid var(--p-line);
-  border-radius: var(--p-radius-lg);
+  border-top: 2px solid var(--p-ink);
+  border-radius: var(--p-radius-card);
   box-shadow: var(--p-shadow-card);
 }
 

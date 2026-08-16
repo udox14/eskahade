@@ -43,6 +43,7 @@ export default async function PortalFinancePage() {
   return (
     <div>
       <PortalPageHeader
+        index="04"
         kicker="Dompet & Tabungan Santri"
         title="Saldo & Alokasi"
         subtitle={`Keuangan ${session.nama}${session.nis ? ` • NIS ${session.nis}` : ''}`}
@@ -67,60 +68,56 @@ export default async function PortalFinancePage() {
         )}
       </PortalPageHeader>
 
-      <div className="px-5 -mt-9 space-y-4 pb-28">
-        {/* Main Hero Card: Saldo Titipan & Sub Wallet */}
-        <div className="portal-rise portal-rise-1 portal-card p-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--p-muted)] flex items-center gap-1.5">
-                <Wallet className="w-3.5 h-3.5 text-[var(--p-ink)]" /> Saldo Titipan Utama
-              </p>
-              <p className="portal-display mt-1 text-[1.85rem] leading-none text-[var(--p-ink)]">
-                {formatRupiah(titipanBalance)}
-              </p>
-            </div>
-            <span className="rounded-[var(--p-radius-sm)] bg-[var(--p-red)] px-3 py-1 text-[11px] font-bold text-white">
+      <div className="pb-28">
+        {/* Strip saldo utama: full-bleed, langsung menyambung dari header */}
+        <div className="portal-rise portal-rise-1 bg-[var(--p-ink)] px-5 pt-5 pb-6">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/50 flex items-center gap-1.5">
+            <Wallet className="w-3.5 h-3.5" /> Saldo Titipan Utama
+          </p>
+          <div className="mt-1 flex items-end justify-between gap-3">
+            <p className="portal-display text-[2.1rem] leading-none text-white">
+              {formatRupiah(titipanBalance)}
+            </p>
+            <span className="mb-1 rounded-[var(--p-radius-sm)] bg-[var(--p-red)] px-3 py-1 text-[11px] font-bold text-white shrink-0">
               Utama
             </span>
           </div>
+        </div>
 
-          <p className="mt-2 text-xs text-[var(--p-muted)] leading-relaxed">
-            Dapat dialokasikan ke Uang Jajan, Uang Makan, Laundry, SPP &amp; Non-SPP.
-          </p>
-
-          <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--p-line)] rounded-[var(--p-radius-md)] border border-[var(--p-line)] text-center overflow-hidden">
-            <div className="p-3">
-              <div className="flex items-center justify-center gap-1 text-[var(--p-muted)]">
-                <ShoppingBag className="w-3.5 h-3.5 text-[var(--p-ink)]" />
-                <span className="text-[10px] font-bold uppercase tracking-wider">Jajan</span>
-              </div>
-              <p className="portal-display mt-1.5 text-xs font-bold text-[var(--p-ink)] truncate">
-                {formatRupiah(jajanBalance)}
-              </p>
+        <div className="grid grid-cols-3 divide-x divide-[var(--p-line)] border-b border-[var(--p-line)] bg-[var(--p-white)] text-center">
+          <div className="p-3">
+            <div className="flex items-center justify-center gap-1 text-[var(--p-muted)]">
+              <ShoppingBag className="w-3.5 h-3.5 text-[var(--p-ink)]" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Jajan</span>
             </div>
+            <p className="portal-display mt-1.5 text-xs font-bold text-[var(--p-ink)] truncate">
+              {formatRupiah(jajanBalance)}
+            </p>
+          </div>
 
-            <div className="p-3">
-              <div className="flex items-center justify-center gap-1 text-[var(--p-muted)]">
-                <ForkKnife className="w-3.5 h-3.5 text-[var(--p-ink)]" />
-                <span className="text-[10px] font-bold uppercase tracking-wider">Makan</span>
-              </div>
-              <p className="portal-display mt-1.5 text-xs font-bold text-[var(--p-ink)] truncate">
-                {formatRupiah(makanBalance)}
-              </p>
+          <div className="p-3">
+            <div className="flex items-center justify-center gap-1 text-[var(--p-muted)]">
+              <ForkKnife className="w-3.5 h-3.5 text-[var(--p-ink)]" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Makan</span>
             </div>
+            <p className="portal-display mt-1.5 text-xs font-bold text-[var(--p-ink)] truncate">
+              {formatRupiah(makanBalance)}
+            </p>
+          </div>
 
-            <div className="p-3">
-              <div className="flex items-center justify-center gap-1 text-[var(--p-muted)]">
-                <TShirt className="w-3.5 h-3.5 text-[var(--p-ink)]" />
-                <span className="text-[10px] font-bold uppercase tracking-wider">Laundry</span>
-              </div>
-              <p className="portal-display mt-1.5 text-xs font-bold text-[var(--p-ink)] truncate">
-                {formatRupiah(laundryBalance)}
-              </p>
+          <div className="p-3">
+            <div className="flex items-center justify-center gap-1 text-[var(--p-muted)]">
+              <TShirt className="w-3.5 h-3.5 text-[var(--p-ink)]" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Laundry</span>
             </div>
+            <p className="portal-display mt-1.5 text-xs font-bold text-[var(--p-ink)] truncate">
+              {formatRupiah(laundryBalance)}
+            </p>
           </div>
         </div>
 
+        <p className="portal-section-label px-5 mt-5 mb-3">02 — Alokasi &amp; Pengaturan</p>
+        <div className="px-5 space-y-4">
         {/* Finance Client Section */}
         <FinanceClient methods={methods} limits={limits} />
 
@@ -159,6 +156,7 @@ export default async function PortalFinancePage() {
           ) : (
             <p className="mt-2 text-xs text-[var(--p-muted)]">Belum ada riwayat pencairan saldo santri.</p>
           )}
+        </div>
         </div>
       </div>
     </div>

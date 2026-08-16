@@ -46,7 +46,7 @@ export default async function RiwayatPage() {
         title="Riwayat Pengajuan"
         subtitle="Pantau status pembayaran transfer & QRIS Anda"
       />
-      <div className="px-5 -mt-9">
+      <div className="px-5 pt-5">
         <RiwayatClient items={items} />
       </div>
     </div>

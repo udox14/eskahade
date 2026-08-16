@@ -39,6 +39,7 @@ export function TagihanClient(props: {
     <div className="space-y-4">
       {props.tampilkanSpp && (
         <BillCard
+          index="01"
           rise="portal-rise-1"
           icon={<Money className="w-5 h-5 text-[var(--p-ink)]" />}
           title="SPP Bulanan"
@@ -52,6 +53,7 @@ export function TagihanClient(props: {
       )}
 
       <BillCard
+        index={props.tampilkanSpp ? '02' : '01'}
         rise="portal-rise-2"
         icon={<Buildings className="w-5 h-5 text-[var(--p-red)]" />}
         title="Biaya Tahunan (Non-SPP)"
@@ -76,6 +78,7 @@ export function TagihanClient(props: {
 }
 
 function BillCard(props: {
+  index: string
   rise: string
   icon: React.ReactNode
   title: string
@@ -91,11 +94,14 @@ function BillCard(props: {
   return (
     <div className={`portal-rise ${props.rise} portal-card p-5`}>
       <div className="flex items-center gap-3">
-        <span className="flex w-10 h-10 items-center justify-center rounded-[var(--p-radius-md)] bg-[var(--p-paper)] border border-[var(--p-line)]">
+        <span className="flex w-10 h-10 items-center justify-center bg-[var(--p-paper)] border border-[var(--p-line)] shrink-0">
           {props.icon}
         </span>
         <div className="flex-1 min-w-0">
-          <h2 className="portal-display text-lg leading-tight text-[var(--p-ink)]">{props.title}</h2>
+          <div className="flex items-center gap-2">
+            <span className="portal-index text-[var(--p-muted)]">{props.index}</span>
+            <h2 className="portal-display text-lg leading-tight text-[var(--p-ink)]">{props.title}</h2>
+          </div>
           <p className="text-[11px] text-[var(--p-muted)]">{props.subtitle}</p>
         </div>
       </div>

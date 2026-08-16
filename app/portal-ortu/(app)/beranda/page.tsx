@@ -51,17 +51,17 @@ export default async function BerandaPage() {
   const totalTagihan = totalSpp + totalNonSpp
   const pendingCount = (pendingSpp ? 1 : 0) + (pendingNonSpp ? 1 : 0)
   const rejected = rejectedSpp || rejectedNonSpp
+  const persenHadir = absen.totalSesi > 0 ? Math.round((absen.hadir / absen.totalSesi) * 100) : null
   // pelanggaran (kartu ringkasan) sengaja all-time; banner "bersih" di bawah
   // harus dihitung khusus bulan berjalan supaya klaim "bulan ini" akurat.
   const pelanggaranBulanIni = pelanggaran.filter(p => p.tanggal >= start && p.tanggal <= end)
 
   return (
     <div>
-      {/* Hero */}
-      <div className="relative overflow-hidden bg-[var(--p-ink)] px-6 pt-10 pb-20 rounded-b-[var(--p-radius-lg)]">
-        <div className="absolute top-0 left-6 right-6 h-[3px] bg-[var(--p-red)]" />
+      {/* Header identitas — siku, spine merah, kartu identitas sebaris (bukan hero blob) */}
+      <div className="relative bg-[var(--p-ink)] pl-7 pr-6 pt-10 pb-6 border-l-4 border-[var(--p-red)]">
         <div className="relative portal-rise flex items-center gap-4">
-          <div className="w-14 h-14 rounded-[var(--p-radius-md)] overflow-hidden bg-white/10 border border-white/15 shrink-0">
+          <div className="w-14 h-14 shrink-0 overflow-hidden bg-white/10 border border-white/15">
             {session.foto_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={session.foto_url} alt={session.nama} className="w-full h-full object-cover" />
@@ -78,59 +78,57 @@ export default async function BerandaPage() {
             <h1 className="portal-display mt-0.5 text-2xl leading-tight text-white truncate">
               {session.nama}
             </h1>
-            <p className="mt-0.5 text-xs text-white/65">
-              NIS {session.nis}
-              {session.asrama ? ` • ${session.asrama}` : ''}
-              {session.kamar ? ` • Kamar ${session.kamar}` : ''}
-            </p>
           </div>
+        </div>
+        <div className="relative portal-rise mt-4 flex divide-x divide-white/15 border-t border-white/15 pt-3 text-[10px] text-white/60">
+          <span className="pr-3 font-semibold">NIS {session.nis}</span>
+          {session.asrama && <span className="px-3 font-semibold">{session.asrama}</span>}
+          {session.kamar && <span className="pl-3 font-semibold">Kamar {session.kamar}</span>}
         </div>
       </div>
 
-      <div className="px-5 -mt-10 space-y-4">
-        {/* Kartu total tagihan */}
-        <Link
-          href="/portal-ortu/tagihan"
-          className="portal-rise portal-rise-1 portal-card block p-5"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--p-muted)]">
-                Total Tagihan Berjalan
-              </p>
-              <p className="portal-display mt-1 text-[1.75rem] leading-none text-[var(--p-ink)]">
-                {formatRupiah(totalTagihan)}
-              </p>
-            </div>
-            <span className="flex items-center gap-1 rounded-[var(--p-radius-sm)] bg-[var(--p-red)] px-3 py-1.5 text-[11px] font-bold text-white">
-              Bayar <CaretRight className="w-3.5 h-3.5" />
-            </span>
+      {/* Strip total tagihan — full-bleed, angka besar, menyambung langsung dari header */}
+      <Link
+        href="/portal-ortu/tagihan"
+        className="portal-rise portal-rise-1 block border-b border-[var(--p-line)] bg-[var(--p-white)] px-5 py-5"
+      >
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="portal-section-label">01 — Total Tagihan Berjalan</p>
+            <p className="portal-display mt-2 text-[2.35rem] leading-none text-[var(--p-ink)]">
+              {formatRupiah(totalTagihan)}
+            </p>
           </div>
-          <div className="mt-4 grid grid-cols-2 divide-x divide-[var(--p-line)] rounded-[var(--p-radius-md)] border border-[var(--p-line)] overflow-hidden">
-            <div className="px-3.5 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">SPP Bulanan</p>
-              <p className="mt-0.5 text-sm font-extrabold text-[var(--p-ink)]">
-                {tampilkanSpp ? formatRupiah(totalSpp) : 'Bebas SPP'}
-              </p>
-              {tampilkanSpp && sppBills.length > 0 && (
-                <p className="text-[10px] text-[var(--p-muted)]">{sppBills.length} bulan belum dibayar</p>
-              )}
-            </div>
-            <div className="px-3.5 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">Non-SPP</p>
-              <p className="mt-0.5 text-sm font-extrabold text-[var(--p-ink)]">
-                {formatRupiah(totalNonSpp)}
-              </p>
-              <p className="text-[10px] text-[var(--p-muted)]">Bangunan, kesehatan, dst.</p>
-            </div>
+          <span className="flex items-center gap-1 shrink-0 bg-[var(--p-red)] px-3 py-2 text-[11px] font-bold text-white rounded-[var(--p-radius-sm)]">
+            Bayar <CaretRight className="w-3.5 h-3.5" />
+          </span>
+        </div>
+        <div className="mt-4 grid grid-cols-2 border border-[var(--p-line)]">
+          <div className="border-r border-[var(--p-line)] px-3.5 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">SPP Bulanan</p>
+            <p className="mt-0.5 text-sm font-extrabold text-[var(--p-ink)]">
+              {tampilkanSpp ? formatRupiah(totalSpp) : 'Bebas SPP'}
+            </p>
+            {tampilkanSpp && sppBills.length > 0 && (
+              <p className="text-[10px] text-[var(--p-muted)]">{sppBills.length} bulan belum dibayar</p>
+            )}
           </div>
-        </Link>
+          <div className="px-3.5 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">Non-SPP</p>
+            <p className="mt-0.5 text-sm font-extrabold text-[var(--p-ink)]">
+              {formatRupiah(totalNonSpp)}
+            </p>
+            <p className="text-[10px] text-[var(--p-muted)]">Bangunan, kesehatan, dst.</p>
+          </div>
+        </div>
+      </Link>
 
+      <div className="px-5 pt-4 space-y-4">
         {/* Banner pengajuan pending */}
         {pendingCount > 0 && (
           <Link
             href="/portal-ortu/riwayat"
-            className="portal-rise portal-rise-2 flex items-center gap-3 rounded-[var(--p-radius-md)] border-l-4 border-[var(--p-warning)] bg-[var(--p-warning-soft)] px-4 py-3.5"
+            className="portal-rise portal-rise-2 flex items-center gap-3 border-l-4 border-[var(--p-warning)] bg-[var(--p-warning-soft)] px-4 py-3.5"
           >
             <Clock className="w-4 h-4 shrink-0 text-[var(--p-warning)]" />
             <p className="flex-1 text-xs leading-relaxed text-[var(--p-ink)]">
@@ -145,7 +143,7 @@ export default async function BerandaPage() {
         {rejected && (
           <Link
             href="/portal-ortu/riwayat"
-            className="portal-rise portal-rise-2 flex items-center gap-3 rounded-[var(--p-radius-md)] border-l-4 border-[var(--p-red)] bg-[var(--p-danger-soft)] px-4 py-3.5"
+            className="portal-rise portal-rise-2 flex items-center gap-3 border-l-4 border-[var(--p-red)] bg-[var(--p-danger-soft)] px-4 py-3.5"
           >
             <XCircle className="w-4 h-4 shrink-0 text-[var(--p-red)]" />
             <p className="flex-1 text-xs leading-relaxed text-[var(--p-ink)]">
@@ -157,49 +155,52 @@ export default async function BerandaPage() {
           </Link>
         )}
 
-        {/* Ringkasan bulan ini */}
-        <div className="portal-rise portal-rise-3 grid grid-cols-2 gap-3">
-          <Link
-            href="/portal-ortu/absensi"
-            className="rounded-[var(--p-radius-lg)] bg-[var(--p-ink)] p-4 text-white"
-          >
-            <CalendarCheck className="w-5 h-5 opacity-80" />
-            <p className="portal-display mt-3 text-2xl leading-none">
-              {absen.totalSesi > 0 ? `${absen.hadir}/${absen.totalSesi}` : '—'}
-            </p>
-            <p className="mt-1 text-[11px] font-semibold text-white/70">
-              Kehadiran pengajian bulan ini
-            </p>
-            <p className="mt-1.5 text-[9.5px] font-medium text-white/70 bg-white/10 w-fit px-2 py-0.5 rounded-full">
-              Update: Selasa malam
-            </p>
-            {(absen.alfa > 0 || absen.izin > 0 || absen.sakit > 0) && (
-              <p className="mt-1 text-[10px] text-white/60">
-                {absen.alfa > 0 ? `${absen.alfa} alfa ` : ''}
-                {absen.sakit > 0 ? `${absen.sakit} sakit ` : ''}
-                {absen.izin > 0 ? `${absen.izin} izin` : ''}
+        {/* Ringkasan bulan ini — grid dua kolom asimetris, angka raksasa */}
+        <div>
+          <p className="portal-section-label mb-3">02 — Ringkasan Bulan Ini</p>
+          <div className="portal-rise portal-rise-3 grid grid-cols-2 border border-[var(--p-line)] divide-x divide-[var(--p-line)]">
+            <Link href="/portal-ortu/absensi" className="p-4">
+              <div className="flex items-center justify-between">
+                <CalendarCheck className="w-4 h-4 text-[var(--p-ink)]" />
+                <span className="portal-index text-[var(--p-muted)]">{persenHadir !== null ? `${persenHadir}%` : '—'}</span>
+              </div>
+              <p className="portal-display mt-3 text-3xl leading-none text-[var(--p-ink)]">
+                {absen.totalSesi > 0 ? `${absen.hadir}/${absen.totalSesi}` : '—'}
               </p>
-            )}
-          </Link>
-          <Link
-            href="/portal-ortu/pelanggaran"
-            className="portal-card p-4"
-          >
-            <ShieldWarning className="w-5 h-5 text-[var(--p-red)]" />
-            <p className="portal-display mt-3 text-2xl leading-none text-[var(--p-ink)]">{totalPoin}</p>
-            <p className="mt-1 text-[11px] font-semibold text-[var(--p-muted)]">
-              Poin pelanggaran ({pelanggaran.length} catatan)
-            </p>
-          </Link>
+              <p className="mt-1.5 text-[11px] font-semibold text-[var(--p-muted)]">
+                Kehadiran pengajian
+              </p>
+              {(absen.alfa > 0 || absen.izin > 0 || absen.sakit > 0) ? (
+                <p className="mt-1 text-[10px] text-[var(--p-red)] font-semibold">
+                  {absen.alfa > 0 ? `${absen.alfa} alfa ` : ''}
+                  {absen.sakit > 0 ? `${absen.sakit} sakit ` : ''}
+                  {absen.izin > 0 ? `${absen.izin} izin` : ''}
+                </p>
+              ) : (
+                <p className="mt-1 text-[10px] text-[var(--p-muted)]">Update Selasa malam</p>
+              )}
+            </Link>
+            <Link href="/portal-ortu/pelanggaran" className="p-4">
+              <div className="flex items-center justify-between">
+                <ShieldWarning className="w-4 h-4 text-[var(--p-red)]" />
+                <span className="portal-index text-[var(--p-muted)]">{pelanggaran.length}</span>
+              </div>
+              <p className="portal-display mt-3 text-3xl leading-none text-[var(--p-ink)]">{totalPoin}</p>
+              <p className="mt-1.5 text-[11px] font-semibold text-[var(--p-muted)]">
+                Poin pelanggaran
+              </p>
+              <p className="mt-1 text-[10px] text-[var(--p-muted)]">{pelanggaran.length} catatan tercatat</p>
+            </Link>
+          </div>
         </div>
 
         {/* Pintasan riwayat */}
         <Link
           href="/portal-ortu/riwayat"
-          className="portal-rise portal-rise-4 portal-card flex items-center gap-3 px-5 py-4"
+          className="portal-rise portal-rise-4 flex items-center gap-3 border border-[var(--p-line)] px-5 py-4"
         >
-          <span className="flex w-10 h-10 items-center justify-center rounded-[var(--p-radius-md)] bg-[var(--p-paper)] border border-[var(--p-line)]">
-            <Receipt className="w-5 h-5 text-[var(--p-ink)]" />
+          <span className="flex w-9 h-9 items-center justify-center bg-[var(--p-paper)] border border-[var(--p-line)] shrink-0">
+            <Receipt className="w-4.5 h-4.5 text-[var(--p-ink)]" />
           </span>
           <div className="flex-1">
             <p className="text-sm font-bold text-[var(--p-ink)]">Riwayat Pengajuan</p>
@@ -209,7 +210,7 @@ export default async function BerandaPage() {
         </Link>
 
         {pelanggaranBulanIni.length === 0 && absen.alfa === 0 && (
-          <div className="flex items-center gap-2.5 rounded-[var(--p-radius-md)] bg-[var(--p-success-soft)] border border-[#cde3d4] px-4 py-3">
+          <div className="flex items-center gap-2.5 border-l-4 border-[var(--p-success)] bg-[var(--p-success-soft)] px-4 py-3">
             <Sparkle className="w-4 h-4 text-[var(--p-success)]" />
             <p className="text-xs font-semibold text-[var(--p-success)]">
               Alhamdulillah, tidak ada catatan pelanggaran maupun alfa bulan ini.

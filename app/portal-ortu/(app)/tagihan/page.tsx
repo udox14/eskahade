@@ -43,11 +43,12 @@ export default async function TagihanPage() {
   return (
     <div>
       <PortalPageHeader
+        index="03"
         kicker="Pembayaran"
         title="Tagihan"
         subtitle="Bayar via transfer bank atau QRIS, lalu unggah bukti untuk diperiksa petugas."
       />
-      <div className="px-5 -mt-9">
+      <div className="px-5 pt-5">
         <TagihanClient
           tampilkanSpp={tampilkanSpp}
           sppItems={sppItems}

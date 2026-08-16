@@ -47,6 +47,7 @@ export default async function AbsensiPage({
   return (
     <div>
       <PortalPageHeader
+        index="02"
         kicker="Rekap Pengajian"
         title="Kehadiran Pengajian"
         subtitle={rekap.namaKelas ? `Kelas ${rekap.namaKelas} • 3 sesi per hari (Shubuh, Ashar, Maghrib)` : '3 sesi per hari (Shubuh, Ashar, Maghrib)'}
@@ -71,7 +72,7 @@ export default async function AbsensiPage({
         </div>
       </PortalPageHeader>
 
-      <div className="px-5 -mt-9 space-y-4">
+      <div className="px-5 pt-5 space-y-4">
         {/* Banner Keterangan Update Data */}
         <div className="portal-rise flex items-center gap-2.5 rounded-[var(--p-radius-md)] border-l-4 border-[var(--p-warning)] bg-[var(--p-warning-soft)] px-4 py-3 text-xs">
           <Clock className="w-4 h-4 shrink-0 text-[var(--p-warning)]" />

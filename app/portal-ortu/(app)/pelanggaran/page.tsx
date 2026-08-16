@@ -20,6 +20,7 @@ export default async function PelanggaranPage() {
   return (
     <div>
       <PortalPageHeader
+        index="05"
         kicker="Catatan Keamanan"
         title="Pelanggaran"
         subtitle="Catatan kedisiplinan dari bagian keamanan pesantren"
@@ -37,9 +38,9 @@ export default async function PelanggaranPage() {
         </div>
       </PortalPageHeader>
 
-      <div className="px-5 -mt-9">
+      <div className="px-5 pt-5">
         {daftar.length === 0 ? (
-          <div className="portal-rise portal-rise-1 flex items-center gap-3 rounded-[var(--p-radius-lg)] bg-[var(--p-success-soft)] border border-[#cde3d4] px-5 py-6">
+          <div className="portal-rise portal-rise-1 flex items-center gap-3 rounded-[var(--p-radius-card)] bg-[var(--p-success-soft)] border border-[#cde3d4] px-5 py-6">
             <ShieldCheck className="w-6 h-6 shrink-0 text-[var(--p-success)]" />
             <div>
               <p className="text-sm font-bold text-[var(--p-success)]">Alhamdulillah, bersih!</p>

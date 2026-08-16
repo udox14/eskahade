@@ -10,11 +10,12 @@ export default async function AkunPage() {
   return (
     <div>
       <PortalPageHeader
+        index="06"
         kicker="Pengaturan Akun"
         title={session.nama}
         subtitle={`NIS ${session.nis}${session.asrama ? ` • Asrama ${session.asrama}` : ''}${session.kamar ? ` • Kamar ${session.kamar}` : ''}`}
       />
-      <div className="px-5 -mt-8">
+      <div className="px-5 pt-5">
         <AkunClient mustChangePassword={session.must_change_password} nis={session.nis} />
       </div>
     </div>

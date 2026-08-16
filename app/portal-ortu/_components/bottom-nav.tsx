@@ -5,20 +5,20 @@ import { usePathname } from 'next/navigation'
 import { Bank, CalendarCheck, House, Receipt, ShieldWarning, User } from '@phosphor-icons/react'
 
 const TABS = [
-  { href: '/portal-ortu/beranda', label: 'Beranda', icon: House },
-  { href: '/portal-ortu/absensi', label: 'Pengajian', icon: CalendarCheck },
-  { href: '/portal-ortu/tagihan', label: 'Tagihan', icon: Receipt },
-  { href: '/portal-ortu/keuangan', label: 'Saldo', icon: Bank },
-  { href: '/portal-ortu/pelanggaran', label: 'Keamanan', icon: ShieldWarning },
-  { href: '/portal-ortu/akun', label: 'Akun', icon: User },
+  { n: '01', href: '/portal-ortu/beranda', label: 'Beranda', icon: House },
+  { n: '02', href: '/portal-ortu/absensi', label: 'Pengajian', icon: CalendarCheck },
+  { n: '03', href: '/portal-ortu/tagihan', label: 'Tagihan', icon: Receipt },
+  { n: '04', href: '/portal-ortu/keuangan', label: 'Saldo', icon: Bank },
+  { n: '05', href: '/portal-ortu/pelanggaran', label: 'Keamanan', icon: ShieldWarning },
+  { n: '06', href: '/portal-ortu/akun', label: 'Akun', icon: User },
 ]
 
 export function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-[26rem]">
-      <div className="flex items-stretch justify-between rounded-[var(--p-radius-lg)] bg-[var(--p-ink)] px-2 py-2 shadow-[0_10px_28px_-8px_rgba(17,17,17,0.5)]">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 w-full max-w-md bg-[var(--p-ink)] border-t border-white/10 pb-[env(safe-area-inset-bottom)]">
+      <div className="grid grid-cols-6">
         {TABS.map(tab => {
           const active = pathname === tab.href || pathname.startsWith(tab.href + '/')
           const Icon = tab.icon
@@ -26,17 +26,15 @@ export function BottomNav() {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`relative flex flex-1 flex-col items-center gap-1 rounded-[var(--p-radius-sm)] py-2 transition active:scale-95 ${
-                active ? 'text-white' : 'text-white/45 active:text-white/80'
+              className={`relative flex flex-col items-center justify-center gap-1 py-3 border-r border-white/10 last:border-r-0 transition-colors active:bg-white/10 ${
+                active ? 'bg-[var(--p-red)] text-white' : 'text-white/45'
               }`}
             >
-              <span
-                className={`absolute top-0 h-[3px] w-5 rounded-full transition-colors ${
-                  active ? 'bg-[var(--p-red)]' : 'bg-transparent'
-                }`}
-              />
+              <span className={`portal-index absolute top-1 left-1.5 text-[8px] ${active ? 'text-white/70' : 'text-white/25'}`}>
+                {tab.n}
+              </span>
               <Icon className="w-5 h-5" weight={active ? 'bold' : 'regular'} />
-              <span className={`text-[10px] leading-none ${active ? 'font-bold' : 'font-medium'}`}>
+              <span className={`text-[9px] leading-none ${active ? 'font-bold' : 'font-medium'}`}>
                 {tab.label}
               </span>
             </Link>
