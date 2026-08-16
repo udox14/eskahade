@@ -13,7 +13,7 @@ import type { ServiceKind, ServiceTariffRow } from '@/lib/finance/service-tariff
 import type { MealServiceKind, ServiceArrearsWithStudent, ServiceBillSkipRow } from '@/lib/finance/service-billing'
 import type { PermanentExemptionKind, ExemptedSantriRow } from '@/lib/finance/exemptions'
 import type { SppBillingStart } from '@/lib/spp/tunggakan'
-import { NON_SPP_JENIS_ALL, type NonSppJenis } from '@/lib/keuangan/non-spp-outstanding'
+import { NON_SPP_JENIS_ALL, type NonSppJenis } from '@/lib/keuangan/non-spp-jenis'
 
 type TabData = {
   tariffs: ServiceTariffRow[]

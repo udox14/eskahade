@@ -8,9 +8,11 @@
 
 import { query, queryOne } from '@/lib/db'
 
-export const NON_SPP_JENIS_TAHUNAN = ['KESEHATAN', 'EHB', 'EKSKUL'] as const
-export const NON_SPP_JENIS_ALL = ['BANGUNAN', ...NON_SPP_JENIS_TAHUNAN] as const
-export type NonSppJenis = typeof NON_SPP_JENIS_ALL[number]
+// Re-export supaya pemanggil lama yang sudah import dari sini tidak perlu
+// diubah — definisi asli sekarang di non-spp-jenis.ts (tanpa dependensi
+// lib/db) supaya aman diimpor dari Client Component juga.
+export { NON_SPP_JENIS_TAHUNAN, NON_SPP_JENIS_ALL, type NonSppJenis } from './non-spp-jenis'
+import { NON_SPP_JENIS_TAHUNAN, NON_SPP_JENIS_ALL, type NonSppJenis } from './non-spp-jenis'
 
 const LEGACY_CUTOFF_KEY = 'keuangan_non_spp_cutoff_tanggal'
 const DEFAULT_LEGACY_CUTOFF = '2026-07-01'
