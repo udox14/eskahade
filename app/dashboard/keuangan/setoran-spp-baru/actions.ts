@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { assertFeature } from '@/lib/auth/feature'
 import { execute, query, queryOne } from '@/lib/db'
-import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
+import { sppJuliPusatLogCondition } from '@/lib/spp/tujuan-setoran'
 
 const PATH = '/dashboard/keuangan/setoran-spp-baru'
 
@@ -23,10 +23,7 @@ export async function getSetoranSppBaru(tahun: number) {
       WHERE sl.tahun = ? AND sl.bulan = 7
         AND s.status_global = 'aktif'
         AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
-        AND (
-          sl.tujuan_setoran = 'BENDAHARA_PUSAT'
-          OR ${getKategoriSantriEfektifSql('s')} = 'BARU'
-        )
+        AND ${sppJuliPusatLogCondition('s', 'sl')}
       GROUP BY COALESCE(NULLIF(TRIM(s.asrama), ''), 'LAINNYA')
     )
     SELECT l.*, ss.id AS setoran_id, ss.jumlah_aktual, ss.nama_penyetor,
@@ -45,10 +42,7 @@ export async function getSetoranSppBaru(tahun: number) {
     WHERE sl.tahun = ? AND sl.bulan = 7
       AND s.status_global = 'aktif'
       AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
-      AND (
-        sl.tujuan_setoran = 'BENDAHARA_PUSAT'
-        OR ${getKategoriSantriEfektifSql('s')} = 'BARU'
-      )
+      AND ${sppJuliPusatLogCondition('s', 'sl')}
     ORDER BY unit_setor, s.nama_lengkap
   `, [tahun])
   return { rows, details }

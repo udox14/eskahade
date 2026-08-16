@@ -43,3 +43,25 @@ export const tujuanSetoranSql = (santriAlias: string, tahunSql: string, bulanSql
   THEN 'BENDAHARA_PUSAT'
   ELSE 'DEWAN_SANTRI'
 END`
+
+/**
+ * Kondisi baris `spp_log` yang uangnya masuk ke Bendahara Pesantren
+ * (SPP Juli santri baru), bukan ke setoran rutin Dewan Santri.
+ *
+ * Dipakai bersama oleh laporan keuangan PSB dan halaman Setoran SPP Santri
+ * Baru supaya angka keduanya tidak bisa berbeda. Cek kategori efektif 'BARU'
+ * dipertahankan sebagai fallback untuk baris lama yang ditulis sebelum kolom
+ * `tujuan_setoran` ada (lihat migrasi 0116).
+ */
+export const sppJuliPusatLogCondition = (santriAlias: string, sppLogAlias: string) => `(
+  ${sppLogAlias}.tujuan_setoran = '${TUJUAN_BENDAHARA_PUSAT}'
+  OR ${getKategoriSantriEfektifSql(santriAlias)} = 'BARU'
+)`
+
+/**
+ * Kondisi santri yang punya tagihan SPP Juli ke Bendahara Pesantren pada
+ * tahun tertentu. Ini sisi "target", pasangan dari `sppJuliPusatLogCondition`
+ * yang menghitung sisi "terbayar".
+ */
+export const sppJuliPusatSantriCondition = (santriAlias: string, tahunSql: string) =>
+  `${tujuanSetoranSql(santriAlias, tahunSql, '7')} = '${TUJUAN_BENDAHARA_PUSAT}'`

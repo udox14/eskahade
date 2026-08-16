@@ -4,6 +4,7 @@ import { assertFeature } from '@/lib/auth/feature'
 import { execute, getDB, query } from '@/lib/db'
 import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 import { getNominalSppForYear } from '@/lib/spp/tunggakan'
+import { sppJuliPusatLogCondition, sppJuliPusatSantriCondition } from '@/lib/spp/tujuan-setoran'
 
 const PATH = '/dashboard/psb/laporan-keuangan'
 const SPP_JULI_BULAN = 7
@@ -51,6 +52,7 @@ type SantriRow = {
   placed_kamar_at: string | null
   done_at: string | null
   payment_note: string | null
+  spp_juli_pusat: number
 }
 
 type PaymentRow = {
@@ -196,7 +198,8 @@ export async function getPsbFinancialReport(filters: PsbFinancialFilters = {}) {
            ${kategoriSql} AS kategori_efektif,
            COALESCE(pf.status, 'VERIFICATION') AS psb_status,
            pf.verified_at, pf.placed_asrama_at, pf.paid_at, pf.placed_kamar_at, pf.done_at,
-           pf.payment_note
+           pf.payment_note,
+           CASE WHEN ${sppJuliPusatSantriCondition('s', String(tahunTagihan))} THEN 1 ELSE 0 END AS spp_juli_pusat
     FROM santri s
     LEFT JOIN psb_flow pf ON pf.santri_id = s.id
     WHERE ${baseWhere}
@@ -230,10 +233,11 @@ export async function getPsbFinancialReport(filters: PsbFinancialFilters = {}) {
     LEFT JOIN psb_flow pf ON pf.santri_id = s.id
     LEFT JOIN users u ON u.id = sl.penerima_id
     WHERE ${baseWhere}
-      AND (sl.psb_receipt_id IS NOT NULL OR sl.tujuan_setoran = 'BENDAHARA_PUSAT')
+      AND ${sppJuliPusatLogCondition('s', 'sl')}
       AND COALESCE(r.is_void, 0) = 0
       AND sl.bulan = ?
-  `, [SPP_JULI_BULAN])
+      AND sl.tahun = ?
+  `, [SPP_JULI_BULAN, tahunTagihan])
 
   const tarifRows = await query<{ tahun_angkatan: number; jenis_biaya: JenisBiaya; nominal: number; source_rank: number }>(`
     SELECT tahun_angkatan, jenis_biaya, nominal,
@@ -263,7 +267,10 @@ export async function getPsbFinancialReport(filters: PsbFinancialFilters = {}) {
     JENIS_NON_SPP.forEach((jenis) => {
       biaya[jenis].target = tarifMap.get(`${tahunMasuk}:${jenis}`) ?? 0
     })
-    biaya.SPP_JULI.target = sppJuliTarif
+    // Hanya santri yang SPP Juli-nya memang disetor ke Bendahara Pesantren
+    // yang punya target di sini; santri lama yang masih punya psb_flow dari
+    // angkatan sebelumnya SPP-nya tetap lewat Dewan Santri.
+    biaya.SPP_JULI.target = toInt(santri.spp_juli_pusat) === 1 ? sppJuliTarif : 0
 
     payments
       .filter((payment) => payment.jenis_biaya === 'BANGUNAN' || Number(payment.tahun_tagihan) === tahunTagihan)
