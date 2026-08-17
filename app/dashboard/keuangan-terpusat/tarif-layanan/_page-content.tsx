@@ -1,11 +1,15 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { FormField, ResultBanner, SectionPanel, StatusBadge, type FinanceResult } from '../_components/finance-ui'
 import {
-  addArrearsAction, addTariffAction, generateBillsAction, markArrearsLunasAction, saveBillingStartAction, searchSantriByName,
+  FinanceTour, FormField, ResultBanner, SectionPanel, StatusBadge,
+  useFinanceTour, type FinanceResult, type TourStep,
+} from '../_components/finance-ui'
+import { RupiahInput, SantriPicker } from '../_components/finance-inputs'
+import {
+  addArrearsAction, addTariffAction, generateBillsAction, markArrearsLunasAction, saveBillingStartAction,
   setExemptionAction, addSkipAction, cabutSkipAction, catatBebasTahunanAction, hapusBebasTahunanAction,
   type SantriSearchRow, type BebasTahunanRow,
 } from './actions'
@@ -36,6 +40,13 @@ function formatRupiah(value: number) {
   return `Rp ${new Intl.NumberFormat('id-ID').format(value)}`
 }
 
+const TOUR: TourStep[] = [
+  { target: '[data-tour="pembebasan"]', title: 'Bebaskan biaya lebih dulu', body: 'Santri yang dibebaskan biaya sebaiknya dicatat sebelum tagihan dibuat. Pembebasan setelah tagihan terbit tidak menghapus tagihan yang sudah ada.' },
+  { target: '[data-tour="layanan"]', title: 'Tiga layanan, satu pola', body: 'SPP, Uang Makan, dan Uang Laundry memakai sistem tarif yang sama. Makan dan Laundry punya tambahan generate tagihan, skip, dan tunggakan.' },
+  { target: '[data-tour="mulai"]', title: 'Tanggal awal tagihan', body: 'Bulan pertama santri mulai ditagih. Santri yang masuk setelah bulan ini otomatis mulai dari bulan masuknya sendiri.' },
+  { target: '[data-tour="tarif"]', title: 'Tarif berjenjang waktu', body: 'Tarif baru ditambahkan beserta bulan efektifnya, bukan menimpa yang lama. Karena itu ganti tarif di tengah tahun tidak mengubah tagihan bulan yang sudah terbit.' },
+]
+
 export function TarifLayananClient({ initialData, exempted, bebasTahunan, skip }: {
   initialData: Record<ServiceKind, TabData>
   exempted: ExemptedSantriRow[]
@@ -44,12 +55,14 @@ export function TarifLayananClient({ initialData, exempted, bebasTahunan, skip }
 }) {
   const [tab, setTab] = useState<ServiceKind>('SPP')
   const data = initialData[tab]
+  const tour = useFinanceTour('tarif-layanan')
 
   return (
     <div className="space-y-4 sm:space-y-5">
-      <PembebasanBiayaPanel exempted={exempted} bebasTahunan={bebasTahunan} />
+      <FinanceTour steps={TOUR} running={tour.running} onFinish={tour.finish} />
+      <div data-tour="pembebasan"><PembebasanBiayaPanel exempted={exempted} bebasTahunan={bebasTahunan} /></div>
 
-      <nav aria-label="Pilih layanan" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <nav data-tour="layanan" aria-label="Pilih layanan" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex min-w-max gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
           {TABS.map(item => (
             <button key={item.id} type="button" onClick={() => setTab(item.id)} aria-current={tab === item.id ? 'page' : undefined}
@@ -97,7 +110,7 @@ function BillingStartPanel({ serviceKind, billingStart }: { serviceKind: Service
 
   return (
     <SectionPanel title="Tanggal Awal Tagihan" description="Bulan pertama santri mulai ditagih (santri yang masuk setelah tanggal ini otomatis mulai dari bulan masuknya).">
-      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
+      <div data-tour="mulai" className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
         <div className="w-full sm:w-48">
           <FormField label="Bulan mulai (YYYY-MM)">
             <input type="month" value={value} onChange={e => setValue(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
@@ -139,15 +152,15 @@ function TariffPanel({ serviceKind, tariffs }: { serviceKind: ServiceKind; tarif
 
   return (
     <SectionPanel title="Riwayat Tarif" description="Tarif baru cuma berlaku untuk tagihan yang dibuat mulai bulan itu — tagihan bulan sebelumnya yang sudah ada tidak berubah.">
-      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-end">
+      <div data-tour="tarif" className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-end">
         <div className="w-full sm:w-40">
           <FormField label="Berlaku mulai">
             <input type="month" value={effectiveMonth} onChange={e => setEffectiveMonth(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
           </FormField>
         </div>
-        <div className="w-full sm:w-48">
-          <FormField label="Nominal (Rp)">
-            <input type="number" min={1} value={amount} onChange={e => setAmount(e.target.value)} placeholder="500000" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+        <div className="w-full sm:w-56">
+          <FormField label="Nominal">
+            <RupiahInput value={Number(amount) || 0} onValueChange={next => setAmount(next ? String(next) : '')} min={1} />
           </FormField>
         </div>
         <button type="button" disabled={pending || !amount} onClick={handleAdd}
@@ -215,74 +228,6 @@ function GenerateBillsPanel({ serviceKind }: { serviceKind: MealServiceKind }) {
   )
 }
 
-function SantriSearchField({ selected, onSelect }: { selected: SantriSearchRow | null; onSelect: (row: SantriSearchRow | null) => void }) {
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SantriSearchRow[]>([])
-  const [open, setOpen] = useState(false)
-  const [searching, setSearching] = useState(false)
-
-  useEffect(() => {
-    if (selected || query.trim().length < 2) return
-    const timer = setTimeout(() => {
-      setSearching(true)
-      searchSantriByName(query).then(rows => {
-        setResults(rows)
-        setSearching(false)
-        setOpen(true)
-      })
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [query, selected])
-
-  if (selected) {
-    return (
-      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm">
-        <span className="min-w-0 truncate font-semibold text-slate-800">{selected.nama_lengkap} <span className="font-normal text-slate-400">({selected.nis})</span></span>
-        <button type="button" onClick={() => { onSelect(null); setQuery('') }} className="shrink-0 text-[11px] font-bold text-slate-500 hover:text-slate-800">
-          Ganti
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="relative">
-      <input
-        value={query}
-        onChange={e => {
-          const value = e.target.value
-          setQuery(value)
-          if (value.trim().length < 2) setOpen(false)
-        }}
-        onFocus={() => results.length > 0 && setOpen(true)}
-        placeholder="Ketik nama santri..."
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-      />
-      {open && (
-        <div className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
-          {searching ? (
-            <p className="px-3 py-2 text-xs text-slate-400">Mencari...</p>
-          ) : results.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-slate-400">Tidak ada santri ditemukan.</p>
-          ) : (
-            results.map(row => (
-              <button
-                key={row.id}
-                type="button"
-                onClick={() => { onSelect(row); setOpen(false) }}
-                className="block w-full px-3 py-2 text-left text-xs hover:bg-slate-50"
-              >
-                <span className="font-bold text-slate-800">{row.nama_lengkap}</span>
-                <span className="ml-1.5 text-slate-400">{row.nis}{row.asrama ? ` • ${row.asrama}` : ''}</span>
-              </button>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 function ArrearsPanel({ serviceKind, arrears }: { serviceKind: MealServiceKind; arrears: ServiceArrearsWithStudent[] }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -330,7 +275,7 @@ function ArrearsPanel({ serviceKind, arrears }: { serviceKind: MealServiceKind; 
     <SectionPanel title="Tunggakan Lama (Backfill)" description="Catat utang dari sebelum fitur ini ada — bentuk bebas, tidak perlu per bulan presisi.">
       <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-4 sm:items-end">
         <FormField label="Santri">
-          <SantriSearchField selected={selectedSantri} onSelect={setSelectedSantri} />
+          <SantriPicker selected={selectedSantri} onSelect={setSelectedSantri} />
         </FormField>
         <FormField label="Label">
           <input value={label} onChange={e => setLabel(e.target.value)} placeholder="Tunggakan sebelum Agustus 2026" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
@@ -426,7 +371,7 @@ function SkipTagihanPanel({ serviceKind, rows }: { serviceKind: MealServiceKind;
     <SectionPanel title="Skip Tagihan Bulan Tertentu" description="Satu santri tidak ditagih untuk satu bulan spesifik — beda dari pembebasan permanen di atas. Berlaku sebelum tombol Generate Tagihan diklik untuk bulan itu.">
       <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-4 sm:items-end">
         <FormField label="Santri">
-          <SantriSearchField selected={selectedSantri} onSelect={setSelectedSantri} />
+          <SantriPicker selected={selectedSantri} onSelect={setSelectedSantri} />
         </FormField>
         <FormField label="Bulan">
           <input type="month" value={yyyymm} onChange={e => setYyyymm(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
@@ -545,7 +490,7 @@ function PembebasanBiayaPanel({ exempted, bebasTahunan }: { exempted: ExemptedSa
         <div className="grid gap-3 sm:grid-cols-4 sm:items-end">
           <div className="sm:col-span-2">
             <FormField label="Santri">
-              <SantriSearchField selected={selectedSantri} onSelect={setSelectedSantri} />
+              <SantriPicker selected={selectedSantri} onSelect={setSelectedSantri} />
             </FormField>
           </div>
           <FormField label="Alasan">
@@ -590,7 +535,7 @@ function PembebasanBiayaPanel({ exempted, bebasTahunan }: { exempted: ExemptedSa
         <div className="grid gap-3 sm:grid-cols-5 sm:items-end">
           <div className="sm:col-span-2">
             <FormField label="Santri">
-              <SantriSearchField selected={selectedSantriTahunan} onSelect={setSelectedSantriTahunan} />
+              <SantriPicker selected={selectedSantriTahunan} onSelect={setSelectedSantriTahunan} />
             </FormField>
           </div>
           <FormField label="Jenis">

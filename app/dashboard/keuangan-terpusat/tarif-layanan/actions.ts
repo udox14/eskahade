@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { query, queryOne, execute, generateId } from '@/lib/db'
 import { requireFinanceAccess } from '@/lib/finance/access'
+import { searchSantriByName as searchSantri } from '@/lib/finance/santri-search'
 import { syncFinanceStudentSnapshot } from '@/lib/finance/snapshots'
 import {
   addServiceTariff, listServiceTariffs, getServiceBillingStart, setServiceBillingStart, type ServiceKind,
@@ -49,19 +50,12 @@ export async function generateBillsAction(input: { serviceKind: MealServiceKind;
   return result
 }
 
-export type SantriSearchRow = { id: string; nama_lengkap: string; nis: string; asrama: string | null; kamar: string | null }
+// Pencarian santri kini tinggal di `lib/finance/santri-search.ts` supaya halaman
+// keuangan lain memakainya tanpa mengimpor server action milik halaman ini.
+export type { SantriSearchRow } from '@/lib/finance/santri-search'
 
-export async function searchSantriByName(keyword: string): Promise<SantriSearchRow[]> {
-  await requireFinanceAccess('VIEW')
-  const trimmed = keyword.trim()
-  if (trimmed.length < 2) return []
-  const like = `%${trimmed}%`
-  return query<SantriSearchRow>(
-    `SELECT id, nama_lengkap, nis, asrama, kamar FROM santri
-     WHERE status_global='aktif' AND (nama_lengkap LIKE ? OR nis LIKE ?)
-     ORDER BY nama_lengkap LIMIT 10`,
-    [like, like]
-  )
+export async function searchSantriByName(keyword: string) {
+  return searchSantri(keyword)
 }
 
 export async function addArrearsAction(input: {
