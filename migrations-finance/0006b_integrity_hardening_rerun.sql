@@ -1,21 +1,19 @@
--- Finance migration 0006: penguatan integritas alokasi tagihan, konsumsi
--- persetujuan reopen periode, dan biaya payout API yang dapat dikonfigurasi.
+-- Finance migration 0006b: isi 0006 TANPA `ALTER TABLE ... ADD COLUMN consumed_at`.
 --
--- PERHATIAN — berkas ini TIDAK dapat dijalankan dua kali. `ALTER TABLE ... ADD
--- COLUMN consumed_at` di bawah gagal dengan `duplicate column name` bila
--- kolomnya sudah ada, dan kegagalan itu menggulung balik seluruh migrasi
--- sehingga ketiga blok lainnya pun tidak terpasang. Untuk database yang sudah
--- punya kolom itu, jalankan `0006b_integrity_hardening_rerun.sql`.
--- Cek kondisi target lebih dulu:
+-- Kapan memakai berkas ini:
+--   Jalankan 0006b bila `finance_period_reopen_approvals.consumed_at` SUDAH ada
+--   di database target. Menjalankan 0006 penuh di kondisi itu gagal dengan
+--   `duplicate column name: consumed_at` dan seluruh migrasi tergulung balik,
+--   sehingga tiga blok lainnya pun tidak pernah terpasang.
+--
+--   Jalankan 0006 penuh hanya bila kolomnya belum ada.
+--
+-- Cara memastikan kondisi target:
 --   npx wrangler d1 execute <BINDING> --remote \
 --     --command "SELECT COUNT(*) ada FROM pragma_table_info('finance_period_reopen_approvals') WHERE name='consumed_at'"
 --
--- Latar belakang: lapisan aplikasi sebelumnya menerapkan pembayaran tagihan
--- lewat UPDATE terpisah di dalam batch. UPDATE yang tidak mengenai baris mana
--- pun bukan error di SQLite, sehingga alokasi bisa memindahkan saldo santri ke
--- akun pendapatan tanpa satu pun tagihan tercatat lunas. Migrasi ini
--- memindahkan validasi sekaligus penerapannya ke trigger agar keduanya menjadi
--- satu kesatuan yang tidak bisa gagal diam-diam.
+-- Seluruh pernyataan di bawah aman diulang berapa kali pun: trigger memakai
+-- DROP IF EXISTS lebih dulu, dan pengaturan memakai INSERT OR IGNORE.
 
 -- 1. Validasi alokasi-tagihan: tambahkan pemeriksaan kepemilikan santri.
 DROP TRIGGER IF EXISTS trg_finance_allocation_bill_validate;
@@ -48,11 +46,8 @@ BEGIN
   WHERE id=NEW.bill_id;
 END;
 
--- 3. Persetujuan reopen periode harus dikonsumsi sekali pakai. Tanpa ini,
--- periode yang pernah dibuka kembali dapat ditutup lalu dibuka lagi tanpa
--- persetujuan baru karena trigger hanya menghitung seluruh riwayat approver.
-ALTER TABLE finance_period_reopen_approvals ADD COLUMN consumed_at TEXT;
-
+-- 3. Persetujuan reopen periode harus dikonsumsi sekali pakai. Kolom
+-- `consumed_at` diasumsikan sudah ada — lihat catatan di kepala berkas.
 DROP TRIGGER IF EXISTS trg_finance_period_reopen_two_approvals;
 CREATE TRIGGER trg_finance_period_reopen_two_approvals
 BEFORE UPDATE OF status ON finance_periods
