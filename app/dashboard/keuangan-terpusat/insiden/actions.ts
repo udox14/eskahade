@@ -6,6 +6,7 @@ import { financeQuery, query, queryOne } from '@/lib/db'
 import { financeAsramaScope, financeCapabilities, requireFinanceAccess } from '@/lib/finance/access'
 import { closeIncidentMode, openIncidentMode, recordIncidentTopup } from '@/lib/finance/incidents'
 import { syncFinanceStudentSnapshot } from '@/lib/finance/snapshots'
+import { runBulk } from '@/lib/finance/bulk'
 
 const PATH = '/dashboard/keuangan-terpusat/insiden'
 
@@ -58,6 +59,51 @@ export async function recordIncidentTopupAction(form: FormData) {
     revalidatePath('/dashboard/keuangan-terpusat')
   }
   return result
+}
+
+/**
+ * Impor massal penerimaan darurat. Saat gateway mati justru volumenya melonjak,
+ * jadi jalur ini yang paling dibutuhkan — tetapi pengamannya tidak dilonggarkan:
+ * incident harus aktif, channel harus yang disetujui, referensi tetap unik per
+ * penerimaan, dan santri di luar scope asrama tetap ditolak.
+ */
+export type IncidentTopupImportRow = {
+  row: number; incidentId: string; nis: string; amountRupiah: number
+  channel: 'CASH' | 'EMERGENCY_TRANSFER'; receiptReference: string; shiftId: string | null; bankReference: string | null
+}
+
+export async function importIncidentTopupsAction(rows: IncidentTopupImportRow[]) {
+  const session = await requireFinanceAccess('CREATE')
+  const scope = financeAsramaScope(session)
+  const list = [...new Set(rows.map(item => item.nis).filter(Boolean))]
+  const students = list.length
+    ? await query<{ id: string; nis: string; asrama: string | null }>(`SELECT id,nis,asrama FROM santri WHERE status_global='aktif' AND nis IN (${list.map(() => '?').join(',')})`, list)
+    : []
+  const byNis = new Map(students.map(student => [student.nis, student]))
+  for (const student of students) await syncFinanceStudentSnapshot(student.id)
+
+  const summary = await runBulk(rows, async item => {
+    const student = byNis.get(item.nis)
+    if (!student) return { success: false, error: `NIS ${item.nis} bukan santri aktif.` }
+    if (scope && student.asrama !== scope) return { success: false, error: `Santri ${item.nis} berada di luar scope asrama Anda.` }
+    if (item.receiptReference.trim().length < 3) return { success: false, error: 'Referensi penerimaan minimal 3 karakter.' }
+    return recordIncidentTopup({
+      idempotencyKey: `${item.incidentId}:${item.receiptReference.trim().toLowerCase()}`,
+      incidentId: item.incidentId,
+      santriId: student.id,
+      channel: item.channel,
+      amountRupiah: item.amountRupiah,
+      receivedBy: session.id,
+      shiftId: item.channel === 'CASH' ? item.shiftId : null,
+      bankReference: item.channel === 'EMERGENCY_TRANSFER' ? item.bankReference : null,
+      asramaScope: student.asrama,
+    })
+  })
+  if (summary.success && summary.created) {
+    revalidatePath(PATH)
+    revalidatePath('/dashboard/keuangan-terpusat')
+  }
+  return summary
 }
 
 export async function closeIncidentAction(form: FormData) {

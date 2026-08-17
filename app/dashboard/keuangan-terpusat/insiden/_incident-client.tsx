@@ -6,12 +6,15 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { CheckCircle, ShieldWarning } from '@phosphor-icons/react'
 import {
-  EmptyState, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
+  EmptyState, FINANCE_FIELD_CLASS, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
   useFinanceTour, type FinanceResult, type TourStep,
 } from '../_components/finance-ui'
-import { closeIncidentAction, openIncidentAction, recordIncidentTopupAction } from './actions'
+import { closeIncidentAction, importIncidentTopupsAction, openIncidentAction, recordIncidentTopupAction } from './actions'
+import type { IncidentTopupImportRow } from './actions'
+import { BulkImport, asInteger, asText } from '../_components/bulk-import'
+import { RupiahInput } from '../_components/finance-inputs'
 
-const field = 'min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500'
+const field = FINANCE_FIELD_CLASS
 const rupiah = (value: number) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`
 
 const TOUR: TourStep[] = [
@@ -26,6 +29,9 @@ export function IncidentClient({ data }: { data: any }) {
   const [pending, startTransition] = useTransition()
   const [channel, setChannel] = useState<'CASH' | 'EMERGENCY_TRANSFER'>('CASH')
   const [incidentId, setIncidentId] = useState('')
+  // Shift kas dijadikan state supaya formulir satuan dan impor massal memakai
+  // shift yang sama — impor tunai tanpa shift terbuka pasti ditolak database.
+  const [bulkShiftId, setBulkShiftId] = useState('')
   const [result, setResult] = useState<FinanceResult | null>(null)
   const tour = useFinanceTour('insiden')
   const now = Number(data.nowMs)
@@ -92,15 +98,62 @@ export function IncidentClient({ data }: { data: any }) {
       {data.canCreate ? <SectionPanel title="Catat top-up darurat" description="Hanya incident yang sedang aktif dan channel yang disetujui dapat digunakan.">
         <form data-tour="record" action={form => mutate(() => recordIncidentTopupAction(form), outcome => `Penerimaan dicatat dengan nomor bukti ${outcome.receiptNumber}.`)} className="grid gap-3 p-4">
           <label className="text-xs font-bold">Incident aktif<select name="incidentId" required value={incidentId} onChange={event => { const id = event.target.value; setIncidentId(id); const incident = active.find((row: any) => row.id === id); const channels = incident ? JSON.parse(incident.allowed_channels_json) as Array<'CASH' | 'EMERGENCY_TRANSFER'> : []; if (channels.length) setChannel(channels[0]) }} className={`mt-1.5 ${field}`}><option value="" disabled>Pilih incident</option>{active.map((row: any) => <option key={row.id} value={row.id}>{row.reason} · sampai {row.ends_at}</option>)}</select></label>
-          <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold">NIS santri<input name="nis" required className={`mt-1.5 ${field}`} /></label><label className="text-xs font-bold">Nominal<input name="amountRupiah" type="number" required min={1} className={`mt-1.5 ${field}`} /></label></div>
+          <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold">NIS santri<input name="nis" required className={`mt-1.5 ${field}`} /></label><label className="text-xs font-bold">Nominal<div className="mt-1.5"><RupiahInput name="amountRupiah" min={1} /></div></label></div>
           <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold">Channel<select name="channel" value={channel} disabled={!allowedChannels.length} onChange={event => setChannel(event.target.value as typeof channel)} className={`mt-1.5 ${field}`}><option value="" disabled>Pilih incident dahulu</option>{allowedChannels.includes('CASH') ? <option value="CASH">Cash</option> : null}{allowedChannels.includes('EMERGENCY_TRANSFER') ? <option value="EMERGENCY_TRANSFER">Transfer darurat</option> : null}</select></label><label className="text-xs font-bold">Referensi penerimaan<input name="receiptReference" required minLength={3} placeholder="Nomor unik per penerimaan" className={`mt-1.5 ${field}`} /><span className="mt-1 block text-[11px] font-normal text-slate-500">Nomor berbeda untuk tiap penerimaan. Nomor yang sama dengan nominal sama dianggap kiriman ulang.</span></label></div>
-          {channel === 'CASH' ? <label className="text-xs font-bold">Shift kas terbuka<select name="shiftId" required defaultValue="" className={`mt-1.5 ${field}`}><option value="" disabled>Pilih shift</option>{data.openShifts.map((row: any) => <option key={row.id} value={row.id}>{row.unit_name} · {row.operator_name} · {row.terminal_id}</option>)}</select></label> : <label className="text-xs font-bold">Referensi bank<input name="bankReference" required placeholder="Nomor referensi transfer" className={`mt-1.5 ${field}`} /></label>}
+          {channel === 'CASH' ? <label className="text-xs font-bold">Shift kas terbuka<select name="shiftId" required value={bulkShiftId} onChange={event => setBulkShiftId(event.target.value)} className={`mt-1.5 ${field}`}><option value="" disabled>Pilih shift</option>{data.openShifts.map((row: any) => <option key={row.id} value={row.id}>{row.unit_name} · {row.operator_name} · {row.terminal_id}</option>)}</select></label> : <label className="text-xs font-bold">Referensi bank<input name="bankReference" required placeholder="Nomor referensi transfer" className={`mt-1.5 ${field}`} /></label>}
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-900">Catat hanya setelah uang benar-benar diterima. Saldo langsung masuk ke dompet Titipan santri dan tidak dapat dihapus — koreksi hanya lewat jurnal.</p>
           <button disabled={pending || !active.length} className="min-h-11 rounded-lg bg-emerald-700 text-sm font-bold text-white disabled:opacity-50">Catat &amp; terbitkan bukti</button>
           {!active.length ? <p className="text-[11px] text-slate-500">Tidak ada incident yang sedang aktif, sehingga penerimaan darurat belum boleh dicatat.</p> : null}
         </form>
       </SectionPanel> : null}
     </section>
+
+    {data.canCreate && selectedIncident ? <BulkImport<Omit<IncidentTopupImportRow, 'row'>>
+      title={`Impor massal penerimaan darurat · ${selectedIncident.reason}`}
+      description="Saat gateway mati, penerimaan menumpuk dalam jumlah besar. Unggah rekap penerimaan yang uangnya sudah benar-benar diterima."
+      templateName="Template_Topup_Darurat"
+      sheetName="Penerimaan"
+      columns={[
+        { key: 'nis', label: 'NIS', example: '2024001' },
+        { key: 'nominal', label: 'Nominal', example: 200_000 },
+        { key: 'channel', label: 'Channel', example: allowedChannels[0] === 'CASH' ? 'Cash' : 'Transfer darurat' },
+        { key: 'referensi', label: 'Referensi penerimaan (unik)', example: 'KWT-001' },
+        { key: 'refbank', label: 'Referensi bank (untuk transfer darurat)', example: '' },
+      ]}
+      note={<>
+        <p className="font-bold text-slate-900">Yang perlu diperhatikan</p>
+        <ul className="mt-1 list-disc space-y-1 pl-4">
+          <li>Impor ini memakai incident <strong>{selectedIncident.reason}</strong> yang sedang dipilih di formulir sebelah, dan hanya menerima channel yang disetujui: <strong>{allowedChannels.join(', ')}</strong>.</li>
+          <li>Referensi penerimaan harus <strong>berbeda tiap baris</strong>. Referensi yang sama dengan nominal sama dianggap kiriman ulang dan tidak menambah saldo dua kali.</li>
+          <li>Baris channel Cash memakai shift kas yang dipilih di formulir sebelah. Transfer darurat wajib mengisi referensi bank.</li>
+          <li>Catat hanya setelah uang benar-benar diterima — saldo langsung masuk dompet Titipan santri dan koreksinya hanya lewat jurnal.</li>
+        </ul>
+      </>}
+      parseRow={get => {
+        const nis = asText(get('nis'))
+        if (!nis) return { error: 'NIS wajib diisi.' }
+        const amountRupiah = asInteger(get('nominal'))
+        if (!amountRupiah || amountRupiah < 1) return { error: 'Nominal harus angka bulat lebih dari nol.' }
+        const channelText = asText(get('channel')).toLowerCase()
+        const channel = channelText.includes('cash') || channelText.includes('tunai') ? 'CASH'
+          : channelText.includes('transfer') || channelText.includes('emergency') ? 'EMERGENCY_TRANSFER'
+            : null
+        if (!channel) return { error: `Channel "${asText(get('channel')) || '(kosong)'}" tidak dikenal. Pakai Cash atau Transfer darurat.` }
+        if (!allowedChannels.includes(channel)) return { error: `Channel ${channel} tidak disetujui pada incident ini.` }
+        const receiptReference = asText(get('referensi'))
+        if (receiptReference.length < 3) return { error: 'Referensi penerimaan minimal 3 karakter dan harus unik.' }
+        const bankReference = asText(get('refbank')) || null
+        if (channel === 'EMERGENCY_TRANSFER' && !bankReference) return { error: 'Transfer darurat wajib mengisi referensi bank.' }
+        if (channel === 'CASH' && !bulkShiftId) return { error: 'Pilih shift kas terbuka di formulir sebelah sebelum mengimpor baris tunai.' }
+        return {
+          value: {
+            incidentId: String(selectedIncident.id), nis, amountRupiah, channel, receiptReference,
+            shiftId: channel === 'CASH' ? bulkShiftId : null, bankReference,
+          },
+        }
+      }}
+      onSubmit={values => importIncidentTopupsAction(values)}
+    /> : null}
 
     <SectionPanel title="Riwayat incident mode" description="Alasan, persetujuan, masa aktif, jumlah bukti, dan penutupan incident.">
       <div className="divide-y divide-slate-100">{data.incidents.length ? data.incidents.map((row: any) => {
@@ -113,7 +166,15 @@ export function IncidentClient({ data }: { data: any }) {
     </SectionPanel>
 
     <SectionPanel title="Bukti penerimaan darurat" description="Jejak bukti top-up yang diposting ke jurnal dan dompet Titipan.">
-      <div data-tour="receipts" className="overflow-x-auto"><table className="w-full min-w-[760px] text-xs"><thead className="bg-slate-50 text-left uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-2.5">Bukti</th><th className="px-4 py-2.5">Santri</th><th className="px-4 py-2.5">Channel</th><th className="px-4 py-2.5">Unit / referensi</th><th className="px-4 py-2.5 text-right">Nominal</th><th className="px-4 py-2.5">Penerima</th></tr></thead><tbody className="divide-y divide-slate-100">{data.receipts.length ? data.receipts.map((row: any) => <tr key={row.id}><td className="px-4 py-3"><strong>{row.receipt_number}</strong><span className="block text-slate-400">{row.created_at}</span></td><td className="px-4 py-3"><strong>{row.student_name}</strong><span className="block text-slate-500">{row.nis} · {row.asrama}</span></td><td className="px-4 py-3"><StatusBadge tone={row.channel === 'CASH' ? 'amber' : 'blue'}>{row.channel}</StatusBadge></td><td className="px-4 py-3">{row.cash_unit_name || row.bank_reference || '—'}</td><td className="px-4 py-3 text-right font-bold tabular-nums">{rupiah(row.amount_rupiah)}</td><td className="px-4 py-3">{row.received_by_name}</td></tr>) : <tr><td colSpan={6} className="p-10 text-center text-slate-500">Belum ada penerimaan darurat.</td></tr>}</tbody></table></div>
+      <div className="divide-y divide-slate-100 sm:hidden">{data.receipts.length ? data.receipts.map((row: any) => <article key={row.id} className="space-y-2 px-4 py-3 text-xs">
+        <div className="flex items-start justify-between gap-3">
+          <div><strong>{row.student_name}</strong><p className="text-slate-500">{row.nis} · {row.asrama}</p></div>
+          <StatusBadge tone={row.channel === 'CASH' ? 'amber' : 'blue'}>{row.channel}</StatusBadge>
+        </div>
+        <p className="tabular-nums"><strong>{rupiah(row.amount_rupiah)}</strong><span className="text-slate-500"> · bukti {row.receipt_number}</span></p>
+        <p className="text-slate-500">{row.cash_unit_name || row.bank_reference || '—'} · diterima {row.received_by_name}</p>
+      </article>) : <p className="p-8 text-center text-slate-500">Belum ada penerimaan darurat.</p>}</div>
+      <div data-tour="receipts" className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[760px] text-xs"><thead className="bg-slate-50 text-left uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-2.5">Bukti</th><th className="px-4 py-2.5">Santri</th><th className="px-4 py-2.5">Channel</th><th className="px-4 py-2.5">Unit / referensi</th><th className="px-4 py-2.5 text-right">Nominal</th><th className="px-4 py-2.5">Penerima</th></tr></thead><tbody className="divide-y divide-slate-100">{data.receipts.length ? data.receipts.map((row: any) => <tr key={row.id}><td className="px-4 py-3"><strong>{row.receipt_number}</strong><span className="block text-slate-400">{row.created_at}</span></td><td className="px-4 py-3"><strong>{row.student_name}</strong><span className="block text-slate-500">{row.nis} · {row.asrama}</span></td><td className="px-4 py-3"><StatusBadge tone={row.channel === 'CASH' ? 'amber' : 'blue'}>{row.channel}</StatusBadge></td><td className="px-4 py-3">{row.cash_unit_name || row.bank_reference || '—'}</td><td className="px-4 py-3 text-right font-bold tabular-nums">{rupiah(row.amount_rupiah)}</td><td className="px-4 py-3">{row.received_by_name}</td></tr>) : <tr><td colSpan={6} className="p-10 text-center text-slate-500">Belum ada penerimaan darurat.</td></tr>}</tbody></table></div>
     </SectionPanel>
   </div>
 }

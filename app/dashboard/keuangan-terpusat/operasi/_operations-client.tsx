@@ -1,7 +1,7 @@
 'use client'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -12,18 +12,22 @@ import {
   createBillAction,
   getPeriodReadinessAction,
   importBankAction,
+  importBillsAction,
   manualMatchBankAction,
   reopenPeriodAction,
   reviewLateTopupAction,
   settlementAction,
   voidBillAction,
 } from './actions'
+import type { BillImportRow } from './actions'
+import { BulkImport, asDateISO, asInteger, asText } from '../_components/bulk-import'
+import { RupiahInput } from '../_components/finance-inputs'
 import {
-  ConfirmAction, EmptyState, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
+  ConfirmAction, EmptyState, FINANCE_FIELD_CLASS, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
   useFinanceTour, type FinanceResult, type TourStep,
 } from '../_components/finance-ui'
 
-const field = 'min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500'
+const field = FINANCE_FIELD_CLASS
 const rupiah = (value: number) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`
 const shortId = (value: string | null | undefined) => value ? `${value.slice(0, 8)}…` : '—'
 
@@ -49,6 +53,16 @@ const TABS = [
 ] as const
 type TabId = typeof TABS[number]['id']
 
+/**
+ * Tautan dari halaman Ringkasan menunjuk anchor pekerjaan, bukan nama tab.
+ * Tanpa peta ini pengguna mendarat di tab bawaan dan anchornya tidak terlihat
+ * karena tab yang memuatnya belum aktif.
+ */
+const ANCHOR_TAB: Record<string, TabId> = {
+  review: 'antrean',
+  reconciliation: 'rekonsiliasi',
+}
+
 const TOUR: TourStep[] = [
   { target: '[data-tour="metrics"]', title: 'Mulai dari angka pengecualian', body: 'Empat kartu ini merangkum pekerjaan yang belum selesai. Selama masih ada yang berwarna kuning, periode belum layak ditutup.' },
   { target: '[data-tour="tabs"]', title: 'Empat kelompok pekerjaan', body: 'Tindakan dipisah per tujuan supaya aksi berat seperti tutup buku tidak bersebelahan dengan pekerjaan harian.' },
@@ -70,6 +84,21 @@ export function OperationsClient({ data }: { data: OperationsData }) {
   const [reopenTarget, setReopenTarget] = useState<{ key: string; reason: string } | null>(null)
   const [confirmReopen, setConfirmReopen] = useState(false)
   const tour = useFinanceTour('operasi')
+
+  useEffect(() => {
+    const anchor = window.location.hash.slice(1)
+    if (!anchor) return
+    const target = ANCHOR_TAB[anchor] ?? (TABS.some(item => item.id === anchor) ? anchor as TabId : null)
+    if (!target) return
+    // Ditunda supaya tidak memanggil setState di badan effect, dan karena panel
+    // target baru terpasang setelah tabnya berganti.
+    const open = window.setTimeout(() => setTab(target), 0)
+    const scroll = window.setTimeout(() => document.getElementById(anchor)?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'start',
+    }), 60)
+    return () => { window.clearTimeout(open); window.clearTimeout(scroll) }
+  }, [])
 
   const closed = data.periods.filter(item => item.status === 'CLOSED').length
   const unmatched = data.bankTransactions.filter(row => row.match_status === 'UNMATCHED')
@@ -157,7 +186,7 @@ export function OperationsClient({ data }: { data: OperationsData }) {
     </nav>
 
     {tab === 'antrean' ? <section className="grid gap-4 xl:grid-cols-2">
-      <SectionPanel title="Review top-up terlambat" description="Pastikan dana benar-benar diterima dan tidak terduplikasi sebelum menutup review.">
+      <SectionPanel id="review" title="Review top-up terlambat" description="Pastikan dana benar-benar diterima dan tidak terduplikasi sebelum menutup review.">
         <div data-tour="reviews" className="divide-y divide-slate-100">
           {data.paymentReviews.length ? data.paymentReviews.map(row => <article key={row.id} className="space-y-3 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -170,7 +199,7 @@ export function OperationsClient({ data }: { data: OperationsData }) {
             <div className="grid gap-2 rounded-lg bg-slate-50 p-3 text-xs sm:grid-cols-3">
               <p><span className="text-slate-500">Kedaluwarsa</span><strong className="mt-0.5 block">{row.expires_at}</strong></p>
               <p><span className="text-slate-500">Dibayar</span><strong className="mt-0.5 block">{row.paid_at || '—'}</strong></p>
-              <p><span className="text-slate-500">Referensi provider</span><strong className="mt-0.5 block break-all font-mono text-[10px]">{row.provider_reference || '—'}</strong></p>
+              <p><span className="text-slate-500">Referensi provider</span><strong className="mt-0.5 block break-all font-mono text-xs">{row.provider_reference || '—'}</strong></p>
             </div>
             <p className="text-[11px] leading-4 text-slate-500">Cocokkan referensi provider dengan mutasi rekening sebelum menyelesaikan review. Menyelesaikan review tidak memindahkan dana — hanya menandai sudah diperiksa.</p>
             <form action={form => mutate(() => reviewLateTopupAction(form), 'Top-up ditandai sudah direview.')} className="flex flex-col gap-2 sm:flex-row">
@@ -233,7 +262,7 @@ export function OperationsClient({ data }: { data: OperationsData }) {
             return <details key={row.id} className="group">
               <summary className="grid cursor-pointer list-none gap-2 px-4 py-3 text-xs hover:bg-slate-50 sm:grid-cols-[120px_1fr_150px_120px] sm:items-center">
                 <span className="tabular-nums text-slate-500">{row.transaction_at}</span>
-                <span className="min-w-0"><strong className="block truncate text-slate-800">{row.description || 'Tanpa keterangan'}</strong><span className="font-mono text-[10px] text-slate-400">{row.bank_reference || 'Tanpa referensi'}</span></span>
+                <span className="min-w-0"><strong className="block truncate text-slate-800">{row.description || 'Tanpa keterangan'}</strong><span className="font-mono text-xs text-slate-400">{row.bank_reference || 'Tanpa referensi'}</span></span>
                 <strong className={`tabular-nums sm:text-right ${Number(row.amount_rupiah) < 0 ? 'text-red-700' : 'text-emerald-700'}`}>{rupiah(row.amount_rupiah)}</strong>
                 <span className="sm:text-right"><StatusBadge tone={row.match_status === 'UNMATCHED' ? 'amber' : row.match_status === 'IGNORED' ? 'slate' : 'emerald'}>{row.match_status}</StatusBadge></span>
               </summary>
@@ -266,9 +295,9 @@ export function OperationsClient({ data }: { data: OperationsData }) {
         <form action={form => mutate(() => settlementAction(form), 'Settlement berhasil diposting.', 'Settlement dengan referensi dan angka yang sama persis sudah pernah diposting.')} className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-5">
           <label className="text-xs font-bold text-slate-800 xl:col-span-2">Referensi settlement<input name="reference" required placeholder="Nomor dari dashboard gateway" className={`mt-1 ${field}`} /></label>
           <label className="text-xs font-bold text-slate-800">Tanggal<input name="date" type="date" required className={`mt-1 ${field}`} /></label>
-          <label className="text-xs font-bold text-slate-800">Bruto<input name="gross" type="number" required min={1} placeholder="0" className={`mt-1 ${field} tabular-nums`} /></label>
-          <label className="text-xs font-bold text-slate-800">Biaya provider<input name="fee" type="number" required min={0} placeholder="0" className={`mt-1 ${field} tabular-nums`} /></label>
-          <label className="text-xs font-bold text-slate-800">Neto diterima<input name="net" type="number" required min={1} placeholder="0" className={`mt-1 ${field} tabular-nums`} /></label>
+          <label className="text-xs font-bold text-slate-800">Bruto<div className="mt-1"><RupiahInput name="gross" min={1} /></div></label>
+          <label className="text-xs font-bold text-slate-800">Biaya provider<div className="mt-1"><RupiahInput name="fee" min={0} /></div></label>
+          <label className="text-xs font-bold text-slate-800">Neto diterima<div className="mt-1"><RupiahInput name="net" min={1} /></div></label>
           <button disabled={!data.capabilities.execute || pending} className="min-h-11 self-end rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50">Posting settlement</button>
           <p className="text-[11px] leading-4 text-slate-500 sm:col-span-2 xl:col-span-5">Referensi yang sama boleh dipakai lagi selama angkanya berbeda — sistem membedakan berdasarkan isi, bukan sekadar nomor dokumen.</p>
         </form>
@@ -276,13 +305,55 @@ export function OperationsClient({ data }: { data: OperationsData }) {
     </div> : null}
 
     {tab === 'tagihan' ? <div className="space-y-4">
+      <BulkImport<Omit<BillImportRow, 'row'>>
+        title="Impor massal tagihan santri"
+        description="Buat banyak tagihan sekaligus dari Excel. NIS diterjemahkan ke santri di server; NIS yang keliru ditolak per baris."
+        templateName="Template_Tagihan_Santri"
+        sheetName="Tagihan"
+        disabled={!data.capabilities.configure}
+        columns={[
+          { key: 'nis', label: 'NIS', example: '2024001' },
+          { key: 'jenis', label: 'Jenis tagihan', example: 'SPP' },
+          { key: 'nama', label: 'Nama tagihan', example: 'SPP September 2026' },
+          { key: 'periode', label: 'Periode (YYYY-MM, opsional)', example: '2026-09' },
+          { key: 'nominal', label: 'Nominal', example: 350_000 },
+          { key: 'jatuhtempo', label: 'Jatuh tempo (opsional)', example: '2026-09-10' },
+        ]}
+        note={<>
+          <p className="font-bold text-slate-900">Yang perlu diperhatikan</p>
+          <ul className="mt-1 list-disc space-y-1 pl-4">
+            <li>Jenis tagihan: <strong>SPP</strong> dan <strong>NON_SPP</strong> wajib lunas sekaligus, <strong>USPP</strong> boleh dicicil wali.</li>
+            <li>Santri berstatus bebas SPP otomatis ditolak untuk jenis SPP — barisnya disebut beserta alasannya.</li>
+            <li>Format kolom NIS sebagai <strong>Teks</strong> di Excel supaya nol di depan tidak hilang.</li>
+          </ul>
+        </>}
+        parseRow={get => {
+          const nis = asText(get('nis'))
+          if (!nis) return { error: 'NIS wajib diisi.' }
+          const kindText = asText(get('jenis')).toUpperCase().replace(/[\s-]/g, '_')
+          const kind = kindText === 'SPP' || kindText === 'USPP' || kindText === 'NON_SPP' ? kindText : null
+          if (!kind) return { error: `Jenis tagihan "${asText(get('jenis')) || '(kosong)'}" tidak dikenal. Pakai SPP, NON_SPP, atau USPP.` }
+          const title = asText(get('nama'))
+          if (title.length < 3) return { error: 'Nama tagihan minimal 3 karakter.' }
+          const amountRupiah = asInteger(get('nominal'))
+          if (!amountRupiah || amountRupiah < 1) return { error: 'Nominal harus angka bulat lebih dari nol.' }
+          const periodText = asText(get('periode'))
+          if (periodText && !/^\d{4}-\d{2}$/.test(periodText)) return { error: 'Periode harus berformat YYYY-MM atau dikosongkan.' }
+          const dueText = asText(get('jatuhtempo'))
+          const dueDate = dueText ? asDateISO(dueText) : null
+          if (dueText && !dueDate) return { error: 'Jatuh tempo harus berformat YYYY-MM-DD atau dikosongkan.' }
+          return { value: { nis, kind, title, periodKey: periodText || null, amountRupiah, dueDate } }
+        }}
+        onSubmit={values => importBillsAction(values)}
+      />
+
       <SectionPanel title="Buat tagihan santri" description="SPP dan Non-SPP wajib dilunasi sekaligus; USPP boleh dicicil oleh wali.">
         <form action={form => mutate(() => createBillAction(form), 'Tagihan berhasil dibuat.')} className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
           <label className="text-xs font-bold text-slate-800">NIS santri<input name="nis" required placeholder="Contoh: 2024001" className={`mt-1 ${field}`} /><span className="mt-1 block text-[11px] font-normal text-slate-500">Santri harus berstatus aktif.</span></label>
           <label className="text-xs font-bold text-slate-800">Jenis tagihan<select name="kind" className={`mt-1 ${field}`}><option value="SPP">SPP — wajib lunas sekaligus</option><option value="NON_SPP">Non-SPP — wajib lunas sekaligus</option><option value="USPP">USPP — boleh dicicil</option></select></label>
           <label className="text-xs font-bold text-slate-800">Nama tagihan<input name="title" required placeholder="Contoh: SPP Agustus 2026" className={`mt-1 ${field}`} /></label>
           <label className="text-xs font-bold text-slate-800">Periode<input name="period" placeholder="YYYY-MM (opsional)" className={`mt-1 ${field}`} /></label>
-          <label className="text-xs font-bold text-slate-800">Nominal<input name="amount" type="number" required min={1} placeholder="0" className={`mt-1 ${field} tabular-nums`} /></label>
+          <label className="text-xs font-bold text-slate-800">Nominal<div className="mt-1"><RupiahInput name="amount" min={1} /></div></label>
           <label className="text-xs font-bold text-slate-800">Jatuh tempo<input name="dueDate" type="date" className={`mt-1 ${field}`} /></label>
           <button disabled={!data.capabilities.configure || pending} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2 xl:col-span-1">Buat tagihan</button>
           <p className="text-[11px] leading-4 text-slate-500 sm:col-span-2 xl:col-span-2">Santri berstatus bebas SPP otomatis ditolak untuk jenis SPP. Tagihan yang sudah dibayar sebagian tidak dapat dibatalkan.</p>
@@ -293,8 +364,8 @@ export function OperationsClient({ data }: { data: OperationsData }) {
         <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[680px] text-xs">
           <thead className="bg-slate-50 text-left uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-2.5">Santri</th><th className="px-4 py-2.5">Tagihan</th><th className="px-4 py-2.5 text-right">Nominal</th><th className="px-4 py-2.5 text-right">Terbayar</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5">Tindakan</th></tr></thead>
           <tbody className="divide-y divide-slate-100">{data.bills.length ? data.bills.map(bill => <tr key={bill.id}>
-            <td className="px-4 py-3 font-semibold">{bill.nama_lengkap}<span className="block text-[10px] text-slate-400">{bill.nis}</span></td>
-            <td className="px-4 py-3">{bill.title}<span className="block text-[10px] text-slate-400">{bill.bill_kind}{bill.due_date ? ` · jatuh tempo ${bill.due_date}` : ''}</span></td>
+            <td className="px-4 py-3 font-semibold">{bill.nama_lengkap}<span className="block text-xs text-slate-400">{bill.nis}</span></td>
+            <td className="px-4 py-3">{bill.title}<span className="block text-xs text-slate-400">{bill.bill_kind}{bill.due_date ? ` · jatuh tempo ${bill.due_date}` : ''}</span></td>
             <td className="px-4 py-3 text-right font-bold tabular-nums">{rupiah(bill.amount_rupiah)}</td>
             <td className="px-4 py-3 text-right tabular-nums text-slate-600">{rupiah(bill.paid_rupiah)}</td>
             <td className="px-4 py-3"><StatusBadge tone={bill.status === 'PAID' ? 'emerald' : bill.status === 'VOID' ? 'slate' : 'amber'}>{bill.status}</StatusBadge></td>

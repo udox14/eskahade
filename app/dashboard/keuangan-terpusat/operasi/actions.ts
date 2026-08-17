@@ -1,7 +1,8 @@
 'use server'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { revalidatePath } from 'next/cache'
-import { financeQuery as query,queryOne } from '@/lib/db'
+import { financeQuery as query,query as mainQuery,queryOne } from '@/lib/db'
+import { runBulk } from '@/lib/finance/bulk'
 import { financeCapabilities, requireFinanceAccess } from '@/lib/finance/access'
 import { createFinanceBill,voidFinanceBill } from '@/lib/finance/billing'
 import { reviewLateTopup } from '@/lib/finance/payments'
@@ -35,6 +36,41 @@ export async function voidBillAction(form:FormData){
   if(r.success)refreshOperations()
   return r
 }
+/**
+ * Impor massal tagihan santri. NIS diterjemahkan ke santri di server lewat satu
+ * query, sehingga NIS yang tidak ada ditolak per baris beserta nomornya, bukan
+ * menggagalkan seluruh berkas.
+ */
+export type BillImportRow={
+  row:number;nis:string;kind:'SPP'|'USPP'|'NON_SPP';title:string;periodKey:string|null;amountRupiah:number;dueDate:string|null
+}
+
+export async function importBillsAction(rows:BillImportRow[]){
+  const session=await requireFinanceAccess('CONFIGURE')
+  const list=[...new Set(rows.map(item=>item.nis).filter(Boolean))]
+  const students=list.length
+    ? await mainQuery<{id:string;nis:string}>(`SELECT id,nis FROM santri WHERE status_global='aktif' AND nis IN (${list.map(()=>'?').join(',')})`,list)
+    : []
+  const byNis=new Map(students.map(student=>[student.nis,student.id]))
+  // Snapshot disinkronkan sekali per santri, bukan tiap baris tagihannya.
+  for(const student of students)await syncFinanceStudentSnapshot(student.id)
+  const summary=await runBulk(rows,async item=>{
+    const santriId=byNis.get(item.nis)
+    if(!santriId)return{success:false,error:`NIS ${item.nis} bukan santri aktif.`}
+    return createFinanceBill({
+      santriId,
+      billKind:item.kind,
+      title:item.title,
+      periodKey:item.periodKey,
+      amountRupiah:item.amountRupiah,
+      dueDate:item.dueDate,
+      actorId:session.id,
+    })
+  })
+  if(summary.success&&summary.created)refreshOperations()
+  return summary
+}
+
 /** Prasyarat tutup buku untuk periode tertentu, dipanggil ulang saat bendahara mengganti bulan. */
 export async function getPeriodReadinessAction(periodKey:string){
   await requireFinanceAccess('VIEW')
