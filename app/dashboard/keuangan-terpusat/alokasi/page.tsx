@@ -6,8 +6,10 @@ import { AllocationClient } from './_allocation-client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AllocationPage() {
+export default async function AllocationPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   await guardPage('/dashboard/keuangan-terpusat/alokasi')
+  // `?q=` diisi oleh pencarian cepat Ctrl+K agar filter sudah terisi saat mendarat.
+  const { q = '' } = await searchParams
   const data = await getAllocationData()
   return <main className="space-y-4 sm:space-y-5">
     <FinancePageHeader title="Alokasi Dana" description="Telusuri perpindahan Titipan ke kebutuhan santri dan kembalikan dana yang belum digunakan." eyebrow={data.scope ? `Scope ${data.scope}` : 'Scope global'} meta="Return mengikuti cutoff dan saldo aktual" />
@@ -38,6 +40,6 @@ export default async function AllocationPage() {
         { term: 'Disbursed', meaning: 'Dana sudah dicairkan ke pengelola. Tidak dapat dikembalikan.' },
       ]}
     />
-    <AllocationClient data={data} />
+    <AllocationClient data={data} initialSearch={q} />
   </main>
 }

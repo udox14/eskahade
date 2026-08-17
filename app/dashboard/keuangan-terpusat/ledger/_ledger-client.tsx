@@ -6,16 +6,44 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ArrowsCounterClockwise, CheckCircle, MagnifyingGlass, Plus, Trash } from '@phosphor-icons/react'
 import {
-  ConfirmAction, EmptyState, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
+  ConfirmAction, EmptyState, FINANCE_FIELD_CLASS, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
   useFinanceTour, type FinanceResult, type TourStep,
 } from '../_components/finance-ui'
 import { postManualJournalAction, reverseManualJournalAction } from './actions'
+import { ExportButton, RupiahInput } from '../_components/finance-inputs'
+import { useDraft } from '../_components/use-draft'
+import { ALL_ASRAMA_LIST } from '@/lib/asrama'
 
-const field = 'min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500'
+const field = FINANCE_FIELD_CLASS
 const rupiah = (value: number) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date())
 
-type Line = { key: number; side: 'DEBIT' | 'CREDIT'; amount: number }
+/**
+ * Seluruh isi baris disimpan di state (bukan sebagian saja) supaya draf yang
+ * dipulihkan utuh — dulu nominal ada di state sementara akun, memo, NIS, dan
+ * scope hanya hidup di DOM, sehingga tidak ada cara memulihkannya.
+ */
+type Line = {
+  key: number
+  side: 'DEBIT' | 'CREDIT'
+  accountCode: string
+  amount: number
+  nis: string
+  asramaScope: string
+  memo: string
+}
+
+type JournalDraft = { effectiveDate: string; reference: string; description: string; lines: Line[] }
+
+const emptyLine = (key: number, side: Line['side']): Line =>
+  ({ key, side, accountCode: '', amount: 0, nis: '', asramaScope: '', memo: '' })
+
+const emptyJournal = (): JournalDraft => ({
+  effectiveDate: today,
+  reference: '',
+  description: '',
+  lines: [emptyLine(1, 'DEBIT'), emptyLine(2, 'CREDIT')],
+})
 
 const TOUR: TourStep[] = [
   { target: '[data-tour="journal-form"]', title: 'Jurnal manual hanya untuk penyesuaian', body: 'Transaksi biasa sudah membuat jurnalnya sendiri. Formulir ini untuk koreksi akuntansi yang punya dokumen sumber.' },
@@ -32,8 +60,12 @@ export function LedgerClient({ data, initialSearch = '' }: { data: any; initialS
   const [status, setStatus] = useState('ALL')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const [lines, setLines] = useState<Line[]>([{ key: 1, side: 'DEBIT', amount: 0 }, { key: 2, side: 'CREDIT', amount: 0 }])
-  const [reference, setReference] = useState('')
+  const draft = useDraft<JournalDraft>('ledger-journal', emptyJournal())
+  const { lines, reference } = draft.value
+  const setLines = (next: (current: Line[]) => Line[]) => draft.setValue(current => ({ ...current, lines: next(current.lines) }))
+  const patch = (changes: Partial<JournalDraft>) => draft.setValue(current => ({ ...current, ...changes }))
+  const patchLine = (key: number, changes: Partial<Line>) =>
+    setLines(current => current.map(item => item.key === key ? { ...item, ...changes } : item))
   const [result, setResult] = useState<FinanceResult | null>(null)
   const [reverseTarget, setReverseTarget] = useState<{ id: string; reason: string } | null>(null)
   const [confirmReverse, setConfirmReverse] = useState(false)
@@ -118,26 +150,32 @@ export function LedgerClient({ data, initialSearch = '' }: { data: any; initialS
     {data.canExecute ? <SectionPanel title="Posting jurnal manual" description="Gunakan hanya untuk penyesuaian akuntansi yang memiliki dokumen sumber; debit dan kredit wajib seimbang.">
       <details data-tour="journal-form">
         <summary className="cursor-pointer px-4 py-3 text-xs font-bold text-emerald-700">Buka formulir jurnal manual</summary>
-        <form action={form => mutate(() => postManualJournalAction(form), 'Jurnal manual berhasil diposting.', () => {
-          setLines([{ key: 1, side: 'DEBIT', amount: 0 }, { key: 2, side: 'CREDIT', amount: 0 }])
-          setReference('')
-        })} className="space-y-4 border-t border-slate-100 p-4">
+        <form action={form => mutate(() => postManualJournalAction(form), 'Jurnal manual berhasil diposting.', () => draft.clear())} className="space-y-4 border-t border-slate-100 p-4">
+          {draft.restored ? <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-900">
+            <span>Draf jurnal yang belum diposting dipulihkan. Periksa lagi sebelum memposting.</span>
+            <div className="flex gap-2">
+              <button type="button" onClick={draft.dismissRestored} className="font-bold underline">Lanjutkan</button>
+              <button type="button" onClick={draft.clear} className="font-bold underline">Kosongkan</button>
+            </div>
+          </div> : null}
           <div className="grid gap-3 md:grid-cols-3">
-            <label className="text-xs font-bold">Tanggal efektif<input name="effectiveDate" type="date" required defaultValue={today} className={`mt-1.5 ${field}`} /><span className="mt-1 block text-[11px] font-normal text-slate-500">Periode yang sudah ditutup akan menolak jurnal ini.</span></label>
-            <label className="text-xs font-bold">Referensi dokumen<input name="externalReference" required minLength={3} value={reference} onChange={event => setReference(event.target.value)} placeholder="Contoh: ADJ-2026-001" className={`mt-1.5 ${field}`} />
+            <label className="text-xs font-bold">Tanggal efektif<input name="effectiveDate" type="date" required value={draft.value.effectiveDate} onChange={event => patch({ effectiveDate: event.target.value })} className={`mt-1.5 ${field}`} /><span className="mt-1 block text-[11px] font-normal text-slate-500">Periode yang sudah ditutup akan menolak jurnal ini.</span></label>
+            <label className="text-xs font-bold">Referensi dokumen<input name="externalReference" required minLength={3} value={reference} onChange={event => patch({ reference: event.target.value })} placeholder="Contoh: ADJ-2026-001" className={`mt-1.5 ${field}`} />
               {referenceReuse
                 ? <span className="mt-1 block text-[11px] font-semibold text-amber-800">Nomor ini sudah dipakai {referenceReuse} jurnal lain. Jurnal tetap akan diposting selama isinya berbeda.</span>
                 : <span className="mt-1 block text-[11px] font-normal text-slate-500">Nomor dokumen sumber; dipakai juga untuk pencocokan mutasi bank.</span>}
             </label>
-            <label className="text-xs font-bold md:col-span-1">Keterangan<input name="description" required minLength={5} placeholder="Tujuan penyesuaian" className={`mt-1.5 ${field}`} /></label>
+            <label className="text-xs font-bold md:col-span-1">Keterangan<input name="description" required minLength={5} value={draft.value.description} onChange={event => patch({ description: event.target.value })} placeholder="Tujuan penyesuaian" className={`mt-1.5 ${field}`} /></label>
           </div>
           <div className="space-y-2">{lines.map((line, index) => <div key={line.key} className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 md:grid-cols-[160px_1fr_180px_140px_140px_1fr_auto] md:items-end">
-            <label className="text-[11px] font-bold">Posisi<select name="side" value={line.side} onChange={event => setLines(current => current.map(item => item.key === line.key ? { ...item, side: event.target.value as Line['side'] } : item))} className={`mt-1 ${field}`}><option value="DEBIT">Debit</option><option value="CREDIT">Kredit</option></select></label>
-            <label className="text-[11px] font-bold">Akun<select name="accountCode" required defaultValue="" className={`mt-1 ${field}`}><option value="" disabled>Pilih akun</option>{data.accounts.map((account: any) => <option key={account.code} value={account.code}>{account.code} · {account.name}</option>)}</select></label>
-            <label className="text-[11px] font-bold">Nominal<input name="amountRupiah" type="number" required min={1} value={line.amount || ''} onChange={event => setLines(current => current.map(item => item.key === line.key ? { ...item, amount: Number(event.target.value) } : item))} className={`mt-1 ${field} tabular-nums`} /></label>
-            <label className="text-[11px] font-bold">NIS opsional<input name="nis" placeholder="NIS" className={`mt-1 ${field}`} /></label>
-            <label className="text-[11px] font-bold">Scope opsional<input name="asramaScope" placeholder="Asrama" className={`mt-1 ${field}`} /></label>
-            <label className="text-[11px] font-bold">Memo<input name="memo" placeholder={`Baris ${index + 1}`} className={`mt-1 ${field}`} /></label>
+            <label className="text-[11px] font-bold">Posisi<select name="side" value={line.side} onChange={event => patchLine(line.key, { side: event.target.value as Line['side'] })} className={`mt-1 ${field}`}><option value="DEBIT">Debit</option><option value="CREDIT">Kredit</option></select></label>
+            <label className="text-[11px] font-bold">Akun<select name="accountCode" required value={line.accountCode} onChange={event => patchLine(line.key, { accountCode: event.target.value })} className={`mt-1 ${field}`}><option value="" disabled>Pilih akun</option>{data.accounts.map((account: any) => <option key={account.code} value={account.code}>{account.code} · {account.name}</option>)}</select></label>
+            <label className="text-[11px] font-bold">Nominal<div className="mt-1"><RupiahInput name="amountRupiah" value={line.amount} onValueChange={next => patchLine(line.key, { amount: next })} min={1} /></div></label>
+            <label className="text-[11px] font-bold">NIS opsional<input name="nis" value={line.nis} onChange={event => patchLine(line.key, { nis: event.target.value })} placeholder="NIS" className={`mt-1 ${field}`} /></label>
+            {/* Scope dipilih dari daftar resmi; dulu diketik bebas sehingga salah
+                ejaan asrama membuat jurnal tidak pernah cocok saat ditelusuri. */}
+            <label className="text-[11px] font-bold">Scope opsional<select name="asramaScope" value={line.asramaScope} onChange={event => patchLine(line.key, { asramaScope: event.target.value })} className={`mt-1 ${field}`}><option value="">Global</option>{ALL_ASRAMA_LIST.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
+            <label className="text-[11px] font-bold">Memo<input name="memo" value={line.memo} onChange={event => patchLine(line.key, { memo: event.target.value })} placeholder={`Baris ${index + 1}`} className={`mt-1 ${field}`} /></label>
             <button type="button" aria-label="Hapus baris" disabled={lines.length <= 2} onClick={() => setLines(current => current.filter(item => item.key !== line.key))} className="grid min-h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 disabled:opacity-30"><Trash /></button>
           </div>)}</div>
 
@@ -152,7 +190,7 @@ export function LedgerClient({ data, initialSearch = '' }: { data: any; initialS
           </div>
 
           <div className="flex flex-col justify-between gap-2 sm:flex-row">
-            <button type="button" onClick={() => setLines(current => [...current, { key: Math.max(...current.map(item => item.key)) + 1, side: current.at(-1)?.side === 'DEBIT' ? 'CREDIT' : 'DEBIT', amount: 0 }])} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-xs font-bold"><Plus />Tambah baris</button>
+            <button type="button" onClick={() => setLines(current => [...current, emptyLine(Math.max(...current.map(item => item.key)) + 1, current.at(-1)?.side === 'DEBIT' ? 'CREDIT' : 'DEBIT')])} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-xs font-bold"><Plus />Tambah baris</button>
             <button disabled={pending || !balanced} className="min-h-11 rounded-lg bg-emerald-700 px-5 text-sm font-bold text-white disabled:opacity-50">Posting jurnal</button>
           </div>
           <p className="text-[11px] leading-4 text-slate-500">Jurnal yang sudah diposting tidak dapat diubah atau dihapus. Koreksi dilakukan dengan reversal, dan hanya jurnal manual yang tidak menyentuh dompet santri yang boleh direversal dari layar ini.</p>
@@ -160,7 +198,25 @@ export function LedgerClient({ data, initialSearch = '' }: { data: any; initialS
       </details>
     </SectionPanel> : null}
 
-    <SectionPanel title="Ledger jurnal" description="Filter dan buka satu jurnal untuk melihat baris debit/kredit, scope, santri, serta relasi reversal.">
+    <SectionPanel
+      title="Ledger jurnal"
+      description="Filter dan buka satu jurnal untuk melihat baris debit/kredit, scope, santri, serta relasi reversal."
+      action={<ExportButton
+        filename={`ledger-${today}`}
+        sheetName="Jurnal"
+        label={`Unduh ${filtered.length} jurnal`}
+        disabled={!filtered.length}
+        rows={() => filtered.map((row: any) => ({
+          Tanggal: row.effective_date,
+          Keterangan: row.description,
+          Referensi: row.external_reference || '',
+          Sumber: row.source_type,
+          Status: row.status,
+          Debit: Number(row.debit_rupiah) || 0,
+          'ID jurnal': row.id,
+        }))}
+      />}
+    >
       <div data-tour="filters" className="grid gap-2 border-b border-slate-100 p-3 md:grid-cols-[1fr_180px_140px_150px_150px]">
         <label className="relative"><MagnifyingGlass className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Cari keterangan, referensi, atau ID" className={`${field} pl-9`} /></label>
         <select value={source} onChange={event => setSource(event.target.value)} className={field}><option value="ALL">Semua sumber</option>{sources.map(item => <option key={item} value={item}>{item}</option>)}</select>
@@ -175,7 +231,7 @@ export function LedgerClient({ data, initialSearch = '' }: { data: any; initialS
           return <details key={journal.id}>
             <summary className="grid cursor-pointer list-none gap-2 px-4 py-3 text-xs hover:bg-slate-50 sm:grid-cols-[100px_1fr_130px_160px_110px] sm:items-center">
               <span className="tabular-nums text-slate-500">{journal.effective_date}</span>
-              <span className="min-w-0"><strong className="block truncate text-slate-800">{journal.description}</strong><span className="font-mono text-[10px] text-slate-400">{journal.external_reference || journal.id}</span></span>
+              <span className="min-w-0"><strong className="block truncate text-slate-800">{journal.description}</strong><span className="font-mono text-xs text-slate-400">{journal.external_reference || journal.id}</span></span>
               <span><StatusBadge tone={journal.source_type === 'REVERSAL' ? 'amber' : 'blue'}>{journal.source_type}</StatusBadge></span>
               <strong className="tabular-nums sm:text-right">{rupiah(journal.debit_rupiah)}</strong>
               <span className="sm:text-right"><StatusBadge tone={journal.status === 'POSTED' ? 'emerald' : 'amber'}>{journal.status}</StatusBadge></span>

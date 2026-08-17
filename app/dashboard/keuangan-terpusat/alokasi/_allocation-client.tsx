@@ -6,12 +6,12 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ArrowCounterClockwise, CheckCircle, MagnifyingGlass } from '@phosphor-icons/react'
 import {
-  ConfirmAction, EmptyState, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
+  ConfirmAction, EmptyState, FINANCE_FIELD_CLASS, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
   useFinanceTour, type FinanceResult, type TourStep,
 } from '../_components/finance-ui'
 import { returnAllocationAction } from './actions'
 
-const field = 'min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500'
+const field = FINANCE_FIELD_CLASS
 const rupiah = (value: number) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`
 const returnableKinds = new Set(['MAKAN', 'LAUNDRY', 'JAJAN'])
 
@@ -21,10 +21,10 @@ const TOUR: TourStep[] = [
   { target: '[data-tour="list"]', title: 'Buka detail sebelum mengembalikan', body: 'Periksa cutoff dan saldo tujuan. Pengembalian menambah jurnal lawan — jurnal alokasi aslinya tetap ada.' },
 ]
 
-export function AllocationClient({ data }: { data: any }) {
+export function AllocationClient({ data, initialSearch = '' }: { data: any; initialSearch?: string }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(initialSearch)
   const [status, setStatus] = useState('ALL')
   const [destination, setDestination] = useState('ALL')
   const [result, setResult] = useState<FinanceResult | null>(null)

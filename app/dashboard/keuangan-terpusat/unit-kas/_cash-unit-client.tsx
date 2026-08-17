@@ -7,8 +7,10 @@ import { useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { CheckCircle, Gear, PencilSimple, Plus, Power, UserPlus, Warning } from '@phosphor-icons/react'
 import { createCashUnit, reviewCashDiscrepancy, setCashUnitActive, setCashUnitOperator, updateCashUnit } from './actions'
+import { ALL_ASRAMA_LIST } from '@/lib/asrama'
+import { RupiahInput } from '../_components/finance-inputs'
 import {
-  ConfirmAction, EmptyState, FinanceTour, ResultBanner, SectionPanel, StatusBadge,
+  ConfirmAction, EmptyState, FINANCE_FIELD_CLASS, FinanceTour, ResultBanner, SectionPanel, StatusBadge,
   useFinanceTour, type FinanceResult, type TourStep,
 } from '../_components/finance-ui'
 
@@ -18,9 +20,10 @@ const TOUR: TourStep[] = [
   { target: '[data-tour="reviews"]', title: 'Review selisih kas', body: 'Shift yang ditutup dengan selisih masuk ke sini. Review mencatat bahwa bendahara sudah memeriksa — angka kasnya tidak diubah.' },
 ]
 
-const ASRAMA = ['', 'AL-FALAH', 'AS-SALAM', 'BAHAGIA', 'ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4', 'AL-BAGHORY']
+/** Nilai kosong berarti unit pusat yang melayani seluruh asrama. */
+const ASRAMA = ['', ...ALL_ASRAMA_LIST]
 const rupiah = (value: number) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`
-const field = 'min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500'
+const field = FINANCE_FIELD_CLASS
 
 export function CashUnitClient({ data }: { data: { units: any[]; operators: any[]; assignments: any[]; shifts: any[] } }) {
   const router = useRouter()
@@ -57,7 +60,7 @@ export function CashUnitClient({ data }: { data: { units: any[]; operators: any[
       {showCreate ? <form className="grid gap-3 border-b border-slate-100 bg-emerald-50/40 p-4 md:grid-cols-[1fr_180px_220px_auto]" action={form => mutate(() => createCashUnit({ name: String(form.get('name')), asramaScope: String(form.get('scope') || '') || null, fixedFloatRupiah: Number(form.get('float')) }), 'Unit Kas dibuat.')}>
         <label className="text-xs font-bold text-slate-700">Nama unit<input name="name" required minLength={3} placeholder="Contoh: Loket Putra" className={`mt-1.5 ${field}`} /></label>
         <label className="text-xs font-bold text-slate-700">Scope asrama<select name="scope" className={`mt-1.5 ${field}`}>{ASRAMA.map(value => <option key={value || 'pusat'} value={value}>{value || 'Pusat / semua'}</option>)}</select></label>
-        <label className="text-xs font-bold text-slate-700">Saldo kas tetap<input name="float" required type="number" min={0} defaultValue={0} className={`mt-1.5 ${field} tabular-nums`} /><span className="mt-1 block text-[11px] font-normal text-slate-500">Nilai awal yang disarankan saat operator membuka shift.</span></label>
+        <label className="text-xs font-bold text-slate-700">Saldo kas tetap<div className="mt-1.5"><RupiahInput name="float" min={0} hint="Nilai awal yang disarankan saat operator membuka shift." /></div></label>
         <button disabled={pending} className="min-h-11 self-end rounded-lg bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-50">Simpan unit</button>
       </form> : null}
       <div data-tour="units" className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-3">{data.units.length ? data.units.map(unit => <button key={unit.id} onClick={() => setSelectedId(unit.id)} className={`rounded-xl border p-3 text-left transition ${selectedId === unit.id ? 'border-emerald-400 bg-emerald-50/60 ring-1 ring-emerald-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
@@ -70,7 +73,7 @@ export function CashUnitClient({ data }: { data: { units: any[]; operators: any[
       <SectionPanel title="Detail Unit Kas" description="Saldo tetap menjadi nilai awal saat operator membuka shift." action={<button onClick={() => setEditingId(editingId === selected.id ? null : selected.id)} className="inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-bold"><PencilSimple />Ubah</button>}>
         {editingId === selected.id ? <form className="grid gap-3 p-4" action={form => mutate(() => updateCashUnit({ id: selected.id, name: String(form.get('name')), asramaScope: String(form.get('scope') || '') || null, fixedFloatRupiah: Number(form.get('float')) }), 'Unit Kas diperbarui.')}>
           <label className="text-xs font-bold">Nama<input name="name" defaultValue={selected.name} required minLength={3} className={`mt-1.5 ${field}`} /></label>
-          <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold">Scope asrama<select name="scope" defaultValue={selected.asrama_scope || ''} className={`mt-1.5 ${field}`}>{ASRAMA.map(value => <option key={value || 'pusat'} value={value}>{value || 'Pusat / semua'}</option>)}</select></label><label className="text-xs font-bold">Saldo kas tetap<input name="float" defaultValue={selected.fixed_float_rupiah} type="number" min={0} required className={`mt-1.5 ${field}`} /></label></div>
+          <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold">Scope asrama<select name="scope" defaultValue={selected.asrama_scope || ''} className={`mt-1.5 ${field}`}>{ASRAMA.map(value => <option key={value || 'pusat'} value={value}>{value || 'Pusat / semua'}</option>)}</select></label><label className="text-xs font-bold">Saldo kas tetap<div className="mt-1.5"><RupiahInput name="float" defaultValue={Number(selected.fixed_float_rupiah) || 0} min={0} /></div></label></div>
           <button disabled={pending} className="min-h-11 rounded-lg bg-emerald-700 text-sm font-bold text-white">Simpan perubahan</button>
         </form> : <div className="grid gap-3 p-4 text-sm sm:grid-cols-3"><div><span className="text-xs text-slate-500">Lokasi/scope</span><strong className="mt-1 block">{selected.asrama_scope || 'Pusat / semua'}</strong></div><div><span className="text-xs text-slate-500">Saldo tetap</span><strong className="mt-1 block tabular-nums">{rupiah(selected.fixed_float_rupiah)}</strong></div><div><span className="text-xs text-slate-500">Status</span><strong className="mt-1 block">{Number(selected.is_active) ? 'Aktif' : 'Nonaktif'}</strong></div></div>}
         <div className="border-t border-slate-100 p-4">
@@ -96,7 +99,19 @@ export function CashUnitClient({ data }: { data: { units: any[]; operators: any[
     </SectionPanel>
 
     <SectionPanel title="Riwayat shift" description="60 shift terbaru dari seluruh Unit Kas.">
-      <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-xs"><thead className="bg-slate-50 text-left uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-2.5">Unit / operator</th><th className="px-4 py-2.5">Dibuka</th><th className="px-4 py-2.5 text-right">Kas awal</th><th className="px-4 py-2.5 text-right">Pencairan</th><th className="px-4 py-2.5 text-right">Selisih</th><th className="px-4 py-2.5">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{data.shifts.length ? data.shifts.map(shift => <tr key={shift.id}><td className="px-4 py-3"><strong>{shift.unit_name}</strong><span className="block text-slate-500">{shift.operator_name}</span></td><td className="px-4 py-3 text-slate-500">{shift.opened_at}</td><td className="px-4 py-3 text-right tabular-nums">{rupiah(shift.opening_cash_rupiah)}</td><td className="px-4 py-3 text-right tabular-nums">{rupiah(shift.paid_rupiah)}</td><td className="px-4 py-3 text-right font-bold tabular-nums">{shift.discrepancy_rupiah == null ? '—' : rupiah(shift.discrepancy_rupiah)}</td><td className="px-4 py-3"><StatusBadge tone={shift.status === 'OPEN' ? 'emerald' : shift.status === 'CLOSED_REVIEW' && !shift.supervisor_id ? 'amber' : 'slate'}>{shift.status === 'CLOSED_REVIEW' && shift.supervisor_id ? 'REVIEWED' : shift.status}</StatusBadge></td></tr>) : <tr><td colSpan={6}><EmptyState icon={CheckCircle} title="Belum ada riwayat shift" description="Riwayat muncul setelah operator membuka shift pertama di salah satu Unit Kas." /></td></tr>}</tbody></table></div>
+      <div className="divide-y divide-slate-100 sm:hidden">{data.shifts.length ? data.shifts.map(shift => <article key={shift.id} className="space-y-2 px-4 py-3 text-xs">
+        <div className="flex items-start justify-between gap-3">
+          <div><strong>{shift.unit_name}</strong><p className="text-slate-500">{shift.operator_name}</p></div>
+          <StatusBadge tone={shift.status === 'OPEN' ? 'emerald' : shift.status === 'CLOSED_REVIEW' && !shift.supervisor_id ? 'amber' : 'slate'}>{shift.status === 'CLOSED_REVIEW' && shift.supervisor_id ? 'REVIEWED' : shift.status}</StatusBadge>
+        </div>
+        <p className="text-slate-500">Dibuka {shift.opened_at}</p>
+        <dl className="grid grid-cols-2 gap-1 tabular-nums">
+          <dt className="text-slate-500">Kas awal</dt><dd className="text-right">{rupiah(shift.opening_cash_rupiah)}</dd>
+          <dt className="text-slate-500">Pencairan</dt><dd className="text-right">{rupiah(shift.paid_rupiah)}</dd>
+          <dt className="font-bold text-slate-700">Selisih</dt><dd className="text-right font-bold">{shift.discrepancy_rupiah == null ? '—' : rupiah(shift.discrepancy_rupiah)}</dd>
+        </dl>
+      </article>) : <EmptyState icon={CheckCircle} title="Belum ada riwayat shift" description="Riwayat muncul setelah operator membuka shift pertama di salah satu Unit Kas." />}</div>
+      <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[760px] text-xs"><thead className="bg-slate-50 text-left uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-2.5">Unit / operator</th><th className="px-4 py-2.5">Dibuka</th><th className="px-4 py-2.5 text-right">Kas awal</th><th className="px-4 py-2.5 text-right">Pencairan</th><th className="px-4 py-2.5 text-right">Selisih</th><th className="px-4 py-2.5">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{data.shifts.length ? data.shifts.map(shift => <tr key={shift.id}><td className="px-4 py-3"><strong>{shift.unit_name}</strong><span className="block text-slate-500">{shift.operator_name}</span></td><td className="px-4 py-3 text-slate-500">{shift.opened_at}</td><td className="px-4 py-3 text-right tabular-nums">{rupiah(shift.opening_cash_rupiah)}</td><td className="px-4 py-3 text-right tabular-nums">{rupiah(shift.paid_rupiah)}</td><td className="px-4 py-3 text-right font-bold tabular-nums">{shift.discrepancy_rupiah == null ? '—' : rupiah(shift.discrepancy_rupiah)}</td><td className="px-4 py-3"><StatusBadge tone={shift.status === 'OPEN' ? 'emerald' : shift.status === 'CLOSED_REVIEW' && !shift.supervisor_id ? 'amber' : 'slate'}>{shift.status === 'CLOSED_REVIEW' && shift.supervisor_id ? 'REVIEWED' : shift.status}</StatusBadge></td></tr>) : <tr><td colSpan={6}><EmptyState icon={CheckCircle} title="Belum ada riwayat shift" description="Riwayat muncul setelah operator membuka shift pertama di salah satu Unit Kas." /></td></tr>}</tbody></table></div>
     </SectionPanel>
 
     <ConfirmAction
