@@ -47,7 +47,7 @@ function AlertPanel({ data }: { data: DashboardData }) {
     <div className="divide-y divide-slate-100">
       {data.alerts.map(row => <Link href={alertHref[row.kind] || '/dashboard/keuangan-terpusat'} key={row.kind} className="flex items-center justify-between gap-3 px-4 py-3 text-xs transition hover:bg-slate-50 sm:gap-4 sm:text-sm">
         <div className="flex min-w-0 items-center gap-2"><AlertTriangle className={Number(row.count) ? 'h-4 w-4 shrink-0 text-amber-600' : 'h-4 w-4 shrink-0 text-slate-300'} /><span className="font-medium text-slate-700">{alertLabel[row.kind] || row.kind}</span></div>
-        <div className="shrink-0 text-right"><StatusBadge tone={Number(row.count) ? 'amber' : 'emerald'}>{row.count} kasus</StatusBadge><p className="mt-1 text-[10px] tabular-nums text-slate-500 sm:text-xs">{rupiah(Number(row.amount_rupiah))}</p></div>
+        <div className="shrink-0 text-right"><StatusBadge tone={Number(row.count) ? 'amber' : 'emerald'}>{row.count} kasus</StatusBadge><p className="mt-1 text-xs tabular-nums text-slate-500 sm:text-xs">{rupiah(Number(row.amount_rupiah))}</p></div>
       </Link>)}
     </div>
   </SectionPanel>
@@ -58,7 +58,7 @@ function ActivityPanel({ data }: { data: DashboardData }) {
     <div className="divide-y divide-slate-100 sm:hidden">
       {data.recentTransactions.length ? data.recentTransactions.map(row => <article key={row.id} className="space-y-2 px-4 py-3 text-xs">
         <div className="flex items-start justify-between gap-3"><Link href={`/dashboard/keuangan-terpusat/ledger?q=${encodeURIComponent(row.id)}`} className="min-w-0 font-semibold text-slate-800 hover:text-emerald-700">{row.description}</Link><span className="shrink-0 tabular-nums text-slate-500">{row.effective_date}</span></div>
-        <div className="flex items-end justify-between gap-3"><StatusBadge>{row.source_type}</StatusBadge><span className="min-w-0 break-all text-right font-mono text-[10px] text-slate-400">{row.external_reference || '—'}</span></div>
+        <div className="flex items-end justify-between gap-3"><StatusBadge>{row.source_type}</StatusBadge><span className="min-w-0 break-all text-right font-mono text-xs text-slate-400">{row.external_reference || '—'}</span></div>
       </article>) : <p className="px-4 py-10 text-center text-sm text-slate-500">Belum ada jurnal terposting.</p>}
     </div>
     <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[560px] text-xs">
