@@ -1,6 +1,9 @@
 import { getEffectiveRoles, getSession } from '@/lib/auth/session'
 import { financeQueryOne } from '@/lib/db'
+import { financeAsramaScope } from '@/lib/finance/access'
+import { getFinanceWorkCounts } from '@/lib/finance/work-counts'
 import { FinanceNavClient } from './finance-ui'
+import { FinanceCommandPalette } from './finance-command'
 
 const href={
   home:'/dashboard/keuangan-terpusat',
@@ -42,5 +45,12 @@ export async function FinanceNav(){
   if(operator)allowed.add(href.cashier)
   if(admin)allowed.add(href.breakGlass)
 
-  return <FinanceNavClient allowedHrefs={[...allowed]} sandbox={demo}/>
+  const counts=await getFinanceWorkCounts(financeAsramaScope(session))
+
+  return <FinanceNavClient
+    allowedHrefs={[...allowed]}
+    sandbox={demo}
+    badges={counts}
+    commandPalette={<FinanceCommandPalette allowedHrefs={[...allowed]}/>}
+  />
 }

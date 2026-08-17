@@ -36,21 +36,53 @@ import {
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { cn } from '@/lib/utils'
 
-const financeNav = [
-  { href: '/dashboard/keuangan-terpusat', label: 'Ringkasan', icon: Landmark },
-  { href: '/dashboard/keuangan-terpusat/loket', label: 'Loket', icon: ScanLine },
-  { href: '/dashboard/keuangan-terpusat/unit-kas', label: 'Unit Kas', icon: WalletCards },
-  { href: '/dashboard/keuangan-terpusat/kredensial', label: 'Kredensial', icon: CreditCard },
-  { href: '/dashboard/keuangan-terpusat/payout', label: 'Payout', icon: SendHorizontal },
-  { href: '/dashboard/keuangan-terpusat/payroll', label: 'Payroll', icon: BadgeDollarSign },
-  { href: '/dashboard/keuangan-terpusat/ledger', label: 'Ledger', icon: BookOpenText },
-  { href: '/dashboard/keuangan-terpusat/alokasi', label: 'Alokasi', icon: ArrowsLeftRight },
-  { href: '/dashboard/keuangan-terpusat/insiden', label: 'Insiden', icon: ShieldWarning },
-  { href: '/dashboard/keuangan-terpusat/kontrol', label: 'Kontrol', icon: ShieldCheck },
-  { href: '/dashboard/keuangan-terpusat/break-glass', label: 'Break-glass', icon: ShieldWarning },
-  { href: '/dashboard/keuangan-terpusat/operasi', label: 'Operasi', icon: Settings2 },
-  { href: '/dashboard/keuangan-terpusat/tarif-layanan', label: 'Tarif Layanan', icon: Tag },
-]
+/**
+ * Navigasi dikelompokkan menurut kapan halamannya dipakai, bukan menurut
+ * kemiripan nama. Sebelumnya tiga belas tab berderet rata sehingga pekerjaan
+ * harian seperti Operasi justru terlempar ke ujung kanan di luar layar.
+ *
+ * `badge` menunjuk angka pekerjaan menunggu dari `getFinanceWorkCounts`.
+ */
+export const FINANCE_NAV_GROUPS = [
+  {
+    id: 'harian', label: 'Pekerjaan harian', items: [
+      { href: '/dashboard/keuangan-terpusat', label: 'Ringkasan', icon: Landmark, badge: null },
+      { href: '/dashboard/keuangan-terpusat/loket', label: 'Loket', icon: ScanLine, badge: null },
+      { href: '/dashboard/keuangan-terpusat/operasi', label: 'Operasi', icon: Settings2, badge: 'operasi' },
+    ],
+  },
+  {
+    id: 'keluar', label: 'Dana keluar', items: [
+      { href: '/dashboard/keuangan-terpusat/payout', label: 'Payout', icon: SendHorizontal, badge: 'payout' },
+      { href: '/dashboard/keuangan-terpusat/payroll', label: 'Payroll', icon: BadgeDollarSign, badge: 'payroll' },
+      { href: '/dashboard/keuangan-terpusat/alokasi', label: 'Alokasi', icon: ArrowsLeftRight, badge: null },
+    ],
+  },
+  {
+    id: 'atur', label: 'Pengaturan', items: [
+      { href: '/dashboard/keuangan-terpusat/tarif-layanan', label: 'Tarif Layanan', icon: Tag, badge: null },
+      { href: '/dashboard/keuangan-terpusat/unit-kas', label: 'Unit Kas', icon: WalletCards, badge: 'unitKas' },
+      { href: '/dashboard/keuangan-terpusat/kredensial', label: 'Kredensial', icon: CreditCard, badge: null },
+    ],
+  },
+  {
+    id: 'kontrol', label: 'Kontrol & penelusuran', items: [
+      { href: '/dashboard/keuangan-terpusat/ledger', label: 'Ledger', icon: BookOpenText, badge: null },
+      { href: '/dashboard/keuangan-terpusat/kontrol', label: 'Kontrol', icon: ShieldCheck, badge: 'kontrol' },
+      { href: '/dashboard/keuangan-terpusat/insiden', label: 'Insiden', icon: ShieldWarning, badge: 'insiden' },
+      { href: '/dashboard/keuangan-terpusat/break-glass', label: 'Break-glass', icon: ShieldWarning, badge: null },
+    ],
+  },
+] as const
+
+export type FinanceNavBadges = Partial<Record<string, number>>
+
+/**
+ * Kelas dasar seluruh input keuangan. Sebelumnya string yang sama persis
+ * disalin sebagai `const field` di delapan halaman, sehingga satu penyesuaian
+ * tinggi sentuh atau warna fokus harus ditulis delapan kali.
+ */
+export const FINANCE_FIELD_CLASS = 'min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500'
 
 export function FinancePageHeader({ title, description, eyebrow, meta, action }: {
   title: string; description: string; eyebrow?: string; meta?: string; action?: React.ReactNode
@@ -64,23 +96,61 @@ export function FinancePageHeader({ title, description, eyebrow, meta, action }:
   </div>
 }
 
-export function FinanceNavClient({ allowedHrefs, sandbox = false }: { allowedHrefs: string[]; sandbox?: boolean }) {
+export function FinanceNavClient({ allowedHrefs, sandbox = false, badges = {}, commandPalette }: {
+  allowedHrefs: string[]
+  sandbox?: boolean
+  /** Jumlah pekerjaan menunggu per kunci `badge` di `FINANCE_NAV_GROUPS`. */
+  badges?: FinanceNavBadges
+  commandPalette?: React.ReactNode
+}) {
   const pathname = usePathname()
+  const groups = FINANCE_NAV_GROUPS
+    .map(group => ({ ...group, items: group.items.filter(item => allowedHrefs.includes(item.href)) }))
+    .filter(group => group.items.length)
+
+  const renderItem = (item: (typeof FINANCE_NAV_GROUPS)[number]['items'][number]) => {
+    const active = item.href === '/dashboard/keuangan-terpusat' ? pathname === item.href : pathname.startsWith(item.href)
+    const count = item.badge ? badges[item.badge] || 0 : 0
+    return <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined} className={cn(
+      'flex min-h-11 items-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-bold transition-colors sm:text-sm',
+      active ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+    )}>
+      <item.icon className="h-4 w-4 shrink-0" weight={active ? 'fill' : 'regular'} />
+      {item.label}
+      {count ? <span aria-label={`${count} menunggu tindakan`} className={cn(
+        'ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-black tabular-nums',
+        active ? 'bg-emerald-700 text-white' : 'bg-amber-100 text-amber-900',
+      )}>{count}</span> : null}
+    </Link>
+  }
+
   return <div className="space-y-3">
     {sandbox ? <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 shadow-sm">
       <span className="font-extrabold tracking-wide">MODE SANDBOX · DATA KEUANGAN DUMMY</span>
       <span>QR: <code>SKH1.DEMO.SANTRI.0001.TEST.CREDENTIAL</code> · RFID: <code>DEMO0001</code> · PIN: <code>123456</code></span>
     </div> : null}
-    <nav aria-label="Navigasi keuangan terpusat" className="-mx-4 overflow-x-auto border-b border-slate-200 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
-    <div className="flex min-w-max gap-1">
-      {financeNav.filter(item => allowedHrefs.includes(item.href)).map(item => {
-        const active = item.href === '/dashboard/keuangan-terpusat' ? pathname === item.href : pathname.startsWith(item.href)
-        return <Link key={item.href} href={item.href} className={cn(
-          'flex min-h-11 items-center gap-1.5 border-b-2 px-3 py-3 text-xs font-bold transition-colors sm:min-h-0 sm:py-2.5',
-          active ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800',
-        )}><item.icon className="h-3.5 w-3.5" />{item.label}</Link>
-      })}
-    </div>
+
+    <nav aria-label="Navigasi keuangan terpusat" className="border-b border-slate-200 pb-2">
+      {/* Layar lebar: kelompok diberi label sehingga urutan kerjanya terbaca.
+          Layar sempit: tetap satu baris yang bisa digeser, tapi sudah terurut
+          per kelompok dan dipisah garis tipis. */}
+      <div className="hidden flex-wrap items-start gap-x-5 gap-y-2 lg:flex">
+        {groups.map(group => <div key={group.id}>
+          <p className="px-3 pb-0.5 text-[10px] font-black uppercase tracking-wider text-slate-400">{group.label}</p>
+          <div className="flex gap-1">{group.items.map(renderItem)}</div>
+        </div>)}
+        {commandPalette ? <div className="ml-auto self-end pb-0.5">{commandPalette}</div> : null}
+      </div>
+
+      <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden">
+        <div className="flex min-w-max items-center gap-1">
+          {groups.map((group, index) => <div key={group.id} className="flex items-center gap-1">
+            {index ? <span aria-hidden className="mx-1 h-6 w-px bg-slate-200" /> : null}
+            {group.items.map(renderItem)}
+          </div>)}
+        </div>
+      </div>
+      {commandPalette ? <div className="mt-2 lg:hidden">{commandPalette}</div> : null}
     </nav>
   </div>
 }
@@ -98,7 +168,12 @@ export function FinanceGuide({
   glossary?: Array<{ term: string; meaning: string }>
   /** Kesalahan yang paling sering terjadi di halaman ini, ditulis sebagai peringatan konkret. */
   commonMistakes?: string[]
-  /** Jika diisi, tombol "Pandu saya" muncul untuk menjalankan ulang tour. */
+  /**
+   * Opsional; bila tidak diisi, tombol "Pandu saya" tetap muncul dan memicu
+   * tour halaman lewat event `FINANCE_TOUR_EVENT`. Panduan ini dirender dari
+   * server component sehingga callback tidak dapat dikirim sebagai prop —
+   * tanpa jalur event, tour hanya bisa berjalan sekali seumur hidup peramban.
+   */
   onStartTour?: () => void
 }) {
   // Panel sebelumnya memakai `hidden sm:block`, sehingga justru hilang di layar
@@ -109,9 +184,10 @@ export function FinanceGuide({
       <span className="flex shrink-0 items-center gap-1 text-[10px] font-semibold text-blue-700 sm:text-xs">Buka <span className="hidden sm:inline">petunjuk</span> <ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></span>
     </summary>
     <div className="border-t border-blue-100 px-4 py-4">
-      {onStartTour ? <button type="button" onClick={onStartTour} className="mb-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-blue-700 px-3 text-xs font-bold text-white">
+      <button type="button" onClick={() => onStartTour ? onStartTour() : window.dispatchEvent(new CustomEvent(FINANCE_TOUR_EVENT))}
+        className="mb-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-blue-700 px-3 text-xs font-bold text-white">
         <Compass className="h-4 w-4" />Pandu saya di layar
-      </button> : null}
+      </button>
       <div className="grid gap-4 text-xs leading-relaxed text-slate-600 md:grid-cols-2 xl:grid-cols-4">
         <div><p className="mb-1 font-bold uppercase tracking-wide text-slate-800">Tujuan</p><p>{purpose}</p></div>
         <div><p className="mb-1 font-bold uppercase tracking-wide text-slate-800">Sebelum mulai</p>{prerequisites.length ? <ul className="list-disc space-y-1 pl-4">{prerequisites.map(item => <li key={item}>{item}</li>)}</ul> : <p>Tidak ada persiapan khusus.</p>}</div>
@@ -162,13 +238,22 @@ export type FinanceResult = { tone: 'success' | 'duplicate' | 'error'; message: 
  * diposting karena kiriman ulang tidak boleh terlihat seperti transaksi baru.
  */
 export function ResultBanner({ result, onDismiss }: { result: FinanceResult | null; onDismiss?: () => void }) {
+  const box = useRef<HTMLDivElement>(null)
+  // Banyak formulir keuangan berada jauh di bawah bannernya. Tanpa digulirkan,
+  // hasil tindakan tidak terlihat dan petugas mengira tombolnya tidak bekerja.
+  useEffect(() => {
+    if (!result || !box.current) return
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    box.current.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' })
+  }, [result])
+
   if (!result) return null
   const style = {
     success: { box: 'border-emerald-200 bg-emerald-50 text-emerald-900', Icon: CheckCircle2 },
     duplicate: { box: 'border-blue-200 bg-blue-50 text-blue-900', Icon: Info },
     error: { box: 'border-red-200 bg-red-50 text-red-900', Icon: XCircle },
   }[result.tone]
-  return <div role="status" className={cn('flex items-start gap-3 rounded-xl border px-4 py-3 text-xs sm:text-sm', style.box)}>
+  return <div ref={box} role="status" aria-live="polite" className={cn('flex items-start gap-3 rounded-xl border px-4 py-3 text-xs sm:text-sm', style.box)}>
     <style.Icon className="mt-0.5 h-5 w-5 shrink-0" />
     <div className="min-w-0 flex-1"><p className="font-bold">{result.message}</p>{result.detail ? <p className="mt-0.5 leading-5 opacity-90">{result.detail}</p> : null}</div>
     {onDismiss ? <button type="button" onClick={onDismiss} aria-label="Tutup pesan" className="shrink-0 opacity-60 hover:opacity-100"><X className="h-4 w-4" /></button> : null}
@@ -223,15 +308,39 @@ function ConfirmDialog({ title, description, impact = [], confirmLabel = 'Lanjut
   onCancel: () => void
 }) {
   const [typed, setTyped] = useState('')
+  const panel = useRef<HTMLElement>(null)
+
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onCancel() }
+    // Fokus dikembalikan ke tombol pemicu setelah dialog tertutup, supaya
+    // pengguna keyboard tidak terlempar ke awal halaman.
+    const opener = document.activeElement as HTMLElement | null
+    const first = panel.current?.querySelector<HTMLElement>('input, button')
+    first?.focus()
+    return () => opener?.focus?.()
+  }, [])
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { onCancel(); return }
+      // Tab dikurung di dalam dialog; tanpa ini fokus bisa nyasar ke halaman
+      // yang sedang tertutup overlay dan tombol "Batal" jadi sulit dicapai.
+      if (event.key !== 'Tab' || !panel.current) return
+      const focusable = [...panel.current.querySelectorAll<HTMLElement>('input, button:not([disabled])')]
+      if (!focusable.length) return
+      const edge = event.shiftKey ? focusable[0] : focusable[focusable.length - 1]
+      if (document.activeElement === edge) {
+        event.preventDefault()
+        ;(event.shiftKey ? focusable[focusable.length - 1] : focusable[0]).focus()
+      }
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onCancel])
+
   const ready = !confirmPhrase || typed.trim().toUpperCase() === confirmPhrase.toUpperCase()
   const accent = tone === 'red' ? 'bg-red-700' : 'bg-amber-600'
   return <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4" onClick={onCancel}>
-    <section role="alertdialog" aria-modal="true" aria-label={title} className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
+    <section ref={panel} role="alertdialog" aria-modal="true" aria-label={title} className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
       <div className="flex items-start gap-3">
         <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', tone === 'red' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700')}><AlertTriangle className="h-5 w-5" /></span>
         <div><h2 className="font-bold text-slate-900">{title}</h2><p className="mt-1 text-sm leading-5 text-slate-600">{description}</p></div>
@@ -260,9 +369,19 @@ export type TourStep = {
  * dan tooltip berisi penjelasan langkah. Progres disimpan per halaman sehingga
  * tour hanya berjalan otomatis sekali, tapi selalu bisa dipanggil ulang.
  */
+/** Event yang menjalankan ulang tour halaman dari tombol di dalam FinanceGuide. */
+export const FINANCE_TOUR_EVENT = 'finance-tour:start'
+
 export function useFinanceTour(storageKey: string) {
   const [running, setRunning] = useState(false)
   const seen = useRef(false)
+
+  useEffect(() => {
+    const onStart = () => setRunning(true)
+    window.addEventListener(FINANCE_TOUR_EVENT, onStart)
+    return () => window.removeEventListener(FINANCE_TOUR_EVENT, onStart)
+  }, [])
+
   useEffect(() => {
     if (seen.current) return
     seen.current = true
@@ -393,10 +512,12 @@ export function MetricCard({ label, value, detail, icon, tone = 'emerald' }: {
   </div>
 }
 
-export function SectionPanel({ title, description, action, children, className }: {
+export function SectionPanel({ id, title, description, action, children, className }: {
+  /** Dipakai sebagai target tautan langsung dari halaman lain, mis. `/operasi#review`. */
+  id?: string
   title: string; description?: string; action?: React.ReactNode; children: React.ReactNode; className?: string
 }) {
-  return <section className={cn('overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm', className)}>
+  return <section id={id} className={cn('overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm', id ? 'scroll-mt-24' : null, className)}>
     <div className="flex flex-col items-stretch justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-start sm:gap-4">
       <div><h2 className="text-xs font-bold text-slate-900 sm:text-sm">{title}</h2>{description ? <p className="mt-0.5 text-[11px] leading-4 text-slate-500 sm:text-xs">{description}</p> : null}</div>{action}
     </div>
