@@ -16,6 +16,7 @@ import {
   verifyTeachingAttendance,
 } from '@/lib/finance/payroll'
 import { syncFinanceTeacherSnapshots } from '@/lib/finance/snapshots'
+import { runBulk } from '@/lib/finance/bulk'
 
 const PATH = '/dashboard/keuangan-terpusat/payroll'
 const refresh = () => revalidatePath(PATH)
@@ -100,6 +101,72 @@ export async function deleteTeachingAttendanceAction(id:string){
   const r=await deleteTeachingAttendance(id,s.id)
   if(r.success)refresh()
   return r
+}
+
+/** Guru yang benar-benar ada di master; dipakai kedua importir agar id palsu tertolak sebelum menulis. */
+async function knownTeacherIds(ids:string[]):Promise<Set<string>>{
+  const unique=[...new Set(ids.filter(Boolean))]
+  if(!unique.length)return new Set()
+  const rows=await query<{id:number}>(`SELECT id FROM data_guru WHERE CAST(id AS TEXT) IN (${unique.map(()=>'?').join(',')})`,unique)
+  return new Set(rows.map(row=>String(row.id)))
+}
+
+/** Baris template kompensasi & absensi; dipakai bersama UI supaya kolomnya tidak pernah berbeda. */
+export type CompensationImportRow={
+  row:number;teacherId:string;effectiveFrom:string;fixedSalaryRupiah:number;sessionRateRupiah:number|null
+}
+export type AttendanceImportRow={
+  row:number;payrollPeriodId:string;sessionDate:string;scheduleReference:string
+  scheduledTeacherId:string;actualTeacherId:string|null;status:'PRESENT'|'ABSENT'|'HOLIDAY'|'SUBSTITUTE';notes:string|null
+}
+
+export async function importCompensationAction(rows:CompensationImportRow[]){
+  const session=await requireFinanceAccess('CONFIGURE')
+  const known=await knownTeacherIds(rows.map(item=>item.teacherId))
+  // Snapshot disinkronkan sekali untuk seluruh berkas, bukan per baris.
+  await syncFinanceTeacherSnapshots([...known])
+  const summary=await runBulk(rows,async item=>{
+    if(!known.has(item.teacherId))return{success:false,error:`Guru dengan id ${item.teacherId} tidak ada di master guru.`}
+    return createTeacherCompensation({
+      teacherId:item.teacherId,
+      effectiveFrom:item.effectiveFrom,
+      fixedSalaryRupiah:item.fixedSalaryRupiah,
+      sessionRateRupiah:item.sessionRateRupiah,
+      actorId:session.id,
+    })
+  })
+  if(summary.success&&summary.created)refresh()
+  return summary
+}
+
+export async function importAttendanceAction(rows:AttendanceImportRow[]){
+  const session=await requireFinanceAccess('CONFIGURE')
+  const known=await knownTeacherIds(rows.flatMap(item=>[item.scheduledTeacherId,item.actualTeacherId||'']))
+  await syncFinanceTeacherSnapshots([...known])
+  const summary=await runBulk(rows,async item=>{
+    if(!known.has(item.scheduledTeacherId))return{success:false,error:`Guru terjadwal id ${item.scheduledTeacherId} tidak ada di master guru.`}
+    if(item.actualTeacherId&&!known.has(item.actualTeacherId))return{success:false,error:`Guru pengganti id ${item.actualTeacherId} tidak ada di master guru.`}
+    return upsertTeachingAttendance({
+      payrollPeriodId:item.payrollPeriodId,
+      scheduleReference:item.scheduleReference,
+      scheduledTeacherId:item.scheduledTeacherId,
+      actualTeacherId:item.actualTeacherId,
+      sessionDate:item.sessionDate,
+      status:item.status,
+      notes:item.notes,
+      actorId:session.id,
+    })
+  })
+  if(summary.success&&summary.created)refresh()
+  return summary
+}
+
+/** Verifikasi beberapa baris absensi sekaligus; syarat lock adalah semua baris terverifikasi. */
+export async function verifyAttendanceBatchAction(ids:string[]){
+  const session=await requireFinanceAccess('CHECK')
+  const summary=await runBulk(ids.map((id,index)=>({row:index+1,id})),item=>verifyTeachingAttendance(item.id,session.id))
+  if(summary.success&&summary.created)refresh()
+  return summary
 }
 
 export async function getPayrollData(){
