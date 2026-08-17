@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { financeQuery as query, financeQueryOne } from '@/lib/db'
 import { financeAsramaScope, financeCapabilities, requireFinanceAccess } from '@/lib/finance/access'
 import { checkPayout, createPayoutRequest, executeApiPayout, executeManualPayout, reconcilePayout, registerFinanceRecipient, verifyFinanceRecipient } from '@/lib/finance/payouts'
+import { bulkIdempotencyKey, runBulk } from '@/lib/finance/bulk'
 
 const PATH = '/dashboard/keuangan-terpusat/payout'
 
@@ -31,6 +32,68 @@ export async function executeApiPayoutAction(id:string){const s=await requireFin
 export async function reconcilePayoutAction(id: string) { const s=await requireFinanceAccess('EXECUTE'); const r=await reconcilePayout(id,s.id); if(r.success)revalidatePath(PATH); return r }
 export async function registerRecipientAction(input:{recipientType:'MEAL_MANAGER'|'LAUNDRY_MANAGER'|'TEACHER'|'OTHER';name:string;bankCode:string;accountNumber:string;accountHolderName:string}){const s=await requireFinanceAccess('CONFIGURE');const r=await registerFinanceRecipient({...input,asramaScope:financeAsramaScope(s),actorId:s.id});if(r.success)revalidatePath(PATH);return r}
 export async function verifyRecipientAction(id:string){const s=await requireFinanceAccess('CHECK');const r=await verifyFinanceRecipient(id,s.id);if(r.success)revalidatePath(PATH);return r}
+
+/** Satu baris template rekening penerima; dipakai bersama oleh UI dan action ini. */
+export type RecipientImportRow = {
+  row: number; recipientType: 'MEAL_MANAGER'|'LAUNDRY_MANAGER'|'TEACHER'|'OTHER'
+  name: string; bankCode: string; accountNumber: string; accountHolderName: string
+}
+
+export type PayoutImportRow = {
+  row: number; recipientId: string; payoutType: 'MEAL'|'LAUNDRY'|'PAYROLL'|'REFUND'|'OTHER'
+  amountRupiah: number; method: 'API'|'MANUAL_TRANSFER'|'CASH'
+}
+
+/** Impor massal rekening penerima. Verifikasi orang lain dan masa tenang 24 jam tetap berlaku per rekening. */
+export async function importRecipientsAction(rows: RecipientImportRow[]) {
+  const session = await requireFinanceAccess('CONFIGURE')
+  const scope = financeAsramaScope(session)
+  const summary = await runBulk(rows, item => registerFinanceRecipient({
+    recipientType: item.recipientType,
+    name: item.name,
+    bankCode: item.bankCode,
+    accountNumber: item.accountNumber,
+    accountHolderName: item.accountHolderName,
+    asramaScope: scope,
+    actorId: session.id,
+  }))
+  if (summary.success && summary.created) revalidatePath(PATH)
+  return summary
+}
+
+/** Impor massal pengajuan payout. Maker tetap Anda; pemeriksa dan pelaksana tetap harus orang lain. */
+export async function importPayoutsAction(rows: PayoutImportRow[]) {
+  const session = await requireFinanceAccess('CREATE')
+  const scope = financeAsramaScope(session)
+  const fee = await apiFeeRupiah()
+  const summary = await runBulk(rows, item => createPayoutRequest({
+    recipientId: item.recipientId,
+    payoutType: item.payoutType,
+    amountRupiah: item.amountRupiah,
+    method: item.method,
+    feeRupiah: item.method === 'API' ? fee : 0,
+    idempotencyKey: bulkIdempotencyKey('payout', item.row, [item.recipientId, item.payoutType, item.amountRupiah, item.method]),
+    makerId: session.id,
+    asramaScope: scope,
+  }))
+  if (summary.success && summary.created) revalidatePath(PATH)
+  return summary
+}
+
+/** Meloloskan beberapa payout sekaligus; tiap payout tetap melewati pemeriksaan server satu per satu. */
+export async function checkPayoutsAction(ids: string[]) {
+  const session = await requireFinanceAccess('CHECK')
+  const summary = await runBulk(ids.map((id, index) => ({ row: index + 1, id })), item => checkPayout(item.id, session.id))
+  if (summary.success && summary.created) revalidatePath(PATH)
+  return summary
+}
+
+export async function reconcilePayoutsAction(ids: string[]) {
+  const session = await requireFinanceAccess('EXECUTE')
+  const summary = await runBulk(ids.map((id, index) => ({ row: index + 1, id })), item => reconcilePayout(item.id, session.id))
+  if (summary.success && summary.created) revalidatePath(PATH)
+  return summary
+}
 
 export async function getPayoutData() {
   const session = await requireFinanceAccess('VIEW'); const scope=financeAsramaScope(session)
