@@ -6,12 +6,19 @@ import { financeQuery, financeQueryOne, generateId, getFinanceDB, query } from '
 import { financeCapabilities, requireFinanceAccess } from '@/lib/finance/access'
 
 const PATH='/dashboard/keuangan-terpusat/kontrol'
-const SETTING_KEYS=new Set(['finance_payment_intent_ttl_hours','finance_soft_alerts','finance_meal_cutoff','finance_laundry_cutoff'])
+const SETTING_KEYS=new Set(['finance_payment_intent_ttl_hours','finance_soft_alerts','finance_meal_cutoff','finance_laundry_cutoff','finance_payout_api_fee_rupiah'])
 
 function normalizedSetting(key:string,raw:string){
   if(key==='finance_payment_intent_ttl_hours'){
     const value=Number(raw)
     if(!Number.isSafeInteger(value)||value<1||value>168)throw new Error('TTL payment intent harus 1–168 jam.')
+    return String(value)
+  }
+  // Biaya payout adalah rupiah bulat, bukan JSON. Tanpa cabang ini nilainya
+  // jatuh ke JSON.parse di bawah dan selalu ditolak.
+  if(key==='finance_payout_api_fee_rupiah'){
+    const value=Number(raw)
+    if(!Number.isSafeInteger(value)||value<0||value>100_000)throw new Error('Biaya payout API harus rupiah bulat 0–100.000.')
     return String(value)
   }
   const parsed=JSON.parse(raw) as Record<string,unknown>
