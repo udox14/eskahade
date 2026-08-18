@@ -1,26 +1,142 @@
 # Runbook Keuangan Terpusat
 
-Sistem baru memakai seluruh tabel berawalan `finance_` dan tidak mengambil saldo dari `santri.saldo_uang_jajan` atau `saldo_tabungan`. Migrasi tidak otomatis mengaktifkan cohort baru.
+Sistem ini memakai seluruh tabel berawalan `finance_` di database terpisah, dan
+tidak mengambil saldo dari `santri.saldo_uang_jajan` atau `saldo_tabungan`.
+Menerapkan migrasi tidak otomatis mengaktifkan sistem baru untuk asrama mana pun.
 
-## Urutan deployment
+Dokumen ini menggantikan runbook sebelum penyederhanaan. Kalau Anda menemukan
+catatan lama yang menyebut MFA staf, break-glass, masa tenang rekening 24 jam,
+mode kredensial HYBRID, atau impor mutasi bank otomatis — semua itu sudah dihapus.
 
-1. Isi secret berdasarkan `docs/finance-env.example` di Cloudflare untuk production dan preview. Jangan memakai secret yang sama untuk JWT, HMAC credential, dan enkripsi rekening.
-2. Terapkan `migrations/0120_finance_application_bridge.sql` ke `DB` dan `DEMO_DB`.
-3. Terapkan seluruh berkas `migrations-finance/` ke `FINANCE_DB` dan `DEMO_FINANCE_DB`. Jangan pernah menerapkan migrasi keuangan ini ke DB utama.
-4. Pastikan callback cash-in adalah `/api/finance/gateway/duitku/callback` dan callback disbursement adalah `/api/finance/gateway/duitku/payout-callback` pada dashboard Duitku.
-5. Uji sandbox cash-in, callback replay, settlement, inquiry rekening, payout, callback payout, dan rekonsiliasi.
-6. Buat unit kas, rekening penerima, kebijakan limit, PIN santri, serta credential pilot 20–50 kartu. Rekening penerima tetap tidak dapat dipakai sampai diverifikasi dan cooling period 24 jam selesai.
-7. Pilih satu asrama pilot dengan mengubah setting `finance_legacy_mode`. Set `new_system_enabled=true`, `pilot_asrama`, dan masukkan asrama yang sama ke `auto_wallet_worker_disabled_cohorts`. Trigger database dan worker akan menghentikan dompet legacy untuk cohort tersebut.
-8. Jalankan satu siklus bulanan, rekonsiliasi semua exception, tutup buku, lalu lakukan uji restore sebelum menambah cohort.
+---
 
-## Database terpasang
+## 1. Yang berubah dari sistem sebelumnya
 
-- `FINANCE_DB` → `eskahade-finance` (`8388b81f-c5c7-4523-9a72-437f947331a1`)
-- `DEMO_FINANCE_DB` → `eskahade-demo-finance` (`c610762b-dec7-4b83-b5f4-5d5ab3036f43`)
-- Deployment awal pemisahan DB: Worker version `a924861c-66c2-4d33-afda-da9feac83e25`.
-- Mode sistem baru tetap nonaktif; aktivasi cohort harus menjadi keputusan go-live terpisah.
+**Dipertahankan penuh.** Double-entry ledger beserta seluruh triggernya: debit
+harus sama dengan kredit, saldo akun dan dompet tidak boleh negatif, jurnal
+`POSTED` tidak bisa diubah atau dihapus. Limit penarikan santri tetap tiga
+tingkat (harian, mingguan, bulanan). Wali tetap bisa mengelola beberapa anak
+dengan satu login. Integrasi Duitku beserta idempotensi dan penanganan replay
+tidak tersentuh sama sekali.
 
-Contoh setting pilot (sesuaikan nama asrama persis dengan master data):
+**Disederhanakan.**
+
+| Bagian | Sebelum | Sekarang |
+|---|---|---|
+| Kredensial santri | RFID, QR, HYBRID, mode transisi | QR saja |
+| Payroll guru | absensi per sesi + versi kebijakan | gaji bulanan + hari alfa/badal |
+| Pencairan | maker-checker-executor, 8 status | maker-checker, 7 status |
+| Rekening penerima | verifikasi + masa tenang 24 jam | verifikasi petugas lain |
+| Rekonsiliasi bank | impor berkas + auto-match per baris | checklist bulanan per rekening |
+| Buka periode tertutup | dua persetujuan | satu penyetuju + alasan |
+| Wali | tiga tingkat akses per santri | setiap wali tertaut punya hak penuh |
+
+**Dihapus total.** MFA/WebAuthn staf, break-glass admin teknis, session finance
+terpisah, outbox event, mode insiden, snapshot staf.
+
+**Ledger tetap ketat, tapi operator tidak pernah melihatnya.** Seluruh kode akun
+hidup di satu berkas, `lib/finance/postings.ts`. Layar Transaksi punya dua lapis:
+lapis operasional berbahasa manusia untuk semua pengurus, dan lapis akuntansi di
+balik tombol "Lihat jurnal" untuk bendahara dan auditor.
+
+---
+
+## 2. Menerapkan migrasi
+
+> **Baca bagian ini sampai habis sebelum menjalankan perintah apa pun.**
+> Pada 16 Agustus 2026 migrasi `0007` dijalankan ke `FINANCE_DB` produksi,
+> `DROP TABLE finance_bills` berhasil tapi `ALTER TABLE ... RENAME` tidak sempat
+> commit, dan tabel `finance_bills` hilang dari skema produksi sampai dipulihkan
+> manual. Migrasi di bawah ini jauh lebih besar dari `0007`.
+
+### Aturan yang tidak boleh dilanggar
+
+1. **Satu berkas satu perintah `--file`.** Jangan pernah memakai `--command`
+   berisi banyak statement: wrangler memecah teksnya berdasarkan titik koma
+   secara naif, sehingga body trigger yang mengandung `;` di dalam `BEGIN…END`
+   pecah jadi fragmen dan gagal dengan "incomplete input".
+2. **Urutan berkas tidak boleh diacak.** Seluruh tabel dibuat lebih dulu
+   (`0001b`–`0001f`), baru seluruh trigger (`0001g`). SQLite membuat trigger
+   tanpa memvalidasi tabel yang hanya disebut di dalam body-nya, jadi trigger
+   yang dibuat sebelum tabel rujukannya ada akan menggantung dan meledak
+   belakangan.
+3. **Urutan lingkungan: D1 lokal → `DEMO_FINANCE_DB` → `FINANCE_DB`.**
+   Produksi paling akhir.
+4. **Kalau satu berkas gagal separuh, berhenti.** Jangan jalankan berkas
+   berikutnya, jangan menambal manual. Pulihkan dari export lalu ulangi.
+
+### Sebelum mulai
+
+```bash
+npx wrangler d1 export eskahade-finance --remote --output ./backup-finance.sql
+```
+
+```bash
+npx wrangler d1 export eskahade-demo-finance --remote --output ./backup-demo-finance.sql
+```
+
+Simpan keduanya di luar repo. Perintah export membuat database tidak melayani
+query selama beberapa detik.
+
+Pastikan juga sistem baru masih nonaktif:
+
+```bash
+npx wrangler d1 execute eskahade-db --remote --command "SELECT value FROM app_settings WHERE key='finance_legacy_mode';"
+```
+
+### Urutan berkas
+
+Jalankan satu per satu, **periksa hasilnya sebelum lanjut ke berkas berikutnya**:
+
+| No | Berkas | Isi |
+|---|---|---|
+| 1 | `0001a_drop_legacy.sql` | DROP seluruh trigger, lalu DROP 49 tabel lama |
+| 2 | `0001b_tables_core.sql` | akun, periode, jurnal, entri, saldo, dompet |
+| 3 | `0001c_tables_billing.sql` | intent, gateway event, wali, tagihan, alokasi, tarif layanan |
+| 4 | `0001d_tables_loket.sql` | kredensial, PIN, limit, unit kas, shift, penarikan |
+| 5 | `0001e_tables_payout.sql` | penerima, pencairan, payroll, rekonsiliasi |
+| 6 | `0001f_tables_support.sql` | audit log, setelan, snapshot |
+| 7 | `0001g_triggers.sql` | **seluruh** trigger |
+| 8 | `0001h_seed.sql` | bagan akun, kebijakan kredensial, setelan awal |
+
+Contoh satu langkah:
+
+```bash
+npx wrangler d1 execute eskahade-finance --remote --file migrations-finance/0001a_drop_legacy.sql
+```
+
+### Verifikasi setelah berkas terakhir
+
+```bash
+npx wrangler d1 execute eskahade-finance --remote --command "SELECT type,COUNT(*) FROM sqlite_master WHERE name LIKE 'finance_%' OR name='student_credentials' GROUP BY type;"
+```
+
+Harus menghasilkan **37 tabel** dan **21 trigger**. Kalau meleset, jangan
+lanjut — pulihkan dari export.
+
+Untuk `DEMO_FINANCE_DB`, jalankan kedelapan berkas yang sama ditambah
+`0002_demo_sandbox_reset.sql`.
+
+---
+
+## 3. Setelah migrasi
+
+1. Isi secret sesuai `docs/finance-env.example`. Jangan memakai secret yang sama
+   untuk JWT, HMAC credential, dan enkripsi rekening.
+2. Pastikan callback Duitku di dashboard provider menunjuk ke
+   `/api/finance/gateway/duitku/callback` dan
+   `/api/finance/gateway/duitku/payout-callback`.
+3. Buat unit kas, rekening penerima, kebijakan limit, PIN santri, dan credential
+   QR pilot 20–50 kartu.
+4. Uji sandbox: cash-in, callback replay, settlement, payout, callback payout,
+   dan checklist rekonsiliasi.
+5. Pilih satu asrama pilot lewat setting `finance_legacy_mode`. Set
+   `new_system_enabled=true`, `pilot_asrama`, dan masukkan asrama yang sama ke
+   `auto_wallet_worker_disabled_cohorts`.
+6. Jalankan satu siklus bulanan penuh, bereskan semua selisih rekonsiliasi, tutup
+   buku, lalu uji restore sebelum menambah asrama berikutnya.
+
+Contoh setting pilot:
 
 ```json
 {
@@ -31,39 +147,99 @@ Contoh setting pilot (sesuaikan nama asrama persis dengan master data):
 }
 ```
 
-## Kontrol wajib sebelum produksi
+---
 
-- Onboarding payment dan disbursement Duitku sudah berstatus aktif. Disbursement menggunakan dua tahap inquiry–transfer dan menunggu callback sebelum dianggap sukses provider.
+## 4. Kontrol yang tetap wajib sebelum produksi
+
+- Onboarding payment dan disbursement Duitku sudah aktif. Disbursement memakai
+  dua tahap inquiry–transfer dan menunggu callback sebelum dianggap sukses.
 - Telaah tertulis model titipan dan pencairan cash selesai.
-- Cloudflare berbayar, backup D1 harian terenkripsi, arsip bulanan bertanda hash, NAS dan salinan luar lokasi Indonesia sudah berjalan.
-- Restore diuji dan dicatat minimal tiap kuartal; retensi jurnal/dokumen pembukuan minimal 10 tahun.
-- Minimal dua reader RFID, dua scanner QR, keypad privat, dan koneksi cadangan sudah lulus pilot beban.
-- Akun admin teknis tidak dapat membuka panel keuangan tanpa break-glass 30 menit; setiap aktivasi masuk outbox untuk notifikasi dan review auditor.
-- Session staf baru berlaku delapan jam. Infrastruktur MFA/revocation tersedia di migration; enrollment MFA organisasi harus diselesaikan sebelum kewajiban MFA diaktifkan untuk seluruh staf.
+- Cloudflare berbayar, backup D1 harian, arsip bulanan, dan salinan luar lokasi
+  sudah berjalan. Restore diuji dan dicatat minimal tiap kuartal.
+- Retensi jurnal dan dokumen pembukuan minimal 10 tahun.
+- Minimal dua scanner QR, keypad privat, dan koneksi cadangan lulus uji beban.
+- **Yang mengajukan pencairan bukan yang menyetujui.** Ini satu-satunya kendali
+  tersisa pada uang keluar, dan ditegakkan trigger database — bukan hanya UI.
+  Pastikan benar-benar ada dua orang berbeda yang aktif.
+- **Yang mendaftarkan rekening penerima bukan yang memverifikasi.**
 
-## Perintah verifikasi
+Perhatikan: admin teknis kini **tidak punya jalan masuk** ke panel keuangan.
+Break-glass dihapus. Kalau admin memang perlu mengurus keuangan, beri dia peran
+bendahara secara eksplisit.
 
-```powershell
-npm.cmd run test:finance
-npx.cmd tsc --noEmit --pretty false
-npm.cmd run build
+---
+
+## 5. Perintah verifikasi
+
+```bash
+npm run test:finance
 ```
 
-`test:finance` membuat D1 lokal terisolasi dan menguji posting seimbang, rollback saldo negatif, jurnal tidak seimbang, idempotensi, periode tertutup, larangan self-approval, mode `HYBRID`, constraint credential aktif, dan resume batch 1.000 santri tanpa duplikasi.
+```bash
+npx tsc --noEmit --pretty false
+```
 
-## Sandbox interaktif
+```bash
+npm run build
+```
 
-- Buat minimal dua user dengan role `demo` bila ingin menguji alur maker–checker tanpa melanggar larangan self-approval.
-- Login sebagai user demo akan mengarahkan data aplikasi ke `DEMO_DB` dan seluruh data Keuangan Terpusat ke `DEMO_FINANCE_DB`.
-- Reset baseline dilakukan oleh admin asli dari **Pengaturan → Fitur & Akses → Reset Data Demo**. Reset mencakup kedua database demo dan tidak menyentuh data produksi.
-- Baseline loket memakai QR `SKH1.DEMO.SANTRI.0001.TEST.CREDENTIAL`, RFID `DEMO0001`, dan PIN `123456`.
-- Payment dan payout dari request akun demo disimulasikan di dalam aplikasi. Request tersebut tidak memanggil endpoint Duitku, meskipun environment produksi sedang aktif.
-- Sebelum memakai reset finansial, migration `0004_demo_sandbox_reset.sql` wajib sudah diterapkan ke `DEMO_FINANCE_DB`.
+`test:finance` membangun D1 lokal terisolasi lalu menjalankan 77 pemeriksaan di
+lima berkas:
 
-## Peralihan RFID dan QR
+| Berkas | Cakupan |
+|---|---|
+| `test-finance-schema.py` | struktur skema, jurnal seimbang, immutability, dompet tidak negatif, tiga limit penarikan |
+| `test-finance-payroll.py` | potongan alfa/badal termasuk guru dibayar penuh dan potongan melebihi gaji |
+| `test-finance-payout.py` | maker-checker, larangan self-approval, rekening belum diverifikasi |
+| `test-finance-gateway.py` | idempotensi & replay callback Duitku, tiga lapis pengaman |
+| `test-finance-demo-seed.py` | setiap tabel & kolom yang disebut demo-seed benar-benar ada |
 
-Mode dapat diubah dari panel Kredensial menjadi `RFID`, `QR`, `HYBRID`, atau `BOTH_TRANSITION`. `HYBRID` mengaktifkan RFID dan QR permanen secara bersamaan. Mode transisi wajib mempunyai metode asal, tujuan, dan batas waktu. Scan pertama setelah batas waktu akan menyelesaikan transisi secara atomik: metode lama menjadi `SUSPENDED_BY_POLICY`; saldo, limit, PIN, foto, dan histori santri tidak berubah.
+Uji terakhir itu penting karena kesalahan di `demo-seed.ts` tidak tertangkap
+TypeScript — isinya string SQL — dan baru meledak saat admin menekan Reset Data
+Demo.
 
-Credential berstatus `LOST` atau `REVOKED` tidak pernah diaktifkan kembali. Token QR disimpan terenkripsi memakai `FINANCE_ENCRYPTION_KEY`, sedangkan resolver tetap membandingkan HMAC. Token mentah tidak pernah dikirim dari client saat export kartu.
+---
 
-Sebelum migrasi `0002_credential_fast_enrollment.sql` dan deploy Worker, pastikan secret `FINANCE_ENCRYPTION_KEY` serta `CLOUDFLARE_BROWSER_RENDERING_API_TOKEN` sudah tersedia. Terapkan migrasi ke `FINANCE_DB` dan `DEMO_FINANCE_DB`; jangan menerapkannya ke DB utama. PDF kartu memakai A4 portrait, delapan kartu CR80 per lembar, serta pasangan halaman belakang yang dicerminkan untuk duplex long-edge.
+## 6. Sandbox interaktif
+
+- Buat minimal dua user berperan `demo` bila ingin menguji alur maker-checker
+  tanpa melanggar larangan self-approval.
+- Login sebagai user demo mengarahkan data aplikasi ke `DEMO_DB` dan seluruh data
+  keuangan ke `DEMO_FINANCE_DB`.
+- Reset baseline dilakukan admin asli lewat **Pengaturan → Fitur & Akses → Reset
+  Data Demo**. Reset menyentuh kedua database demo dan tidak menyentuh produksi.
+- Baseline loket memakai QR `SKH1.DEMO.SANTRI.0001.TEST.CREDENTIAL` dan PIN
+  `123456`.
+- Di sandbox, guru pertama sengaja punya tarif potongan alfa/badal dan guru kedua
+  bertarif nol, supaya kedua perilaku payroll langsung terlihat.
+- Payment dan payout dari akun demo disimulasikan di dalam aplikasi dan tidak
+  pernah memanggil endpoint Duitku, meskipun environment produksi sedang aktif.
+
+---
+
+## 7. Kredensial santri
+
+Hanya QR. Mode RFID, HYBRID, dan transisi bertahap sudah dihapus seluruhnya —
+tidak ada lagi dua metode berjalan bersamaan.
+
+Token QR disimpan terenkripsi memakai `FINANCE_ENCRYPTION_KEY`, sedangkan
+pencocokan tetap lewat HMAC. Token mentah tidak pernah dikirim ke client saat
+export kartu. Credential berstatus `LOST` atau `REVOKED` tidak pernah bisa
+diaktifkan kembali.
+
+Kolom `mode` di `finance_credential_policy` sengaja dipertahankan meski hanya
+menerima satu nilai, supaya penambahan RFID di kemudian hari cukup melonggarkan
+satu CHECK tanpa migrasi ulang.
+
+PDF kartu memakai A4 portrait, delapan kartu CR80 per lembar, dengan pasangan
+halaman belakang yang dicerminkan untuk duplex long-edge.
+
+---
+
+## 8. Database terpasang
+
+- `FINANCE_DB` → `eskahade-finance` (`8388b81f-c5c7-4523-9a72-437f947331a1`)
+- `DEMO_FINANCE_DB` → `eskahade-demo-finance` (`c610762b-dec7-4b83-b5f4-5d5ab3036f43`)
+
+Jangan pernah menerapkan migrasi `migrations-finance/` ke DB aplikasi utama, dan
+sebaliknya jangan menerapkan `migrations/` ke database keuangan.

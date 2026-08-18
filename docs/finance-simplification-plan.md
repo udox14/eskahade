@@ -1,7 +1,24 @@
 # Rencana Penyederhanaan Modul Keuangan Terpusat
 
-Status dokumen: **rencana, belum dieksekusi.** Implementasi menunggu persetujuan.
-Tanggal: 18 Agustus 2026. Revisi 2.
+Status dokumen: **SELESAI DIIMPLEMENTASIKAN** di branch `feat/finance-simplification`.
+Tanggal rencana: 18 Agustus 2026, revisi 2. Implementasi selesai hari yang sama.
+
+| Fase | Status | Commit |
+|---|---|---|
+| 0 pengamanan | selesai | — |
+| 1 skema + katalog resep | selesai | `bc9a3be8` |
+| 2 pembuangan fitur | selesai | `759ef1bd` + `86419916` |
+| 3 payroll, payout, rekonsiliasi | selesai | `2e8498dc`, `9dd68148`, `7000ccb9` |
+| 4 lapisan tampilan | selesai | `71abd9b4` |
+| 5 Duitku | selesai | `bfa678dc` |
+| 6 dokumen | selesai | dokumen ini + runbook |
+
+**Yang belum: penerapan migrasi ke `FINANCE_DB` dan `DEMO_FINANCE_DB`.**
+Itu dijalankan pemilik sistem, mengikuti urutan di
+`docs/finance-centralized-rollout.md` bagian 2.
+
+Penyimpangan dari rencana yang benar-benar terjadi, beserta alasannya, dicatat di
+bagian 8 di bawah.
 
 Perubahan dari revisi 1, atas keputusan pemilik sistem:
 1. **Double-entry dipertahankan penuh.** Yang disederhanakan adalah cara operator
@@ -785,3 +802,56 @@ npm run test:finance && npx tsc --noEmit --pretty false && npm run build
 - Legacy `santri.saldo_uang_jajan` / `saldo_tabungan` dan
   `migrations/0120_finance_application_bridge.sql` tidak diubah — jalur legacy masih
   satu-satunya yang aktif dan harus tetap utuh.
+
+---
+
+## 8. Penyimpangan dari rencana saat implementasi
+
+Empat hal berbeda dari yang tertulis di atas. Semuanya disengaja.
+
+**1. Resep jurnal berupa fungsi, bukan tabel data.** Sketsa di §3.1 menggambarkan
+`RESEP` sebagai objek datar berisi `debit`/`credit`. Ternyata tiga kejadian punya
+baris kondisional: biaya gateway hanya muncul bila wali dikenai biaya, dan
+reversal provider memecah nominal menjadi bagian yang bisa ditarik dari dompet
+plus bagian yang menjadi piutang. Tabel datar tidak bisa menyatakan itu tanpa
+berbohong, jadi tiap resep menjadi fungsi. Tujuannya tetap tercapai: satu berkas,
+bahasa bisnis, nol kode akun di tempat lain.
+
+**2. Migrasi dipecah menjadi delapan berkas, bukan tujuh, dan seluruh trigger
+dipisah ke berkas terakhir.** Rencana mengelompokkan trigger bersama tabelnya.
+Itu berbahaya: beberapa trigger merujuk tabel lintas modul, dan SQLite membuat
+trigger tanpa memvalidasi tabel yang hanya disebut di body-nya — persis penyebab
+insiden `0007`. Urutannya sekarang seluruh tabel dulu, baru seluruh trigger.
+
+**3. Status pencairan `DIPROSES` ditambahkan.** Rencana menyebut enam status.
+Transfer lewat API mengirim uang sungguhan lalu menunggu callback; tanpa status
+kunci di antara `DISETUJUI` dan `DIBAYAR`, dua klik beruntun mengirim dua
+transfer. Ini bukan penyederhanaan yang boleh diambil.
+
+**4. Syarat "rekening harus terverifikasi" dipertahankan.** Rencana mendaftar
+`trg_finance_payout_recipient_ready` sebagai dihapus. Trigger itu mengandung dua
+hal: masa tenang 24 jam *dan* syarat rekening sudah diverifikasi. Yang diminta
+brief hanya masa tenang. Syarat verifikasi dilebur ke `no_self_check`, jadi
+rekening yang belum diverifikasi petugas lain tetap tidak bisa menerima transfer.
+
+Selain itu, dua kejadian yang dulu lewat outbox dipindahkan ke `finance_audit_log`
+alih-alih dibuang: pembekuan dompet akibat reversal provider, dan perubahan limit
+penarikan oleh wali. Keduanya mengubah hak seseorang atas uang, dan outbox adalah
+satu-satunya tempat jejaknya tercatat.
+
+## 9. Hasil uji akhir
+
+`npm run test:finance` — 77 pemeriksaan di 5 berkas, seluruhnya lulus.
+`npx tsc --noEmit` bersih. `npm run build` lulus.
+
+Temuan yang layak dicatat dari proses pengujian:
+
+- Uji T8 gagal pada percobaan pertama dengan `FINANCE_ACCOUNT_NEGATIVE`, karena
+  mencoba mencairkan ke pengelola makan tanpa utangnya pernah dibukukan lewat
+  alokasi santri. Trigger benar; ujinya yang kurang lengkap.
+- Kasus replay paling berbahaya (callback dengan `event_key` berbeda tapi
+  `merchant_order_id` sama) ternyata ditangkap trigger
+  `trg_finance_topup_journal_requires_paid_intent`, bukan sekadar UNIQUE —
+  jaminan yang lebih kuat dari perkiraan awal.
+- Berkas gateway Duitku sama sekali tidak berubah. Nol baris. Itu konsekuensi
+  langsung dari keputusan mempertahankan double-entry.
