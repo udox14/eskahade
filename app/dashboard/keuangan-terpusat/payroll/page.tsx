@@ -10,33 +10,32 @@ export default async function PayrollPage() {
   await guardPage('/dashboard/keuangan-terpusat/payroll')
   const data = await getPayrollData()
   return <main className="space-y-4 sm:space-y-5">
-    <FinancePageHeader title="Payroll Guru" description="Kelola kebijakan, kompensasi, absensi terverifikasi, perhitungan, dan akrual payroll." eyebrow="Submodul terpisah · ledger bersama" meta="Tarif mengikuti versi efektif pada periode" />
+    <FinancePageHeader title="Payroll Guru" description="Gaji tetap bulanan dengan potongan opsional untuk hari alfa dan hari badal." eyebrow="Submodul terpisah · ledger bersama" meta="Tiap bulan hanya dua angka per guru" />
     <FinanceNav />
     <FinanceGuide
-      purpose="Menghitung payroll secara konsisten dari master kompensasi dan data kehadiran yang sudah diverifikasi."
-      prerequisites={['Kebijakan payroll dan kompensasi tiap guru sudah tersedia.', 'Semua sesi mengajar tercatat lengkap dengan guru terjadwal dan statusnya.', 'Checker siap memverifikasi absensi dan menyetujui batch.']}
+      purpose="Menghitung gaji guru dari gaji bulanan tetap, dikurangi potongan hari alfa dan hari badal bila ada."
+      prerequisites={['Kompensasi tiap guru sudah diisi: gaji bulanan dan tarif potongan.', 'Checker siap menyetujui hasil perhitungan.']}
       steps={[
-        'Buat kebijakan payroll, lalu isi kompensasi tiap guru.',
-        'Buat periode bulanan.',
-        'Catat absensi mengajar, lalu minta checker memverifikasi setiap barisnya.',
-        'Kunci absensi, hitung payroll, periksa rinciannya, baru setujui batch.',
+        'Isi kompensasi tiap guru sekali saja: gaji bulanan, potongan per hari alfa, potongan per hari badal.',
+        'Buat periode bulanan, lalu tekan Hitung untuk menarik semua guru yang kompensasinya berlaku.',
+        'Isi jumlah hari alfa dan hari badal per guru. Guru yang hadir penuh cukup dibiarkan nol.',
+        'Periksa total, lalu minta checker menyetujui.',
       ]}
       notes={[
-        'Sesi yang tidak tercatat tidak dihitung sebagai kehadiran maupun ketidakhadiran.',
-        'Versi kebijakan lama tidak pernah ditimpa; periode lama tetap memakai versinya sendiri.',
-        'Perubahan tarif dicatat sebagai baris efektif baru, bukan mengubah angka lama.',
-        'Persetujuan batch mencatat kewajiban gaji; pencairan uangnya dilakukan dari halaman Payout.',
+        'Tarif potongan 0 berarti guru dibayar penuh berapa pun hari alfa/badalnya.',
+        'Potongan tidak pernah membuat gaji jadi negatif; batas bawahnya nol.',
+        'Menghitung ulang tidak menghapus jumlah hari yang sudah Anda ketik.',
+        'Persetujuan mencatat kewajiban gaji; pencairan uangnya dilakukan dari halaman Payout.',
       ]}
       commonMistakes={[
-        'Mengubah kompensasi guru dengan tanggal efektif mundur, sehingga periode yang sudah dihitung ikut berubah saat dihitung ulang.',
-        'Mengunci absensi padahal masih ada sesi yang belum dicatat. Setelah terkunci, sesi itu tidak bisa ditambahkan lagi.',
-        'Mengira persetujuan batch berarti gaji sudah dibayar. Yang terjadi baru pencatatan kewajiban.',
-        'Memilih status Digantikan tanpa mengisi guru pengganti, atau mengisi pengganti yang sama dengan guru terjadwal.',
+        'Mengira persetujuan berarti gaji sudah dibayar. Yang terjadi baru pencatatan kewajiban.',
+        'Mengisi tarif potongan padahal pesantren tidak memotong gaji — biarkan 0 supaya guru dibayar penuh.',
+        'Menambah kompensasi dengan tanggal berlaku mundur, sehingga perhitungan ulang periode lama ikut berubah.',
       ]}
       glossary={[
-        { term: 'Periode payroll', meaning: 'Satu bulan penggajian. Kebijakan yang dipakai dikunci saat periode dibuat.' },
-        { term: 'Kebijakan payroll', meaning: 'Aturan cara menghitung: apakah gaji tetap dipotong saat absen, dan berapa persen honor guru pengganti.' },
-        { term: 'Kompensasi efektif', meaning: 'Gaji tetap dan tarif sesi seorang guru terhitung dari tanggal tertentu. Baris baru tidak menghapus baris lama.' },
+        { term: 'Hari alfa', meaning: 'Hari guru tidak mengajar tanpa keterangan.' },
+        { term: 'Hari badal', meaning: 'Hari jadwal guru diisi guru lain sebagai pengganti.' },
+        { term: 'Kompensasi', meaning: 'Gaji bulanan dan tarif potongan seorang guru, berlaku sejak tanggal tertentu.' },
         { term: 'Akrual', meaning: 'Pencatatan kewajiban gaji di pembukuan sebelum uangnya benar-benar dibayarkan.' },
       ]}
     />
