@@ -6,7 +6,7 @@ type CredentialBatchRow={id:string;credential_kind:string;status:CredentialBatch
 
 export async function createCredentialBatch(input:{
   santriIds:string[]
-  kind:'QR_STATIC'|'RFID_UID'
+  kind:'QR_STATIC'
   actorId:string
   filter?:Record<string,unknown>
 }) {
@@ -55,7 +55,7 @@ export async function processQrCredentialBatch(batchId:string,actorId:string,lim
   for(const item of items){
     await db.prepare(`UPDATE finance_credential_batch_items SET status='PROCESSING',error_message=NULL WHERE batch_id=? AND santri_id=?`).bind(batchId,item.santri_id).run()
     const existing=await financeQueryOne<{id:string}>(`SELECT id FROM student_credentials WHERE santri_id=? AND credential_kind='QR_STATIC'
-      AND status IN ('ACTIVE','SUSPENDED_BY_POLICY','BLOCKED') LIMIT 1`,[item.santri_id])
+      AND status IN ('ACTIVE','BLOCKED') LIMIT 1`,[item.santri_id])
     if(existing){
       await db.prepare(`UPDATE finance_credential_batch_items SET status='SKIPPED',credential_id=?,processed_at=datetime('now') WHERE batch_id=? AND santri_id=?`).bind(existing.id,batchId,item.santri_id).run()
       continue

@@ -176,8 +176,8 @@ export async function POST(request: NextRequest) {
           const db = await getFinanceDB()
           await db.batch([
             db.prepare(`INSERT INTO finance_guardians(id,display_name,password_hash,status,legacy_santri_id) VALUES(?,?,?,'ACTIVE',?)`).bind(guardianId, `Wali ${santri.nama_lengkap}`, currentHash, santri.id),
-            db.prepare(`INSERT OR IGNORE INTO finance_guardian_students(guardian_id,santri_id,relationship,access_level,verified_at)
-              VALUES(?,?,'WALI',CASE WHEN EXISTS(SELECT 1 FROM finance_guardian_students WHERE santri_id=? AND access_level='PRIMARY_FINANCE') THEN 'VIEW' ELSE 'PRIMARY_FINANCE' END,datetime('now'))`).bind(guardianId, santri.id, santri.id),
+            db.prepare(`INSERT OR IGNORE INTO finance_guardian_students(guardian_id,santri_id,relationship,verified_at)
+              VALUES(?,?,'WALI',datetime('now'))`).bind(guardianId, santri.id),
           ])
         }
       }

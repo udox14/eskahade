@@ -3,7 +3,7 @@ import { getFinanceDB as getDB, generateId, financeQueryOne as queryOne } from '
 import { hashPassword, verifyPassword } from '@/lib/auth/password'
 import { financeError } from './errors'
 import { decryptFinanceValue, encryptFinanceValue } from './encryption'
-import type { CredentialKind, CredentialMode } from './types'
+import type { CredentialKind } from './types'
 
 function secret(): string {
   const value = process.env.CREDENTIAL_HMAC_SECRET || process.env.JWT_SECRET
@@ -22,13 +22,12 @@ export function generateQrToken(): string {
   return `SKH1.${Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')}`
 }
 
-export function normalizeCredentialToken(kind: CredentialKind, rawToken: string): string {
-  const value = String(rawToken || '').trim()
-  return kind === 'RFID_UID' ? value.toUpperCase() : value
+export function normalizeCredentialToken(_kind: CredentialKind, rawToken: string): string {
+  return String(rawToken || '').trim()
 }
 
-function credentialCardNumber(kind: CredentialKind, id: string) {
-  return `SKH-${kind === 'QR_STATIC' ? 'QR' : 'RF'}-${id.replace(/-/g, '').slice(0, 10).toUpperCase()}`
+function credentialCardNumber(id: string) {
+  return `SKH-QR-${id.replace(/-/g, '').slice(0, 10).toUpperCase()}`
 }
 
 export async function issueCredential(input: {
@@ -42,26 +41,26 @@ export async function issueCredential(input: {
 }) {
   try {
     const version = input.version || 1
-    const rawToken = normalizeCredentialToken(input.kind, input.kind === 'QR_STATIC' ? (input.rawToken || generateQrToken()) : String(input.rawToken || ''))
-    if (rawToken.length < (input.kind === 'QR_STATIC' ? 32 : 4)) throw new Error('Token credential tidak valid.')
+    const rawToken = normalizeCredentialToken('QR_STATIC', input.rawToken || generateQrToken())
+    if (rawToken.length < 32) throw new Error('Token credential tidak valid.')
     const id = generateId()
     const db = await getDB()
     const current = await db.prepare(`SELECT id FROM student_credentials WHERE santri_id=? AND credential_kind=?
-      AND status IN ('ACTIVE','SUSPENDED_BY_POLICY','BLOCKED') LIMIT 1`).bind(input.santriId,input.kind).first() as {id:string}|null
+      AND status IN ('ACTIVE','BLOCKED') LIMIT 1`).bind(input.santriId,'QR_STATIC').first() as {id:string}|null
     if (current && !input.reissue) throw new Error('Santri sudah mempunyai credential jenis ini.')
-    const encrypted = input.kind === 'QR_STATIC' ? await encryptFinanceValue(rawToken) : null
-    const cardNumber = credentialCardNumber(input.kind,id)
+    const encrypted = await encryptFinanceValue(rawToken)
+    const cardNumber = credentialCardNumber(id)
     const statements = []
     if (current) statements.push(db.prepare(`UPDATE student_credentials SET status='REVOKED',blocked_reason='REISSUED',replacement_credential_id=? WHERE id=?`).bind(id,current.id))
     statements.push(
       db.prepare(`INSERT INTO student_credentials
         (id,santri_id,credential_kind,token_hmac,token_encrypted,token_version,card_number,status,expires_at,created_by,physically_verified_at,physically_verified_by)
         VALUES(?,?,?,?,?,?,?,'ACTIVE',?,?,datetime('now'),?)`).bind(
-          id,input.santriId,input.kind,await credentialHmac(rawToken,version),encrypted,version,cardNumber,input.expiresAt||null,input.actorId||null,input.actorId||null,
+          id,input.santriId,'QR_STATIC',await credentialHmac(rawToken,version),encrypted,version,cardNumber,input.expiresAt||null,input.actorId||null,input.actorId||null,
       ),
       db.prepare(`INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,before_json,after_json)
         VALUES(?,'STAFF',?,?,'STUDENT_CREDENTIAL',?,?,?)`).bind(
-          generateId(),input.actorId||null,current?'REISSUE_CREDENTIAL':'ISSUE_CREDENTIAL',id,current?JSON.stringify({replacedCredentialId:current.id}):null,JSON.stringify({santriId:input.santriId,kind:input.kind,cardNumber}),
+          generateId(),input.actorId||null,current?'REISSUE_CREDENTIAL':'ISSUE_CREDENTIAL',id,current?JSON.stringify({replacedCredentialId:current.id}):null,JSON.stringify({santriId:input.santriId,kind:'QR_STATIC',cardNumber}),
       ),
     )
     await db.batch(statements)
@@ -72,25 +71,16 @@ export async function issueCredential(input: {
 }
 
 export async function resolveCredential(kind: CredentialKind, rawToken: string) {
-  let policy = await queryOne<{ mode: CredentialMode; transition_to: 'RFID'|'QR'|null; transition_ends_at: string | null }>(`SELECT mode,transition_to,transition_ends_at FROM finance_credential_policy WHERE singleton_id=1`)
-  if (!policy) return null
-  if(policy.mode==='BOTH_TRANSITION'&&policy.transition_to&&policy.transition_ends_at&&new Date(policy.transition_ends_at).getTime()<=Date.now()){
-    const activeKind=policy.transition_to==='RFID'?'RFID_UID':'QR_STATIC',db=await getDB()
-    await db.batch([
-      db.prepare(`UPDATE student_credentials SET status='SUSPENDED_BY_POLICY',blocked_reason='TRANSITION_ENDED' WHERE status='ACTIVE' AND credential_kind<>?`).bind(activeKind),
-      db.prepare(`UPDATE finance_credential_policy SET mode=?,transition_from=NULL,transition_to=NULL,transition_ends_at=NULL,updated_at=datetime('now') WHERE singleton_id=1 AND mode='BOTH_TRANSITION'`).bind(policy.transition_to),
-    ])
-    policy=await queryOne<any>(`SELECT mode,transition_to,transition_ends_at FROM finance_credential_policy WHERE singleton_id=1`)
-    if(!policy)return null
-  }
-  const expectedMode = kind === 'RFID_UID' ? 'RFID' : 'QR'
-  const allowed = policy.mode === 'HYBRID' || policy.mode === expectedMode || (policy.mode === 'BOTH_TRANSITION' && (!policy.transition_ends_at || new Date(policy.transition_ends_at).getTime() > Date.now()))
-  if (!allowed) return null
+  // Hanya QR. Mode HYBRID dan BOTH_TRANSITION beserta penyelesaian transisi
+  // otomatis pada scan pertama sudah dihapus - tidak ada lagi dua metode
+  // berjalan bersamaan, jadi tidak ada yang perlu dinegosiasikan di sini.
+  if (kind !== 'QR_STATIC') return null
   for (let version = 10; version >= 1; version--) {
     const row = await queryOne<{
       id: string; santri_id: string; credential_kind: CredentialKind; token_version: number; status: string; expires_at: string | null
     }>(`SELECT id,santri_id,credential_kind,token_version,status,expires_at FROM student_credentials
-      WHERE credential_kind=? AND token_hmac=? AND token_version=? LIMIT 1`, [kind, await credentialHmac(normalizeCredentialToken(kind,rawToken), version), version])
+      WHERE credential_kind='QR_STATIC' AND token_hmac=? AND token_version=? LIMIT 1`,
+      [await credentialHmac(normalizeCredentialToken(kind, rawToken), version), version])
     if (!row) continue
     if (row.status !== 'ACTIVE' || (row.expires_at && new Date(row.expires_at).getTime() <= Date.now())) return null
     return row
@@ -98,40 +88,11 @@ export async function resolveCredential(kind: CredentialKind, rawToken: string) 
   return null
 }
 
-export async function setCredentialMode(input: {
-  mode: CredentialMode
-  transitionFrom?: 'RFID' | 'QR' | null
-  transitionTo?: 'RFID' | 'QR' | null
-  transitionEndsAt?: string | null
-  actorId: string
-}) {
-  try {
-    if (input.mode === 'BOTH_TRANSITION' && (!input.transitionFrom || !input.transitionTo || input.transitionFrom === input.transitionTo || !input.transitionEndsAt)) {
-      throw new Error('Mode transisi memerlukan metode asal, tujuan, dan tanggal selesai.')
-    }
-    const db = await getDB()
-    const statements = [db.prepare(`UPDATE finance_credential_policy SET mode=?,transition_from=?,transition_to=?,transition_ends_at=?,updated_by=?,updated_at=datetime('now') WHERE singleton_id=1`).bind(
-      input.mode, input.transitionFrom || null, input.transitionTo || null, input.transitionEndsAt || null, input.actorId,
-    )]
-    if (input.mode === 'HYBRID') {
-      statements.push(db.prepare(`UPDATE student_credentials SET status='ACTIVE',blocked_reason=NULL WHERE status='SUSPENDED_BY_POLICY' AND physically_verified_at IS NOT NULL`))
-    } else if (input.mode !== 'BOTH_TRANSITION') {
-      const activeKind = input.mode === 'RFID' ? 'RFID_UID' : 'QR_STATIC'
-      statements.push(db.prepare(`UPDATE student_credentials SET status='SUSPENDED_BY_POLICY',blocked_reason='GLOBAL_MODE' WHERE status='ACTIVE' AND credential_kind<>?`).bind(activeKind))
-      statements.push(db.prepare(`UPDATE student_credentials SET status='ACTIVE',blocked_reason=NULL WHERE status='SUSPENDED_BY_POLICY' AND credential_kind=? AND physically_verified_at IS NOT NULL`).bind(activeKind))
-    }
-    statements.push(db.prepare(`INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,after_json)
-      VALUES(?,'STAFF',?,'SET_CREDENTIAL_MODE','CREDENTIAL_POLICY','1',?)`).bind(generateId(),input.actorId,JSON.stringify({mode:input.mode,transitionFrom:input.transitionFrom||null,transitionTo:input.transitionTo||null,transitionEndsAt:input.transitionEndsAt||null})))
-    await db.batch(statements)
-    return { success: true as const }
-  } catch (error) { return { success: false as const, ...financeError(error) } }
-}
-
 export async function getPrintableQrToken(credentialId: string): Promise<string | null> {
   const row = await queryOne<{token_encrypted:string|null;credential_kind:CredentialKind;status:string}>(
     `SELECT token_encrypted,credential_kind,status FROM student_credentials WHERE id=?`,[credentialId]
   )
-  if (!row || row.credential_kind !== 'QR_STATIC' || !row.token_encrypted || !['ACTIVE','SUSPENDED_BY_POLICY'].includes(row.status)) return null
+  if (!row || row.credential_kind !== 'QR_STATIC' || !row.token_encrypted || row.status !== 'ACTIVE') return null
   return decryptFinanceValue(row.token_encrypted)
 }
 

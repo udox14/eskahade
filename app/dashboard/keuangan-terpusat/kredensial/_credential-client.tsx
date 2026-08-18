@@ -9,10 +9,9 @@ import {
 import { toast } from 'sonner'
 import {
   createQrBatchAction, getCredentialBatchAction, getCredentialFilters, getLatestCredentialBatchAction,
-  getRfidEnrollmentQueueAction, issueCredentialAction, processQrBatchAction, searchCredentialStudents,
-  setCredentialModeAction, type CredentialStudentRow,
+  issueCredentialAction, processQrBatchAction, searchCredentialStudents,
+  type CredentialStudentRow,
 } from './actions'
-import type { CredentialMode } from '@/lib/finance/types'
 import { useKeyboardWedgeScanner } from '@/lib/finance/scanner-client'
 import { CredentialActions } from './_credential-actions'
 import {
@@ -39,11 +38,11 @@ type CardPreview = {
   asrama: string | null; kamar: string | null; photoUrl: string | null; kelas: string | null; qrSvg: string
 }
 export type CredentialInventoryRow = {
-  id: string; santri_id: string; credential_kind: 'RFID_UID' | 'QR_STATIC'
+  id: string; santri_id: string; credential_kind: 'QR_STATIC'
   card_number: string | null; status: string; print_count: number; nis: string; nama_lengkap: string
 }
-type CredentialTab = 'enrollment' | 'rfid' | 'qr' | 'cards' | 'settings'
-type Selectable = { id: string; qr_id: string | null; rfid_id: string | null }
+type CredentialTab = 'enrollment' | 'qr' | 'cards' | 'settings'
+type Selectable = { id: string; qr_id: string | null }
 
 const emptyFilters: Filters = { q: '', asrama: '', kamar: '', kelas: '', status: 'ALL' }
 
@@ -64,11 +63,8 @@ function EmptyTab({ icon: Icon, title, description, action }: {
   </section>
 }
 
-export function CredentialClient({ initialMode, credentials }: { initialMode: CredentialMode; credentials: CredentialInventoryRow[] }) {
+export function CredentialClient({ credentials }: { credentials: CredentialInventoryRow[] }) {
   const [pending, startTransition] = useTransition()
-  const [mode, setMode] = useState<CredentialMode>(initialMode)
-  const [from, setFrom] = useState<'RFID' | 'QR'>('RFID')
-  const [ends, setEnds] = useState('')
   const [activeTab, setActiveTab] = useState<CredentialTab>('enrollment')
   const [filters, setFilters] = useState<Filters>(emptyFilters)
   const [options, setOptions] = useState<Options>({ asramas: [], kamars: [], kelas: [] })
@@ -80,18 +76,12 @@ export function CredentialClient({ initialMode, credentials }: { initialMode: Cr
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [batch, setBatch] = useState<Batch>(null)
-  const [rfidQueue, setRfidQueue] = useState<CredentialStudentRow[]>([])
-  const [rfidIndex, setRfidIndex] = useState(0)
-  const [rfidValue, setRfidValue] = useState('')
   const [readerTest, setReaderTest] = useState('')
   const [pageSize, setPageSize] = useState(50)
   const [showFilterModal, setShowFilterModal] = useState(false)
-  const [isRfidFocused, setIsRfidFocused] = useState(true)
   const [exporting, setExporting] = useState<number | null>(null)
   const [preview, setPreview] = useState<CardPreview | null>(null)
   const [result, setResult] = useState<FinanceResult | null>(null)
-  const [confirmMode, setConfirmMode] = useState(false)
-  const rfidInput = useRef<HTMLInputElement>(null)
   const tour = useFinanceTour('kredensial')
 
   const load = useCallback(async (nextPage = page, nextFilters = filters, nextPageSize = pageSize) => {
@@ -114,23 +104,6 @@ export function CredentialClient({ initialMode, credentials }: { initialMode: Cr
     void load(1, filters, 50)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (rfidQueue.length) rfidInput.current?.focus()
-  }, [rfidIndex, rfidQueue.length])
-
-  const currentRfid = rfidQueue[rfidIndex] || null
-
-  const enrollRfid = useCallback(async (raw: string) => {
-    if (!currentRfid) return
-    const value = raw.trim()
-    if (value.length < 4) { toast.error('UID RFID terlalu pendek.'); return }
-    const outcome = await issueCredentialAction({ santriId: currentRfid.id, kind: 'RFID_UID', rawToken: value })
-    if ('error' in outcome) { toast.error(outcome.error); return }
-    toast.success(`RFID ${currentRfid.nama_lengkap} tersimpan.`)
-    setRfidValue('')
-    setRfidIndex(index => index + 1)
-    void load(page)
-  }, [currentRfid, load, page])
 
   useKeyboardWedgeScanner(setReaderTest, activeTab === 'settings')
 
@@ -148,21 +121,6 @@ export function CredentialClient({ initialMode, credentials }: { initialMode: Cr
   })
 
   const selectAllFiltered = () => setSelected(allFilteredSelected ? new Set() : new Set(allSelectable.map(row => row.id)))
-
-  const applyMode = () => startTransition(async () => {
-    const outcome = mode === 'BOTH_TRANSITION'
-      ? await setCredentialModeAction({ mode, transitionFrom: from, transitionTo: from === 'RFID' ? 'QR' : 'RFID', transitionEndsAt: new Date(ends).toISOString() })
-      : await setCredentialModeAction({ mode })
-    if ('error' in outcome) { setResult({ tone: 'error', message: outcome.error }); toast.error(outcome.error); return }
-    setResult({
-      tone: 'success',
-      message: 'Mode kredensial diperbarui.',
-      detail: mode === 'HYBRID' ? 'RFID dan QR keduanya diterima di loket.'
-        : mode === 'BOTH_TRANSITION' ? 'Kedua jenis diterima sampai tanggal transisi berakhir.'
-          : `Hanya ${mode} yang diterima; jenis lain ditangguhkan.`,
-    })
-    toast.success('Mode kredensial diperbarui.')
-  })
 
   const runBatch = async (batchId: string) => {
     let active = await getCredentialBatchAction(batchId) as Batch
@@ -188,17 +146,6 @@ export function CredentialClient({ initialMode, credentials }: { initialMode: Cr
       await runBatch(created.id)
     })
   }
-
-  const startRfidQueue = () => startTransition(async () => {
-    const ids = allSelectable.filter(row => selected.has(row.id) && !row.rfid_id).map(row => row.id)
-    if (!ids.length) { toast.error('Semua santri terpilih sudah memiliki RFID.'); return }
-    const queue = await getRfidEnrollmentQueueAction(ids)
-    if (!queue.length) { toast.error('Tidak ada santri yang dapat dimasukkan ke antrean RFID.'); await load(page); return }
-    setRfidQueue(queue)
-    setRfidIndex(0)
-    setRfidValue('')
-    setActiveTab('rfid')
-  })
 
   const downloadVolume = async (ids: string[], index: number) => {
     setExporting(index)
@@ -235,7 +182,6 @@ export function CredentialClient({ initialMode, credentials }: { initialMode: Cr
 
   const tabs: Array<{ id: CredentialTab; label: string; description: string; icon: typeof UsersThree; badge?: number | string }> = [
     { id: 'enrollment', label: 'Pilih Santri', description: 'Cari & pilih', icon: UsersThree, badge: selected.size || undefined },
-    { id: 'rfid', label: 'RFID', description: 'Antrean scan', icon: IdentificationCard, badge: rfidQueue.length ? `${Math.min(rfidIndex + 1, rfidQueue.length)}/${rfidQueue.length}` : undefined },
     { id: 'qr', label: 'Batch QR', description: 'Progres terbit', icon: ListChecks, badge: batch?.failed_count || undefined },
     { id: 'cards', label: 'Kartu', description: 'Preview & PDF', icon: Printer, badge: qrIds.length || undefined },
     { id: 'settings', label: 'Pengaturan', description: 'Mode & alat', icon: GearSix },
@@ -270,29 +216,7 @@ export function CredentialClient({ initialMode, credentials }: { initialMode: Cr
       </div>
     </nav>
 
-    {activeTab === 'settings' ? <section className="grid gap-4 xl:grid-cols-[1fr_1.25fr]" role="tabpanel">
-      <div data-tour="mode" className="rounded-xl border bg-white p-4">
-        <h2 className="font-bold">Mode kredensial global</h2>
-        <p className="mt-1 text-xs text-slate-500">Menentukan jenis kredensial yang diterima loket. Mengubahnya menangguhkan jenis lain di seluruh pesantren — pakai mode transisi bila ingin berpindah bertahap.</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
-          <select value={mode} onChange={event => setMode(event.target.value as CredentialMode)} className="min-h-11 rounded-xl border px-3 py-2">
-            <option value="HYBRID">RFID + QR aktif</option>
-            <option value="RFID">RFID saja</option>
-            <option value="QR">QR saja</option>
-            <option value="BOTH_TRANSITION">Mode transisi</option>
-          </select>
-          <button disabled={pending || (mode === 'BOTH_TRANSITION' && !ends)} onClick={() => setConfirmMode(true)}
-            className="min-h-11 rounded-xl bg-emerald-700 px-4 py-2 font-bold text-white disabled:opacity-50">Terapkan</button>
-        </div>
-        {mode === 'BOTH_TRANSITION' ? <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          <select value={from} onChange={event => setFrom(event.target.value as 'RFID' | 'QR')} className="min-h-11 rounded-xl border px-3">
-            <option value="RFID">RFID ke QR</option>
-            <option value="QR">QR ke RFID</option>
-          </select>
-          <input type="datetime-local" value={ends} onChange={event => setEnds(event.target.value)} className="min-h-11 rounded-xl border px-3" />
-        </div> : null}
-      </div>
-
+    {activeTab === 'settings' ? <section className="grid gap-4" role="tabpanel">
       <div className="rounded-xl border bg-white p-4">
         <div className="flex items-center gap-2"><Scan className="h-5 w-5 text-emerald-700" /><h2 className="font-bold">Uji USB reader / scanner</h2></div>
         <p className="mt-1 text-xs text-slate-500">Klik area kosong, lalu tempel kartu atau scan QR. Reader harus mengirim Enter.</p>
@@ -311,7 +235,6 @@ export function CredentialClient({ initialMode, credentials }: { initialMode: Cr
           </div>
           <div data-tour="run" className="flex flex-wrap gap-2">
             <button onClick={createQrBatch} disabled={pending || !selected.size} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"><Play className="h-4 w-4" />Terbitkan QR ({selected.size})</button>
-            <button onClick={startRfidQueue} disabled={pending || !selected.size} className="inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold disabled:opacity-50"><IdentificationCard className="h-4 w-4" />Antrean RFID</button>
             <button onClick={() => setActiveTab('cards')} disabled={!selected.size} className="inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold disabled:opacity-50"><Printer className="h-4 w-4" />Cetak kartu</button>
           </div>
         </div>
@@ -355,7 +278,6 @@ export function CredentialClient({ initialMode, credentials }: { initialMode: Cr
                 <p className="text-xs text-slate-500">{row.nis} · {row.kelas_pesantren || '-'} · {row.asrama || '-'} / {row.kamar || '-'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-xs"><span>RFID</span>{badge(row.rfid_status)}</div>
             <div className="flex items-center gap-2 text-xs"><span>QR</span>{badge(row.qr_status)}</div>
           </label>)
             : <p className="p-10 text-center text-sm text-slate-500">Tidak ada santri sesuai filter.</p>}
@@ -378,44 +300,6 @@ export function CredentialClient({ initialMode, credentials }: { initialMode: Cr
         <button disabled={page >= totalPages} onClick={() => void load(page + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Berikutnya</button>
       </div>
     </section> : null}
-
-    {activeTab === 'rfid' ? <div role="tabpanel">
-      {currentRfid ? <section className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase text-emerald-700">Enrollment RFID {rfidIndex + 1}/{rfidQueue.length}</p>
-            <h2 className="mt-1 text-xl font-black">{currentRfid.nama_lengkap}</h2>
-            <p className="text-sm">{currentRfid.nis} · {currentRfid.kelas_pesantren || '-'} · {currentRfid.asrama || '-'}</p>
-          </div>
-          <button onClick={() => setRfidQueue([])} className="text-sm text-slate-500">Tutup</button>
-        </div>
-        <div className="relative mt-4">
-          <input ref={rfidInput} data-scanner-input value={rfidValue}
-            onChange={event => setRfidValue(event.target.value)}
-            onFocus={() => setIsRfidFocused(true)}
-            onBlur={() => setIsRfidFocused(false)}
-            onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void enrollRfid(rfidValue) } }}
-            placeholder="Tempel kartu RFID - UID akan masuk di sini"
-            className="min-h-14 w-full rounded-xl border-2 border-emerald-400 bg-white px-4 font-mono text-lg outline-none focus:ring-4 focus:ring-emerald-400/20" />
-          {/* Reader USB mengirim ketikan ke elemen yang sedang fokus; bila fokus
-              lepas, scan berikutnya hilang tanpa jejak. Karena itu hilangnya
-              fokus ditandai terang-terangan. */}
-          {!isRfidFocused ? <div className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-xl bg-white/80 backdrop-blur-sm" onClick={() => rfidInput.current?.focus()}>
-            <p className="flex items-center gap-2 font-bold text-red-600 drop-shadow"><Warning weight="fill" className="h-5 w-5" /> KLIK DI SINI UNTUK MELANJUTKAN SCAN</p>
-          </div> : null}
-        </div>
-        <div className="mt-2 flex justify-between text-xs">
-          <span>Scan berhasil akan otomatis lanjut.</span>
-          <button onClick={() => setRfidIndex(index => index + 1)} className="font-bold text-amber-700">Lewati santri</button>
-        </div>
-      </section>
-        : rfidQueue.length ? <section className="rounded-xl bg-emerald-50 p-5 text-center">
-          <CheckCircle className="mx-auto h-8 w-8 text-emerald-700" />
-          <p className="mt-2 font-bold">Antrean RFID selesai.</p>
-          <button onClick={() => setRfidQueue([])} className="mt-2 text-sm text-emerald-700">Tutup</button>
-        </section>
-          : <EmptyTab icon={IdentificationCard} title="Antrean RFID masih kosong" description="Pilih santri pada tab Pilih Santri, lalu tekan Antrean RFID." action={() => setActiveTab('enrollment')} />}
-    </div> : null}
 
     {activeTab === 'qr' ? <div role="tabpanel">
       {batch ? <section className="rounded-xl border bg-white p-4">
@@ -474,9 +358,9 @@ export function CredentialClient({ initialMode, credentials }: { initialMode: Cr
               <p className="text-slate-500">{credential.nis} · {credential.card_number || credential.credential_kind}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge tone={credential.status === 'ACTIVE' ? 'emerald' : credential.status === 'SUSPENDED_BY_POLICY' ? 'amber' : 'red'}>{credential.status}</StatusBadge>
+              <StatusBadge tone={credential.status === 'ACTIVE' ? 'emerald' : 'red'}>{credential.status}</StatusBadge>
               {credential.credential_kind === 'QR_STATIC' ? <span className="text-slate-500">Dicetak {credential.print_count || 0}×</span> : null}
-              <CredentialActions id={credential.id} santriId={credential.santri_id} kind={credential.credential_kind} status={credential.status} />
+              <CredentialActions id={credential.id} santriId={credential.santri_id} status={credential.status} />
             </div>
           </div>) : <p className="p-10 text-center text-sm text-slate-500">Belum ada credential.</p>}
         </div>
@@ -566,22 +450,5 @@ export function CredentialClient({ initialMode, credentials }: { initialMode: Cr
         </div>
       </div>
     </div> : null}
-
-    <ConfirmAction
-      open={confirmMode}
-      title="Ubah mode kredensial seluruh pesantren?"
-      description={mode === 'HYBRID' ? 'RFID dan QR akan sama-sama diterima di loket.'
-        : mode === 'BOTH_TRANSITION' ? 'Kedua jenis diterima sampai tanggal transisi berakhir, setelah itu jenis lama ditangguhkan otomatis.'
-          : `Hanya ${mode} yang akan diterima di loket.`}
-      impact={mode === 'HYBRID'
-        ? ['Kredensial yang tadinya ditangguhkan karena kebijakan akan aktif kembali bila sudah diverifikasi fisik.']
-        : mode === 'BOTH_TRANSITION'
-          ? ['Setelah tanggal transisi lewat, kredensial jenis lama ditangguhkan otomatis tanpa peringatan tambahan.', 'Pastikan seluruh santri sudah menerima kartu jenis baru sebelum tanggal itu.']
-          : [`Seluruh kredensial selain ${mode} langsung ditangguhkan dan tidak dapat dipakai di loket.`, 'Santri yang hanya punya jenis lain tidak akan bisa mencairkan uang jajan.']}
-      confirmLabel="Terapkan mode"
-      pending={pending}
-      onCancel={() => setConfirmMode(false)}
-      onConfirm={() => { setConfirmMode(false); applyMode() }}
-    />
   </div>
 }

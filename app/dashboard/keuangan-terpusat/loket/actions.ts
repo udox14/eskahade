@@ -198,7 +198,7 @@ export async function getCashierBootstrap() {
     policy: {
       denominationRupiah: Number(policy?.denomination_rupiah || 5000),
       perTransactionCapRupiah: Number(policy?.per_transaction_cap_rupiah || 200000),
-      mode: policy?.mode || 'HYBRID',
+      mode: policy?.mode || 'QR',
     },
   }
 }

@@ -1,5 +1,4 @@
 import { guardPage } from '@/lib/auth/guard'
-import type { CredentialMode } from '@/lib/finance/types'
 import { CredentialClient,type CredentialInventoryRow } from './_credential-client'
 import { getCredentialData } from './actions'
 import { FINANCE_GLOSSARY,FinanceGuide,FinancePageHeader } from '../_components/finance-ui'
@@ -9,9 +8,9 @@ export const dynamic='force-dynamic'
 
 export default async function CredentialPage(){
   await guardPage('/dashboard/keuangan-terpusat/kredensial')
-  const data=await getCredentialData(),mode=(data.policy?.mode||'HYBRID') as CredentialMode
+  const data=await getCredentialData()
   return <main className="space-y-4 sm:space-y-5">
-    <FinancePageHeader title="Kredensial" description="Pendaftaran kartu massal, integrasi reader, dan pencetakan kartu QR santri." eyebrow={`Mode aktif: ${mode}`} meta={data.scope?`Scope asrama ${data.scope} · saldo dan PIN tidak pernah menempel pada kartu`:'Saldo dan PIN tidak pernah menempel pada kartu'}/>
+    <FinancePageHeader title="Kredensial" description="Pendaftaran kartu massal, integrasi reader, dan pencetakan kartu QR santri." eyebrow="Kredensial: QR Code" meta={data.scope?`Scope asrama ${data.scope} · saldo dan PIN tidak pernah menempel pada kartu`:'Saldo dan PIN tidak pernah menempel pada kartu'}/>
     <FinanceNav/>
     <FinanceGuide
       purpose="Mendaftarkan ribuan kartu santri lewat alur scan berurutan dan batch yang dapat dilanjutkan bila terputus."
@@ -29,7 +28,7 @@ export default async function CredentialPage(){
       ]}
       commonMistakes={[
         'Mencetak ulang kartu tanpa mencabut yang lama, sehingga dua kartu aktif untuk satu santri.',
-        'Mengganti mode global ke RFID saja padahal sebagian santri baru punya QR — mereka langsung tidak bisa mencairkan uang.',
+        
         'Memulai antrean RFID tanpa menguji reader dulu, lalu semua scan tertahan karena reader tidak mengirim Enter.',
         'Memilih "Pilih semua hasil" tanpa menyaring, sehingga santri yang sudah punya kartu ikut diproses ulang.',
       ]}
@@ -41,6 +40,6 @@ export default async function CredentialPage(){
         FINANCE_GLOSSARY.makerChecker,
       ]}
     />
-    <CredentialClient initialMode={mode} credentials={data.credentials as CredentialInventoryRow[]}/>
+    <CredentialClient credentials={data.credentials as CredentialInventoryRow[]}/>
   </main>
 }

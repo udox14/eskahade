@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { Clock, Money, Scan, SignOut, Wallet } from '@phosphor-icons/react'
 import { closeCashShift, identifyStudent, openCashShift, submitWithdrawal } from './actions'
 import type { CredentialKind } from '@/lib/finance/types'
-import { credentialKindFromToken, useKeyboardWedgeScanner } from '@/lib/finance/scanner-client'
+import { isQrToken, useKeyboardWedgeScanner } from '@/lib/finance/scanner-client'
 import { QrCameraScanner } from '@/components/finance/qr-camera-scanner'
 import { ConfirmAction, FinanceTour, ResultBanner, useFinanceTour, type FinanceResult, type TourStep } from '../_components/finance-ui'
 
@@ -53,7 +53,6 @@ export function CashierClient({ units, shift: initialShift, operatorName, canCon
   const [selectedUnitId, setSelectedUnitId] = useState(units[0]?.id || '')
   const selectedUnit = units.find(unit => unit.id === selectedUnitId)
   const [openingCash, setOpeningCash] = useState(selectedUnit?.fixed_float_rupiah || 0)
-  const [kind, setKind] = useState<CredentialKind>('RFID_UID')
   const [token, setToken] = useState('')
   const [student, setStudent] = useState<any>(null)
   const [limits, setLimits] = useState<LimitSummary | null>(null)
@@ -76,12 +75,14 @@ export function CashierClient({ units, shift: initialShift, operatorName, canCon
   const scanCredential = (rawToken: string) => {
     const value = rawToken.trim()
     if (!value || !shift) return
-    const detectedKind = credentialKindFromToken(value)
-    setKind(detectedKind)
+    if (!isQrToken(value)) {
+      setResult({ tone: 'error', message: 'Kode ini bukan QR santri yang sah.', detail: 'QR santri selalu berawalan SKH1. Pastikan yang dipindai adalah kartu santri, bukan barcode lain.' })
+      return
+    }
     setToken(value)
     setResult(null)
     startTransition(async () => {
-      const identified = await identifyStudent(shift.id, detectedKind, value)
+      const identified = await identifyStudent(shift.id, 'QR_STATIC', value)
       if ('error' in identified) {
         setStudent(null)
         setLimits(null)
@@ -251,7 +252,7 @@ export function CashierClient({ units, shift: initialShift, operatorName, canCon
             pending={pending}
             onCancel={() => setConfirmWithdrawal(false)}
             onConfirm={() => startTransition(async () => {
-              const withdrawn = await submitWithdrawal({ requestKey: crypto.randomUUID(), credentialKind: kind, rawToken: token, pin, amountRupiah: amount, cashUnitId: shift.cash_unit_id, shiftId: shift.id, terminalId: shift.terminal_id, identityConfirmed: confirmed })
+              const withdrawn = await submitWithdrawal({ requestKey: crypto.randomUUID(), credentialKind: 'QR_STATIC', rawToken: token, pin, amountRupiah: amount, cashUnitId: shift.cash_unit_id, shiftId: shift.id, terminalId: shift.terminal_id, identityConfirmed: confirmed })
               setConfirmWithdrawal(false)
               if ('error' in withdrawn) {
                 setResult({ tone: 'error', message: withdrawn.error, detail: 'Uang belum boleh diserahkan. Perbaiki penyebabnya lalu ulangi.' })

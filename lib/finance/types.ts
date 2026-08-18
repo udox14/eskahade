@@ -4,8 +4,10 @@ import type { FinanceAccountCode } from './postings'
 export type { FinanceAccountCode }
 
 export type WalletKind = 'TITIPAN' | 'SPP' | 'USPP' | 'NON_SPP' | 'MAKAN' | 'LAUNDRY' | 'JAJAN'
-export type CredentialKind = 'RFID_UID' | 'QR_STATIC'
-export type CredentialMode = 'RFID' | 'QR' | 'HYBRID' | 'BOTH_TRANSITION'
+// Satu metode aktif: QR. Tipe dipertahankan sebagai union satu anggota supaya
+// penambahan RFID kelak tidak perlu mengubah tanda tangan fungsi.
+export type CredentialKind = 'QR_STATIC'
+export type CredentialMode = 'QR'
 
 export type JournalEntryInput = {
   accountCode: FinanceAccountCode

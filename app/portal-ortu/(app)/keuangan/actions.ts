@@ -13,9 +13,12 @@ import { NON_SPP_JENIS_ALL, type NonSppJenis } from '@/lib/keuangan/non-spp-outs
 
 async function requirePortalFinanceAccess() {
   const session = await requirePortalSessionAction()
+  // Tingkat akses berjenjang (PRIMARY_FINANCE/VIEW/NOTIFY) dihapus: setiap wali
+  // yang tertaut ke santri punya hak penuh atas keuangan santri itu. Kendalinya
+  // ada pada penautan wali-santri, bukan pada tingkatan di dalamnya.
   if (session.guardian_id) {
-    const link = await queryOne<{ access_level: string }>(`SELECT access_level FROM finance_guardian_students WHERE guardian_id=? AND santri_id=?`, [session.guardian_id, session.santri_id])
-    if (link?.access_level !== 'PRIMARY_FINANCE') throw new Error('Hanya wali utama yang dapat mengubah keuangan santri.')
+    const link = await queryOne<{ santri_id: string }>(`SELECT santri_id FROM finance_guardian_students WHERE guardian_id=? AND santri_id=?`, [session.guardian_id, session.santri_id])
+    if (!link) throw new Error('Akun wali ini tidak tertaut ke santri tersebut.')
   }
   return session
 }

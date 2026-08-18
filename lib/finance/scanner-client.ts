@@ -2,7 +2,9 @@
 
 import { useEffect, useRef } from 'react'
 
-export function credentialKindFromToken(token:string){return token.trim().startsWith('SKH1.')?'QR_STATIC' as const:'RFID_UID' as const}
+// Hanya QR yang berlaku. Token sah selalu berawalan SKH1.; apa pun selain itu
+// bukan kredensial yang bisa dipakai di loket dan ditolak resolver.
+export function isQrToken(token:string){return token.trim().startsWith('SKH1.')}
 
 export function useKeyboardWedgeScanner(onScan:(value:string)=>void,enabled=true){
   const callback=useRef(onScan),buffer=useRef(''),lastKeyAt=useRef(0)
