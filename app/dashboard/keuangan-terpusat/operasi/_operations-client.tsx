@@ -7,14 +7,12 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { CheckCircle, FileCsv, MagnifyingGlass, Warning, XCircle } from '@phosphor-icons/react'
 import {
-  approveReopenAction,
   closePeriodAction,
   createBillAction,
   getPeriodReadinessAction,
-  importBankAction,
   importBillsAction,
-  manualMatchBankAction,
   reopenPeriodAction,
+  recordReconciliationAction,
   reviewLateTopupAction,
   settlementAction,
   voidBillAction,
@@ -35,9 +33,9 @@ type Blocker = { key: string; label: string; detail: string; count: number; href
 
 type OperationsData = {
   periods: any[]
-  imports: any[]
-  bankTransactions: any[]
-  journalCandidates: any[]
+  reconciliationTargets: Array<{ accountId: string; code: string; label: string; systemTotalRupiah: number }>
+  reconciliationChecks: any[]
+  staff: any[]
   paymentReviews: any[]
   bills: any[]
   capabilities: { view: boolean; create: boolean; check: boolean; configure: boolean; audit: boolean }
@@ -81,7 +79,7 @@ export function OperationsClient({ data }: { data: OperationsData }) {
   const [period, setPeriod] = useState(data.defaultPeriod)
   const [readiness, setReadiness] = useState(data.readiness)
   const [confirmClose, setConfirmClose] = useState(false)
-  const [reopenTarget, setReopenTarget] = useState<{ key: string; reason: string } | null>(null)
+  const [reopenTarget, setReopenTarget] = useState<{ key: string; approvedBy: string; reason: string } | null>(null)
   const [confirmReopen, setConfirmReopen] = useState(false)
   const tour = useFinanceTour('operasi')
 
@@ -101,17 +99,8 @@ export function OperationsClient({ data }: { data: OperationsData }) {
   }, [])
 
   const closed = data.periods.filter(item => item.status === 'CLOSED').length
-  const unmatched = data.bankTransactions.filter(row => row.match_status === 'UNMATCHED')
   const openBills = data.bills.filter(bill => bill.status === 'OPEN' || bill.status === 'PARTIAL')
-  const filteredTransactions = useMemo(() => {
-    const needle = bankSearch.trim().toLowerCase()
-    return data.bankTransactions.filter(row => {
-      if (bankFilter === 'UNMATCHED' && row.match_status !== 'UNMATCHED') return false
-      if (!needle) return true
-      return [row.bank_reference, row.description, row.source_filename, row.bank_account_label]
-        .some(value => String(value || '').toLowerCase().includes(needle))
-    })
-  }, [bankFilter, bankSearch, data.bankTransactions])
+  const belumDicek = data.reconciliationTargets.length - data.reconciliationChecks.length
 
   /**
    * Hasil aksi ditampilkan menetap lewat ResultBanner, bukan hanya toast.
@@ -152,17 +141,14 @@ export function OperationsClient({ data }: { data: OperationsData }) {
   }
 
   function candidatesFor(amount: number) {
-    const exact = data.journalCandidates.filter(row => Number(row.bank_amount_rupiah) === Number(amount))
-    return exact.length ? exact : data.journalCandidates
   }
 
-  const pendingWork = data.paymentReviews.length + unmatched.length
+  const pendingWork = data.paymentReviews.length + belumDicek
 
   return <div className="space-y-4 sm:space-y-5">
     <FinanceTour steps={TOUR} running={tour.running} onFinish={tour.finish} />
 
     <section data-tour="metrics" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-      <MetricCard label="Mutasi belum cocok" value={String(unmatched.length)} detail={`${data.bankTransactions.length} mutasi terbaru dimuat`} icon="fileSpreadsheet" tone={unmatched.length ? 'amber' : 'emerald'} />
       <MetricCard label="Top-up perlu review" value={String(data.paymentReviews.length)} detail="Pembayaran diterima setelah kedaluwarsa" icon="listChecks" tone={data.paymentReviews.length ? 'amber' : 'emerald'} />
       <MetricCard label="Tagihan belum lunas" value={String(openBills.length)} detail={`dari ${data.bills.length} tagihan terbaru`} icon="receipt" />
       <MetricCard label="Periode ditutup" value={String(closed)} detail="Riwayat 24 periode terakhir" icon="lock" tone="slate" />
@@ -174,7 +160,7 @@ export function OperationsClient({ data }: { data: OperationsData }) {
       <div className="flex min-w-max gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
         {TABS.map(item => {
           const active = tab === item.id
-          const badge = item.id === 'antrean' ? pendingWork : item.id === 'rekonsiliasi' ? unmatched.length : 0
+          const badge = item.id === 'antrean' ? pendingWork : item.id === 'rekonsiliasi' ? belumDicek : 0
           return <button key={item.id} type="button" onClick={() => setTab(item.id)} aria-current={active ? 'page' : undefined}
             className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs font-bold transition ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
             {item.label}
@@ -212,83 +198,48 @@ export function OperationsClient({ data }: { data: OperationsData }) {
         </div>
       </SectionPanel>
 
-      <SectionPanel title="Riwayat impor mutasi" description="Status matching per berkas dan hasil deduplikasi impor.">
-        <div className="max-h-[520px] divide-y divide-slate-100 overflow-y-auto">
-          {data.imports.length ? data.imports.map(row => <article key={row.id} className="space-y-2 px-4 py-3 text-xs">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0"><strong className="block truncate text-slate-800">{row.source_filename}</strong><span className="text-slate-500">{row.bank_account_label} · {row.created_at}</span></div>
-              <StatusBadge tone={row.status === 'FAILED' ? 'red' : row.status === 'READY' ? 'emerald' : 'amber'}>{row.status}</StatusBadge>
-            </div>
-            <div className="flex flex-wrap gap-3 text-slate-600"><span>{row.row_count} baris</span><span className="text-emerald-700">{Number(row.matched_count || 0)} cocok</span><span className={Number(row.unmatched_count) ? 'font-bold text-amber-700' : 'text-slate-500'}>{Number(row.unmatched_count || 0)} belum cocok</span></div>
-            {row.error_message ? <p className="rounded bg-red-50 p-2 text-red-700">{row.error_message}</p> : null}
-          </article>) : <EmptyState icon={FileCsv} title="Belum ada berkas mutasi" description="Impor mutasi rekening dari tab Rekonsiliasi bank untuk mulai mencocokkan." action={<button type="button" onClick={() => setTab('rekonsiliasi')} className="min-h-10 rounded-lg border border-slate-200 px-3 text-xs font-bold">Buka rekonsiliasi</button>} />}
-        </div>
-      </SectionPanel>
     </section> : null}
 
     {tab === 'rekonsiliasi' ? <div className="space-y-4">
-      <SectionPanel title="Impor mutasi bank" description="Unggah mutasi resmi rekening, lalu cocokkan baris yang belum terjelaskan.">
-        <div data-tour="import" className="grid gap-4 p-4 lg:grid-cols-2">
-          <form action={form => mutate(() => importBankAction(form), 'Mutasi berhasil diimpor dan diproses.', 'Berkas ini sudah pernah diimpor — tidak ada baris baru yang ditambahkan.')} className="grid gap-2">
-            <label className="text-xs font-bold text-slate-800">Label rekening<input name="bankLabel" required defaultValue="Rekening Utama" className={`mt-1 ${field}`} /></label>
-            <label className="text-xs font-bold text-slate-800">Berkas mutasi<input name="file" type="file" accept=".csv,.xls,.xlsx" required className={`mt-1 ${field} p-1.5`} /></label>
-            <button disabled={!data.capabilities.configure || pending} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50">Impor &amp; cocokkan otomatis</button>
-          </form>
-          <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-xs leading-5 text-slate-700">
-            <p className="font-bold text-slate-900">Yang terjadi setelah impor</p>
-            <ul className="mt-2 list-disc space-y-1 pl-4">
-              <li>CSV/XLS/XLSX maksimal 10 MB. Berkas dengan isi identik ditolak sebagai duplikat.</li>
-              <li>Kolom dikenali otomatis: tanggal, nominal/debit/kredit, referensi, dan keterangan.</li>
-              <li>Pencocokan otomatis hanya jalan bila satu nomor referensi memetakan <strong>tepat satu</strong> mutasi ke <strong>tepat satu</strong> jurnal yang belum terpakai. Sisanya wajib dicocokkan manual agar tidak ada mutasi yang terlihat beres padahal belum dijelaskan.</li>
-            </ul>
-          </div>
-        </div>
-      </SectionPanel>
-
-      <SectionPanel title="Mutasi bank &amp; pencocokan jurnal" description="Buka detail mutasi, lalu cocokkan mutasi yang belum terselesaikan ke satu jurnal terposting.">
-        <div id="reconciliation" className="scroll-mt-24 border-b border-slate-100 p-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs font-bold">
-              <button onClick={() => setBankFilter('UNMATCHED')} className={`min-h-9 rounded-md px-3 ${bankFilter === 'UNMATCHED' ? 'bg-white text-amber-800 shadow-sm' : 'text-slate-500'}`}>Belum cocok ({unmatched.length})</button>
-              <button onClick={() => setBankFilter('ALL')} className={`min-h-9 rounded-md px-3 ${bankFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Semua ({data.bankTransactions.length})</button>
-            </div>
-            <label className="relative block sm:w-80"><MagnifyingGlass className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" /><input value={bankSearch} onChange={event => setBankSearch(event.target.value)} placeholder="Cari referensi, uraian, atau berkas" className={`${field} pl-9`} /></label>
-          </div>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {filteredTransactions.length ? filteredTransactions.map(row => {
-            const candidates = candidatesFor(row.amount_rupiah)
-            const hasExact = candidates.some(candidate => Number(candidate.bank_amount_rupiah) === Number(row.amount_rupiah))
-            return <details key={row.id} className="group">
-              <summary className="grid cursor-pointer list-none gap-2 px-4 py-3 text-xs hover:bg-slate-50 sm:grid-cols-[120px_1fr_150px_120px] sm:items-center">
-                <span className="tabular-nums text-slate-500">{row.transaction_at}</span>
-                <span className="min-w-0"><strong className="block truncate text-slate-800">{row.description || 'Tanpa keterangan'}</strong><span className="font-mono text-xs text-slate-400">{row.bank_reference || 'Tanpa referensi'}</span></span>
-                <strong className={`tabular-nums sm:text-right ${Number(row.amount_rupiah) < 0 ? 'text-red-700' : 'text-emerald-700'}`}>{rupiah(row.amount_rupiah)}</strong>
-                <span className="sm:text-right"><StatusBadge tone={row.match_status === 'UNMATCHED' ? 'amber' : row.match_status === 'IGNORED' ? 'slate' : 'emerald'}>{row.match_status}</StatusBadge></span>
-              </summary>
-              <div className="border-t border-slate-100 bg-slate-50/60 p-4">
-                <div className="grid gap-3 text-xs sm:grid-cols-4">
-                  <p><span className="text-slate-500">Sumber</span><strong className="mt-1 block">{row.bank_account_label}</strong></p>
-                  <p><span className="text-slate-500">Berkas / baris</span><strong className="mt-1 block">{row.source_filename} · {row.row_number}</strong></p>
-                  <p><span className="text-slate-500">Target saat ini</span><strong className="mt-1 block font-mono">{row.matched_type ? `${row.matched_type} · ${shortId(row.matched_id)}` : '—'}</strong></p>
-                  <p><span className="text-slate-500">Dicocokkan</span><strong className="mt-1 block">{row.matched_at || '—'}</strong></p>
+      <SectionPanel
+        title="Cocokkan saldo dengan rekening koran"
+        description="Bandingkan saldo menurut pembukuan dengan saldo akhir di rekening koran, satu baris per rekening kas. Selisih wajib dijelaskan sebelum periode boleh ditutup.">
+        <div id="reconciliation" className="scroll-mt-24 divide-y divide-slate-100">
+          {data.reconciliationTargets.map(target => {
+            const existing = data.reconciliationChecks.find((row: any) => row.bank_account_label === target.label)
+            return <form key={target.accountId}
+              action={form => mutate(() => recordReconciliationAction(form), 'Hasil pencocokan tersimpan.')}
+              className="grid gap-3 p-4 lg:grid-cols-[1fr_auto] lg:items-end">
+              <input type="hidden" name="period" value={data.defaultPeriod} />
+              <input type="hidden" name="bankLabel" value={target.label} />
+              <input type="hidden" name="systemTotal" value={target.systemTotalRupiah} />
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <span className="text-xs font-bold text-slate-800">{target.label}</span>
+                  <p className="mt-1 text-xs text-slate-500">Menurut pembukuan</p>
+                  <strong className="block tabular-nums text-slate-900">{rupiah(target.systemTotalRupiah)}</strong>
                 </div>
-                {row.match_status === 'UNMATCHED' ? <form action={form => mutate(() => manualMatchBankAction(form), 'Mutasi berhasil dicocokkan.')} className="mt-4 grid gap-2 rounded-lg border border-amber-200 bg-white p-3 lg:grid-cols-[1fr_auto] lg:items-end">
-                  <input type="hidden" name="bankTransactionId" value={row.id} />
-                  <label className="text-xs font-bold text-slate-700">Jurnal terposting
-                    <select name="journalId" required defaultValue="" className={`mt-1.5 ${field}`}>
-                      <option value="" disabled>Pilih jurnal {hasExact ? 'dengan nominal yang cocok' : 'secara manual'}</option>
-                      {candidates.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.effective_date} · {candidate.description} · {rupiah(candidate.bank_amount_rupiah)} · {shortId(candidate.external_reference || candidate.id)}</option>)}
-                    </select>
-                  </label>
-                  <button disabled={!data.capabilities.configure || pending || !candidates.length} className="min-h-11 rounded-lg bg-slate-900 px-4 text-xs font-bold text-white disabled:opacity-50">Cocokkan mutasi</button>
-                  <p className="text-[11px] text-slate-500 lg:col-span-2">Satu jurnal hanya boleh dipakai untuk satu mutasi. Jika jurnalnya sudah terpakai, sistem akan menolak.</p>
-                  {!hasExact ? <p className="text-[11px] font-semibold text-amber-800 lg:col-span-2">Tidak ada kandidat bernominal sama. Pastikan jurnal yang dipilih memang mewakili mutasi ini.</p> : null}
-                </form> : null}
+                <label className="text-xs font-bold text-slate-800">Saldo di rekening koran
+                  <div className="mt-1"><RupiahInput name="statementTotal" defaultValue={Number(existing?.statement_total_rupiah ?? target.systemTotalRupiah)} /></div>
+                </label>
+                <label className="text-xs font-bold text-slate-800">Catatan bila ada selisih
+                  <input name="note" defaultValue={existing?.note || ''} placeholder="Contoh: biaya admin bank belum dibukukan" className={`mt-1 ${field}`} />
+                </label>
               </div>
-            </details>
-          }) : <EmptyState icon={CheckCircle} title="Tidak ada mutasi yang sesuai filter" description={bankFilter === 'UNMATCHED' ? 'Semua mutasi yang dimuat sudah dicocokkan ke jurnal.' : 'Impor berkas mutasi untuk mulai mencocokkan.'} />}
+              <div className="flex items-center gap-3">
+                {existing ? <StatusBadge tone={Number(existing.difference_rupiah) === 0 ? 'emerald' : 'amber'}>
+                  {Number(existing.difference_rupiah) === 0 ? 'Cocok' : `Selisih ${rupiah(existing.difference_rupiah)}`}
+                </StatusBadge> : <StatusBadge tone="slate">Belum dicek</StatusBadge>}
+                <button disabled={!data.capabilities.configure || pending}
+                  className="min-h-11 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50">Simpan</button>
+              </div>
+            </form>
+          })}
         </div>
+        <p className="border-t border-slate-100 px-4 py-3 text-[11px] leading-5 text-slate-500">
+          Impor rekening koran dan pencocokan otomatis per baris dihapus. Hasilnya tetap harus diperiksa manusia,
+          dan yang benar-benar bisa dinilai pengurus adalah satu angka total per rekening.
+        </p>
       </SectionPanel>
 
       <SectionPanel title="Posting settlement gateway" description="Catat pencairan dana gateway ke rekening bank. Bruto harus sama dengan neto ditambah biaya provider.">
@@ -414,36 +365,38 @@ export function OperationsClient({ data }: { data: OperationsData }) {
         </div>
       </SectionPanel>
 
-      <SectionPanel title="Riwayat periode pembukuan" description="Membuka kembali periode tertutup membutuhkan dua persetujuan dari orang berbeda, dan persetujuan itu hanya berlaku sekali.">
+      <SectionPanel title="Riwayat periode pembukuan" description="Membuka kembali periode tertutup butuh satu penyetuju selain yang mengajukan, dan alasannya tercatat permanen.">
         <div className="divide-y divide-slate-100">{data.periods.length ? data.periods.map(item => <article key={item.period_key} className="px-4 py-3 text-xs">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <strong className="text-sm">{item.period_key}</strong>
             <div className="flex items-center gap-2">
               <StatusBadge tone={item.status === 'CLOSED' ? 'slate' : 'emerald'}>{item.status === 'CLOSED' ? 'Terkunci' : 'Terbuka'}</StatusBadge>
-              {item.status === 'CLOSED' ? <StatusBadge tone={Number(item.approval_count) >= 2 ? 'emerald' : 'amber'}>{item.approval_count} dari 2 persetujuan</StatusBadge> : null}
+
             </div>
           </div>
           {item.closed_at ? <p className="mt-1 text-slate-500">Ditutup {item.closed_at}{item.reopened_at ? ` · pernah dibuka kembali ${item.reopened_at}` : ''}</p> : null}
-          {item.status === 'CLOSED' ? <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <form action={form => mutate(() => approveReopenAction(form), 'Persetujuan reopen dicatat.')} className="grid gap-2 rounded-lg border border-slate-200 p-3">
-              <p className="font-bold text-slate-700">1. Kumpulkan persetujuan</p>
-              <input type="hidden" name="period" value={item.period_key} />
-              <input name="reason" required minLength={10} placeholder="Alasan persetujuan (min. 10 karakter)" className={field} />
-              <button disabled={!data.capabilities.check || pending} className="min-h-11 rounded-lg border border-slate-200 px-3 font-bold disabled:opacity-50">Setujui pembukaan</button>
-            </form>
-            <div className="grid gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
-              <p className="font-bold text-amber-900">2. Buka kembali</p>
-              <p className="leading-4 text-amber-800">Butuh minimal dua persetujuan dari orang berbeda. Setelah dibuka, persetujuan tersebut habis terpakai.</p>
-              <input
-                value={reopenTarget?.key === item.period_key ? reopenTarget?.reason ?? '' : ''}
-                onChange={event => setReopenTarget({ key: item.period_key, reason: event.target.value })}
-                minLength={10} placeholder="Alasan final pembukaan (min. 10 karakter)" className={field} />
-              <button type="button"
-                disabled={!data.capabilities.configure || Number(item.approval_count) < 2 || pending
-                  || reopenTarget?.key !== item.period_key || (reopenTarget?.reason.trim().length ?? 0) < 10}
-                onClick={() => setConfirmReopen(true)}
-                className="min-h-11 rounded-lg bg-amber-600 px-3 font-bold text-white disabled:opacity-50">Buka kembali periode</button>
-            </div>
+          {item.reopen_reason ? <p className="mt-1 text-amber-800">Alasan dibuka kembali: {item.reopen_reason}</p> : null}
+          {item.status === 'CLOSED' ? <div className="mt-3 grid gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+            <p className="font-bold text-amber-900">Buka kembali periode</p>
+            <p className="leading-4 text-amber-800">Butuh satu penyetuju selain Anda. Alasannya tercatat permanen di periode dan audit log.</p>
+            <select
+              value={reopenTarget?.key === item.period_key ? reopenTarget?.approvedBy ?? '' : ''}
+              onChange={event => setReopenTarget({ key: item.period_key, approvedBy: event.target.value, reason: reopenTarget?.key === item.period_key ? reopenTarget!.reason : '' })}
+              className={field}>
+              <option value="">Pilih penyetuju</option>
+              {data.staff.map((person: any) => <option key={person.id} value={person.id}>{person.full_name}</option>)}
+            </select>
+            <input
+              value={reopenTarget?.key === item.period_key ? reopenTarget?.reason ?? '' : ''}
+              onChange={event => setReopenTarget({ key: item.period_key, approvedBy: reopenTarget?.key === item.period_key ? reopenTarget!.approvedBy : '', reason: event.target.value })}
+              minLength={10} placeholder="Alasan pembukaan kembali (min. 10 karakter)" className={field} />
+            <button type="button"
+              disabled={!data.capabilities.configure || pending
+                || reopenTarget?.key !== item.period_key
+                || !reopenTarget?.approvedBy
+                || (reopenTarget?.reason.trim().length ?? 0) < 10}
+              onClick={() => setConfirmReopen(true)}
+              className="min-h-11 rounded-lg bg-amber-600 px-3 font-bold text-white disabled:opacity-50">Buka kembali periode</button>
           </div> : null}
         </article>) : <EmptyState icon={CheckCircle} title="Belum ada periode pembukuan" description="Periode akan muncul setelah tutup buku pertama dilakukan." />}</div>
       </SectionPanel>
@@ -489,6 +442,7 @@ export function OperationsClient({ data }: { data: OperationsData }) {
         const target = reopenTarget
         const form = new FormData()
         form.set('period', target.key)
+        form.set('approvedBy', target.approvedBy)
         form.set('reason', target.reason.trim())
         setConfirmReopen(false)
         setReopenTarget(null)

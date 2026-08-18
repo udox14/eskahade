@@ -12,12 +12,12 @@ export const dynamic = 'force-dynamic'
 type DashboardData = Awaited<ReturnType<typeof getFinanceDashboard>>
 
 const rupiah = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
-const alertLabel: Record<string, string> = { LATE_TOPUP: 'Top-up terlambat', UNMATCHED_BANK: 'Mutasi belum cocok', PAYOUT_FAILED: 'Payout gagal' }
+const alertLabel: Record<string, string> = { LATE_TOPUP: 'Top-up terlambat', SELISIH_BANK: 'Selisih dengan rekening koran', PAYOUT_GAGAL: 'Pencairan gagal' }
 const softAlertLabel: Record<string, string> = { LARGE_TOPUP: 'Top-up besar (30 hari)', HIGH_STUDENT_BALANCE: 'Saldo santri tinggi', HIGH_FLOAT: 'Float wali tinggi' }
 const alertHref: Record<string, string> = {
   LATE_TOPUP: '/dashboard/keuangan-terpusat/operasi#review',
-  UNMATCHED_BANK: '/dashboard/keuangan-terpusat/operasi#reconciliation',
-  PAYOUT_FAILED: '/dashboard/keuangan-terpusat/payout',
+  SELISIH_BANK: '/dashboard/keuangan-terpusat/operasi#reconciliation',
+  PAYOUT_GAGAL: '/dashboard/keuangan-terpusat/payout',
 }
 
 function SoftAlertPanel({ data }: { data: DashboardData }) {

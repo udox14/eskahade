@@ -57,16 +57,16 @@ export async function getFinanceAlerts(): Promise<KeuanganMonitoring['alert']> {
       `SELECT 'LATE_TOPUP' AS kind, COUNT(*) AS count, COALESCE(SUM(amount_rupiah), 0) AS amount_rupiah
        FROM finance_payment_intents WHERE review_status = 'REQUIRED'
        UNION ALL
-       SELECT 'UNMATCHED_BANK', COUNT(*), COALESCE(SUM(ABS(amount_rupiah)), 0)
-       FROM finance_bank_transactions WHERE match_status = 'UNMATCHED'
+       SELECT 'SELISIH_BANK', COUNT(*), COALESCE(SUM(ABS(difference_rupiah)), 0)
+       FROM finance_reconciliation_checks WHERE difference_rupiah <> 0
        UNION ALL
-       SELECT 'PAYOUT_FAILED', COUNT(*), COALESCE(SUM(amount_rupiah), 0)
-       FROM finance_payouts WHERE status = 'FAILED'`
+       SELECT 'PAYOUT_GAGAL', COUNT(*), COALESCE(SUM(amount_rupiah), 0)
+       FROM finance_payouts WHERE status = 'GAGAL'`
     )
     const labelMap: Record<string, string> = {
       LATE_TOPUP: 'Topup perlu review',
-      UNMATCHED_BANK: 'Transaksi bank belum dipasangkan',
-      PAYOUT_FAILED: 'Payout gagal',
+      SELISIH_BANK: 'Selisih dengan rekening koran',
+      PAYOUT_GAGAL: 'Pencairan gagal',
     }
     return rows
       .map(row => ({

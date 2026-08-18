@@ -35,13 +35,13 @@ export async function getFinanceDashboard(asramaScope: string | null): Promise<F
   const alertsPromise = !asramaScope
     ? financeQuery<{ kind: string; count: number; amount_rupiah: number }>(`SELECT 'LATE_TOPUP' kind,COUNT(*) count,COALESCE(SUM(amount_rupiah),0) amount_rupiah
         FROM finance_payment_intents WHERE review_status='REQUIRED'
-        UNION ALL SELECT 'UNMATCHED_BANK',COUNT(*),COALESCE(SUM(ABS(amount_rupiah)),0) FROM finance_bank_transactions WHERE match_status='UNMATCHED'
-        UNION ALL SELECT 'PAYOUT_FAILED',COUNT(*),COALESCE(SUM(amount_rupiah),0) FROM finance_payouts WHERE status='FAILED'`)
+        UNION ALL SELECT 'SELISIH_BANK',COUNT(*),COALESCE(SUM(ABS(difference_rupiah)),0) FROM finance_reconciliation_checks WHERE difference_rupiah<>0
+        UNION ALL SELECT 'PAYOUT_GAGAL',COUNT(*),COALESCE(SUM(amount_rupiah),0) FROM finance_payouts WHERE status='GAGAL'`)
     : financeQuery<{ kind: string; count: number; amount_rupiah: number }>(`SELECT 'LATE_TOPUP' kind,COUNT(*) count,COALESCE(SUM(p.amount_rupiah),0) amount_rupiah
         FROM finance_payment_intents p JOIN finance_student_snapshots s ON s.santri_id=p.santri_id
         WHERE p.review_status='REQUIRED' AND s.asrama=?
-        UNION ALL SELECT 'UNMATCHED_BANK',0,0
-        UNION ALL SELECT 'PAYOUT_FAILED',COUNT(*),COALESCE(SUM(amount_rupiah),0) FROM finance_payouts WHERE status='FAILED' AND asrama_scope=?`,
+        UNION ALL SELECT 'SELISIH_BANK',0,0
+        UNION ALL SELECT 'PAYOUT_GAGAL',COUNT(*),COALESCE(SUM(amount_rupiah),0) FROM finance_payouts WHERE status='GAGAL' AND asrama_scope=?`,
       [asramaScope, asramaScope])
   const accountBalancesPromise = !asramaScope
     ? financeQuery<{ code: string; name: string; account_type: string; balance_rupiah: number }>(`SELECT a.code,a.name,a.account_type,COALESCE(b.balance_rupiah,0) balance_rupiah
