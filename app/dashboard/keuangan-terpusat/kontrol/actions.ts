@@ -55,24 +55,6 @@ export async function updateFinanceSettingAction(form:FormData){
   }catch(error){return{success:false as const,error:error instanceof Error?error.message:'Pengaturan tidak valid.'}}
 }
 
-export async function retryOutboxAction(id:string){
-  const session=await requireFinanceAccess('EXECUTE')
-  const db=await getFinanceDB(),result=await db.prepare(`UPDATE finance_outbox SET status='PENDING',available_at=datetime('now'),last_error=NULL WHERE id=? AND status='FAILED'`).bind(id).run()
-  if(!result.meta?.changes)return{success:false as const,error:'Event tidak ditemukan atau bukan berstatus FAILED.'}
-  await db.prepare(`INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id) VALUES(?,'STAFF',?,'RETRY','OUTBOX_EVENT',?)`).bind(generateId(),session.id,id).run()
-  revalidatePath(PATH)
-  return{success:true as const}
-}
-
-export async function revokeFinanceSessionAction(id:string){
-  const session=await requireFinanceAccess('CONFIGURE')
-  const db=await getFinanceDB(),result=await db.prepare(`UPDATE finance_staff_sessions SET revoked_at=datetime('now') WHERE id=? AND revoked_at IS NULL AND datetime(expires_at)>datetime('now')`).bind(id).run()
-  if(!result.meta?.changes)return{success:false as const,error:'Sesi sudah berakhir, sudah dicabut, atau tidak ditemukan.'}
-  await db.prepare(`INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id) VALUES(?,'STAFF',?,'REVOKE','FINANCE_STAFF_SESSION',?)`).bind(generateId(),session.id,id).run()
-  revalidatePath(PATH)
-  return{success:true as const}
-}
-
 export async function getFinanceControlData(){
   const session=await requireFinanceAccess('VIEW')
   const capabilities=await financeCapabilities(session)
@@ -81,21 +63,12 @@ export async function getFinanceControlData(){
   const users=await query<any>(`SELECT id,full_name,email FROM users`)
   const names=new Map(users.map(row=>[row.id,row.full_name||row.email]))
   const settings=await financeQuery<any>(`SELECT * FROM finance_settings ORDER BY key`)
-  const outbox=await financeQuery<any>(`SELECT id,event_type,aggregate_type,aggregate_id,status,attempts,available_at,processed_at,last_error,created_at FROM finance_outbox ORDER BY CASE status WHEN 'FAILED' THEN 0 WHEN 'PENDING' THEN 1 WHEN 'PROCESSING' THEN 2 ELSE 3 END,created_at DESC LIMIT 250`)
-  const mfa=await financeQuery<any>(`SELECT user_id,method,enabled_at,last_verified_at FROM finance_staff_mfa ORDER BY enabled_at DESC`)
-  const sessions=await financeQuery<any>(`SELECT id,user_id,created_at,expires_at,revoked_at,ip_address,user_agent FROM finance_staff_sessions ORDER BY created_at DESC LIMIT 150`)
-  const authTrend=await financeQuery<any>(`SELECT date(created_at,'+7 hours') day,COUNT(*) attempts,SUM(CASE WHEN succeeded=1 THEN 1 ELSE 0 END) succeeded,SUM(CASE WHEN succeeded=0 THEN 1 ELSE 0 END) failed FROM finance_auth_attempts WHERE datetime(created_at)>=datetime('now','-14 days') GROUP BY date(created_at,'+7 hours') ORDER BY day`)
   const audit=canAudit?await financeQuery<any>(`SELECT * FROM finance_audit_log ORDER BY created_at DESC LIMIT 500`):[]
   return{
     settings,
-    outbox,
-    mfa:mfa.map(row=>({...row,user_name:names.get(row.user_id)||row.user_id})),
-    sessions:sessions.map(row=>({...row,user_name:names.get(row.user_id)||row.user_id})),
-    authTrend,
     audit:audit.map(row=>({...row,actor_name:names.get(row.actor_id)||row.actor_id||row.actor_type})),
     canAudit,
     canConfigure,
-    canExecute:capabilities.execute,
     nowMs:Date.now(),
   }
 }

@@ -147,7 +147,7 @@ export function LedgerClient({ data, initialSearch = '' }: { data: any; initialS
 
     <ResultBanner result={result} onDismiss={() => setResult(null)} />
 
-    {data.canExecute ? <SectionPanel title="Posting jurnal manual" description="Gunakan hanya untuk penyesuaian akuntansi yang memiliki dokumen sumber; debit dan kredit wajib seimbang.">
+    {data.canConfigure ? <SectionPanel title="Posting jurnal manual" description="Gunakan hanya untuk penyesuaian akuntansi yang memiliki dokumen sumber; debit dan kredit wajib seimbang.">
       <details data-tour="journal-form">
         <summary className="cursor-pointer px-4 py-3 text-xs font-bold text-emerald-700">Buka formulir jurnal manual</summary>
         <form action={form => mutate(() => postManualJournalAction(form), 'Jurnal manual berhasil diposting.', () => draft.clear())} className="space-y-4 border-t border-slate-100 p-4">
@@ -227,7 +227,7 @@ export function LedgerClient({ data, initialSearch = '' }: { data: any; initialS
       <div data-tour="ledger-list" className="divide-y divide-slate-100">
         {filtered.length ? filtered.map((journal: any) => {
           const entries = entriesByJournal.get(journal.id) || []
-          const canReverse = data.canExecute && journal.status === 'POSTED' && journal.source_type === 'MANUAL' && !journal.reversal_of_id && !journal.reversed_by_id
+          const canReverse = data.canConfigure && journal.status === 'POSTED' && journal.source_type === 'MANUAL' && !journal.reversal_of_id && !journal.reversed_by_id
           return <details key={journal.id}>
             <summary className="grid cursor-pointer list-none gap-2 px-4 py-3 text-xs hover:bg-slate-50 sm:grid-cols-[100px_1fr_130px_160px_110px] sm:items-center">
               <span className="tabular-nums text-slate-500">{journal.effective_date}</span>

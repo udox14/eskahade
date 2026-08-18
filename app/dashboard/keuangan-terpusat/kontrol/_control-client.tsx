@@ -6,11 +6,11 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ArrowClockwise, CheckCircle, MagnifyingGlass, ShieldCheck, Warning } from '@phosphor-icons/react'
 import {
-  ConfirmAction, EmptyState, FINANCE_FIELD_CLASS, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
+  EmptyState, FINANCE_FIELD_CLASS, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
   useFinanceTour, type FinanceResult, type TourStep,
 } from '../_components/finance-ui'
 import { ExportButton, RupiahInput } from '../_components/finance-inputs'
-import { retryOutboxAction, revokeFinanceSessionAction, updateFinanceSettingAction } from './actions'
+import { updateFinanceSettingAction } from './actions'
 
 const field = FINANCE_FIELD_CLASS
 
@@ -60,8 +60,6 @@ type RangeId = typeof RANGES[number]['id']
 
 const TOUR: TourStep[] = [
   { target: '[data-tour="settings"]', title: 'Pengaturan runtime', body: 'Nilai di sini mengubah perilaku seluruh modul keuangan tanpa perlu deploy. Setiap kolom sudah berbentuk sesuai isinya — angka, rupiah, tanggal, atau jam — dan perubahannya tercatat di audit log.' },
-  { target: '[data-tour="outbox"]', title: 'Antrean event', body: 'Notifikasi dan integrasi dikirim lewat antrean ini. Event berstatus FAILED bisa dicoba ulang; retry hanya mengembalikannya ke antrean, tidak mengubah transaksinya.' },
-  { target: '[data-tour="sessions"]', title: 'Sesi dan MFA staf', body: 'Cabut sesi bila ada perangkat yang hilang atau akses mencurigakan. Pencabutan berlaku langsung dan diminta konfirmasi lebih dulu.' },
   { target: '[data-tour="audit"]', title: 'Audit trail', body: 'Saring dengan rentang waktu, pelaku, tindakan, dan jenis entitas — tidak perlu mengetik kata kunci menebak-nebak. Hasil yang tersaring bisa diunduh sebagai Excel.' },
 ]
 
@@ -71,12 +69,8 @@ export function FinanceControlClient({ data }: { data: any }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [result, setResult] = useState<FinanceResult | null>(null)
-  const [confirmRevoke, setConfirmRevoke] = useState<any>(null)
   const tour = useFinanceTour('kontrol')
   const now = Number(data.nowMs)
-  const failedOutbox = data.outbox.filter((row: any) => row.status === 'FAILED')
-  const activeSessions = data.sessions.filter((row: any) => !row.revoked_at && new Date(row.expires_at).getTime() > now)
-  const failedAuth = data.authTrend.reduce((sum: number, row: any) => sum + Number(row.failed), 0)
 
   const act: Mutate = (work, success) => startTransition(async () => {
     try {
@@ -100,48 +94,18 @@ export function FinanceControlClient({ data }: { data: any }) {
   return <div className="space-y-4 sm:space-y-5">
     <FinanceTour steps={TOUR} running={tour.running} onFinish={tour.finish} />
 
-    <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+    <section className="grid grid-cols-1 gap-3">
       <MetricCard label="Audit dimuat" value={String(data.audit.length)} detail={data.canAudit ? '500 aktivitas terbaru' : 'Khusus checker/auditor'} icon="fileSpreadsheet" tone="blue" />
-      <MetricCard label="Outbox gagal" value={String(failedOutbox.length)} detail={`${data.outbox.filter((row: any) => row.status === 'PENDING').length} event pending`} icon="listChecks" tone={failedOutbox.length ? 'amber' : 'emerald'} />
-      <MetricCard label="Sesi finance aktif" value={String(activeSessions.length)} detail={`${data.mfa.length} staf memiliki MFA`} icon="lock" tone="slate" />
-      <MetricCard label="Login gagal 14 hari" value={String(failedAuth)} detail="Agregat finance auth attempts" icon="checkCircle" tone={failedAuth ? 'amber' : 'emerald'} />
     </section>
 
     <ResultBanner result={result} onDismiss={() => setResult(null)} />
 
-    <section className="grid gap-4 xl:grid-cols-2">
-      <SettingsPanel data={data} act={act} pending={pending} />
-      <OutboxPanel data={data} act={act} pending={pending} />
-    </section>
-
-    <section className="grid gap-4 xl:grid-cols-2">
-      <SessionsPanel data={data} now={now} pending={pending} onRevoke={setConfirmRevoke} />
-      <AuthTrendPanel data={data} />
-    </section>
+    <SettingsPanel data={data} act={act} pending={pending} />
 
     {data.canAudit
       ? <AuditPanel data={data} now={now} />
       : <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"><Warning className="mr-2 inline h-5 w-5" />Audit trail terperinci hanya tersedia untuk checker Dewan Santri.</div>}
 
-    <ConfirmAction
-      open={Boolean(confirmRevoke)}
-      tone="red"
-      title={`Cabut sesi keuangan ${confirmRevoke?.user_name ?? ''}?`}
-      description="Sesi berakhir seketika di seluruh perangkat yang memakainya."
-      impact={[
-        'Pekerjaan yang belum disimpan di perangkat tersebut akan hilang.',
-        'Staf harus masuk ulang beserta verifikasi tambahan sebelum bisa melanjutkan.',
-        'Pencabutan tercatat di audit log dengan nama Anda dan tidak dapat dibatalkan.',
-      ]}
-      confirmLabel="Cabut sesi"
-      pending={pending}
-      onCancel={() => setConfirmRevoke(null)}
-      onConfirm={() => {
-        const target = confirmRevoke
-        setConfirmRevoke(null)
-        act(() => revokeFinanceSessionAction(target.id), 'Sesi finance dicabut.')
-      }}
-    />
   </div>
 }
 
@@ -231,62 +195,6 @@ function SettingForm({ row, canConfigure, act, pending }: { row: any; canConfigu
     {problem ? <p className="text-[11px] font-semibold text-red-700">{problem}</p> : null}
     {canConfigure ? <button disabled={pending || Boolean(problem)} className="min-h-10 justify-self-end rounded-lg bg-slate-900 px-4 text-xs font-bold text-white disabled:opacity-50">Simpan</button> : null}
   </form>
-}
-
-function OutboxPanel({ data, act, pending }: { data: any; act: Mutate; pending: boolean }) {
-  return <SectionPanel title="Antrean event" description="Notifikasi dan integrasi dikirim lewat antrean ini; retry hanya mengembalikan event gagal ke antrean.">
-    <div data-tour="outbox" className="max-h-[520px] divide-y divide-slate-100 overflow-y-auto">
-      {data.outbox.length ? data.outbox.map((row: any) => <article key={row.id} className="space-y-2 px-4 py-3 text-xs">
-        <div className="flex items-start justify-between gap-3">
-          <div><strong>{row.event_type}</strong><p className="text-slate-500">{row.aggregate_type} · {row.aggregate_id}</p></div>
-          <StatusBadge tone={row.status === 'FAILED' ? 'red' : row.status === 'SENT' ? 'emerald' : row.status === 'PENDING' ? 'amber' : 'blue'}>{row.status}</StatusBadge>
-        </div>
-        <p className="text-slate-500">{row.created_at} · {row.attempts} percobaan</p>
-        {row.last_error ? <p className="rounded bg-red-50 p-2 text-red-700">{row.last_error}</p> : null}
-        {data.canExecute && row.status === 'FAILED' ? <button disabled={pending} onClick={() => act(() => retryOutboxAction(row.id), 'Event dikembalikan ke antrean.')} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 font-bold text-amber-800 disabled:opacity-50"><ArrowClockwise />Coba kirim ulang</button> : null}
-      </article>) : <EmptyState icon={CheckCircle} title="Belum ada event" description="Antrean terisi otomatis saat transaksi keuangan terjadi. Kosong berarti belum ada yang perlu dikirim." />}
-    </div>
-  </SectionPanel>
-}
-
-function SessionsPanel({ data, now, pending, onRevoke }: { data: any; now: number; pending: boolean; onRevoke: (row: any) => void }) {
-  return <SectionPanel title="MFA &amp; sesi staf" description="Kunci MFA tidak pernah dikirim ke layar; bendahara dapat mencabut sesi yang masih aktif.">
-    <div className="border-b border-slate-100 p-4">
-      <h3 className="text-xs font-bold">Cakupan MFA</h3>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {data.mfa.length ? data.mfa.map((row: any) => <span key={row.user_id} className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-800"><strong>{row.user_name}</strong> · {row.method}</span>)
-          : <span className="text-xs text-amber-700">Belum ada staf finance dengan MFA tercatat.</span>}
-      </div>
-    </div>
-    <div data-tour="sessions" className="max-h-80 divide-y divide-slate-100 overflow-y-auto">
-      {data.sessions.length ? data.sessions.map((row: any) => {
-        const active = !row.revoked_at && new Date(row.expires_at).getTime() > now
-        return <article key={row.id} className="flex items-start justify-between gap-3 px-4 py-3 text-xs">
-          <div className="min-w-0">
-            <strong>{row.user_name}</strong>
-            <p className="text-slate-500">{row.created_at} — {row.expires_at}</p>
-            <p className="mt-1 max-w-md truncate text-[11px] text-slate-400">{row.user_agent || 'User agent tidak tersedia'}</p>
-          </div>
-          <div className="shrink-0 text-right">
-            <StatusBadge tone={active ? 'emerald' : 'slate'}>{active ? 'AKTIF' : row.revoked_at ? 'DICABUT' : 'BERAKHIR'}</StatusBadge>
-            {data.canConfigure && active ? <button disabled={pending} onClick={() => onRevoke(row)} className="mt-2 block min-h-9 rounded-lg border border-red-200 px-3 font-bold text-red-700 disabled:opacity-50">Cabut</button> : null}
-          </div>
-        </article>
-      }) : <EmptyState icon={ShieldCheck} title="Belum ada sesi khusus keuangan" description="Sesi tercatat di sini saat staf masuk ke modul keuangan dengan verifikasi tambahan." />}
-    </div>
-  </SectionPanel>
-}
-
-function AuthTrendPanel({ data }: { data: any }) {
-  return <SectionPanel title="Percobaan autentikasi 14 hari" description="Agregat sukses/gagal tanpa mengekspos identity hash atau IP hash.">
-    <div className="divide-y divide-slate-100">
-      {data.authTrend.length ? data.authTrend.map((row: any) => <div key={row.day} className="grid grid-cols-[1fr_auto_auto] gap-4 px-4 py-3 text-xs">
-        <strong>{row.day}</strong>
-        <span className="text-emerald-700">{row.succeeded} sukses</span>
-        <span className={Number(row.failed) ? 'font-bold text-red-700' : 'text-slate-400'}>{row.failed} gagal</span>
-      </div>) : <div className="p-10 text-center text-sm text-slate-500"><ShieldCheck className="mx-auto mb-2 h-8 w-8 text-emerald-500" />Belum ada percobaan autentikasi finance.</div>}
-    </div>
-  </SectionPanel>
 }
 
 /**

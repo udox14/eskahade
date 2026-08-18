@@ -22,7 +22,7 @@ import { accountNumberProblem, bankCodeProblem, BANK_CODES, BANK_CODE_OTHER } fr
 const field = FINANCE_FIELD_CLASS
 const rupiah = (value: number) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`
 
-type Capabilities = { view: boolean; create: boolean; check: boolean; execute: boolean; configure: boolean; audit: boolean }
+type Capabilities = { view: boolean; create: boolean; check: boolean; configure: boolean; audit: boolean }
 
 /**
  * Alur payout adalah rantai empat tahap dengan pemisahan tugas. Urutan dan
@@ -158,7 +158,7 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
   const selectableReconcile = visiblePayouts.filter(row => row.status === 'PROVIDER_SUCCESS')
   const chosenCheck = selectableCheck.filter(row => selected.has(row.id))
   const chosenReconcile = selectableReconcile.filter(row => selected.has(row.id))
-  const canSelect = (row: any) => (row.status === 'SUBMITTED' && capabilities.check) || (row.status === 'PROVIDER_SUCCESS' && capabilities.execute)
+  const canSelect = (row: any) => (row.status === 'SUBMITTED' && capabilities.check) || (row.status === 'PROVIDER_SUCCESS' && capabilities.configure)
 
   function toggle(id: string) {
     setSelected(current => {
@@ -449,14 +449,14 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
             </div>
             <div className="grid gap-2 sm:flex sm:flex-wrap lg:justify-end">
               {row.status === 'SUBMITTED' ? <button disabled={!capabilities.check || pending} onClick={() => act(() => checkPayoutAction(row.id), 'Payout lolos pemeriksaan dan siap dieksekusi.')} className="min-h-11 rounded-lg border border-slate-200 px-3 text-xs font-bold disabled:opacity-50">Periksa payout</button> : null}
-              {row.status === 'CHECKED' && row.method === 'API' ? <button disabled={!capabilities.execute || pending} onClick={() => setConfirmApi(row)} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-50">Kirim via API</button> : null}
-              {row.status === 'CHECKED' && row.method !== 'API' ? <button disabled={!capabilities.execute || pending} onClick={() => setExecuteTarget({ id: row.id, reference: '', name: row.recipient_name, amount: total })} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-50">Catat eksekusi</button> : null}
-              {row.status === 'PROVIDER_SUCCESS' ? <button disabled={!capabilities.execute || pending} onClick={() => act(() => reconcilePayoutAction(row.id), 'Payout ditandai cocok dengan mutasi bank.')} className="min-h-11 rounded-lg border border-slate-200 px-3 text-xs font-bold disabled:opacity-50">Tandai direkonsiliasi</button> : null}
+              {row.status === 'CHECKED' && row.method === 'API' ? <button disabled={!capabilities.configure || pending} onClick={() => setConfirmApi(row)} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-50">Kirim via API</button> : null}
+              {row.status === 'CHECKED' && row.method !== 'API' ? <button disabled={!capabilities.configure || pending} onClick={() => setExecuteTarget({ id: row.id, reference: '', name: row.recipient_name, amount: total })} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-50">Catat eksekusi</button> : null}
+              {row.status === 'PROVIDER_SUCCESS' ? <button disabled={!capabilities.configure || pending} onClick={() => act(() => reconcilePayoutAction(row.id), 'Payout ditandai cocok dengan mutasi bank.')} className="min-h-11 rounded-lg border border-slate-200 px-3 text-xs font-bold disabled:opacity-50">Tandai direkonsiliasi</button> : null}
             </div>
           </article>
         }) : <EmptyState icon={PaperPlaneTilt} title={statusFilter === 'ACTIVE' ? 'Tidak ada payout berjalan' : 'Belum ada payout'} description={statusFilter === 'ACTIVE' ? 'Semua payout sudah direkonsiliasi atau dibatalkan.' : 'Ajukan payout pertama lewat formulir di atas.'} />}
       </div>
-      {selectableCheck.length + selectableReconcile.length > 1 && (capabilities.check || capabilities.execute)
+      {selectableCheck.length + selectableReconcile.length > 1 && (capabilities.check || capabilities.configure)
         ? <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 px-4 py-2.5 text-[11px] text-slate-500">
           <button type="button" onClick={() => setSelected(new Set([...selectableCheck, ...selectableReconcile].filter(canSelect).map(row => row.id)))} className="font-bold text-blue-700 underline">Pilih semua yang bisa ditindak</button>
           <span>Centang beberapa payout untuk memeriksa atau menandai rekonsiliasi sekaligus.</span>

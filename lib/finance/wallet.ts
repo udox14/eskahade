@@ -95,8 +95,6 @@ export async function allocateStudentFunds(input: {
       ...(input.billItems||[]).map(item=>
         db.prepare(`INSERT INTO finance_allocation_bill_items(allocation_id,bill_id,amount_rupiah) VALUES(?,?,?)`).bind(allocationId,item.billId,item.amountRupiah)),
       db.prepare(`UPDATE finance_journals SET status='POSTED',posted_at=datetime('now') WHERE id=? AND status='DRAFT'`).bind(journal.journalId),
-      db.prepare(`INSERT INTO finance_outbox(id,event_type,aggregate_type,aggregate_id,payload_json)
-        VALUES(?,?,?,?,?)`).bind(generateId(), 'ALLOCATION_CREATED', 'ALLOCATION', allocationId, JSON.stringify({ santriId: input.santriId, destination: input.destination, amountRupiah: input.amountRupiah })),
     ])
     return { success: true as const, allocationId, journalId: journal.journalId }
   } catch (error) {

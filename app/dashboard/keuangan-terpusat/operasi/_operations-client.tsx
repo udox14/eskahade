@@ -40,7 +40,7 @@ type OperationsData = {
   journalCandidates: any[]
   paymentReviews: any[]
   bills: any[]
-  capabilities: { view: boolean; create: boolean; check: boolean; execute: boolean; configure: boolean; audit: boolean }
+  capabilities: { view: boolean; create: boolean; check: boolean; configure: boolean; audit: boolean }
   defaultPeriod: string
   readiness: { valid: boolean; blockers: Blocker[] }
 }
@@ -232,7 +232,7 @@ export function OperationsClient({ data }: { data: OperationsData }) {
           <form action={form => mutate(() => importBankAction(form), 'Mutasi berhasil diimpor dan diproses.', 'Berkas ini sudah pernah diimpor — tidak ada baris baru yang ditambahkan.')} className="grid gap-2">
             <label className="text-xs font-bold text-slate-800">Label rekening<input name="bankLabel" required defaultValue="Rekening Utama" className={`mt-1 ${field}`} /></label>
             <label className="text-xs font-bold text-slate-800">Berkas mutasi<input name="file" type="file" accept=".csv,.xls,.xlsx" required className={`mt-1 ${field} p-1.5`} /></label>
-            <button disabled={!data.capabilities.execute || pending} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50">Impor &amp; cocokkan otomatis</button>
+            <button disabled={!data.capabilities.configure || pending} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50">Impor &amp; cocokkan otomatis</button>
           </form>
           <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-xs leading-5 text-slate-700">
             <p className="font-bold text-slate-900">Yang terjadi setelah impor</p>
@@ -281,7 +281,7 @@ export function OperationsClient({ data }: { data: OperationsData }) {
                       {candidates.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.effective_date} · {candidate.description} · {rupiah(candidate.bank_amount_rupiah)} · {shortId(candidate.external_reference || candidate.id)}</option>)}
                     </select>
                   </label>
-                  <button disabled={!data.capabilities.execute || pending || !candidates.length} className="min-h-11 rounded-lg bg-slate-900 px-4 text-xs font-bold text-white disabled:opacity-50">Cocokkan mutasi</button>
+                  <button disabled={!data.capabilities.configure || pending || !candidates.length} className="min-h-11 rounded-lg bg-slate-900 px-4 text-xs font-bold text-white disabled:opacity-50">Cocokkan mutasi</button>
                   <p className="text-[11px] text-slate-500 lg:col-span-2">Satu jurnal hanya boleh dipakai untuk satu mutasi. Jika jurnalnya sudah terpakai, sistem akan menolak.</p>
                   {!hasExact ? <p className="text-[11px] font-semibold text-amber-800 lg:col-span-2">Tidak ada kandidat bernominal sama. Pastikan jurnal yang dipilih memang mewakili mutasi ini.</p> : null}
                 </form> : null}
@@ -298,7 +298,7 @@ export function OperationsClient({ data }: { data: OperationsData }) {
           <label className="text-xs font-bold text-slate-800">Bruto<div className="mt-1"><RupiahInput name="gross" min={1} /></div></label>
           <label className="text-xs font-bold text-slate-800">Biaya provider<div className="mt-1"><RupiahInput name="fee" min={0} /></div></label>
           <label className="text-xs font-bold text-slate-800">Neto diterima<div className="mt-1"><RupiahInput name="net" min={1} /></div></label>
-          <button disabled={!data.capabilities.execute || pending} className="min-h-11 self-end rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50">Posting settlement</button>
+          <button disabled={!data.capabilities.configure || pending} className="min-h-11 self-end rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50">Posting settlement</button>
           <p className="text-[11px] leading-4 text-slate-500 sm:col-span-2 xl:col-span-5">Referensi yang sama boleh dipakai lagi selama angkanya berbeda — sistem membedakan berdasarkan isi, bukan sekadar nomor dokumen.</p>
         </form>
       </SectionPanel>
@@ -409,7 +409,7 @@ export function OperationsClient({ data }: { data: OperationsData }) {
           {readiness.valid
             ? <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-900">Semua prasyarat terpenuhi. Periode {period} siap dikunci.</p>
             : <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">Selesaikan baris merah di atas lebih dulu. Sistem akan menolak penutupan selama masih ada yang tertinggal.</p>}
-          <button type="button" disabled={!data.capabilities.execute || !readiness.valid || pending} onClick={() => setConfirmClose(true)}
+          <button type="button" disabled={!data.capabilities.configure || !readiness.valid || pending} onClick={() => setConfirmClose(true)}
             className="min-h-11 rounded-lg bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-50">Tutup periode {period}</button>
         </div>
       </SectionPanel>
@@ -439,7 +439,7 @@ export function OperationsClient({ data }: { data: OperationsData }) {
                 onChange={event => setReopenTarget({ key: item.period_key, reason: event.target.value })}
                 minLength={10} placeholder="Alasan final pembukaan (min. 10 karakter)" className={field} />
               <button type="button"
-                disabled={!data.capabilities.execute || Number(item.approval_count) < 2 || pending
+                disabled={!data.capabilities.configure || Number(item.approval_count) < 2 || pending
                   || reopenTarget?.key !== item.period_key || (reopenTarget?.reason.trim().length ?? 0) < 10}
                 onClick={() => setConfirmReopen(true)}
                 className="min-h-11 rounded-lg bg-amber-600 px-3 font-bold text-white disabled:opacity-50">Buka kembali periode</button>

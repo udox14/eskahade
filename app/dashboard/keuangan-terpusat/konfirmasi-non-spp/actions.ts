@@ -26,7 +26,7 @@ export async function getSubmissionsNonSpp(statusFilter: string) {
 
 export async function approveSubmissionNonSpp(submissionId: string) {
   try {
-    const session = await requireFinanceAccess('EXECUTE')
+    const session = await requireFinanceAccess('CONFIGURE')
     const result = await approvePortalSubmission({
       submissionId, kategori: 'NON_SPP', actorId: session.id, assertAccess: () => {},
     })
@@ -53,7 +53,7 @@ export async function approveSubmissionNonSpp(submissionId: string) {
 
 export async function rejectSubmissionNonSpp(submissionId: string, reason: string) {
   try {
-    const session = await requireFinanceAccess('EXECUTE')
+    const session = await requireFinanceAccess('CONFIGURE')
     const result = await rejectPortalSubmission({
       submissionId, kategori: 'NON_SPP', actorId: session.id, reason, assertAccess: () => {},
     })

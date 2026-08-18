@@ -86,7 +86,7 @@ export async function updatePortalWithdrawalLimits(input: { dailyRupiah: number 
     db.prepare(`INSERT INTO finance_withdrawal_limits(santri_id,daily_rupiah,weekly_rupiah,monthly_rupiah,changed_by_guardian_id,reauthenticated_at)
       VALUES(?,?,?,?,?,CASE WHEN ?=1 THEN datetime('now') ELSE NULL END)
       ON CONFLICT(santri_id) DO UPDATE SET daily_rupiah=excluded.daily_rupiah,weekly_rupiah=excluded.weekly_rupiah,monthly_rupiah=excluded.monthly_rupiah,version=version+1,changed_by_guardian_id=excluded.changed_by_guardian_id,reauthenticated_at=excluded.reauthenticated_at,updated_at=datetime('now')`).bind(session.santri_id,next.daily,next.weekly,next.monthly,session.guardian_id||null,increased?1:0),
-    db.prepare(`INSERT INTO finance_outbox(id,event_type,aggregate_type,aggregate_id,payload_json) VALUES(?,?,?,?,?)`).bind(generateId(),'WITHDRAWAL_LIMIT_CHANGED','STUDENT',session.santri_id,JSON.stringify(next)),
+    db.prepare(`INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,after_json) VALUES(?,'GUARDIAN',?,'CHANGE_WITHDRAWAL_LIMIT','STUDENT',?,?)`).bind(generateId(),session.guardian_id||null,session.santri_id,JSON.stringify(next)),
   ])
   revalidatePath('/portal-ortu/keuangan')
   return { success: true as const }

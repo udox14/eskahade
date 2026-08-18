@@ -113,9 +113,6 @@ export async function processDuitkuCallback(payload: Record<string, string>) {
       db.prepare(`UPDATE finance_journals SET status='POSTED',posted_at=datetime('now') WHERE id=? AND status='DRAFT'`).bind(journal.journalId),
       db.prepare(`UPDATE finance_payment_intents SET journal_id=? WHERE id=? AND status='PAID' AND journal_id IS NULL`).bind(journal.journalId, intent.id),
       db.prepare(`UPDATE finance_gateway_events SET processing_status='PROCESSED',processed_at=datetime('now') WHERE id=?`).bind(eventId),
-      db.prepare(`INSERT INTO finance_outbox(id,event_type,aggregate_type,aggregate_id,payload_json) VALUES(?,?,?,?,?)`).bind(
-        generateId(), 'TOPUP_PAID', 'PAYMENT_INTENT', intent.id, JSON.stringify({ santriId: intent.santri_id, amountRupiah: intent.amount_rupiah, late: Boolean(late) }),
-      ),
     ])
     return { success: true as const, intentId: intent.id, journalId: journal.journalId }
   } catch (error) {

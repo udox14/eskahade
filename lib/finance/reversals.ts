@@ -28,7 +28,7 @@ export async function handleProviderReversal(input:{paymentIntentId:string;provi
       // Beku hanya dompet titipan. Membekukan SPP/MAKAN/LAUNDRY ikut memutus
       // layanan yang sudah dibayar dan tidak berkaitan dengan piutang ini.
       ...(shortfall>0?[db.prepare(`UPDATE finance_student_wallets SET frozen_at=datetime('now'),freeze_reason='PROVIDER_REVERSAL_RECEIVABLE' WHERE santri_id=? AND wallet_kind='TITIPAN'`).bind(intent.santri_id)]:[]),
-      db.prepare(`INSERT INTO finance_outbox(id,event_type,aggregate_type,aggregate_id,payload_json) VALUES(?,?,?,?,?)`).bind(generateId(),'ACCOUNT_FROZEN_PROVIDER_REVERSAL','PAYMENT_INTENT',intent.id,JSON.stringify({santriId:intent.santri_id,receivableRupiah:shortfall})),
+      ...(shortfall>0?[db.prepare(`INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,after_json) VALUES(?,'STAFF',?,'FREEZE_WALLET','PAYMENT_INTENT',?,?)`).bind(generateId(),input.actorId,intent.id,JSON.stringify({santriId:intent.santri_id,receivableRupiah:shortfall,reason:'PROVIDER_REVERSAL_RECEIVABLE'}))]:[]),
     ])
     return{success:true as const,journalId:journal.journalId,receivableRupiah:shortfall,frozen:shortfall>0}
   }catch(error){return{success:false as const,...financeError(error)}}

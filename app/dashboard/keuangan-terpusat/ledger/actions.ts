@@ -18,7 +18,7 @@ async function audit(actorId: string, action: string, entityId: string, after: u
 }
 
 export async function postManualJournalAction(form: FormData) {
-  const session = await requireFinanceAccess('EXECUTE')
+  const session = await requireFinanceAccess('CONFIGURE')
   const accountCodes = form.getAll('accountCode').map(String)
   const sides = form.getAll('side').map(String)
   const amounts = form.getAll('amountRupiah').map(Number)
@@ -84,7 +84,7 @@ export async function postManualJournalAction(form: FormData) {
 }
 
 export async function reverseManualJournalAction(form: FormData) {
-  const session = await requireFinanceAccess('EXECUTE')
+  const session = await requireFinanceAccess('CONFIGURE')
   const journalId = String(form.get('journalId') || '')
   const reason = String(form.get('reason') || '').trim()
   const result = await reverseJournal({
@@ -130,7 +130,7 @@ export async function getLedgerData() {
     journals,
     entries,
     accounts,
-    canExecute: capabilities.execute,
+    canConfigure: capabilities.configure,
     scope,
     totals: {
       posted: await financeQueryOne<{ count: number }>(`SELECT COUNT(*) count FROM finance_journals j ${countFilter} ${countFilter ? 'AND' : 'WHERE'} j.status='POSTED'`, params),

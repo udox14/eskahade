@@ -9,7 +9,7 @@ import { returnUnusedAllocation } from '@/lib/finance/wallet'
 const PATH = '/dashboard/keuangan-terpusat/alokasi'
 
 export async function returnAllocationAction(form: FormData) {
-  const session = await requireFinanceAccess('EXECUTE')
+  const session = await requireFinanceAccess('CONFIGURE')
   const allocationId = String(form.get('allocationId') || '')
   const result = await returnUnusedAllocation({
     allocationId,
@@ -43,7 +43,7 @@ export async function getAllocationData() {
     scope,
     // returnAllocationAction memakai izin EXECUTE; flag UI harus mengikuti,
     // bukan sekadar daftar role, agar tombol tidak tampil untuk yang pasti ditolak.
-    canReturn: capabilities.execute,
+    canReturn: capabilities.configure,
     nowMs: Date.now(),
   }
 }

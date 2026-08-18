@@ -27,9 +27,9 @@ export async function createPayoutAction(input: { recipientId: string; payoutTyp
   if (result.success) revalidatePath(PATH); return result
 }
 export async function checkPayoutAction(id: string) { const s = await requireFinanceAccess('CHECK'); const r = await checkPayout(id,s.id); if(r.success)revalidatePath(PATH); return r }
-export async function executePayoutAction(input: { id: string; reference: string }) { const s=await requireFinanceAccess('EXECUTE'); const r=await executeManualPayout({payoutId:input.id,executorId:s.id,bankReference:input.reference}); if(r.success)revalidatePath(PATH); return r }
-export async function executeApiPayoutAction(id:string){const s=await requireFinanceAccess('EXECUTE');const r=await executeApiPayout({payoutId:id,executorId:s.id});if(r.success)revalidatePath(PATH);return r}
-export async function reconcilePayoutAction(id: string) { const s=await requireFinanceAccess('EXECUTE'); const r=await reconcilePayout(id,s.id); if(r.success)revalidatePath(PATH); return r }
+export async function executePayoutAction(input: { id: string; reference: string }) { const s=await requireFinanceAccess('CONFIGURE'); const r=await executeManualPayout({payoutId:input.id,executorId:s.id,bankReference:input.reference}); if(r.success)revalidatePath(PATH); return r }
+export async function executeApiPayoutAction(id:string){const s=await requireFinanceAccess('CONFIGURE');const r=await executeApiPayout({payoutId:id,executorId:s.id});if(r.success)revalidatePath(PATH);return r}
+export async function reconcilePayoutAction(id: string) { const s=await requireFinanceAccess('CONFIGURE'); const r=await reconcilePayout(id,s.id); if(r.success)revalidatePath(PATH); return r }
 export async function registerRecipientAction(input:{recipientType:'MEAL_MANAGER'|'LAUNDRY_MANAGER'|'TEACHER'|'OTHER';name:string;bankCode:string;accountNumber:string;accountHolderName:string}){const s=await requireFinanceAccess('CONFIGURE');const r=await registerFinanceRecipient({...input,asramaScope:financeAsramaScope(s),actorId:s.id});if(r.success)revalidatePath(PATH);return r}
 export async function verifyRecipientAction(id:string){const s=await requireFinanceAccess('CHECK');const r=await verifyFinanceRecipient(id,s.id);if(r.success)revalidatePath(PATH);return r}
 
@@ -89,7 +89,7 @@ export async function checkPayoutsAction(ids: string[]) {
 }
 
 export async function reconcilePayoutsAction(ids: string[]) {
-  const session = await requireFinanceAccess('EXECUTE')
+  const session = await requireFinanceAccess('CONFIGURE')
   const summary = await runBulk(ids.map((id, index) => ({ row: index + 1, id })), item => reconcilePayout(item.id, session.id))
   if (summary.success && summary.created) revalidatePath(PATH)
   return summary

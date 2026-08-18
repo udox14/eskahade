@@ -43,10 +43,6 @@ export async function withdrawPocketMoney(input: {
         ),
       db.prepare(`UPDATE student_credentials SET last_used_at=datetime('now') WHERE id=?`).bind(credential.id),
       db.prepare(`UPDATE finance_journals SET status='POSTED',posted_at=datetime('now') WHERE id=? AND status='DRAFT'`).bind(journal.journalId),
-      db.prepare(`INSERT INTO finance_outbox(id,event_type,aggregate_type,aggregate_id,payload_json) VALUES(?,?,?,?,?)`).bind(
-        generateId(), 'POCKET_MONEY_WITHDRAWN', 'WITHDRAWAL', withdrawalId,
-        JSON.stringify({ santriId: credential.santri_id, amountRupiah: input.amountRupiah }),
-      ),
     ])
     return { success: true as const, withdrawalId, santriId: credential.santri_id }
   } catch (error) {
