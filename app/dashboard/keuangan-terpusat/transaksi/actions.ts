@@ -9,7 +9,7 @@ import { postJournal, reverseJournal } from '@/lib/finance/ledger'
 import { syncFinanceStudentSnapshot } from '@/lib/finance/snapshots'
 import type { FinanceAccountCode, JournalEntryInput } from '@/lib/finance/types'
 
-const PATH = '/dashboard/keuangan-terpusat/ledger'
+const PATH = '/dashboard/keuangan-terpusat/transaksi'
 
 async function audit(actorId: string, action: string, entityId: string, after: unknown) {
   await (await getFinanceDB()).prepare(`INSERT INTO finance_audit_log
@@ -102,11 +102,14 @@ export async function reverseManualJournalAction(form: FormData) {
   return result
 }
 
-export async function getLedgerData() {
+export async function getTransactionData() {
   const session = await requireFinanceAccess('VIEW')
   const scope = financeAsramaScope(session)
   const params = scope ? [scope] : []
   const journals = await financeQuery<any>(`SELECT j.*,
+    (SELECT s.full_name FROM finance_journal_entries je LEFT JOIN finance_student_snapshots s ON s.santri_id=je.santri_id
+      WHERE je.journal_id=j.id AND je.santri_id IS NOT NULL LIMIT 1) santri_name,
+    (SELECT je.counterparty_id FROM finance_journal_entries je WHERE je.journal_id=j.id AND je.counterparty_id IS NOT NULL LIMIT 1) counterparty_id,
     COALESCE(SUM(CASE WHEN e.side='DEBIT' THEN e.amount_rupiah ELSE 0 END),0) debit_rupiah,
     COALESCE(SUM(CASE WHEN e.side='CREDIT' THEN e.amount_rupiah ELSE 0 END),0) credit_rupiah,
     (SELECT r.id FROM finance_journals r WHERE r.reversal_of_id=j.id LIMIT 1) reversed_by_id

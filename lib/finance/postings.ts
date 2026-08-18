@@ -241,3 +241,27 @@ export const RESEP_MANUAL = [
   { kunci: 'SETTLEMENT', label: 'Dana gateway masuk rekening utama' },
   { kunci: 'PENCAIRAN', label: 'Cairkan ke pengelola/guru' },
 ] as const
+
+/**
+ * Bahasa manusia untuk tiap jenis kejadian, dipakai layar Transaksi.
+ *
+ * Operator melihat kolom ini; kata "debit", "kredit", dan kode akun hanya
+ * muncul di lapis akuntansi yang harus dibuka sengaja oleh bendahara/auditor.
+ */
+export const JENIS_TRANSAKSI: Record<string, { label: string; arah: 'MASUK' | 'KELUAR' | 'INTERNAL' }> = {
+  TOPUP: { label: 'Wali isi saldo', arah: 'MASUK' },
+  PORTAL_MANUAL_RECEIPT: { label: 'Wali transfer manual', arah: 'MASUK' },
+  ALLOCATION: { label: 'Bayar tagihan dari saldo', arah: 'INTERNAL' },
+  ALLOCATION_RETURN: { label: 'Alokasi dikembalikan', arah: 'INTERNAL' },
+  WITHDRAWAL: { label: 'Santri ambil uang jajan', arah: 'KELUAR' },
+  PAYOUT: { label: 'Pencairan ke pengelola/guru', arah: 'KELUAR' },
+  PAYROLL_ACCRUAL: { label: 'Pencatatan gaji guru', arah: 'INTERNAL' },
+  GATEWAY_SETTLEMENT: { label: 'Dana gateway masuk rekening', arah: 'INTERNAL' },
+  PROVIDER_REVERSAL: { label: 'Pembatalan isi saldo oleh provider', arah: 'KELUAR' },
+  REVERSAL: { label: 'Koreksi transaksi', arah: 'INTERNAL' },
+  MANUAL: { label: 'Catatan manual bendahara', arah: 'INTERNAL' },
+}
+
+export function jenisTransaksi(sourceType: string) {
+  return JENIS_TRANSAKSI[sourceType] || { label: sourceType, arah: 'INTERNAL' as const }
+}

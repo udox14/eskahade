@@ -12,7 +12,7 @@ const href={
   credentials:'/dashboard/keuangan-terpusat/kredensial',
   payout:'/dashboard/keuangan-terpusat/payout',
   payroll:'/dashboard/keuangan-terpusat/payroll',
-  ledger:'/dashboard/keuangan-terpusat/ledger',
+  ledger:'/dashboard/keuangan-terpusat/transaksi',
   allocation:'/dashboard/keuangan-terpusat/alokasi',
   control:'/dashboard/keuangan-terpusat/kontrol',
   operations:'/dashboard/keuangan-terpusat/operasi',

@@ -67,7 +67,7 @@ export const FINANCE_NAV_GROUPS = [
   },
   {
     id: 'kontrol', label: 'Kontrol & penelusuran', items: [
-      { href: '/dashboard/keuangan-terpusat/ledger', label: 'Ledger', icon: BookOpenText, badge: null },
+      { href: '/dashboard/keuangan-terpusat/transaksi', label: 'Ledger', icon: BookOpenText, badge: null },
       { href: '/dashboard/keuangan-terpusat/kontrol', label: 'Kontrol', icon: ShieldCheck, badge: 'kontrol' },
       { href: '/dashboard/keuangan-terpusat/insiden', label: 'Insiden', icon: ShieldWarning, badge: 'insiden' },
       { href: '/dashboard/keuangan-terpusat/break-glass', label: 'Break-glass', icon: ShieldWarning, badge: null },

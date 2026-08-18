@@ -69,7 +69,7 @@ export function FinanceCommandPalette({ allowedHrefs }: { allowedHrefs: string[]
     ? pages.filter(page => page.label.toLowerCase().includes(needle) || page.caption.toLowerCase().includes(needle))
     : pages
 
-  const ledgerAllowed = allowedHrefs.includes('/dashboard/keuangan-terpusat/ledger')
+  const ledgerAllowed = allowedHrefs.includes('/dashboard/keuangan-terpusat/transaksi')
   const allocationAllowed = allowedHrefs.includes('/dashboard/keuangan-terpusat/alokasi')
   const visibleStudents = needle.length >= 2 ? students : []
 

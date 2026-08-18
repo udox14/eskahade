@@ -16,7 +16,7 @@ const PATH = '/dashboard/keuangan-terpusat/konfirmasi-spp'
 const REVALIDATE_PATHS = [
   PATH,
   '/dashboard/keuangan-terpusat',
-  '/dashboard/keuangan-terpusat/ledger',
+  '/dashboard/keuangan-terpusat/transaksi',
   '/portal-ortu/keuangan',
   '/portal-ortu/beranda',
 ]
