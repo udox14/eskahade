@@ -17,7 +17,7 @@ export default async function PayoutPage() {
     <FinanceNav />
     <FinanceGuide
       purpose="Mengirim dana makan, laundry, payroll, atau refund dengan persetujuan berlapis dan jejak audit."
-      prerequisites={["Rekening penerima sudah didaftarkan, diverifikasi petugas lain, dan lewat masa tenang 24 jam.", "Nomor rekening sudah dikonfirmasi ulang langsung ke pemiliknya.", "Pembuat, pemeriksa, dan pelaksana adalah tiga orang berbeda."]}
+      prerequisites={["Rekening penerima sudah didaftarkan dan diverifikasi petugas lain.", "Nomor rekening sudah dikonfirmasi ulang langsung ke pemiliknya.", "Pembuat, pemeriksa, dan pelaksana adalah tiga orang berbeda."]}
       steps={[
         "Maker mengajukan payout beserta nominal dan metode.",
         "Checker memeriksa penerima, nominal, dan biaya, lalu meloloskan.",
@@ -32,12 +32,10 @@ export default async function PayoutPage() {
       commonMistakes={[
         "Menandai direkonsiliasi hanya karena provider bilang sukses, tanpa mencocokkan ke mutasi rekening.",
         "Mendaftarkan rekening dengan nomor hasil salah ketik. Nomor disimpan terenkripsi dan hanya tampil tersamar, jadi salah ketik sulit terlihat belakangan.",
-        "Mengira masa tenang 24 jam bisa dilewati setelah verifikasi. Verifikasi dan masa tenang adalah dua pengaman terpisah.",
         "Menyerahkan uang tunai sebelum eksekusi tercatat, sehingga jurnal dan kas tidak sinkron.",
       ]}
       glossary={[
         FINANCE_GLOSSARY.makerChecker,
-        { term: 'Masa tenang 24 jam', meaning: 'Jeda wajib sejak rekening didaftarkan sampai boleh menerima transfer, untuk memberi waktu mendeteksi rekening palsu.' },
         { term: 'BI-Fast', meaning: 'Kanal transfer antarbank yang dipakai payout API. Berjalan langsung dan tidak bisa dibatalkan dari aplikasi.' },
         { term: 'Rekonsiliasi payout', meaning: 'Menandai bahwa dana yang keluar sudah terlihat di mutasi rekening yang sebenarnya.' },
       ]}

@@ -22,7 +22,9 @@ CREATE TABLE IF NOT EXISTS finance_recipients (
 );
 
 -- Perubahan: peran executor dihapus (maker-checker-executor menjadi maker-checker),
--- dan delapan status dipangkas menjadi enam berbahasa Indonesia. Larangan
+-- dan delapan status dipangkas menjadi tujuh berbahasa Indonesia. DIPROSES hanya
+-- dipakai metode API selama menunggu jawaban provider - tanpa status itu, dua
+-- klik beruntun mengirim dua transfer sungguhan. Larangan
 -- self-approval (maker <> checker) TETAP, ditegakkan trigger di 0001g.
 CREATE TABLE IF NOT EXISTS finance_payouts (
   id TEXT PRIMARY KEY,
@@ -34,7 +36,7 @@ CREATE TABLE IF NOT EXISTS finance_payouts (
   fee_rupiah INTEGER NOT NULL DEFAULT 0 CHECK (fee_rupiah >= 0),
   method TEXT NOT NULL CHECK (method IN ('API','MANUAL_TRANSFER','CASH')),
   status TEXT NOT NULL DEFAULT 'DRAFT'
-    CHECK (status IN ('DRAFT','DIAJUKAN','DISETUJUI','DIBAYAR','GAGAL','DIBATALKAN')),
+    CHECK (status IN ('DRAFT','DIAJUKAN','DISETUJUI','DIPROSES','DIBAYAR','GAGAL','DIBATALKAN')),
   maker_id TEXT NOT NULL,
   checker_id TEXT,
   provider_reference TEXT,

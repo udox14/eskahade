@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Bank, CheckCircle, Clock, FileXls, PaperPlaneTilt, UserPlus } from '@phosphor-icons/react'
 import {
-  checkPayoutAction, checkPayoutsAction, createPayoutAction, executeApiPayoutAction, executePayoutAction,
-  importPayoutsAction, importRecipientsAction, reconcilePayoutAction, reconcilePayoutsAction,
+  approvePayoutAction, approvePayoutsAction, createPayoutAction, payApiPayoutAction, payPayoutAction,
+  importPayoutsAction, importRecipientsAction,
   registerRecipientAction, verifyRecipientAction,
 } from './actions'
 import type { PayoutImportRow, RecipientImportRow } from './actions'
@@ -30,13 +30,12 @@ type Capabilities = { view: boolean; create: boolean; check: boolean; configure:
  * posisi tiap payout, bukan sekadar menampilkan kode status.
  */
 const STAGES = [
-  { status: 'SUBMITTED', label: 'Menunggu pemeriksaan', owner: 'Checker', tone: 'amber' as const, next: 'Checker memeriksa penerima dan nominal.' },
-  { status: 'CHECKED', label: 'Siap dieksekusi', owner: 'Executor', tone: 'blue' as const, next: 'Executor mengirim dana; harus orang ketiga.' },
-  { status: 'EXECUTING', label: 'Sedang dikirim', owner: 'Provider', tone: 'blue' as const, next: 'Menunggu konfirmasi provider.' },
-  { status: 'PROVIDER_SUCCESS', label: 'Sukses di provider', owner: 'Executor', tone: 'blue' as const, next: 'Cocokkan dengan mutasi bank, lalu rekonsiliasi.' },
-  { status: 'RECONCILED', label: 'Selesai', owner: '—', tone: 'emerald' as const, next: 'Sudah cocok dengan mutasi rekening.' },
-  { status: 'FAILED', label: 'Gagal', owner: 'Maker', tone: 'red' as const, next: 'Periksa alasan kegagalan lalu ajukan ulang bila perlu.' },
-  { status: 'CANCELLED', label: 'Dibatalkan', owner: '—', tone: 'slate' as const, next: 'Tidak ada tindakan lanjutan.' },
+  { status: 'DIAJUKAN', label: 'Menunggu persetujuan', owner: 'Checker', tone: 'amber' as const, next: 'Checker memeriksa lalu menyetujui.' },
+  { status: 'DISETUJUI', label: 'Siap dibayar', owner: 'Checker', tone: 'blue' as const, next: 'Checker mengirim dana lalu mencatat buktinya.' },
+  { status: 'DIPROSES', label: 'Sedang dikirim provider', owner: 'Provider', tone: 'blue' as const, next: 'Menunggu konfirmasi provider.' },
+  { status: 'DIBAYAR', label: 'Selesai dibayar', owner: '—', tone: 'emerald' as const, next: 'Tidak ada tindakan lanjutan.' },
+  { status: 'GAGAL', label: 'Gagal', owner: 'Maker', tone: 'red' as const, next: 'Periksa alasan kegagalan lalu ajukan ulang.' },
+  { status: 'DIBATALKAN', label: 'Dibatalkan', owner: '—', tone: 'slate' as const, next: 'Tidak ada tindakan lanjutan.' },
 ] as const
 
 const stageOf = (status: string) => STAGES.find(item => item.status === status)
@@ -66,7 +65,7 @@ const emptyRecipientDraft: RecipientDraft = { bank: BANK_CODES[0].code, manualBa
 
 const TOUR: TourStep[] = [
   { target: '[data-tour="stages"]', title: 'Payout melewati empat tahap', body: 'Diajukan, diperiksa, dieksekusi, lalu direkonsiliasi. Pembuat, pemeriksa, dan pelaksana wajib tiga orang berbeda — database menolak bila sama.' },
-  { target: '[data-tour="recipients"]', title: 'Daftarkan rekening lebih dulu', body: 'Rekening baru wajib diverifikasi petugas lain dan menunggu masa tenang 24 jam sebelum bisa menerima transfer API.' },
+  { target: '[data-tour="recipients"]', title: 'Daftarkan rekening lebih dulu', body: 'Rekening baru wajib diverifikasi petugas lain sebelum bisa menerima transfer. Yang mendaftarkan tidak boleh jadi yang memverifikasi.' },
   { target: '[data-tour="create"]', title: 'Ajukan payout', body: 'Pilih penerima aktif, jenis, dan metode. Biaya transfer API ditampilkan sebelum Anda mengajukan, supaya checker menyetujui angka yang sama dengan yang dibukukan.' },
   { target: '[data-tour="board"]', title: 'Pantau antrean', body: 'Setiap kartu menunjukkan tahap saat ini, siapa pemiliknya, dan tindakan berikutnya. Sukses di provider belum berarti selesai.' },
 ]
@@ -110,22 +109,18 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
 
   const fee = method === 'API' ? apiFeeRupiah : 0
   const activeRecipients = recipients.filter(row => row.status === 'ACTIVE')
-  /** Rekening masih dalam masa tenang bila `usable_after` belum terlewati. */
-  const coolingLeft = (row: any) => {
-    const until = new Date(row.usable_after || 0).getTime()
-    return Number.isFinite(until) && until > nowMs ? until - nowMs : 0
-  }
-  const readyRecipients = activeRecipients.filter(row => coolingLeft(row) === 0)
+  // Rekening siap dipakai begitu diverifikasi petugas lain; masa tenang 24 jam dihapus.
+  const readyRecipients = activeRecipients
 
   const visiblePayouts = useMemo(() => statusFilter === 'ALL'
     ? payouts
-    : payouts.filter(row => !['RECONCILED', 'CANCELLED'].includes(row.status)), [payouts, statusFilter])
+    : payouts.filter(row => !['DIBAYAR', 'DIBATALKAN'].includes(row.status)), [payouts, statusFilter])
 
   const counts = useMemo(() => ({
-    submitted: payouts.filter(row => row.status === 'SUBMITTED').length,
-    checked: payouts.filter(row => row.status === 'CHECKED').length,
-    inflight: payouts.filter(row => ['EXECUTING', 'PROVIDER_SUCCESS'].includes(row.status)).length,
-    failed: payouts.filter(row => row.status === 'FAILED').length,
+    submitted: payouts.filter(row => row.status === 'DIAJUKAN').length,
+    checked: payouts.filter(row => row.status === 'DISETUJUI').length,
+    inflight: payouts.filter(row => row.status === 'DIPROSES').length,
+    failed: payouts.filter(row => row.status === 'GAGAL').length,
   }), [payouts])
 
   function act(work: () => Promise<any>, success: string, duplicateMessage?: string) {
@@ -154,11 +149,11 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
    * meloloskan pemeriksaan dan menandai rekonsiliasi. Eksekusi pengiriman dana
    * sengaja TIDAK dimassalkan — tiap transfer tetap dikonfirmasi satu per satu.
    */
-  const selectableCheck = visiblePayouts.filter(row => row.status === 'SUBMITTED')
-  const selectableReconcile = visiblePayouts.filter(row => row.status === 'PROVIDER_SUCCESS')
+  const selectableCheck = visiblePayouts.filter(row => row.status === 'DIAJUKAN')
+  const selectableReconcile: any[] = []
   const chosenCheck = selectableCheck.filter(row => selected.has(row.id))
   const chosenReconcile = selectableReconcile.filter(row => selected.has(row.id))
-  const canSelect = (row: any) => (row.status === 'SUBMITTED' && capabilities.check) || (row.status === 'PROVIDER_SUCCESS' && capabilities.configure)
+  const canSelect = (row: any) => (row.status === 'DIAJUKAN' && capabilities.check) || (row.status === 'PROVIDER_SUCCESS' && capabilities.configure)
 
   function toggle(id: string) {
     setSelected(current => {
@@ -190,10 +185,6 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
     })
   }
 
-  function hoursLeft(ms: number) {
-    const hours = Math.ceil(ms / 3600_000)
-    return hours > 1 ? `${hours} jam lagi` : 'kurang dari 1 jam lagi'
-  }
 
   return <div className="space-y-4 sm:space-y-5">
     <FinanceTour steps={TOUR} running={tour.running} onFinish={tour.finish} />
@@ -231,7 +222,7 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
             <span className="mt-1 block text-[11px] font-normal text-slate-500">
               {readyRecipients.length
                 ? `${readyRecipients.length} rekening siap dipakai.`
-                : 'Belum ada rekening yang siap. Daftarkan dan verifikasi rekening, lalu tunggu masa tenang 24 jam.'}
+                : 'Belum ada rekening yang siap. Daftarkan lalu minta petugas lain memverifikasinya.'}
             </span>
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -265,7 +256,7 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
 
       <SectionPanel
         title="Rekening penerima"
-        description="Rekening baru wajib diverifikasi orang lain dan menunggu masa tenang 24 jam."
+        description="Rekening baru wajib diverifikasi petugas lain sebelum bisa menerima transfer."
         action={capabilities.configure ? <div className="flex flex-wrap gap-2">
           <button onClick={() => showRecipient ? closeRecipientForm() : setShowRecipient(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold"><UserPlus className="h-4 w-4" />{showRecipient ? 'Tutup' : 'Tambah'}</button>
           <button type="button" onClick={() => setImportMode(mode => mode === 'recipients' ? null : 'recipients')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold"><FileXls className="h-4 w-4" />{importMode === 'recipients' ? 'Tutup impor' : 'Impor Excel'}</button>
@@ -281,7 +272,7 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
               bankCode: bankCode.trim(),
               accountNumber: account,
               accountHolderName: String(form.get('accountHolder')),
-            }), 'Rekening didaftarkan. Menunggu verifikasi petugas lain dan masa tenang 24 jam.')
+            }), 'Rekening didaftarkan. Menunggu verifikasi petugas lain.')
           }}>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-bold text-slate-800">Jenis penerima<select name="recipientType" className={`mt-1 ${field}`}><option value="MEAL_MANAGER">Pengelola makan</option><option value="LAUNDRY_MANAGER">Pengelola laundry</option><option value="TEACHER">Guru</option><option value="OTHER">Lainnya</option></select></label>
@@ -314,7 +305,6 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
           </form> : null}
           <div className="divide-y divide-slate-100">
             {recipients.length ? recipients.map(row => {
-              const cooling = coolingLeft(row)
               return <article key={row.id} className="flex flex-col gap-2 px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <strong className="block break-words text-slate-800">{row.name}</strong>
@@ -322,12 +312,10 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
                   <span className="text-[11px] text-slate-400">{row.recipient_type}{row.asrama_scope ? ` · ${row.asrama_scope}` : ''}</span>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  {row.status === 'ACTIVE' && cooling > 0
-                    ? <StatusBadge tone="amber">Masa tenang · {hoursLeft(cooling)}</StatusBadge>
-                    : <StatusBadge tone={row.status === 'ACTIVE' ? 'emerald' : row.status === 'PENDING_VERIFICATION' ? 'amber' : 'slate'}>
+                  {<StatusBadge tone={row.status === 'ACTIVE' ? 'emerald' : row.status === 'PENDING_VERIFICATION' ? 'amber' : 'slate'}>
                       {row.status === 'ACTIVE' ? 'Siap dipakai' : row.status === 'PENDING_VERIFICATION' ? 'Belum diverifikasi' : row.status}
                     </StatusBadge>}
-                  {row.status === 'PENDING_VERIFICATION' ? <button disabled={!capabilities.check || pending} onClick={() => act(() => verifyRecipientAction(row.id), 'Rekening diverifikasi. Masa tenang 24 jam tetap berlaku.')} className="min-h-9 rounded-lg border border-slate-200 px-3 font-bold disabled:opacity-50">Verifikasi</button> : null}
+                  {row.status === 'PENDING_VERIFICATION' ? <button disabled={!capabilities.check || pending} onClick={() => act(() => verifyRecipientAction(row.id), 'Rekening diverifikasi dan siap dipakai.')} className="min-h-9 rounded-lg border border-slate-200 px-3 font-bold disabled:opacity-50">Verifikasi</button> : null}
                 </div>
               </article>
             }) : <EmptyState icon={Bank} title="Belum ada rekening penerima" description="Daftarkan rekening pengelola makan, laundry, atau guru sebelum mengajukan payout." />}
@@ -338,7 +326,7 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
 
     {importMode === 'recipients' ? <BulkImport<Omit<RecipientImportRow, 'row'>>
       title="Impor massal rekening penerima"
-      description="Daftarkan banyak rekening sekaligus. Setiap rekening tetap wajib diverifikasi petugas lain dan tetap menunggu masa tenang 24 jam."
+      description="Daftarkan banyak rekening sekaligus. Setiap rekening tetap wajib diverifikasi petugas lain sebelum bisa dipakai."
       templateName="Template_Rekening_Penerima"
       sheetName="Penerima"
       disabled={!capabilities.configure}
@@ -354,7 +342,7 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
         <ul className="mt-1 list-disc space-y-1 pl-4">
           <li>Jenis penerima boleh ditulis <strong>Pengelola makan</strong>, <strong>Pengelola laundry</strong>, <strong>Guru</strong>, atau <strong>Lainnya</strong>.</li>
           <li>Format kolom kode bank dan nomor rekening sebagai <strong>Teks</strong> di Excel, supaya angka nol di depan tidak hilang. Kode 2 digit otomatis dilengkapi jadi 3 digit.</li>
-          <li>Impor tidak melewati pengaman: rekening masuk berstatus belum diverifikasi dan belum bisa menerima transfer sampai masa tenang berakhir.</li>
+          <li>Impor tidak melewati pengaman: rekening masuk berstatus belum diverifikasi dan belum bisa menerima transfer sampai ada petugas lain yang memverifikasinya.</li>
         </ul>
       </>}
       parseRow={get => {
@@ -381,7 +369,7 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
       templateName="Template_Pengajuan_Payout"
       sheetName="Payout"
       disabled={!capabilities.create || !readyRecipients.length}
-      disabledReason={!readyRecipients.length ? 'Belum ada rekening penerima yang siap dipakai. Daftarkan dan verifikasi rekening, lalu tunggu masa tenang 24 jam.' : undefined}
+      disabledReason={!readyRecipients.length ? 'Belum ada rekening penerima yang siap dipakai. Daftarkan lalu minta petugas lain memverifikasinya.' : undefined}
       columns={[
         { key: 'penerima', label: 'Nama penerima', example: readyRecipients[0]?.name ?? 'Dapur Pusat' },
         { key: 'akhirrekening', label: '4 angka akhir rekening', example: (readyRecipients[0]?.account_number_masked ?? '7890').slice(-4) },
@@ -448,27 +436,24 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
               {row.provider_reference ? <p className="mt-1 break-all font-mono text-xs text-slate-400">Ref {row.provider_reference}</p> : null}
             </div>
             <div className="grid gap-2 sm:flex sm:flex-wrap lg:justify-end">
-              {row.status === 'SUBMITTED' ? <button disabled={!capabilities.check || pending} onClick={() => act(() => checkPayoutAction(row.id), 'Payout lolos pemeriksaan dan siap dieksekusi.')} className="min-h-11 rounded-lg border border-slate-200 px-3 text-xs font-bold disabled:opacity-50">Periksa payout</button> : null}
-              {row.status === 'CHECKED' && row.method === 'API' ? <button disabled={!capabilities.configure || pending} onClick={() => setConfirmApi(row)} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-50">Kirim via API</button> : null}
-              {row.status === 'CHECKED' && row.method !== 'API' ? <button disabled={!capabilities.configure || pending} onClick={() => setExecuteTarget({ id: row.id, reference: '', name: row.recipient_name, amount: total })} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-50">Catat eksekusi</button> : null}
-              {row.status === 'PROVIDER_SUCCESS' ? <button disabled={!capabilities.configure || pending} onClick={() => act(() => reconcilePayoutAction(row.id), 'Payout ditandai cocok dengan mutasi bank.')} className="min-h-11 rounded-lg border border-slate-200 px-3 text-xs font-bold disabled:opacity-50">Tandai direkonsiliasi</button> : null}
+              {row.status === 'DIAJUKAN' ? <button disabled={!capabilities.check || pending} onClick={() => act(() => approvePayoutAction(row.id), 'Pencairan disetujui dan siap dibayar.')} className="min-h-11 rounded-lg border border-slate-200 px-3 text-xs font-bold disabled:opacity-50">Setujui</button> : null}
+              {row.status === 'DISETUJUI' && row.method === 'API' ? <button disabled={!capabilities.check || pending} onClick={() => setConfirmApi(row)} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-50">Kirim via API</button> : null}
+              {row.status === 'DISETUJUI' && row.method !== 'API' ? <button disabled={!capabilities.check || pending} onClick={() => setExecuteTarget({ id: row.id, reference: '', name: row.recipient_name, amount: total })} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-50">Catat pembayaran</button> : null}
             </div>
           </article>
-        }) : <EmptyState icon={PaperPlaneTilt} title={statusFilter === 'ACTIVE' ? 'Tidak ada payout berjalan' : 'Belum ada payout'} description={statusFilter === 'ACTIVE' ? 'Semua payout sudah direkonsiliasi atau dibatalkan.' : 'Ajukan payout pertama lewat formulir di atas.'} />}
+        }) : <EmptyState icon={PaperPlaneTilt} title={statusFilter === 'ACTIVE' ? 'Tidak ada payout berjalan' : 'Belum ada payout'} description={statusFilter === 'ACTIVE' ? 'Semua pencairan sudah dibayar atau dibatalkan.' : 'Ajukan payout pertama lewat formulir di atas.'} />}
       </div>
-      {selectableCheck.length + selectableReconcile.length > 1 && (capabilities.check || capabilities.configure)
+      {selectableCheck.length > 1 && capabilities.check
         ? <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 px-4 py-2.5 text-[11px] text-slate-500">
-          <button type="button" onClick={() => setSelected(new Set([...selectableCheck, ...selectableReconcile].filter(canSelect).map(row => row.id)))} className="font-bold text-blue-700 underline">Pilih semua yang bisa ditindak</button>
-          <span>Centang beberapa payout untuk memeriksa atau menandai rekonsiliasi sekaligus.</span>
+          <button type="button" onClick={() => setSelected(new Set(selectableCheck.filter(canSelect).map(row => row.id)))} className="font-bold text-blue-700 underline">Pilih semua yang bisa disetujui</button>
+          <span>Centang beberapa pencairan untuk menyetujuinya sekaligus.</span>
         </div>
         : null}
     </SectionPanel>
 
-    <BulkActionBar count={chosenCheck.length + chosenReconcile.length} noun="payout" onClear={() => setSelected(new Set())}>
-      {chosenCheck.length ? <button type="button" disabled={pending} onClick={() => runBatch(() => checkPayoutsAction(chosenCheck.map(row => row.id)), 'lolos pemeriksaan')}
-        className="min-h-9 rounded-lg bg-white px-3 text-xs font-bold text-slate-900 disabled:opacity-50">Periksa {chosenCheck.length}</button> : null}
-      {chosenReconcile.length ? <button type="button" disabled={pending} onClick={() => runBatch(() => reconcilePayoutsAction(chosenReconcile.map(row => row.id)), 'ditandai direkonsiliasi')}
-        className="min-h-9 rounded-lg bg-white px-3 text-xs font-bold text-slate-900 disabled:opacity-50">Tandai direkonsiliasi {chosenReconcile.length}</button> : null}
+    <BulkActionBar count={chosenCheck.length} noun="pencairan" onClear={() => setSelected(new Set())}>
+      {chosenCheck.length ? <button type="button" disabled={pending} onClick={() => runBatch(() => approvePayoutsAction(chosenCheck.map(row => row.id)), 'disetujui')}
+        className="min-h-9 rounded-lg bg-white px-3 text-xs font-bold text-slate-900 disabled:opacity-50">Setujui {chosenCheck.length}</button> : null}
     </BulkActionBar>
 
     {/* Eksekusi manual butuh nomor bukti; dulu diminta lewat window.prompt yang tidak dapat divalidasi. */}
@@ -487,7 +472,7 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
           <button disabled={pending || executeTarget.reference.trim().length < 3} onClick={() => {
             const target = executeTarget
             setExecuteTarget(null)
-            act(() => executePayoutAction({ id: target.id, reference: target.reference.trim() }), 'Eksekusi payout tercatat dan jurnal diposting.')
+            act(() => payPayoutAction({ id: target.id, reference: target.reference.trim() }), 'Pembayaran pencairan tercatat dan jurnal diposting.')
           }} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50">Simpan eksekusi</button>
         </div>
       </section>
@@ -509,7 +494,7 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
       onConfirm={() => {
         const target = confirmApi
         setConfirmApi(null)
-        act(() => executeApiPayoutAction(target.id), 'Perintah transfer dikirim ke provider.')
+        act(() => payApiPayoutAction(target.id), 'Perintah transfer dikirim ke provider.')
       }}
     />
 

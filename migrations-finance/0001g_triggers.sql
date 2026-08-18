@@ -273,7 +273,7 @@ BEFORE DELETE ON finance_withdrawals BEGIN SELECT RAISE(ABORT, 'FINANCE_WITHDRAW
 -- menyetujui, dan rekening penerima wajib sudah diverifikasi petugas lain.
 CREATE TRIGGER IF NOT EXISTS trg_finance_payout_no_self_check
 BEFORE UPDATE OF status ON finance_payouts
-WHEN NEW.status IN ('DISETUJUI','DIBAYAR')
+WHEN NEW.status IN ('DISETUJUI','DIPROSES','DIBAYAR')
 BEGIN
   SELECT CASE WHEN NEW.checker_id IS NULL
     THEN RAISE(ABORT, 'FINANCE_CHECKER_REQUIRED') END;
