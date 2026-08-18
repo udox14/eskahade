@@ -24,7 +24,11 @@ export type ServiceTariffRow = {
   created_at: string
 }
 
-const BILLING_START_KEY: Record<ServiceKind, string> = {
+// Diekspor supaya generateMonthlyServiceBillsCore (lib/finance/service-billing.ts)
+// bisa query finance_settings langsung lewat binding D1 eksplisit, tanpa
+// lewat getServiceBillingStart yang bergantung getCloudflareContext (tidak
+// jalan di standalone cron worker).
+export const BILLING_START_KEY: Record<ServiceKind, string> = {
   SPP: 'finance_spp_tagihan_mulai',
   MAKAN: 'finance_meal_tagihan_mulai',
   LAUNDRY: 'finance_laundry_tagihan_mulai',
@@ -34,9 +38,9 @@ const BILLING_START_KEY: Record<ServiceKind, string> = {
 // kalau staff belum sempat pindahkan setting-nya ke halaman baru — sama
 // seperti fallback lama di getSppBillingStartSetting (app_settings, sekarang
 // digantikan tabel ini).
-const SPP_FALLBACK = '2026-06'
+export const SPP_FALLBACK = '2026-06'
 
-function parseBillingStart(value: string): SppBillingStart {
+export function parseBillingStart(value: string): SppBillingStart {
   const [tahunStr, bulanStr] = value.split('-')
   const tahun = Number(tahunStr)
   const bulan = Number(bulanStr)

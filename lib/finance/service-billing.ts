@@ -1,14 +1,15 @@
 // lib/finance/service-billing.ts
 //
 // Tagihan bulanan Uang Makan & Laundry — beda dari SPP yang otomatis/live
-// (syncPortalSppBills, dijalankan tiap portal dibuka). Makan/Laundry sengaja
-// staff-initiated: klik tombol "Generate Tagihan Bulan X" di Keuangan
-// Terpusat → Tarif Layanan, idempoten (aman diklik ulang, skip santri yang
-// sudah punya tagihan bulan itu).
+// (syncPortalSppBills, dijalankan tiap portal dibuka). Makan/Laundry sekarang
+// digenerate otomatis tiap hari lewat cron worker (workers/service-billing-auto.ts),
+// plus tombol "Generate Tagihan Bulan X" di Keuangan Terpusat → Tarif Layanan
+// sebagai fallback manual — keduanya idempoten (aman dipanggil berkali-kali,
+// skip santri yang sudah punya tagihan bulan itu).
 
-import { getFinanceDB as getDB, generateId, financeQuery, financeQueryOne, query as mainQuery } from '@/lib/db'
+import { getFinanceDB as getDB, getDB as getMainDB, generateId, financeQuery, financeQueryOne } from '@/lib/db'
 import { getSppStudentBillingStart, isSppBillablePeriod, BULAN_SPP } from '@/lib/spp/tunggakan'
-import { getServiceBillingStart, getServiceTariffForMonth } from './service-tariffs'
+import { BILLING_START_KEY, parseBillingStart } from './service-tariffs'
 
 export type MealServiceKind = 'MAKAN' | 'LAUNDRY'
 
@@ -35,7 +36,17 @@ export type GenerateServiceBillsResult = {
   error: string
 }
 
-export async function generateMonthlyServiceBills(
+// Versi inti yang menerima binding D1 secara eksplisit (bukan lewat
+// getDB()/getFinanceDB() yang bergantung getCloudflareContext, hanya jalan
+// dalam request Next.js/OpenNext) — supaya bisa dipanggil baik dari server
+// action (tombol manual) maupun dari standalone cron worker
+// (workers/service-billing-auto.ts) yang menerima env.DB/env.FINANCE_DB
+// langsung dari signature scheduled(). Query billing-start & tarif di-inline
+// di sini (bukan lewat getServiceBillingStart/getServiceTariffForMonth) demi
+// alasan yang sama.
+export async function generateMonthlyServiceBillsCore(
+  db: D1Database,
+  financeDb: D1Database,
   serviceKind: MealServiceKind,
   yyyymm: string,
   actorId: string
@@ -43,48 +54,48 @@ export async function generateMonthlyServiceBills(
   if (!/^\d{4}-\d{2}$/.test(yyyymm)) return { success: false, error: 'Format bulan harus YYYY-MM.' }
   const [tahun, bulan] = yyyymm.split('-').map(Number)
 
-  const billingStart = await getServiceBillingStart(serviceKind)
+  const billingStartRow = await financeDb.prepare(
+    `SELECT value FROM finance_settings WHERE key = ?`
+  ).bind(BILLING_START_KEY[serviceKind]).first<{ value: string }>()
+  const billingStart = billingStartRow?.value ? parseBillingStart(billingStartRow.value) : null
   if (!billingStart) return { success: false, error: `Tanggal awal tagihan ${SERVICE_LABEL[serviceKind]} belum diatur.` }
 
-  const tarif = await getServiceTariffForMonth(serviceKind, yyyymm)
+  const tarifRow = await financeDb.prepare(
+    `SELECT amount_rupiah FROM finance_service_tariffs
+     WHERE service_kind = ? AND effective_month <= ?
+     ORDER BY effective_month DESC, id DESC LIMIT 1`
+  ).bind(serviceKind, yyyymm).first<{ amount_rupiah: number }>()
+  const tarif = tarifRow ? Number(tarifRow.amount_rupiah) : null
   if (!tarif) return { success: false, error: `Tarif ${SERVICE_LABEL[serviceKind]} untuk bulan ${yyyymm} belum diatur.` }
 
   const vendorColumn = VENDOR_COLUMN[serviceKind]
-  const santriList = await mainQuery<{
-    id: string
-    tanggal_masuk: string | null
-    created_at: string | null
-  }>(
+  const santriList = (await db.prepare(
     `SELECT id, tanggal_masuk, created_at FROM santri
      WHERE status_global = 'aktif' AND ${vendorColumn} IS NOT NULL`
-  )
+  ).all<{ id: string; tanggal_masuk: string | null; created_at: string | null }>()).results ?? []
 
   // Santri yang dibebaskan permanen (lib/finance/exemptions.ts, DB utama) —
   // tidak pernah ditagih sama sekali untuk layanan ini.
-  const exemptedRows = await mainQuery<{ santri_id: string }>(
-    `SELECT santri_id FROM santri_pembebasan_biaya WHERE service_kind = ? AND is_active = 1`,
-    [serviceKind]
-  )
+  const exemptedRows = (await db.prepare(
+    `SELECT santri_id FROM santri_pembebasan_biaya WHERE service_kind = ? AND is_active = 1`
+  ).bind(serviceKind).all<{ santri_id: string }>()).results ?? []
   const exemptedSet = new Set(exemptedRows.map(row => row.santri_id))
 
   const periodKey = `SERVICE:${serviceKind}:${yyyymm}`
-  const existingRows = await financeQuery<{ santri_id: string }>(
-    `SELECT santri_id FROM finance_bills WHERE bill_kind = ? AND period_key = ?`,
-    [serviceKind, periodKey]
-  )
+  const existingRows = (await financeDb.prepare(
+    `SELECT santri_id FROM finance_bills WHERE bill_kind = ? AND period_key = ?`
+  ).bind(serviceKind, periodKey).all<{ santri_id: string }>()).results ?? []
   const existingSet = new Set(existingRows.map(row => row.santri_id))
 
   // Skip individual bulan ini saja (finance_service_bill_skip, FINANCE_DB) —
   // beda dari exemption permanen, hanya berlaku untuk bulan yyyymm ini.
-  const skipRows = await financeQuery<{ santri_id: string }>(
+  const skipRows = (await financeDb.prepare(
     `SELECT santri_id FROM finance_service_bill_skip
-     WHERE service_kind = ? AND tahun = ? AND bulan = ? AND is_active = 1`,
-    [serviceKind, tahun, bulan]
-  )
+     WHERE service_kind = ? AND tahun = ? AND bulan = ? AND is_active = 1`
+  ).bind(serviceKind, tahun, bulan).all<{ santri_id: string }>()).results ?? []
   const skipSet = new Set(skipRows.map(row => row.santri_id))
 
   const title = `${SERVICE_LABEL[serviceKind]} ${BULAN_SPP[bulan - 1]} ${tahun}`
-  const db = await getDB()
   const statements = []
   let created = 0
   let skippedExisting = 0
@@ -111,16 +122,28 @@ export async function generateMonthlyServiceBills(
       continue
     }
     statements.push(
-      db.prepare(
+      financeDb.prepare(
         `INSERT INTO finance_bills(id,santri_id,bill_kind,title,period_key,amount_rupiah,created_by) VALUES(?,?,?,?,?,?,?)`
       ).bind(generateId(), santri.id, serviceKind, title, periodKey, tarif, actorId)
     )
     created++
   }
 
-  if (statements.length) await db.batch(statements)
+  if (statements.length) await financeDb.batch(statements)
 
   return { success: true, created, skippedExisting, skippedNotBillable, skippedExemption, skippedWaived, totalEligible: santriList.length }
+}
+
+// Dipakai tombol manual "Generate Tagihan Bulan X" (server action) — resolve
+// binding D1 lewat getDB()/getFinanceDB() (request Next.js/OpenNext), lalu
+// delegasi ke core. Perilaku tidak berubah dari sebelumnya.
+export async function generateMonthlyServiceBills(
+  serviceKind: MealServiceKind,
+  yyyymm: string,
+  actorId: string
+): Promise<GenerateServiceBillsResult> {
+  const [db, financeDb] = await Promise.all([getMainDB(), getDB()])
+  return generateMonthlyServiceBillsCore(db, financeDb, serviceKind, yyyymm, actorId)
 }
 
 export type ServiceBillSkipRow = {
