@@ -5,6 +5,7 @@ import { financeAsramaScope, requireFinanceAccess } from '@/lib/finance/access'
 import { getFinanceDashboard } from '@/lib/finance/dashboard'
 import { EmptyState, FINANCE_GLOSSARY, FinanceGuide, FinancePageHeader, MetricCard, SectionPanel, StatusBadge } from './_components/finance-ui'
 import { FinanceNav } from './_components/finance-nav'
+import { AKUN_TITIPAN_WALI, AKUN_KAS_MASUK } from '@/lib/finance/postings'
 
 export const dynamic = 'force-dynamic'
 
@@ -82,8 +83,8 @@ export default async function CentralFinancePage() {
   const scope = financeAsramaScope(session)
   const data = await getFinanceDashboard(scope)
   const account = (code: string) => Number(data.accountBalances.find(row => row.code === code)?.balance_rupiah || 0)
-  const bankPosition = account('1101') + account('1102')
-  const guardianFloat = account('2101')
+  const bankPosition = AKUN_KAS_MASUK.reduce((sum, code) => sum + account(code), 0)
+  const guardianFloat = account(AKUN_TITIPAN_WALI)
   const walletTotal = data.walletTotals.reduce((sum, row) => sum + Number(row.balance_rupiah), 0)
   const totalAlerts = data.alerts.reduce((sum, row) => sum + Number(row.count), 0)
   const maxWallet = Math.max(...data.walletTotals.map(row => Number(row.balance_rupiah)), 1)

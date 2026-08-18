@@ -4,6 +4,7 @@ import { assertIntegerRupiah, financeError } from './errors'
 import { duplicateOf } from './idempotency'
 import { prepareJournalStatements } from './ledger'
 import type { CredentialKind } from './types'
+import { tarikJajanDiLoket } from './postings'
 
 export async function withdrawPocketMoney(input: {
   idempotencyKey: string
@@ -30,10 +31,7 @@ export async function withdrawPocketMoney(input: {
       idempotencyKey: `withdrawal:${input.idempotencyKey}`,
       description: 'Pencairan uang jajan', sourceType: 'WITHDRAWAL', sourceId: withdrawalId,
       actorType: 'STAFF', actorId: input.operatorId,
-      entries: [
-        { accountCode: '2105', side: 'DEBIT', amountRupiah: input.amountRupiah, santriId: credential.santri_id },
-        { accountCode: '1104', side: 'CREDIT', amountRupiah: input.amountRupiah, santriId: credential.santri_id },
-      ],
+      ...tarikJajanDiLoket({ santriId: credential.santri_id, nominalRupiah: input.amountRupiah }),
     })
     await db.batch([
       ...journal.statements,

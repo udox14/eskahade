@@ -3,6 +3,7 @@ import { assertIntegerRupiah, financeError } from './errors'
 import { paymentGateway } from './gateway'
 import { prepareJournalStatements, prepareWalletStatements } from './ledger'
 import { isDemoRequest } from '@/lib/auth/demo-context'
+import { topupGateway } from './postings'
 
 type PaymentIntentRow = {
   id: string
@@ -91,11 +92,12 @@ export async function processDuitkuCallback(payload: Record<string, string>) {
       description: `Top-up Duitku ${orderId}`,
       sourceType: 'TOPUP', sourceId: intent.id, externalReference: payload.reference || null,
       actorType: 'GATEWAY', actorId: 'DUITKU',
-      entries: [
-        { accountCode: '1102', side: 'DEBIT', amountRupiah: intent.charged_amount_rupiah, santriId: intent.santri_id },
-        { accountCode: '2101', side: 'CREDIT', amountRupiah: intent.amount_rupiah, santriId: intent.santri_id },
-        ...(intent.gateway_fee_rupiah > 0 ? [{ accountCode: '4104' as const, side: 'CREDIT' as const, amountRupiah: intent.gateway_fee_rupiah, santriId: intent.santri_id }] : []),
-      ],
+      ...topupGateway({
+        santriId: intent.santri_id,
+        nominalRupiah: intent.amount_rupiah,
+        biayaGatewayRupiah: intent.gateway_fee_rupiah,
+        totalDibayarRupiah: intent.charged_amount_rupiah,
+      }),
     })
     const late = new Date(intent.expires_at).getTime() < Date.now() ? 1 : 0
     await db.batch([

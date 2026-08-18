@@ -3,10 +3,7 @@ import { assertIntegerRupiah, financeError } from './errors'
 import { duplicateOf } from './idempotency'
 import { prepareJournalStatements, prepareWalletStatements } from './ledger'
 import type { WalletKind } from './types'
-
-const DESTINATION_ACCOUNT = {
-  SPP: '4101', USPP: '4102', NON_SPP: '4103', MAKAN: '2102', LAUNDRY: '2103', JAJAN: '2105',
-} as const
+import { alokasiDana, alokasiDikembalikan } from './postings'
 
 async function configuredCutoff(destination:'MAKAN'|'LAUNDRY'):Promise<string|null>{
   const key=destination==='MAKAN'?'finance_meal_cutoff':'finance_laundry_cutoff'
@@ -71,10 +68,12 @@ export async function allocateStudentFunds(input: {
       sourceType: 'ALLOCATION', sourceId: allocationId,
       actorType: input.actorType, actorId: input.actorId,
       metadata: { billingReference: input.billingReference || null },
-      entries: [
-        { accountCode: '2101', side: 'DEBIT', amountRupiah: input.amountRupiah, santriId: input.santriId, asramaScope: input.asramaScope },
-        { accountCode: DESTINATION_ACCOUNT[input.destination], side: 'CREDIT', amountRupiah: input.amountRupiah, santriId: input.santriId, asramaScope: input.asramaScope },
-      ],
+      ...alokasiDana({
+        santriId: input.santriId,
+        tujuan: input.destination,
+        nominalRupiah: input.amountRupiah,
+        asramaScope: input.asramaScope,
+      }),
     })
     const wallet = prepareWalletStatements(db, journal.journalId, [
       { idempotencyKey: `${input.idempotencyKey}:out`, santriId: input.santriId, walletKind: 'TITIPAN', amountRupiah: -input.amountRupiah, movementType: 'ALLOCATION_OUT', referenceType: 'ALLOCATION', referenceId: allocationId },
@@ -135,16 +134,17 @@ export async function returnUnusedAllocation(input: {
     if (allocation.cutoff_at && new Date(allocation.cutoff_at).getTime() <= Date.now()) throw new Error('Cutoff pengembalian sudah lewat.')
 
     const db = await getDB()
-    const account = DESTINATION_ACCOUNT[allocation.destination_kind]
     const journal = prepareJournalStatements(db, {
       idempotencyKey: `allocation-return:${input.idempotencyKey}`,
       description: `Pengembalian alokasi ${allocation.destination_kind}`,
       sourceType: 'ALLOCATION_RETURN', sourceId: allocation.id,
       actorType: input.actorType, actorId: input.actorId,
-      entries: [
-        { accountCode: account, side: 'DEBIT', amountRupiah: allocation.amount_rupiah, santriId: allocation.santri_id, asramaScope: allocation.asrama_scope },
-        { accountCode: '2101', side: 'CREDIT', amountRupiah: allocation.amount_rupiah, santriId: allocation.santri_id, asramaScope: allocation.asrama_scope },
-      ],
+      ...alokasiDikembalikan({
+        santriId: allocation.santri_id,
+        tujuan: allocation.destination_kind as Exclude<WalletKind, 'TITIPAN'>,
+        nominalRupiah: allocation.amount_rupiah,
+        asramaScope: allocation.asrama_scope,
+      }),
     })
     await db.batch([
       db.prepare(`UPDATE finance_allocations SET status='RETURNED',returned_at=datetime('now') WHERE id=? AND status IN ('RESERVED','COMMITTED') AND (cutoff_at IS NULL OR datetime(cutoff_at)>datetime('now'))`).bind(allocation.id),

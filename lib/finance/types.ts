@@ -1,8 +1,7 @@
-export type FinanceAccountCode =
-  | '1101' | '1102' | '1103' | '1104' | '1201'
-  | '2101' | '2102' | '2103' | '2104' | '2105'
-  | '4101' | '4102' | '4103' | '4104'
-  | '5101' | '5102' | '9999'
+// Bagan akun hidup di postings.ts — satu-satunya berkas yang boleh menyebut kode
+// akun (lihat uji T3). Di sini hanya di-re-export agar impor lama tetap jalan.
+import type { FinanceAccountCode } from './postings'
+export type { FinanceAccountCode }
 
 export type WalletKind = 'TITIPAN' | 'SPP' | 'USPP' | 'NON_SPP' | 'MAKAN' | 'LAUNDRY' | 'JAJAN'
 export type CredentialKind = 'RFID_UID' | 'QR_STATIC'

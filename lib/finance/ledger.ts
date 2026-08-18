@@ -3,15 +3,8 @@ import { getFinanceDB as getDB, generateId, financeQueryOne as queryOne } from '
 import type { JournalInput, WalletMovementInput } from './types'
 import { assertIntegerRupiah, financeError } from './errors'
 import { duplicateOf } from './idempotency'
+import { ACCOUNT_IDS } from './postings'
 
-const ACCOUNT_IDS: Record<string, string> = {
-  '1101': 'fa-main-bank', '1102': 'fa-gateway-clearing', '1103': 'fa-central-cash',
-  '1104': 'fa-unit-cash', '1201': 'fa-parent-receivable', '2101': 'fa-guardian-float',
-  '2102': 'fa-meal-payable', '2103': 'fa-laundry-payable', '2104': 'fa-payroll-payable',
-  '2105': 'fa-jajan-liability', '4101': 'fa-spp-revenue', '4102': 'fa-uspp-revenue',
-  '4103': 'fa-nonspp-revenue', '4104': 'fa-gateway-fee-revenue',
-  '5101': 'fa-gateway-fee-expense', '5102': 'fa-payroll-expense', '9999': 'fa-suspense',
-}
 
 export function jakartaDate(date = new Date()): string {
   const parts = new Intl.DateTimeFormat('en-CA', {

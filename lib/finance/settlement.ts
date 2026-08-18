@@ -2,6 +2,7 @@ import { getFinanceDB as getDB, generateId, financeQueryOne as queryOne } from '
 import { assertIntegerRupiah, financeError } from './errors'
 import { contentKey, duplicateOf } from './idempotency'
 import { prepareJournalStatements } from './ledger'
+import { settlementGateway } from './postings'
 
 export async function reconcileGatewaySettlement(input:{
   idempotencyKey:string;grossRupiah:number;netRupiah:number;providerFeeRupiah:number
@@ -20,11 +21,7 @@ export async function reconcileGatewaySettlement(input:{
     const journal=prepareJournalStatements(db,{
       idempotencyKey:key,effectiveDate:input.effectiveDate,description:`Settlement gateway ${input.bankReference}`,
       sourceType:'GATEWAY_SETTLEMENT',sourceId:settlementId,externalReference:input.bankReference,actorType:'STAFF',actorId:input.actorId,
-      entries:[
-        {accountCode:'1101',side:'DEBIT',amountRupiah:input.netRupiah},
-        ...(input.providerFeeRupiah>0?[{accountCode:'5101' as const,side:'DEBIT' as const,amountRupiah:input.providerFeeRupiah}]:[]),
-        {accountCode:'1102',side:'CREDIT',amountRupiah:input.grossRupiah},
-      ],
+      ...settlementGateway({brutoRupiah:input.grossRupiah,netoRupiah:input.netRupiah,biayaProviderRupiah:input.providerFeeRupiah}),
     })
     await db.batch([...journal.statements,db.prepare(`UPDATE finance_journals SET status='POSTED',posted_at=datetime('now') WHERE id=? AND status='DRAFT'`).bind(journal.journalId)])
     return{success:true as const,journalId:journal.journalId}

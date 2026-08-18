@@ -1,4 +1,5 @@
 import { financeQuery, financeQueryOne, query } from '@/lib/db'
+import { AKUN_TITIPAN_WALI, AKUN_KAS_MASUK } from './postings'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export type FinanceDashboard = {
@@ -55,12 +56,12 @@ export async function getFinanceDashboard(asramaScope: string | null): Promise<F
   const softAlertsPromise=!asramaScope
     ?financeQuery<{kind:string;count:number;amount_rupiah:number}>(`SELECT 'LARGE_TOPUP' kind,COUNT(*) count,COALESCE(SUM(amount_rupiah),0) amount_rupiah FROM finance_payment_intents WHERE status='PAID' AND datetime(paid_at)>=datetime('now','-30 days') AND amount_rupiah>=?
       UNION ALL SELECT 'HIGH_STUDENT_BALANCE',COUNT(*),COALESCE(SUM(amount_rupiah),0) FROM (SELECT santri_id,SUM(balance_rupiah) amount_rupiah FROM finance_student_wallets GROUP BY santri_id HAVING SUM(balance_rupiah)>=?)
-      UNION ALL SELECT 'HIGH_FLOAT',CASE WHEN COALESCE(b.balance_rupiah,0)>=? THEN 1 ELSE 0 END,COALESCE(b.balance_rupiah,0) FROM finance_accounts a LEFT JOIN finance_account_balances b ON b.account_id=a.id WHERE a.code='2101'`,
-      [softConfig.topup_rupiah,softConfig.student_balance_rupiah,softConfig.aggregate_float_rupiah])
+      UNION ALL SELECT 'HIGH_FLOAT',CASE WHEN COALESCE(b.balance_rupiah,0)>=? THEN 1 ELSE 0 END,COALESCE(b.balance_rupiah,0) FROM finance_accounts a LEFT JOIN finance_account_balances b ON b.account_id=a.id WHERE a.code=?`,
+      [softConfig.topup_rupiah,softConfig.student_balance_rupiah,softConfig.aggregate_float_rupiah,AKUN_TITIPAN_WALI])
     :financeQuery<{kind:string;count:number;amount_rupiah:number}>(`SELECT 'LARGE_TOPUP' kind,COUNT(*) count,COALESCE(SUM(p.amount_rupiah),0) amount_rupiah FROM finance_payment_intents p JOIN finance_student_snapshots s ON s.santri_id=p.santri_id WHERE p.status='PAID' AND datetime(p.paid_at)>=datetime('now','-30 days') AND p.amount_rupiah>=? AND s.asrama=?
       UNION ALL SELECT 'HIGH_STUDENT_BALANCE',COUNT(*),COALESCE(SUM(amount_rupiah),0) FROM (SELECT w.santri_id,SUM(w.balance_rupiah) amount_rupiah FROM finance_student_wallets w JOIN finance_student_snapshots s ON s.santri_id=w.santri_id WHERE s.asrama=? GROUP BY w.santri_id HAVING SUM(w.balance_rupiah)>=?)
-      UNION ALL SELECT 'HIGH_FLOAT',CASE WHEN COALESCE(SUM(CASE WHEN e.side=a.normal_balance THEN e.amount_rupiah ELSE -e.amount_rupiah END),0)>=? THEN 1 ELSE 0 END,COALESCE(SUM(CASE WHEN e.side=a.normal_balance THEN e.amount_rupiah ELSE -e.amount_rupiah END),0) FROM finance_journal_entries e JOIN finance_accounts a ON a.id=e.account_id AND a.code='2101' JOIN finance_journals j ON j.id=e.journal_id AND j.status='POSTED' WHERE e.asrama_scope=?`,
-      [softConfig.topup_rupiah,asramaScope,asramaScope,softConfig.student_balance_rupiah,softConfig.aggregate_float_rupiah,asramaScope])
+      UNION ALL SELECT 'HIGH_FLOAT',CASE WHEN COALESCE(SUM(CASE WHEN e.side=a.normal_balance THEN e.amount_rupiah ELSE -e.amount_rupiah END),0)>=? THEN 1 ELSE 0 END,COALESCE(SUM(CASE WHEN e.side=a.normal_balance THEN e.amount_rupiah ELSE -e.amount_rupiah END),0) FROM finance_journal_entries e JOIN finance_accounts a ON a.id=e.account_id AND a.code=? JOIN finance_journals j ON j.id=e.journal_id AND j.status='POSTED' WHERE e.asrama_scope=?`,
+      [softConfig.topup_rupiah,asramaScope,asramaScope,softConfig.student_balance_rupiah,softConfig.aggregate_float_rupiah,AKUN_TITIPAN_WALI,asramaScope])
   const [accountBalances, walletTotals, recentTransactions, alerts, softAlerts, cashTrend] = await Promise.all([
     accountBalancesPromise,
     walletTotalsPromise,
@@ -73,10 +74,10 @@ export async function getFinanceDashboard(asramaScope: string | null): Promise<F
       COALESCE(SUM(CASE WHEN e.side='CREDIT' THEN e.amount_rupiah ELSE 0 END),0) outflow_rupiah
       FROM finance_journal_entries e
       JOIN finance_journals j ON j.id=e.journal_id AND j.status='POSTED'
-      JOIN finance_accounts a ON a.id=e.account_id AND a.code IN ('1101','1102')
+      JOIN finance_accounts a ON a.id=e.account_id AND a.code IN (?,?)
       WHERE date(j.effective_date)>=date('now','-29 days')
       ${asramaScope ? `AND e.asrama_scope=?` : ''}
-      GROUP BY j.effective_date ORDER BY j.effective_date`, asramaScope ? [asramaScope] : []),
+      GROUP BY j.effective_date ORDER BY j.effective_date`, asramaScope ? [...AKUN_KAS_MASUK, asramaScope] : [...AKUN_KAS_MASUK]),
   ])
   return { accountBalances, walletTotals, recentTransactions, alerts, softAlerts, cashTrend }
 }

@@ -3,6 +3,7 @@ import { getFinanceDB as getDB, generateId, financeQuery as query, financeQueryO
 import { financeError } from './errors'
 import { prepareJournalStatements } from './ledger'
 import { syncFinanceTeacherSnapshots } from './snapshots'
+import { akrualGajiGuru } from './postings'
 
 export async function createPayrollPeriod(periodKey:string,actorId?:string|null){try{if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(periodKey))throw new Error('Format periode tidak valid.');const policy=await queryOne<{id:string}>(`SELECT id FROM finance_payroll_policies WHERE effective_from<=? ORDER BY effective_from DESC,version DESC LIMIT 1`,[`${periodKey}-01`]);if(!policy)throw new Error('Kebijakan payroll belum tersedia.');const id=generateId(),db=await getDB();await db.batch([db.prepare(`INSERT INTO finance_payroll_periods(id,period_key,policy_id) VALUES(?,?,?)`).bind(id,periodKey,policy.id),db.prepare(`INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,after_json) VALUES(?,'STAFF',?,'CREATE','PAYROLL_PERIOD',?,?)`).bind(generateId(),actorId||null,id,JSON.stringify({periodKey,policyId:policy.id}))]);return{success:true as const,id}}catch(error){return{success:false as const,...financeError(error)}}}
 
@@ -130,7 +131,7 @@ export async function approvePayrollPeriod(periodId:string,actorId:string){
     const db=await getDB(),statements:any[]=[]
     for(const item of items){
       if(Number(item.net_rupiah)<=0){statements.push(db.prepare(`UPDATE finance_payroll_items SET status='APPROVED',updated_at=datetime('now') WHERE id=? AND status='CALCULATED'`).bind(item.id))}
-      else{const journal=prepareJournalStatements(db,{idempotencyKey:`payroll:${periodId}:${item.teacher_id}`,effectiveDate:`${period.period_key}-28`,description:`Akrual payroll guru ${item.teacher_id}`,sourceType:'PAYROLL_ACCRUAL',sourceId:item.id,actorType:'STAFF',actorId,entries:[{accountCode:'5102',side:'DEBIT',amountRupiah:Number(item.net_rupiah),counterpartyType:'TEACHER',counterpartyId:item.teacher_id},{accountCode:'2104',side:'CREDIT',amountRupiah:Number(item.net_rupiah),counterpartyType:'TEACHER',counterpartyId:item.teacher_id}]});statements.push(...journal.statements,db.prepare(`UPDATE finance_journals SET status='POSTED',posted_at=datetime('now') WHERE id=? AND status='DRAFT'`).bind(journal.journalId),db.prepare(`UPDATE finance_payroll_items SET status='APPROVED',journal_id=?,updated_at=datetime('now') WHERE id=? AND status='CALCULATED'`).bind(journal.journalId,item.id))}
+      else{const journal=prepareJournalStatements(db,{idempotencyKey:`payroll:${periodId}:${item.teacher_id}`,effectiveDate:`${period.period_key}-28`,description:`Akrual payroll guru ${item.teacher_id}`,sourceType:'PAYROLL_ACCRUAL',sourceId:item.id,actorType:'STAFF',actorId,...akrualGajiGuru({guruId:String(item.teacher_id),nominalRupiah:Number(item.net_rupiah)})});statements.push(...journal.statements,db.prepare(`UPDATE finance_journals SET status='POSTED',posted_at=datetime('now') WHERE id=? AND status='DRAFT'`).bind(journal.journalId),db.prepare(`UPDATE finance_payroll_items SET status='APPROVED',journal_id=?,updated_at=datetime('now') WHERE id=? AND status='CALCULATED'`).bind(journal.journalId,item.id))}
       if(statements.length>=70)await db.batch(statements.splice(0))
     }
     statements.push(

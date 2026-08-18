@@ -16,6 +16,7 @@ import { duplicateOf } from './idempotency'
 import { allocateStudentFunds } from './wallet'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
 import type { PortalBillDetailItem } from '@/app/portal-ortu/(app)/keuangan/tagihan-actions'
+import { topupManual } from './postings'
 
 export type PortalSubmissionRow = {
   id: string
@@ -102,10 +103,7 @@ async function recordManualReceipt(input: {
       sourceId: input.submissionId,
       actorType: 'STAFF',
       actorId: input.actorId,
-      entries: [
-        { accountCode: '1102', side: 'DEBIT', amountRupiah: input.amountRupiah, santriId: input.santriId },
-        { accountCode: '2101', side: 'CREDIT', amountRupiah: input.amountRupiah, santriId: input.santriId },
-      ],
+      ...topupManual({ santriId: input.santriId, nominalRupiah: input.amountRupiah }),
     })
     await db.batch([
       ...journal.statements,

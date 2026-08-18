@@ -5,6 +5,7 @@ import { duplicateOf } from './idempotency'
 import { prepareJournalStatements } from './ledger'
 import { decryptFinanceValue, encryptFinanceValue } from './encryption'
 import { startDuitkuBifastTransfer, verifyDuitkuDisbursementCallback } from './disbursement/duitku'
+import { pencairan } from './postings'
 
 type PayoutType = 'MEAL' | 'LAUNDRY' | 'PAYROLL' | 'REFUND' | 'OTHER'
 
@@ -59,31 +60,24 @@ export async function checkPayout(payoutId: string, checkerId: string) {
   } catch (error) { return { success: false as const, ...financeError(error) } }
 }
 
-function payableAccount(type: PayoutType): '2101' | '2102' | '2103' | '2104' | '9999' {
-  if (type === 'MEAL') return '2102'
-  if (type === 'LAUNDRY') return '2103'
-  if (type === 'PAYROLL') return '2104'
-  if (type === 'REFUND') return '2101'
-  return '9999'
-}
-
 export async function executeManualPayout(input: { payoutId: string; executorId: string; bankReference: string; proofUrl?: string | null }) {
   try {
     const payout = await queryOne<{ id: string; idempotency_key: string; payout_type: PayoutType; amount_rupiah: number; fee_rupiah: number; method: string; status: string; asrama_scope: string | null }>(`SELECT id,idempotency_key,payout_type,amount_rupiah,fee_rupiah,method,status,asrama_scope FROM finance_payouts WHERE id=?`, [input.payoutId])
     if (!payout || payout.status !== 'CHECKED' || payout.method === 'API') throw new Error('Payout manual belum siap dieksekusi.')
     if (!input.bankReference.trim()) throw new Error('Referensi transfer/kuitansi wajib diisi.')
     const total = Number(payout.amount_rupiah) + Number(payout.fee_rupiah)
-    const cashAccount = payout.method === 'CASH' ? '1103' as const : '1101' as const
     const db = await getDB()
     const journal = prepareJournalStatements(db, {
       idempotencyKey: `payout:${payout.idempotency_key}`,
       description: `Payout ${payout.payout_type}`, sourceType: 'PAYOUT', sourceId: payout.id,
       externalReference: input.bankReference, actorType: 'STAFF', actorId: input.executorId,
-      entries: [
-        { accountCode: payableAccount(payout.payout_type), side: 'DEBIT', amountRupiah: payout.amount_rupiah, asramaScope: payout.asrama_scope },
-        ...(payout.fee_rupiah > 0 ? [{ accountCode: '5101' as const, side: 'DEBIT' as const, amountRupiah: payout.fee_rupiah, asramaScope: payout.asrama_scope }] : []),
-        { accountCode: cashAccount, side: 'CREDIT', amountRupiah: total, asramaScope: payout.asrama_scope },
-      ],
+      ...pencairan({
+        jenis: payout.payout_type,
+        nominalRupiah: Number(payout.amount_rupiah),
+        biayaRupiah: Number(payout.fee_rupiah),
+        sumberDana: payout.method === 'CASH' ? 'TUNAI' : 'BANK',
+        asramaScope: payout.asrama_scope,
+      }),
     })
     await db.batch([
       db.prepare(`UPDATE finance_payouts SET status='EXECUTING',executor_id=?,executed_at=datetime('now'),provider_reference=?,proof_url=?,updated_at=datetime('now') WHERE id=? AND status='CHECKED'`).bind(
@@ -114,11 +108,13 @@ export async function executeApiPayout(input:{payoutId:string;executorId:string}
           description:`Payout API sandbox ${payout.payout_type}`,
           sourceType:'PAYOUT',sourceId:payout.id,externalReference:result.disburseId,
           actorType:'GATEWAY',actorId:'DUITKU_SANDBOX',
-          entries:[
-            {accountCode:payableAccount(payout.payout_type),side:'DEBIT',amountRupiah:Number(payout.amount_rupiah),asramaScope:payout.asrama_scope},
-            ...(Number(payout.fee_rupiah)>0?[{accountCode:'5101' as const,side:'DEBIT' as const,amountRupiah:Number(payout.fee_rupiah),asramaScope:payout.asrama_scope}]:[]),
-            {accountCode:'1102',side:'CREDIT',amountRupiah:total,asramaScope:payout.asrama_scope},
-          ],
+          ...pencairan({
+            jenis:payout.payout_type,
+            nominalRupiah:Number(payout.amount_rupiah),
+            biayaRupiah:Number(payout.fee_rupiah),
+            sumberDana:'GATEWAY',
+            asramaScope:payout.asrama_scope,
+          }),
         })
         await db.batch([
           db.prepare(`UPDATE finance_payouts SET provider_reference=?,provider_payload_json=?,updated_at=datetime('now') WHERE id=? AND status='EXECUTING'`).bind(result.disburseId,JSON.stringify(result),payout.id),
@@ -146,7 +142,7 @@ export async function processDuitkuPayoutCallback(payload:Record<string,string>)
     if(code!=='00'){await db.prepare(`UPDATE finance_payouts SET status='FAILED',failure_reason=?,provider_payload_json=?,updated_at=datetime('now') WHERE id=? AND status='EXECUTING'`).bind(payload.errorMessage||payload.statusDesc||code,JSON.stringify(payload),payout.id).run();return{success:true as const,failed:true}}
     const total=Number(payout.amount_rupiah)+Number(payout.fee_rupiah),journal=prepareJournalStatements(db,{
       idempotencyKey:`payout:${payout.idempotency_key}`,description:`Payout API ${payout.payout_type}`,sourceType:'PAYOUT',sourceId:payout.id,externalReference:payload.disburseId,actorType:'GATEWAY',actorId:'DUITKU',
-      entries:[{accountCode:payableAccount(payout.payout_type),side:'DEBIT',amountRupiah:Number(payout.amount_rupiah),asramaScope:payout.asrama_scope},...(Number(payout.fee_rupiah)>0?[{accountCode:'5101' as const,side:'DEBIT' as const,amountRupiah:Number(payout.fee_rupiah),asramaScope:payout.asrama_scope}]:[]),{accountCode:'1102',side:'CREDIT',amountRupiah:total,asramaScope:payout.asrama_scope}],
+      ...pencairan({jenis:payout.payout_type,nominalRupiah:Number(payout.amount_rupiah),biayaRupiah:Number(payout.fee_rupiah),sumberDana:'GATEWAY',asramaScope:payout.asrama_scope}),
     })
     await db.batch([...journal.statements,db.prepare(`UPDATE finance_journals SET status='POSTED',posted_at=datetime('now') WHERE id=? AND status='DRAFT'`).bind(journal.journalId),db.prepare(`UPDATE finance_payouts SET status='PROVIDER_SUCCESS',journal_id=?,provider_payload_json=?,updated_at=datetime('now') WHERE id=? AND status='EXECUTING'`).bind(journal.journalId,JSON.stringify(payload),payout.id)])
     return{success:true as const,journalId:journal.journalId}

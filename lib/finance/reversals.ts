@@ -1,6 +1,7 @@
 import { getFinanceDB as getDB, generateId, financeQueryOne as queryOne } from '@/lib/db'
 import { financeError } from './errors'
 import { prepareJournalStatements, prepareWalletStatements } from './ledger'
+import { topupDibatalkanProvider } from './postings'
 
 export async function handleProviderReversal(input:{paymentIntentId:string;providerReference:string;actorId:string}){
   try{
@@ -11,12 +12,13 @@ export async function handleProviderReversal(input:{paymentIntentId:string;provi
     const db=await getDB();const journal=prepareJournalStatements(db,{
       idempotencyKey:`provider-reversal:${intent.id}`,description:`Reversal provider ${intent.merchant_order_id}`,sourceType:'PROVIDER_REVERSAL',sourceId:intent.id,
       externalReference:input.providerReference,actorType:'STAFF',actorId:input.actorId,metadata:{recoverableRupiah:recoverable,receivableRupiah:shortfall},
-      entries:[
-        ...(recoverable>0?[{accountCode:'2101' as const,side:'DEBIT' as const,amountRupiah:recoverable,santriId:intent.santri_id}]:[]),
-        ...(shortfall>0?[{accountCode:'1201' as const,side:'DEBIT' as const,amountRupiah:shortfall,santriId:intent.santri_id}]:[]),
-        ...(intent.gateway_fee_rupiah>0?[{accountCode:'4104' as const,side:'DEBIT' as const,amountRupiah:intent.gateway_fee_rupiah,santriId:intent.santri_id}]:[]),
-        {accountCode:'1102',side:'CREDIT',amountRupiah:intent.charged_amount_rupiah,santriId:intent.santri_id},
-      ],
+      ...topupDibatalkanProvider({
+        santriId:intent.santri_id,
+        dapatDitarikRupiah:recoverable,
+        piutangRupiah:shortfall,
+        biayaGatewayRupiah:Number(intent.gateway_fee_rupiah),
+        totalDibayarRupiah:Number(intent.charged_amount_rupiah),
+      }),
     })
     await db.batch([
       ...journal.statements,
