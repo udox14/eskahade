@@ -275,6 +275,123 @@ export function FormField({ label, hint, error, children, required }: {
  * mewajibkan pengguna mengetik ulang kata kunci untuk aksi paling berat
  * (tutup buku, reopen periode, eksekusi payout).
  */
+/**
+ * Tab kerja. Diekstrak dari markup yang sebelumnya ditulis tiga kali berbeda di
+ * operasi, kredensial, dan tarif-layanan.
+ *
+ * Alasan ada tab sama sekali: sebelumnya setiap modul menumpuk semua panel di
+ * satu layar, sehingga pekerjaan harian (antrean) terdorong jauh ke bawah oleh
+ * data setup yang jarang diubah. Aturannya sekarang: tab pertama selalu
+ * pekerjaan harian.
+ */
+export function FinanceTabs({ tabs, active, onChange, label = 'Kelompok pekerjaan' }: {
+  tabs: ReadonlyArray<{ id: string; label: string; hint?: string; badge?: number }>
+  active: string
+  onChange: (id: string) => void
+  label?: string
+}) {
+  const current = tabs.find(item => item.id === active)
+  return <nav aria-label={label} className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+    <div className="flex min-w-max gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+      {tabs.map(item => {
+        const aktif = item.id === active
+        return <button key={item.id} type="button" onClick={() => onChange(item.id)}
+          aria-current={aktif ? 'page' : undefined}
+          className={cn('flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs font-bold transition',
+            aktif ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800')}>
+          {item.label}
+          {item.badge ? <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">{item.badge}</span> : null}
+        </button>
+      })}
+    </div>
+    {current?.hint ? <p className="mt-2 px-1 text-[11px] text-slate-500">{current.hint}</p> : null}
+  </nav>
+}
+
+const UKURAN_MODAL = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl', xl: 'max-w-5xl' } as const
+
+/**
+ * Cangkang modal untuk formulir dan impor massal.
+ *
+ * Sebelum ini setiap modul menyalin sendiri `fixed inset-0` beserta backdrop-nya,
+ * dan sebagian besar form justru tidak dimodalkan sama sekali - panel impor Excel
+ * dirender di dasar halaman, ratusan baris jauh dari tombol yang membukanya.
+ *
+ * Menangani hal yang mudah terlewat bila ditulis ulang tiap kali: Esc menutup,
+ * klik latar menutup, fokus terkunci di dalam dialog, fokus kembali ke tombol
+ * pemicu setelah tertutup, dan scroll halaman latar dikunci selama terbuka.
+ */
+export function FinanceModal({ open, title, description, size = 'md', onClose, children, footer }: {
+  open: boolean
+  title: string
+  description?: string
+  size?: keyof typeof UKURAN_MODAL
+  onClose: () => void
+  children: React.ReactNode
+  footer?: React.ReactNode
+}) {
+  if (!open) return null
+  return <ModalShell {...{ title, description, size, onClose, footer }}>{children}</ModalShell>
+}
+
+function ModalShell({ title, description, size, onClose, children, footer }: {
+  title: string
+  description?: string
+  size: keyof typeof UKURAN_MODAL
+  onClose: () => void
+  children: React.ReactNode
+  footer?: React.ReactNode
+}) {
+  const panel = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    panel.current?.querySelector<HTMLElement>(FOKUS)?.focus()
+    return () => {
+      document.body.style.overflow = overflow
+      opener?.focus?.()
+    }
+  }, [])
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { onClose(); return }
+      if (event.key !== 'Tab' || !panel.current) return
+      const focusable = [...panel.current.querySelectorAll<HTMLElement>(FOKUS)].filter(el => !el.hasAttribute('disabled'))
+      if (!focusable.length) return
+      const edge = event.shiftKey ? focusable[0] : focusable[focusable.length - 1]
+      if (document.activeElement === edge) {
+        event.preventDefault()
+        ;(event.shiftKey ? focusable[focusable.length - 1] : focusable[0]).focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-slate-950/60 p-4" onClick={onClose}>
+    <section ref={panel} role="dialog" aria-modal="true" aria-label={title}
+      className={cn('my-auto w-full rounded-xl bg-white shadow-2xl', UKURAN_MODAL[size])}
+      onClick={event => event.stopPropagation()}>
+      <header className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div>
+          <h2 className="font-bold text-slate-900">{title}</h2>
+          {description ? <p className="mt-1 text-sm leading-5 text-slate-600">{description}</p> : null}
+        </div>
+        <button type="button" onClick={onClose} aria-label="Tutup"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700">✕</button>
+      </header>
+      <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
+      {footer ? <footer className="border-t border-slate-100 px-5 py-3">{footer}</footer> : null}
+    </section>
+  </div>
+}
+
+/** Elemen yang bisa menerima fokus di dalam dialog. */
+const FOKUS = 'input, select, textarea, button:not([disabled]), a[href]'
+
 export function ConfirmAction({ open, title, description, impact = [], confirmLabel = 'Lanjutkan', confirmPhrase, tone = 'amber', pending, onConfirm, onCancel }: {
   open: boolean
   title: string

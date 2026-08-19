@@ -14,8 +14,8 @@ import type { PayoutImportRow, RecipientImportRow } from './actions'
 import { BulkImport, asInteger, asText } from '../_components/bulk-import'
 import { BulkActionBar, RupiahInput } from '../_components/finance-inputs'
 import {
-  ConfirmAction, EmptyState, FINANCE_FIELD_CLASS, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
-  useFinanceTour, type FinanceResult, type TourStep,
+  ConfirmAction, EmptyState, FINANCE_FIELD_CLASS, FinanceModal, FinanceTabs, FinanceTour, MetricCard,
+  ResultBanner, SectionPanel, StatusBadge, useFinanceTour, type FinanceResult, type TourStep,
 } from '../_components/finance-ui'
 import { accountNumberProblem, bankCodeProblem, BANK_CODES, BANK_CODE_OTHER } from '@/lib/finance/banks'
 
@@ -64,10 +64,10 @@ type RecipientDraft = { bank: string; manualBank: string; account: string; repea
 const emptyRecipientDraft: RecipientDraft = { bank: BANK_CODES[0].code, manualBank: '', account: '', repeat: '' }
 
 const TOUR: TourStep[] = [
-  { target: '[data-tour="stages"]', title: 'Payout melewati empat tahap', body: 'Diajukan, diperiksa, dieksekusi, lalu direkonsiliasi. Pembuat, pemeriksa, dan pelaksana wajib tiga orang berbeda — database menolak bila sama.' },
-  { target: '[data-tour="recipients"]', title: 'Daftarkan rekening lebih dulu', body: 'Rekening baru wajib diverifikasi petugas lain sebelum bisa menerima transfer. Yang mendaftarkan tidak boleh jadi yang memverifikasi.' },
-  { target: '[data-tour="create"]', title: 'Ajukan payout', body: 'Pilih penerima aktif, jenis, dan metode. Biaya transfer API ditampilkan sebelum Anda mengajukan, supaya checker menyetujui angka yang sama dengan yang dibukukan.' },
-  { target: '[data-tour="board"]', title: 'Pantau antrean', body: 'Setiap kartu menunjukkan tahap saat ini, siapa pemiliknya, dan tindakan berikutnya. Sukses di provider belum berarti selesai.' },
+  { target: '[data-tour="stages"]', title: 'Empat angka teratas', body: 'Ringkasan cepat: berapa yang menunggu persetujuan, berapa siap dibayar, berapa sedang dikirim provider, dan berapa yang gagal.' },
+  { target: '[data-tour="board"]', title: 'Antrean pencairan', body: 'Ini layar kerja harian. Tiap baris menunjukkan tahapnya, siapa yang ditunggu, dan tombol tindakan berikutnya.' },
+  { target: '[data-tour="aksi"]', title: 'Ajukan lewat dialog', body: 'Formulir pengajuan dan impor Excel kini muncul sebagai dialog di tengah layar, bukan panel yang selalu terbuka atau menempel di dasar halaman.' },
+  { target: '[data-tour="tab"]', title: 'Rekening ada di tab sendiri', body: 'Data rekening penerima jarang berubah, jadi dipindah ke tab kedua supaya tidak ikut memenuhi layar kerja harian.' },
 ]
 
 export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, nowMs }: {
@@ -75,7 +75,14 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [showRecipient, setShowRecipient] = useState(false)
+  /**
+   * Satu state untuk seluruh dialog. Sebelumnya form pengajuan dan form rekening
+   * selalu terbuka di layar, dan panel impor Excel dirender di dasar halaman -
+   * ratusan baris jauh dari tombol yang membukanya.
+   */
+  const [modal, setModal] = useState<'ajukan' | 'impor-payout' | 'rekening' | 'impor-rekening' | null>(null)
+  /** Tab pertama selalu pekerjaan harian; data setup menyusul di tab kedua. */
+  const [tab, setTab] = useState<'antrean' | 'rekening'>('antrean')
   const [result, setResult] = useState<FinanceResult | null>(null)
   const [method, setMethod] = useState<'API' | 'MANUAL_TRANSFER' | 'CASH'>('API')
   const [amount, setAmount] = useState(0)
@@ -88,7 +95,6 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
    * dan kode banknya dipilih, bukan dihafal.
    */
   const [recipientDraft, setRecipientDraft] = useState(emptyRecipientDraft)
-  const [importMode, setImportMode] = useState<'recipients' | 'payouts' | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const tour = useFinanceTour('payout')
 
@@ -102,8 +108,8 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
       : null
   const recipientReady = !bankProblem && !accountProblem && !repeatProblem
 
-  function closeRecipientForm() {
-    setShowRecipient(false)
+  function tutupModal() {
+    setModal(null)
     setRecipientDraft(emptyRecipientDraft)
   }
 
@@ -198,13 +204,54 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
 
     <ResultBanner result={result} onDismiss={() => setResult(null)} />
 
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div data-tour="tab"><FinanceTabs
+      label="Kelompok pekerjaan payout"
+      active={tab}
+      onChange={id => setTab(id as 'antrean' | 'rekening')}
+      tabs={[
+        { id: 'antrean', label: 'Antrean pencairan', hint: 'Pekerjaan harian: setujui dan bayar', badge: counts.submitted + counts.checked },
+        { id: 'rekening', label: 'Rekening penerima', hint: 'Data setup, jarang berubah', badge: recipients.filter(row => row.status === 'PENDING_VERIFICATION').length },
+      ]}
+    /></div>
+
+    {tab === 'rekening' ? <>
       <SectionPanel
-        title="Ajukan payout"
-        description="Anda berperan sebagai maker. Pemeriksa dan pelaksana harus orang lain."
-        action={capabilities.create ? <button type="button" onClick={() => setImportMode(mode => mode === 'payouts' ? null : 'payouts')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold"><FileXls className="h-4 w-4" />{importMode === 'payouts' ? 'Tutup impor' : 'Impor Excel'}</button> : null}
+        title="Rekening penerima"
+        description="Rekening baru wajib diverifikasi petugas lain sebelum bisa menerima transfer."
+        action={capabilities.configure ? <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setModal('rekening')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold"><UserPlus className="h-4 w-4" />Daftarkan rekening</button>
+          <button type="button" onClick={() => setModal('impor-rekening')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold"><FileXls className="h-4 w-4" />Impor Excel</button>
+        </div> : null}
       >
-        <form data-tour="create" className="grid gap-3 p-4" action={form => {
+        <div data-tour="recipients">
+          <div className="divide-y divide-slate-100">
+            {recipients.length ? recipients.map(row => {
+              return <article key={row.id} className="flex flex-col gap-2 px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <strong className="block break-words text-slate-800">{row.name}</strong>
+                  <span className="block font-mono text-[11px] text-slate-500">{row.account_number_masked || 'Tanpa rekening'}</span>
+                  <span className="text-[11px] text-slate-400">{row.recipient_type}{row.asrama_scope ? ` · ${row.asrama_scope}` : ''}</span>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <StatusBadge tone={row.status === 'ACTIVE' ? 'emerald' : row.status === 'PENDING_VERIFICATION' ? 'amber' : 'slate'}>
+                    {row.status === 'ACTIVE' ? 'Siap dipakai' : row.status === 'PENDING_VERIFICATION' ? 'Belum diverifikasi' : row.status}
+                  </StatusBadge>
+                  {row.status === 'PENDING_VERIFICATION' ? <button disabled={!capabilities.check || pending} onClick={() => act(() => verifyRecipientAction(row.id), 'Rekening diverifikasi dan siap dipakai.')} className="min-h-9 rounded-lg border border-slate-200 px-3 font-bold disabled:opacity-50">Verifikasi</button> : null}
+                </div>
+              </article>
+            }) : <EmptyState icon={Bank} title="Belum ada rekening penerima" description="Daftarkan rekening pengelola makan, laundry, atau guru sebelum mengajukan pencairan." />}
+          </div>
+        </div>
+      </SectionPanel>
+    </> : null}
+
+    <FinanceModal
+      open={modal === 'ajukan'}
+      title="Ajukan pencairan"
+      description="Anda berperan sebagai maker. Yang menyetujui harus orang lain."
+      onClose={tutupModal}>
+        <form data-tour="create" className="grid gap-3" action={form => {
+          setModal(null)
           setAmount(0)
           act(() => createPayoutAction({
             recipientId: String(form.get('recipient')),
@@ -249,23 +296,20 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
             <div className="flex justify-between px-3 py-2"><dt className="text-slate-500">Biaya transfer{method === 'API' ? ' (API)' : ''}</dt><dd className="font-semibold tabular-nums">{fee ? `+ ${rupiah(fee)}` : 'Tidak ada'}</dd></div>
             <div className="flex justify-between bg-slate-50 px-3 py-2"><dt className="font-bold text-slate-700">Total keluar dari kas</dt><dd className="font-bold tabular-nums">{rupiah(amount + fee)}</dd></div>
           </dl>
-          <button disabled={!capabilities.create || pending || !readyRecipients.length} className="min-h-11 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50">Ajukan payout</button>
-          {!capabilities.create ? <p className="text-[11px] text-slate-500">Akun Anda tidak memiliki kewenangan mengajukan payout.</p> : null}
+          <button disabled={!capabilities.create || pending || !readyRecipients.length} className="min-h-11 rounded-lg bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50">Ajukan pencairan</button>
+          {!capabilities.create ? <p className="text-[11px] text-slate-500">Akun Anda tidak memiliki kewenangan mengajukan pencairan.</p> : null}
         </form>
-      </SectionPanel>
+    </FinanceModal>
 
-      <SectionPanel
-        title="Rekening penerima"
-        description="Rekening baru wajib diverifikasi petugas lain sebelum bisa menerima transfer."
-        action={capabilities.configure ? <div className="flex flex-wrap gap-2">
-          <button onClick={() => showRecipient ? closeRecipientForm() : setShowRecipient(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold"><UserPlus className="h-4 w-4" />{showRecipient ? 'Tutup' : 'Tambah'}</button>
-          <button type="button" onClick={() => setImportMode(mode => mode === 'recipients' ? null : 'recipients')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold"><FileXls className="h-4 w-4" />{importMode === 'recipients' ? 'Tutup impor' : 'Impor Excel'}</button>
-        </div> : null}
-      >
-        <div data-tour="recipients">
-          {showRecipient ? <form className="grid gap-3 border-b border-slate-100 bg-slate-50/60 p-4" action={form => {
+    <FinanceModal
+      open={modal === 'rekening'}
+      title="Daftarkan rekening penerima"
+      description="Nomor rekening disimpan terenkripsi dan hanya ditampilkan tersamar setelah disimpan."
+      size="lg"
+      onClose={tutupModal}>
+          <form className="grid gap-3" action={form => {
             const account = recipientDraft.account.replace(/\s/g, '')
-            closeRecipientForm()
+            tutupModal()
             act(() => registerRecipientAction({
               recipientType: String(form.get('recipientType')) as any,
               name: String(form.get('name')),
@@ -302,29 +346,15 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
             </div>
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-900">Nomor rekening disimpan terenkripsi dan hanya ditampilkan tersamar. Setelah tersimpan, salah ketik tidak akan terlihat lagi — dana akan terkirim ke orang lain.</p>
             <button disabled={pending || !recipientReady} className="min-h-11 rounded-lg border border-emerald-700 px-3 text-sm font-bold text-emerald-800 disabled:border-slate-200 disabled:text-slate-400">Daftarkan rekening</button>
-          </form> : null}
-          <div className="divide-y divide-slate-100">
-            {recipients.length ? recipients.map(row => {
-              return <article key={row.id} className="flex flex-col gap-2 px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <strong className="block break-words text-slate-800">{row.name}</strong>
-                  <span className="block font-mono text-[11px] text-slate-500">{row.account_number_masked || 'Tanpa rekening'}</span>
-                  <span className="text-[11px] text-slate-400">{row.recipient_type}{row.asrama_scope ? ` · ${row.asrama_scope}` : ''}</span>
-                </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  {<StatusBadge tone={row.status === 'ACTIVE' ? 'emerald' : row.status === 'PENDING_VERIFICATION' ? 'amber' : 'slate'}>
-                      {row.status === 'ACTIVE' ? 'Siap dipakai' : row.status === 'PENDING_VERIFICATION' ? 'Belum diverifikasi' : row.status}
-                    </StatusBadge>}
-                  {row.status === 'PENDING_VERIFICATION' ? <button disabled={!capabilities.check || pending} onClick={() => act(() => verifyRecipientAction(row.id), 'Rekening diverifikasi dan siap dipakai.')} className="min-h-9 rounded-lg border border-slate-200 px-3 font-bold disabled:opacity-50">Verifikasi</button> : null}
-                </div>
-              </article>
-            }) : <EmptyState icon={Bank} title="Belum ada rekening penerima" description="Daftarkan rekening pengelola makan, laundry, atau guru sebelum mengajukan payout." />}
-          </div>
-        </div>
-      </SectionPanel>
-    </div>
+          </form>
+    </FinanceModal>
 
-    {importMode === 'recipients' ? <BulkImport<Omit<RecipientImportRow, 'row'>>
+    <FinanceModal
+      open={modal === 'impor-rekening'}
+      title="Impor massal rekening penerima"
+      size="xl"
+      onClose={tutupModal}>
+      <BulkImport<Omit<RecipientImportRow, 'row'>>
       title="Impor massal rekening penerima"
       description="Daftarkan banyak rekening sekaligus. Setiap rekening tetap wajib diverifikasi petugas lain sebelum bisa dipakai."
       templateName="Template_Rekening_Penerima"
@@ -361,9 +391,15 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
         return { value: { recipientType: jenis, name: nama, bankCode, accountNumber, accountHolderName } }
       }}
       onSubmit={values => importRecipientsAction(values)}
-    /> : null}
+      />
+    </FinanceModal>
 
-    {importMode === 'payouts' ? <BulkImport<Omit<PayoutImportRow, 'row'>>
+    <FinanceModal
+      open={modal === 'impor-payout'}
+      title="Impor massal pengajuan pencairan"
+      size="xl"
+      onClose={tutupModal}>
+      <BulkImport<Omit<PayoutImportRow, 'row'>>
       title="Impor massal pengajuan payout"
       description="Ajukan banyak payout sekaligus. Anda tetap tercatat sebagai maker; pemeriksa dan pelaksana tetap harus orang lain."
       templateName="Template_Pengajuan_Payout"
@@ -402,14 +438,22 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
         return { value: { recipientId: matches[0].id, payoutType, amountRupiah, method } }
       }}
       onSubmit={values => importPayoutsAction(values)}
-    /> : null}
+      />
+    </FinanceModal>
 
+    {tab === 'antrean' ? <>
     <SectionPanel
-      title="Antrean payout"
-      description="Setiap kartu menunjukkan tahap saat ini dan tindakan yang menunggu."
-      action={<div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs font-bold">
-        <button onClick={() => setStatusFilter('ACTIVE')} className={`min-h-9 rounded-md px-3 ${statusFilter === 'ACTIVE' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Berjalan</button>
-        <button onClick={() => setStatusFilter('ALL')} className={`min-h-9 rounded-md px-3 ${statusFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Semua ({payouts.length})</button>
+      title="Antrean pencairan"
+      description="Setiap baris menunjukkan tahap saat ini dan tindakan yang menunggu."
+      action={<div data-tour="aksi" className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs font-bold">
+          <button onClick={() => setStatusFilter('ACTIVE')} className={`min-h-9 rounded-md px-3 ${statusFilter === 'ACTIVE' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Berjalan</button>
+          <button onClick={() => setStatusFilter('ALL')} className={`min-h-9 rounded-md px-3 ${statusFilter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>Semua ({payouts.length})</button>
+        </div>
+        {capabilities.create ? <>
+          <button type="button" onClick={() => setModal('impor-payout')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold"><FileXls className="h-4 w-4" />Impor Excel</button>
+          <button type="button" onClick={() => setModal('ajukan')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white"><PaperPlaneTilt className="h-4 w-4" />Ajukan pencairan</button>
+        </> : null}
       </div>}
     >
       <div data-tour="board" className="divide-y divide-slate-100">
@@ -441,7 +485,7 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
               {row.status === 'DISETUJUI' && row.method !== 'API' ? <button disabled={!capabilities.check || pending} onClick={() => setExecuteTarget({ id: row.id, reference: '', name: row.recipient_name, amount: total })} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white disabled:opacity-50">Catat pembayaran</button> : null}
             </div>
           </article>
-        }) : <EmptyState icon={PaperPlaneTilt} title={statusFilter === 'ACTIVE' ? 'Tidak ada payout berjalan' : 'Belum ada payout'} description={statusFilter === 'ACTIVE' ? 'Semua pencairan sudah dibayar atau dibatalkan.' : 'Ajukan payout pertama lewat formulir di atas.'} />}
+        }) : <EmptyState icon={PaperPlaneTilt} title={statusFilter === 'ACTIVE' ? 'Tidak ada payout berjalan' : 'Belum ada payout'} description={statusFilter === 'ACTIVE' ? 'Semua pencairan sudah dibayar atau dibatalkan.' : 'Tekan "Ajukan pencairan" untuk membuat yang pertama.'} />}
       </div>
       {selectableCheck.length > 1 && capabilities.check
         ? <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 px-4 py-2.5 text-[11px] text-slate-500">
@@ -455,28 +499,27 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
       {chosenCheck.length ? <button type="button" disabled={pending} onClick={() => runBatch(() => approvePayoutsAction(chosenCheck.map(row => row.id)), 'disetujui')}
         className="min-h-9 rounded-lg bg-white px-3 text-xs font-bold text-slate-900 disabled:opacity-50">Setujui {chosenCheck.length}</button> : null}
     </BulkActionBar>
+    </> : null}
 
-    {/* Eksekusi manual butuh nomor bukti; dulu diminta lewat window.prompt yang tidak dapat divalidasi. */}
-    {executeTarget ? <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4" onClick={() => setExecuteTarget(null)}>
-      <section role="dialog" aria-modal="true" aria-label="Catat eksekusi payout" className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
-        <div className="flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><Clock className="h-5 w-5" /></span>
-          <div><h2 className="font-bold text-slate-900">Catat eksekusi payout</h2><p className="mt-1 text-sm leading-5 text-slate-600">Isi hanya setelah dana benar-benar dikirim ke {executeTarget.name} sebesar {rupiah(executeTarget.amount)}.</p></div>
-        </div>
-        <label className="mt-4 block text-xs font-bold text-slate-800">Nomor referensi transfer atau kuitansi
-          <input autoFocus value={executeTarget.reference} onChange={event => setExecuteTarget({ ...executeTarget, reference: event.target.value })} placeholder="Contoh: TRF20260813001" className={`mt-1.5 ${field}`} />
-          <span className="mt-1 block text-[11px] font-normal text-slate-500">Nomor ini dipakai untuk mencocokkan payout dengan mutasi rekening nanti.</span>
-        </label>
-        <div className="mt-5 grid grid-cols-2 gap-2">
-          <button onClick={() => setExecuteTarget(null)} className="min-h-11 rounded-lg border border-slate-200 text-sm font-bold text-slate-700">Batal</button>
-          <button disabled={pending || executeTarget.reference.trim().length < 3} onClick={() => {
-            const target = executeTarget
-            setExecuteTarget(null)
-            act(() => payPayoutAction({ id: target.id, reference: target.reference.trim() }), 'Pembayaran pencairan tercatat dan jurnal diposting.')
-          }} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50">Simpan eksekusi</button>
-        </div>
-      </section>
-    </div> : null}
+    {/* Nomor bukti wajib; dulu diminta lewat window.prompt yang tidak dapat divalidasi. */}
+    <FinanceModal
+      open={Boolean(executeTarget)}
+      title="Catat pembayaran pencairan"
+      description={executeTarget ? `Isi hanya setelah dana benar-benar dikirim ke ${executeTarget.name} sebesar ${rupiah(executeTarget.amount)}.` : ''}
+      onClose={() => setExecuteTarget(null)}
+      footer={<div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => setExecuteTarget(null)} className="min-h-11 rounded-lg border border-slate-200 text-sm font-bold text-slate-700">Batal</button>
+        <button type="button" disabled={pending || (executeTarget?.reference.trim().length ?? 0) < 3} onClick={() => {
+          const target = executeTarget!
+          setExecuteTarget(null)
+          act(() => payPayoutAction({ id: target.id, reference: target.reference.trim() }), 'Pembayaran pencairan tercatat dan jurnal diposting.')
+        }} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50">Simpan pembayaran</button>
+      </div>}>
+      <label className="block text-xs font-bold text-slate-800">Nomor referensi transfer atau kuitansi
+        <input autoFocus value={executeTarget?.reference ?? ''} onChange={event => setExecuteTarget(target => target ? { ...target, reference: event.target.value } : target)} placeholder="Contoh: TRF20260813001" className={`mt-1.5 ${field}`} />
+        <span className="mt-1 block text-[11px] font-normal text-slate-500">Nomor ini dipakai saat mencocokkan saldo dengan rekening koran di akhir bulan.</span>
+      </label>
+    </FinanceModal>
 
     <ConfirmAction
       open={Boolean(confirmApi)}
