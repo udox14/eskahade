@@ -148,10 +148,10 @@ CREATE TABLE IF NOT EXISTS finance_service_bill_skip (
   UNIQUE(santri_id, service_kind, tahun, bulan)
 );
 
-CREATE UNIQUE INDEX uq_finance_guardian_phone ON finance_guardians(phone) WHERE phone IS NOT NULL;
-CREATE UNIQUE INDEX uq_finance_guardian_email ON finance_guardians(email) WHERE email IS NOT NULL;
-CREATE UNIQUE INDEX uq_finance_active_intent_student ON finance_payment_intents(santri_id) WHERE status='PENDING';
-CREATE INDEX idx_finance_intent_status ON finance_payment_intents(status, expires_at);
-CREATE INDEX idx_finance_bills_student ON finance_bills(santri_id,status,due_date);
-CREATE INDEX idx_finance_service_tariffs ON finance_service_tariffs(service_kind, effective_month);
-CREATE INDEX idx_finance_service_arrears_santri ON finance_service_arrears_historis(santri_id, service_kind, status);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_finance_guardian_phone ON finance_guardians(phone) WHERE phone IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_finance_guardian_email ON finance_guardians(email) WHERE email IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_finance_active_intent_student ON finance_payment_intents(santri_id) WHERE status='PENDING';
+CREATE INDEX IF NOT EXISTS idx_finance_intent_status ON finance_payment_intents(status, expires_at);
+CREATE INDEX IF NOT EXISTS idx_finance_bills_student ON finance_bills(santri_id,status,due_date);
+CREATE INDEX IF NOT EXISTS idx_finance_service_tariffs ON finance_service_tariffs(service_kind, effective_month);
+CREATE INDEX IF NOT EXISTS idx_finance_service_arrears_santri ON finance_service_arrears_historis(santri_id, service_kind, status);

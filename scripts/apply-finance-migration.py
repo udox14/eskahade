@@ -37,8 +37,12 @@ NPX = shutil.which('npx') or 'npx'
 
 
 def wrangler(args):
+    # encoding/errors WAJIB diisi: wrangler mencetak karakter kotak (U+2500-an)
+    # dan Python di Windows default ke cp1252, sehingga pembacaan output-nya
+    # meledak dan pesan error aslinya hilang.
     return subprocess.run([NPX, 'wrangler', 'd1', 'execute', DB, '--remote'] + args,
-                          capture_output=True, text=True, shell=False)
+                          capture_output=True, text=True, shell=False,
+                          encoding='utf-8', errors='replace')
 
 
 print('Menerapkan skema keuangan ke: %s' % DB)

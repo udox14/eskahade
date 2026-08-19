@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS finance_withdrawals (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_student_credentials_student ON student_credentials(santri_id, status);
-CREATE UNIQUE INDEX uq_finance_open_shift_operator ON finance_cash_shifts(operator_id) WHERE status='OPEN';
-CREATE INDEX idx_finance_withdrawal_student ON finance_withdrawals(santri_id, created_at);
-CREATE INDEX idx_finance_withdrawal_shift ON finance_withdrawals(shift_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_student_credentials_student ON student_credentials(santri_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_finance_open_shift_operator ON finance_cash_shifts(operator_id) WHERE status='OPEN';
+CREATE INDEX IF NOT EXISTS idx_finance_withdrawal_student ON finance_withdrawals(santri_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_finance_withdrawal_shift ON finance_withdrawals(shift_id, created_at);

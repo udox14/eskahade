@@ -43,5 +43,5 @@ CREATE TABLE IF NOT EXISTS finance_teacher_snapshots (
   synced_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_finance_audit_entity ON finance_audit_log(entity_type,entity_id,created_at);
-CREATE INDEX idx_finance_student_snapshot_asrama ON finance_student_snapshots(asrama,status_global);
+CREATE INDEX IF NOT EXISTS idx_finance_audit_entity ON finance_audit_log(entity_type,entity_id,created_at);
+CREATE INDEX IF NOT EXISTS idx_finance_student_snapshot_asrama ON finance_student_snapshots(asrama,status_global);

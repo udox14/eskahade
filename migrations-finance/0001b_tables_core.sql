@@ -94,13 +94,13 @@ CREATE TABLE IF NOT EXISTS finance_wallet_movements (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX idx_finance_journal_date ON finance_journals(effective_date, status);
-CREATE INDEX idx_finance_journal_source ON finance_journals(source_type, source_id);
-CREATE UNIQUE INDEX uq_finance_single_allocation_return ON finance_journals(source_type,source_id) WHERE source_type='ALLOCATION_RETURN';
-CREATE UNIQUE INDEX uq_finance_single_payout_journal ON finance_journals(source_type,source_id) WHERE source_type='PAYOUT';
-CREATE UNIQUE INDEX uq_finance_single_provider_reversal ON finance_journals(source_type,source_id) WHERE source_type='PROVIDER_REVERSAL';
-CREATE INDEX idx_finance_entry_account ON finance_journal_entries(account_id, created_at);
-CREATE INDEX idx_finance_entry_santri ON finance_journal_entries(santri_id, created_at);
-CREATE INDEX idx_finance_entry_asrama ON finance_journal_entries(asrama_scope, created_at);
-CREATE INDEX idx_finance_wallet_movement_student ON finance_wallet_movements(santri_id, created_at);
-CREATE INDEX idx_finance_entry_journal ON finance_journal_entries(journal_id);
+CREATE INDEX IF NOT EXISTS idx_finance_journal_date ON finance_journals(effective_date, status);
+CREATE INDEX IF NOT EXISTS idx_finance_journal_source ON finance_journals(source_type, source_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_finance_single_allocation_return ON finance_journals(source_type,source_id) WHERE source_type='ALLOCATION_RETURN';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_finance_single_payout_journal ON finance_journals(source_type,source_id) WHERE source_type='PAYOUT';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_finance_single_provider_reversal ON finance_journals(source_type,source_id) WHERE source_type='PROVIDER_REVERSAL';
+CREATE INDEX IF NOT EXISTS idx_finance_entry_account ON finance_journal_entries(account_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_finance_entry_santri ON finance_journal_entries(santri_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_finance_entry_asrama ON finance_journal_entries(asrama_scope, created_at);
+CREATE INDEX IF NOT EXISTS idx_finance_wallet_movement_student ON finance_wallet_movements(santri_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_finance_entry_journal ON finance_journal_entries(journal_id);
