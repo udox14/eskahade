@@ -118,7 +118,9 @@ npx wrangler d1 execute eskahade-finance --remote --file migrations-finance/0001
 npx wrangler d1 execute eskahade-finance --remote --command "SELECT type,COUNT(*) FROM sqlite_master WHERE name LIKE 'finance_%' OR name='student_credentials' GROUP BY type;"
 ```
 
-Harus menghasilkan **37 tabel** dan **21 trigger**. Kalau meleset, jangan
+Harus menghasilkan **37 tabel, 21 trigger, 24 index, 17 akun**. Jangan menyaring
+trigger dengan `name LIKE 'finance_%'` — nama trigger diawali `trg_`, jadi filter
+itu selalu melaporkan nol secara diam-diam. Kalau meleset, jangan
 lanjut — pulihkan dari export.
 
 Untuk `DEMO_FINANCE_DB`, jalankan kedelapan berkas yang sama ditambah

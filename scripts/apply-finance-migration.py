@@ -63,9 +63,14 @@ for i, nama in enumerate(BERKAS, 1):
     raise SystemExit(1)
 
 print('\nVerifikasi struktur:')
+# Filter nama TIDAK boleh dipakai untuk trigger: namanya diawali trg_, bukan
+# finance_, jadi query lama selalu melaporkan 0 trigger secara diam-diam.
 cek = wrangler(['--command',
-                "SELECT type, COUNT(*) jumlah FROM sqlite_master "
-                "WHERE name LIKE 'finance_%' OR name='student_credentials' GROUP BY type;"])
+                "SELECT (SELECT COUNT(*) FROM sqlite_master WHERE type='table' "
+                "  AND (name LIKE 'finance_%' OR name='student_credentials')) tabel, "
+                "(SELECT COUNT(*) FROM sqlite_master WHERE type='trigger') trigger_, "
+                "(SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND sql IS NOT NULL) index_, "
+                "(SELECT COUNT(*) FROM finance_accounts) akun;"])
 print(cek.stdout or cek.stderr)
-print('Yang harus terlihat: 37 tabel dan 21 trigger.')
+print('Yang harus terlihat: 37 tabel, 21 trigger, 24 index, 17 akun.')
 print('Kalau angkanya meleset, JANGAN lanjut ke deploy - pulihkan dari export.')
