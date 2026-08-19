@@ -285,7 +285,7 @@ export function FormField({ label, hint, error, children, required }: {
  * pekerjaan harian.
  */
 export function FinanceTabs({ tabs, active, onChange, label = 'Kelompok pekerjaan' }: {
-  tabs: ReadonlyArray<{ id: string; label: string; hint?: string; badge?: number }>
+  tabs: ReadonlyArray<{ id: string; label: string; hint?: string; badge?: number; icon?: React.ComponentType<{ className?: string }> }>
   active: string
   onChange: (id: string) => void
   label?: string
@@ -299,6 +299,7 @@ export function FinanceTabs({ tabs, active, onChange, label = 'Kelompok pekerjaa
           aria-current={aktif ? 'page' : undefined}
           className={cn('flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs font-bold transition',
             aktif ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800')}>
+          {item.icon ? <item.icon className="h-4 w-4" /> : null}
           {item.label}
           {item.badge ? <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">{item.badge}</span> : null}
         </button>

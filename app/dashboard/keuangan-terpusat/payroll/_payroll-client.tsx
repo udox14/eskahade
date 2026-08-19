@@ -13,7 +13,7 @@ import {
 import { BulkImport, asDateISO, asInteger, asText } from '../_components/bulk-import'
 import { RupiahInput } from '../_components/finance-inputs'
 import {
-  ConfirmAction, EmptyState, FINANCE_FIELD_CLASS, FormField, MetricCard,
+  ConfirmAction, EmptyState, FINANCE_FIELD_CLASS, FinanceModal, FinanceTabs, FormField, MetricCard,
   ResultBanner, SectionPanel, StatusBadge, type FinanceResult,
 } from '../_components/finance-ui'
 
@@ -30,6 +30,8 @@ export function PayrollClient({ data }: { data: any }) {
   const [periodKey, setPeriodKey] = useState(() => new Date().toISOString().slice(0, 7))
   const [selectedPeriod, setSelectedPeriod] = useState<string>(data.periods[0]?.id || '')
   const [confirmApprove, setConfirmApprove] = useState<any>(null)
+  const [tab, setTab] = useState<'perhitungan' | 'kompensasi'>('perhitungan')
+  const [modal, setModal] = useState<'kompensasi' | 'impor-kompensasi' | null>(null)
 
   const period = data.periods.find((row: any) => row.id === selectedPeriod)
   const items = useMemo(
@@ -64,6 +66,17 @@ export function PayrollClient({ data }: { data: any }) {
 
     <ResultBanner result={result} onDismiss={() => setResult(null)} />
 
+    <FinanceTabs
+      label="Kelompok pekerjaan payroll"
+      active={tab}
+      onChange={id => setTab(id as typeof tab)}
+      tabs={[
+        { id: 'perhitungan', label: 'Perhitungan bulanan', hint: 'Pekerjaan harian: hitung, isi hari alfa/badal, setujui', badge: data.periods.filter((row: any) => row.status === 'DIHITUNG').length },
+        { id: 'kompensasi', label: 'Kompensasi guru', hint: 'Data setup: gaji bulanan dan tarif potongan', badge: 0 },
+      ]}
+    />
+
+    {tab === 'perhitungan' ? <>
     <SectionPanel title="Periode bulanan" description="Buat periode, hitung, lalu setujui. Persetujuan mencatat kewajiban gaji di pembukuan — pencairan uangnya dilakukan dari halaman Payout.">
       <div className="flex flex-wrap items-end gap-3 p-4">
         <FormField label="Periode baru">
@@ -130,32 +143,16 @@ export function PayrollClient({ data }: { data: any }) {
         </div>
         : <EmptyState title="Belum dihitung" description="Tekan Hitung untuk menarik seluruh guru yang punya kompensasi berlaku pada periode ini." />}
     </SectionPanel> : null}
+    </> : null}
 
-    <SectionPanel title="Kompensasi guru" description="Gaji bulanan dan tarif potongan per hari. Tarif potongan 0 berarti guru dibayar penuh berapa pun hari alfa/badalnya.">
-      <form action={form => act(() => setTeacherCompensationAction(form), 'Kompensasi guru disimpan.')} className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-5">
-        <FormField label="Guru" required>
-          <select name="teacherId" required className={FINANCE_FIELD_CLASS}>
-            <option value="">Pilih guru</option>
-            {data.teachers.map((row: any) => <option key={row.id} value={String(row.id)}>{row.nama_lengkap}</option>)}
-          </select>
-        </FormField>
-        <FormField label="Berlaku dari" required>
-          <input type="date" name="effectiveFrom" required className={FINANCE_FIELD_CLASS} />
-        </FormField>
-        <FormField label="Gaji bulanan" required>
-          <RupiahInput name="monthlySalaryRupiah" defaultValue={0} />
-        </FormField>
-        <FormField label="Potongan / hari alfa" hint="Kosongkan (0) bila tidak ada potongan">
-          <RupiahInput name="alfaDeductionPerDayRupiah" defaultValue={0} />
-        </FormField>
-        <FormField label="Potongan / hari badal" hint="Kosongkan (0) bila tidak ada potongan">
-          <RupiahInput name="badalDeductionPerDayRupiah" defaultValue={0} />
-        </FormField>
-        <div className="sm:col-span-2 xl:col-span-5">
-          <button disabled={pending || !data.canConfigure} className="min-h-11 rounded-xl bg-emerald-700 px-5 font-bold text-white disabled:opacity-50">Simpan kompensasi</button>
-        </div>
-      </form>
-
+    {tab === 'kompensasi' ? <>
+    <SectionPanel
+      title="Kompensasi guru"
+      description="Gaji bulanan dan tarif potongan per hari. Tarif potongan 0 berarti guru dibayar penuh berapa pun hari alfa/badalnya."
+      action={data.canConfigure ? <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => setModal('impor-kompensasi')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold"><CloudArrowUp className="h-4 w-4" />Impor Excel</button>
+        <button type="button" onClick={() => setModal('kompensasi')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white">Tambah kompensasi</button>
+      </div> : null}>
       <div className="overflow-x-auto border-t">
         <table className="w-full min-w-[40rem] text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
@@ -180,8 +177,44 @@ export function PayrollClient({ data }: { data: any }) {
       </div>
     </SectionPanel>
 
-    <SectionPanel title="Impor kompensasi massal" description="Untuk mengisi banyak guru sekaligus dari Excel." action={<CloudArrowUp className="h-5 w-5 text-slate-400" />}>
-      <div className="p-4">
+    <FinanceModal
+      open={modal === 'kompensasi'}
+      title="Kompensasi guru"
+      description="Tarif potongan 0 berarti guru dibayar penuh berapa pun hari alfa/badalnya."
+      size="lg"
+      onClose={() => setModal(null)}>
+      <form action={form => { setModal(null); act(() => setTeacherCompensationAction(form), 'Kompensasi guru disimpan.') }} className="grid gap-3 sm:grid-cols-2">
+        <FormField label="Guru" required>
+          <select name="teacherId" required className={FINANCE_FIELD_CLASS}>
+            <option value="">Pilih guru</option>
+            {data.teachers.map((row: any) => <option key={row.id} value={String(row.id)}>{row.nama_lengkap}</option>)}
+          </select>
+        </FormField>
+        <FormField label="Berlaku dari" required>
+          <input type="date" name="effectiveFrom" required className={FINANCE_FIELD_CLASS} />
+        </FormField>
+        <FormField label="Gaji bulanan" required>
+          <RupiahInput name="monthlySalaryRupiah" defaultValue={0} />
+        </FormField>
+        <FormField label="Potongan / hari alfa" hint="Kosongkan (0) bila tidak ada potongan">
+          <RupiahInput name="alfaDeductionPerDayRupiah" defaultValue={0} />
+        </FormField>
+        <FormField label="Potongan / hari badal" hint="Kosongkan (0) bila tidak ada potongan">
+          <RupiahInput name="badalDeductionPerDayRupiah" defaultValue={0} />
+        </FormField>
+        <div className="sm:col-span-2 xl:col-span-5">
+          <button disabled={pending || !data.canConfigure} className="min-h-11 rounded-xl bg-emerald-700 px-5 font-bold text-white disabled:opacity-50">Simpan kompensasi</button>
+        </div>
+      </form>
+    </FinanceModal>
+
+
+    <FinanceModal
+      open={modal === 'impor-kompensasi'}
+      title="Impor massal kompensasi guru"
+      size="xl"
+      onClose={() => setModal(null)}>
+      <div>
         <BulkImport<Omit<CompensationImportRow, 'row'>>
           title="Impor massal kompensasi guru"
           description="Isi gaji bulanan dan tarif potongan banyak guru sekaligus. Tarif potongan boleh dikosongkan bila guru dibayar penuh."
@@ -225,7 +258,8 @@ export function PayrollClient({ data }: { data: any }) {
           onSubmit={importCompensationAction}
         />
       </div>
-    </SectionPanel>
+    </FinanceModal>
+    </> : null}
 
     <ConfirmAction
       open={Boolean(confirmApprove)}

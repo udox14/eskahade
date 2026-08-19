@@ -21,8 +21,8 @@ import type { BillImportRow } from './actions'
 import { BulkImport, asDateISO, asInteger, asText } from '../_components/bulk-import'
 import { RupiahInput } from '../_components/finance-inputs'
 import {
-  ConfirmAction, EmptyState, FINANCE_FIELD_CLASS, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
-  useFinanceTour, type FinanceResult, type TourStep,
+  ConfirmAction, EmptyState, FINANCE_FIELD_CLASS, FinanceModal, FinanceTabs, FinanceTour, MetricCard,
+  ResultBanner, SectionPanel, StatusBadge, useFinanceTour, type FinanceResult, type TourStep,
 } from '../_components/finance-ui'
 
 const field = FINANCE_FIELD_CLASS
@@ -81,6 +81,8 @@ export function OperationsClient({ data }: { data: OperationsData }) {
   const [confirmClose, setConfirmClose] = useState(false)
   const [reopenTarget, setReopenTarget] = useState<{ key: string; approvedBy: string; reason: string } | null>(null)
   const [confirmReopen, setConfirmReopen] = useState(false)
+  /** Satu state untuk semua dialog di halaman ini. */
+  const [modal, setModal] = useState<'settlement' | 'tagihan' | 'impor-tagihan' | null>(null)
   const tour = useFinanceTour('operasi')
 
   useEffect(() => {
@@ -156,20 +158,15 @@ export function OperationsClient({ data }: { data: OperationsData }) {
 
     <ResultBanner result={result} onDismiss={() => setResult(null)} />
 
-    <nav data-tour="tabs" aria-label="Kelompok pekerjaan operasi" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-      <div className="flex min-w-max gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-        {TABS.map(item => {
-          const active = tab === item.id
-          const badge = item.id === 'antrean' ? pendingWork : item.id === 'rekonsiliasi' ? belumDicek : 0
-          return <button key={item.id} type="button" onClick={() => setTab(item.id)} aria-current={active ? 'page' : undefined}
-            className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs font-bold transition ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
-            {item.label}
-            {badge ? <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">{badge}</span> : null}
-          </button>
-        })}
-      </div>
-      <p className="mt-2 px-1 text-[11px] text-slate-500">{TABS.find(item => item.id === tab)?.hint}</p>
-    </nav>
+    <div data-tour="tabs"><FinanceTabs
+      label="Kelompok pekerjaan operasi"
+      active={tab}
+      onChange={id => setTab(id as typeof tab)}
+      tabs={TABS.map(item => ({
+        ...item,
+        badge: item.id === 'antrean' ? pendingWork : item.id === 'rekonsiliasi' ? belumDicek : 0,
+      }))}
+    /></div>
 
     {tab === 'antrean' ? <section className="grid gap-4 xl:grid-cols-2">
       <SectionPanel id="review" title="Review top-up terlambat" description="Pastikan dana benar-benar diterima dan tidak terduplikasi sebelum menutup review.">
@@ -242,21 +239,41 @@ export function OperationsClient({ data }: { data: OperationsData }) {
         </p>
       </SectionPanel>
 
-      <SectionPanel title="Posting settlement gateway" description="Catat pencairan dana gateway ke rekening bank. Bruto harus sama dengan neto ditambah biaya provider.">
-        <form action={form => mutate(() => settlementAction(form), 'Settlement berhasil diposting.', 'Settlement dengan referensi dan angka yang sama persis sudah pernah diposting.')} className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-5">
+      <SectionPanel
+        title="Settlement gateway"
+        description="Catat pencairan dana gateway ke rekening bank."
+        action={data.capabilities.configure ? <button type="button" onClick={() => setModal('settlement')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white">Posting settlement</button> : null}>
+        <p className="p-4 text-xs leading-5 text-slate-500">
+          Dipakai setiap kali dana dari gateway masuk ke rekening utama. Bruto harus sama dengan neto ditambah biaya
+          provider — sistem menolak bila tidak seimbang.
+        </p>
+      </SectionPanel>
+
+      <FinanceModal
+        open={modal === 'settlement'}
+        title="Posting settlement gateway"
+        description="Bruto harus sama dengan neto ditambah biaya provider."
+        size="lg"
+        onClose={() => setModal(null)}>
+        <form action={form => { setModal(null); mutate(() => settlementAction(form), 'Settlement berhasil diposting.', 'Settlement dengan referensi dan angka yang sama persis sudah pernah diposting.') }} className="grid gap-3 sm:grid-cols-2">
           <label className="text-xs font-bold text-slate-800 xl:col-span-2">Referensi settlement<input name="reference" required placeholder="Nomor dari dashboard gateway" className={`mt-1 ${field}`} /></label>
           <label className="text-xs font-bold text-slate-800">Tanggal<input name="date" type="date" required className={`mt-1 ${field}`} /></label>
           <label className="text-xs font-bold text-slate-800">Bruto<div className="mt-1"><RupiahInput name="gross" min={1} /></div></label>
           <label className="text-xs font-bold text-slate-800">Biaya provider<div className="mt-1"><RupiahInput name="fee" min={0} /></div></label>
           <label className="text-xs font-bold text-slate-800">Neto diterima<div className="mt-1"><RupiahInput name="net" min={1} /></div></label>
           <button disabled={!data.capabilities.configure || pending} className="min-h-11 self-end rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50">Posting settlement</button>
-          <p className="text-[11px] leading-4 text-slate-500 sm:col-span-2 xl:col-span-5">Referensi yang sama boleh dipakai lagi selama angkanya berbeda — sistem membedakan berdasarkan isi, bukan sekadar nomor dokumen.</p>
+          <p className="text-[11px] leading-4 text-slate-500 sm:col-span-2">Referensi yang sama boleh dipakai lagi selama angkanya berbeda — sistem membedakan berdasarkan isi, bukan sekadar nomor dokumen.</p>
         </form>
-      </SectionPanel>
+      </FinanceModal>
     </div> : null}
 
     {tab === 'tagihan' ? <div className="space-y-4">
-      <BulkImport<Omit<BillImportRow, 'row'>>
+      <FinanceModal
+        open={modal === 'impor-tagihan'}
+        title="Impor massal tagihan santri"
+        size="xl"
+        onClose={() => setModal(null)}>
+        <BulkImport<Omit<BillImportRow, 'row'>>
         title="Impor massal tagihan santri"
         description="Buat banyak tagihan sekaligus dari Excel. NIS diterjemahkan ke santri di server; NIS yang keliru ditolak per baris."
         templateName="Template_Tagihan_Santri"
@@ -296,10 +313,16 @@ export function OperationsClient({ data }: { data: OperationsData }) {
           return { value: { nis, kind, title, periodKey: periodText || null, amountRupiah, dueDate } }
         }}
         onSubmit={values => importBillsAction(values)}
-      />
+        />
+      </FinanceModal>
 
-      <SectionPanel title="Buat tagihan santri" description="SPP dan Non-SPP wajib dilunasi sekaligus; USPP boleh dicicil oleh wali.">
-        <form action={form => mutate(() => createBillAction(form), 'Tagihan berhasil dibuat.')} className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+      <FinanceModal
+        open={modal === 'tagihan'}
+        title="Buat tagihan santri"
+        description="SPP dan Non-SPP wajib dilunasi sekaligus; USPP boleh dicicil oleh wali."
+        size="lg"
+        onClose={() => setModal(null)}>
+        <form action={form => { setModal(null); mutate(() => createBillAction(form), 'Tagihan berhasil dibuat.') }} className="grid gap-3 sm:grid-cols-2">
           <label className="text-xs font-bold text-slate-800">NIS santri<input name="nis" required placeholder="Contoh: 2024001" className={`mt-1 ${field}`} /><span className="mt-1 block text-[11px] font-normal text-slate-500">Santri harus berstatus aktif.</span></label>
           <label className="text-xs font-bold text-slate-800">Jenis tagihan<select name="kind" className={`mt-1 ${field}`}><option value="SPP">SPP — wajib lunas sekaligus</option><option value="NON_SPP">Non-SPP — wajib lunas sekaligus</option><option value="USPP">USPP — boleh dicicil</option></select></label>
           <label className="text-xs font-bold text-slate-800">Nama tagihan<input name="title" required placeholder="Contoh: SPP Agustus 2026" className={`mt-1 ${field}`} /></label>
@@ -307,11 +330,17 @@ export function OperationsClient({ data }: { data: OperationsData }) {
           <label className="text-xs font-bold text-slate-800">Nominal<div className="mt-1"><RupiahInput name="amount" min={1} /></div></label>
           <label className="text-xs font-bold text-slate-800">Jatuh tempo<input name="dueDate" type="date" className={`mt-1 ${field}`} /></label>
           <button disabled={!data.capabilities.configure || pending} className="min-h-11 rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white disabled:opacity-50 sm:col-span-2 xl:col-span-1">Buat tagihan</button>
-          <p className="text-[11px] leading-4 text-slate-500 sm:col-span-2 xl:col-span-2">Santri berstatus bebas SPP otomatis ditolak untuk jenis SPP. Tagihan yang sudah dibayar sebagian tidak dapat dibatalkan.</p>
+          <p className="text-[11px] leading-4 text-slate-500 sm:col-span-2">Santri berstatus bebas SPP otomatis ditolak untuk jenis SPP. Tagihan yang sudah dibayar sebagian tidak dapat dibatalkan.</p>
         </form>
-      </SectionPanel>
+      </FinanceModal>
 
-      <SectionPanel title="Tagihan terbaru" description="Validasi hasil pembuatan dan status pembayaran tagihan.">
+      <SectionPanel
+        title="Tagihan terbaru"
+        description="Validasi hasil pembuatan dan status pembayaran tagihan."
+        action={data.capabilities.configure ? <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setModal('impor-tagihan')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold">Impor Excel</button>
+          <button type="button" onClick={() => setModal('tagihan')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white">Buat tagihan</button>
+        </div> : null}>
         <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[680px] text-xs">
           <thead className="bg-slate-50 text-left uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-2.5">Santri</th><th className="px-4 py-2.5">Tagihan</th><th className="px-4 py-2.5 text-right">Nominal</th><th className="px-4 py-2.5 text-right">Terbayar</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5">Tindakan</th></tr></thead>
           <tbody className="divide-y divide-slate-100">{data.bills.length ? data.bills.map(bill => <tr key={bill.id}>
