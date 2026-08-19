@@ -818,7 +818,15 @@ berbohong, jadi tiap resep menjadi fungsi. Tujuannya tetap tercapai: satu berkas
 bahasa bisnis, nol kode akun di tempat lain.
 
 **2. Migrasi dipecah menjadi delapan berkas, bukan tujuh, dan seluruh trigger
-dipisah ke berkas terakhir.** Rencana mengelompokkan trigger bersama tabelnya.
+dipisah ke berkas terakhir.**
+
+> Nama berkas di bagian-bagian sebelum ini sudah usang. Pemetaan sebenarnya:
+> `0001_finance_core.sql` dan `scripts/reset-finance-db.sql` → digantikan
+> `0001a_drop_legacy.sql` … `0001h_seed.sql`;
+> `scripts/test-finance-invariants.mjs` → digantikan `scripts/test-finance.py`
+> beserta lima berkas uji di sampingnya. Yang berlaku adalah isi
+> `migrations-finance/` dan `scripts/` hari ini, bukan nama di rencana.
+ Rencana mengelompokkan trigger bersama tabelnya.
 Itu berbahaya: beberapa trigger merujuk tabel lintas modul, dan SQLite membuat
 trigger tanpa memvalidasi tabel yang hanya disebut di body-nya — persis penyebab
 insiden `0007`. Urutannya sekarang seluruh tabel dulu, baru seluruh trigger.
