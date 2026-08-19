@@ -30,7 +30,7 @@ export default async function CashierPage() {
     <FinanceNav />
     <FinanceGuide
       purpose="Memastikan uang hanya dicairkan kepada santri yang benar dan setiap rupiah tercatat pada shift kas."
-      prerequisites={["Pastikan Anda sudah ditugaskan ke Unit Kas.", "Hitung uang fisik sebelum membuka shift.", "Siapkan scanner RFID/QR dan keypad PIN."]}
+      prerequisites={["Pastikan Anda sudah ditugaskan ke Unit Kas.", "Hitung uang fisik sebelum membuka shift.", "Siapkan scanner QR dan keypad PIN."]}
       steps={["Pilih Unit Kas dan buka shift.", "Scan kartu/QR, cocokkan foto dengan santri di depan Anda.", "Isi nominal, minta santri memasukkan PIN, lalu cairkan.", "Di akhir shift, hitung ulang kas fisik dan tutup shift."]}
       notes={["PIN dan konfirmasi identitas tidak dapat dilewati.", "Scope santri mengikuti Unit Kas aktif.", "Selisih penutupan otomatis masuk review bendahara.", `Nominal harus kelipatan Rp ${data.policy.denominationRupiah.toLocaleString('id-ID')} dan maksimal Rp ${data.policy.perTransactionCapRupiah.toLocaleString('id-ID')} per transaksi.`]}
       commonMistakes={[

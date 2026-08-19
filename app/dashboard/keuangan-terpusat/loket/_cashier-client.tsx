@@ -39,7 +39,7 @@ const OPEN_TOUR: TourStep[] = [
 
 const SERVE_TOUR: TourStep[] = [
   { target: '[data-tour="shift-summary"]', title: 'Pantau posisi kas', body: 'Kas seharusnya = kas awal dikurangi total yang sudah dicairkan. Cocokkan dengan laci kas kapan saja.' },
-  { target: '[data-tour="scan"]', title: 'Scan kartu atau QR', body: 'Tempel kartu RFID atau scan QR. Jenis kredensial dikenali otomatis, tidak perlu dipilih manual.' },
+  { target: '[data-tour="scan"]', title: 'Scan QR santri', body: 'Scan QR di kartu santri. Kode yang bukan QR santri langsung ditolak dengan pesan yang jelas.' },
   { target: '[data-tour="identity"]', title: 'Cocokkan wajah dengan foto', body: 'Bandingkan foto di layar dengan santri di depan Anda. Langkah ini tidak bisa dilewati dan menjadi tanggung jawab operator.' },
   { target: '[data-tour="amount"]', title: 'Isi nominal', body: 'Nominal harus kelipatan yang berlaku dan tidak melampaui batas per transaksi maupun sisa limit dari wali. Peringatan muncul sebelum Anda menekan tombol.' },
   { target: '[data-tour="submit"]', title: 'Cairkan', body: 'PIN santri dan centang kecocokan identitas wajib diisi. Setelah tercatat, pencairan tidak dapat dihapus — koreksi hanya lewat bendahara.' },
@@ -167,7 +167,7 @@ export function CashierClient({ units, shift: initialShift, operatorName, canCon
         <h3 className="font-bold text-slate-900">Sebelum loket dibuka</h3>
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-xs leading-5">
           <li>Hitung uang tunai di laci kas.</li>
-          <li>Pastikan scanner RFID/QR dan keypad PIN siap.</li>
+          <li>Pastikan scanner QR dan keypad PIN siap.</li>
           <li>Pastikan nama Unit Kas dan scope asrama sudah benar.</li>
         </ol>
       </aside>
@@ -197,7 +197,7 @@ export function CashierClient({ units, shift: initialShift, operatorName, canCon
 
     <div className="grid gap-4 lg:grid-cols-[minmax(300px,.8fr)_minmax(0,1.2fr)]">
       <section data-tour="scan" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Langkah 2</p><h2 className="mt-1 font-bold">Scan RFID atau QR</h2><p className="mt-1 text-xs text-slate-500">Jenis kredensial dikenali otomatis.</p></div><Scan className="h-6 w-6 text-slate-400" /></div>
+        <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Langkah 2</p><h2 className="mt-1 font-bold">Scan QR santri</h2><p className="mt-1 text-xs text-slate-500">Jenis kredensial dikenali otomatis.</p></div><Scan className="h-6 w-6 text-slate-400" /></div>
         <label className="mt-4 block text-sm font-bold">Kredensial
           <input autoFocus data-scanner-input value={token} onChange={event => setToken(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); scanCredential(token) } }} className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-3 font-mono text-sm" placeholder="Tempel kartu atau scan QR" />
         </label>

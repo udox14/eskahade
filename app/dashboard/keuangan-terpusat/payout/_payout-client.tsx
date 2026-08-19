@@ -192,7 +192,7 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
     <section data-tour="stages" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       <MetricCard label="Menunggu pemeriksaan" value={String(counts.submitted)} detail="Perlu tindakan checker" icon="listChecks" tone={counts.submitted ? 'amber' : 'emerald'} />
       <MetricCard label="Siap dieksekusi" value={String(counts.checked)} detail="Sudah diperiksa, belum dikirim" icon="wallet" tone={counts.checked ? 'blue' : 'slate'} />
-      <MetricCard label="Dalam perjalanan" value={String(counts.inflight)} detail="Belum cocok dengan mutasi bank" icon="landmark" tone={counts.inflight ? 'blue' : 'slate'} />
+      <MetricCard label="Sedang dikirim provider" value={String(counts.inflight)} detail="Belum cocok dengan mutasi bank" icon="landmark" tone={counts.inflight ? 'blue' : 'slate'} />
       <MetricCard label="Gagal" value={String(counts.failed)} detail="Periksa alasan lalu ajukan ulang" icon="checkCircle" tone={counts.failed ? 'amber' : 'emerald'} />
     </section>
 

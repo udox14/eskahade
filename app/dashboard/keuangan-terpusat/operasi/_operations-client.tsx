@@ -65,7 +65,7 @@ const TOUR: TourStep[] = [
   { target: '[data-tour="metrics"]', title: 'Mulai dari angka pengecualian', body: 'Empat kartu ini merangkum pekerjaan yang belum selesai. Selama masih ada yang berwarna kuning, periode belum layak ditutup.' },
   { target: '[data-tour="tabs"]', title: 'Empat kelompok pekerjaan', body: 'Tindakan dipisah per tujuan supaya aksi berat seperti tutup buku tidak bersebelahan dengan pekerjaan harian.' },
   { target: '[data-tour="reviews"]', title: 'Review top-up terlambat', body: 'Top-up yang dibayar setelah kedaluwarsa. Pastikan dana benar-benar masuk dan belum pernah dicatat, lalu tulis hasil pemeriksaan.' },
-  { target: '[data-tour="import"]', title: 'Impor mutasi bank', body: 'Berkas yang sama tidak akan diimpor dua kali. Pencocokan otomatis hanya dilakukan bila satu referensi memetakan tepat satu mutasi ke satu jurnal.' },
+  { target: '[data-tour="import"]', title: 'Cocokkan rekening koran', body: 'Berkas yang sama tidak akan diimpor dua kali. Pencocokan otomatis hanya dilakukan bila satu referensi memetakan tepat satu mutasi ke satu jurnal.' },
   { target: '[data-tour="readiness"]', title: 'Checklist sebelum tutup buku', body: 'Setiap baris merah harus jadi hijau lebih dulu. Klik barisnya untuk langsung menuju pekerjaan yang menahan.' },
 ]
 
@@ -409,7 +409,7 @@ export function OperationsClient({ data }: { data: OperationsData }) {
       impact={[
         'Sidik jari saldo seluruh akun disimpan sebagai bukti penutupan.',
         'Jurnal dengan tanggal efektif di periode ini akan ditolak database.',
-        'Membuka kembali memerlukan dua persetujuan dari orang berbeda.',
+        'Membuka kembali memerlukan satu penyetuju selain Anda.',
       ]}
       confirmPhrase="TUTUP BUKU"
       confirmLabel="Kunci periode"
@@ -429,7 +429,6 @@ export function OperationsClient({ data }: { data: OperationsData }) {
       title={`Buka kembali periode ${reopenTarget?.key ?? ''}?`}
       description="Periode yang dibuka kembali menerima jurnal baru dan sidik jari penutupannya tidak lagi mewakili kondisi akhir."
       impact={[
-        'Kedua persetujuan yang terkumpul akan habis terpakai.',
         'Penutupan berikutnya menghasilkan sidik jari saldo yang berbeda.',
         'Seluruh tindakan tercatat di audit log dengan nama Anda.',
       ]}

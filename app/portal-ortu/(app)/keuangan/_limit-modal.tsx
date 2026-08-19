@@ -47,7 +47,7 @@ export function LimitModal({
   return (
     <BottomSheet open={open} onClose={onClose} title="Limit Pencairan Anak">
       <p className="text-xs text-[var(--p-muted)] leading-relaxed">
-        Batas pencairan saldo jajan/makan di pesantren (RFID/QR). Isi 0 untuk tidak memberlakukan limit pada periode tersebut.
+        Batas pencairan saldo jajan/makan di pesantren lewat kartu QR. Isi 0 untuk tidak memberlakukan limit pada periode tersebut.
       </p>
 
       <div className="mt-4 space-y-3">

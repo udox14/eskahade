@@ -13,7 +13,7 @@ export default async function PayoutPage() {
   const pending = data.payouts.filter((p: any) => !['RECONCILED', 'FAILED'].includes(p.status)).length
 
   return <main className="space-y-4 sm:space-y-5">
-    <FinancePageHeader title="Payout" description="Kelola pengiriman dana melalui alur maker, checker, executor, dan rekonsiliasi." eyebrow="Pemisahan tugas wajib" meta="Payout baru final setelah sukses provider dan cocok dengan mutasi bank" />
+    <FinancePageHeader title="Payout" description="Kelola pengiriman dana lewat alur maker-checker: yang mengajukan bukan yang menyetujui." eyebrow="Pemisahan tugas wajib" meta="Pencairan final setelah dana terkirim dan buktinya tercatat" />
     <FinanceNav />
     <FinanceGuide
       purpose="Mengirim dana makan, laundry, payroll, atau refund dengan persetujuan berlapis dan jejak audit."
@@ -21,7 +21,7 @@ export default async function PayoutPage() {
       steps={[
         "Maker mengajukan payout beserta nominal dan metode.",
         "Checker memeriksa penerima, nominal, dan biaya, lalu meloloskan.",
-        "Executor mengirim dana — via API atau transfer manual dengan nomor bukti.",
+        "Checker yang sama mengirim dana — via API atau transfer manual dengan nomor bukti.",
         "Setelah cocok dengan mutasi rekening, tandai direkonsiliasi.",
       ]}
       notes={[

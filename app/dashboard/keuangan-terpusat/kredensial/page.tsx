@@ -13,11 +13,11 @@ export default async function CredentialPage(){
     <FinancePageHeader title="Kredensial" description="Pendaftaran kartu massal, integrasi reader, dan pencetakan kartu QR santri." eyebrow="Kredensial: QR Code" meta={data.scope?`Scope asrama ${data.scope} · saldo dan PIN tidak pernah menempel pada kartu`:'Saldo dan PIN tidak pernah menempel pada kartu'}/>
     <FinanceNav/>
     <FinanceGuide
-      purpose="Mendaftarkan ribuan kartu santri lewat alur scan berurutan dan batch yang dapat dilanjutkan bila terputus."
-      prerequisites={['Hubungkan USB reader dalam mode keyboard dan pastikan reader mengirim Enter setelah tiap scan.', 'Uji reader lebih dulu di tab Pengaturan sebelum memulai antrean panjang.', 'Izinkan akses kamera bila memakai scan QR lewat perangkat.']}
+      purpose="Menerbitkan kartu QR santri secara massal, dalam batch yang dapat dilanjutkan bila terputus."
+      prerequisites={['Uji scanner lebih dulu di tab Pengaturan; scanner harus mengirim Enter setelah tiap scan.', 'Izinkan akses kamera bila memindai QR lewat perangkat.']}
       steps={[
         'Saring dan pilih santri di tab Pilih Santri.',
-        'Jalankan batch QR, atau mulai antrean RFID untuk scan satu per satu.',
+        'Jalankan batch penerbitan QR.',
         'Periksa hasilnya di tab Batch QR — batch yang terputus dapat dilanjutkan.',
         'Cetak kartu per volume PDF di tab Kartu.',
       ]}
@@ -29,13 +29,12 @@ export default async function CredentialPage(){
       commonMistakes={[
         'Mencetak ulang kartu tanpa mencabut yang lama, sehingga dua kartu aktif untuk satu santri.',
         
-        'Memulai antrean RFID tanpa menguji reader dulu, lalu semua scan tertahan karena reader tidak mengirim Enter.',
+        'Menguji scanner hanya sekali lalu menganggap semua unit beres; scanner yang tidak mengirim Enter membuat scan tertahan.',
         'Memilih "Pilih semua hasil" tanpa menyaring, sehingga santri yang sudah punya kartu ikut diproses ulang.',
       ]}
       glossary={[
-        { term: 'RFID', meaning: 'Kartu tempel. Nomor uniknya dibaca reader; nomor itu sendiri tidak berarti apa-apa tanpa PIN.' },
         { term: 'QR statis', meaning: 'Kode QR tercetak di kartu. Isinya token acak yang disimpan terenkripsi, bukan data santri.' },
-        { term: 'Mode kredensial', meaning: 'Jenis kartu yang diterima loket. Mode transisi menerima keduanya sampai tanggal tertentu.' },
+        { term: 'PIN santri', meaning: 'Enam digit milik santri. QR saja tidak cukup — tanpa PIN, kartu yang jatuh tidak bisa dipakai orang lain.' },
         { term: 'Batch penerbitan', meaning: 'Antrean penerbitan QR massal yang mencatat progresnya, sehingga dapat dilanjutkan bila terputus.' },
         FINANCE_GLOSSARY.makerChecker,
       ]}

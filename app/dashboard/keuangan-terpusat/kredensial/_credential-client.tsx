@@ -20,9 +20,9 @@ import {
 } from '../_components/finance-ui'
 
 const TOUR: TourStep[] = [
-  { target: '[data-tour="tabs"]', title: 'Lima tahap penerbitan', body: 'Mulai dari Pilih Santri, lalu jalankan RFID atau QR, cetak kartunya, dan atur mode di tab Pengaturan.' },
-  { target: '[data-tour="select"]', title: 'Saring lalu pilih', body: 'Filter lanjutan bisa menyaring santri yang belum punya QR atau RFID, sehingga tidak ada yang terlewat maupun tercetak dua kali.' },
-  { target: '[data-tour="run"]', title: 'Jalankan enrollment', body: 'Batch QR berjalan otomatis dan bisa dilanjutkan bila terputus. Antrean RFID menuntun Anda scan satu per satu.' },
+  { target: '[data-tour="tabs"]', title: 'Lima tahap penerbitan', body: 'Mulai dari Pilih Santri, lalu jalankan batch QR, lanjut ke cetak kartu.' },
+  { target: '[data-tour="select"]', title: 'Saring lalu pilih', body: 'Filter lanjutan bisa menyaring santri yang belum punya QR, sehingga tidak ada yang terlewat maupun tercetak dua kali.' },
+  { target: '[data-tour="run"]', title: 'Jalankan enrollment', body: 'Batch QR berjalan otomatis dan bisa dilanjutkan bila terputus tanpa membuat kartu ganda.' },
   { target: '[data-tour="mode"]', title: 'Mode menentukan yang diterima loket', body: 'Mengubah mode akan menangguhkan kredensial jenis lain di seluruh pesantren. Pakai mode transisi bila ingin berpindah bertahap.' },
 ]
 
@@ -231,7 +231,7 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <h2 className="font-bold">Pilih santri</h2>
-            <p className="text-xs text-slate-500">Saring hasil, pilih sebagian atau semua, lalu jalankan penerbitan. Kolom RFID dan QR menunjukkan siapa yang belum punya.</p>
+            <p className="text-xs text-slate-500">Saring hasil, pilih sebagian atau semua, lalu jalankan penerbitan. Kolom QR menunjukkan siapa yang belum punya kartu.</p>
           </div>
           <div data-tour="run" className="flex flex-wrap gap-2">
             <button onClick={createQrBatch} disabled={pending || !selected.size} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"><Play className="h-4 w-4" />Terbitkan QR ({selected.size})</button>
@@ -438,9 +438,7 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
             <select value={filters.status} onChange={event => setFilters({ ...filters, status: event.target.value })} className="min-h-11 w-full rounded-xl border px-3">
               <option value="ALL">Semua status</option>
               <option value="MISSING_QR">Belum punya QR</option>
-              <option value="MISSING_RFID">Belum punya RFID</option>
               <option value="HAS_QR">Sudah punya QR</option>
-              <option value="HAS_RFID">Sudah punya RFID</option>
             </select>
           </label>
         </div>

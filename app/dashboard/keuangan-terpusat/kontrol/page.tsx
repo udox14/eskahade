@@ -10,7 +10,7 @@ export default async function FinanceControlPage(){
   await guardPage('/dashboard/keuangan-terpusat/kontrol')
   const data=await getFinanceControlData()
   return <main className="space-y-4 sm:space-y-5">
-    <FinancePageHeader title="Kontrol & Audit" description="Pantau audit trail, pengaturan runtime, outbox, MFA, sesi staf, dan percobaan autentikasi." eyebrow="Kontrol internal" meta="Akses tindakan mengikuti pemisahan bendahara dan checker"/>
+    <FinancePageHeader title="Kontrol & Audit" description="Pantau audit trail dan ubah pengaturan runtime modul keuangan." eyebrow="Kontrol internal" meta="Akses tindakan mengikuti pemisahan bendahara dan checker"/>
     <FinanceNav/>
     <FinanceGuide
       purpose="Menyatukan kontrol operasional dan bukti audit tanpa mengekspos kunci keamanan."
@@ -22,7 +22,6 @@ export default async function FinanceControlPage(){
         'Checker menelusuri audit trail untuk memastikan tidak ada tindakan janggal.',
       ]}
       notes={[
-        'Kunci MFA dan hash identitas tidak pernah ditampilkan di layar.',
         'Mengirim ulang event tidak mengubah transaksi keuangannya sama sekali.',
         'Semua perubahan di halaman ini ikut tercatat di audit trail.',
       ]}

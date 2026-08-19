@@ -13,7 +13,7 @@ export default async function OperationsPage() {
   return <main className="space-y-4 sm:space-y-5">
     <FinancePageHeader
       title="Operasi & Rekonsiliasi"
-      description="Kendalikan tagihan, mutasi bank, settlement gateway, dan tutup buku dari satu workspace."
+      description="Kendalikan tagihan, pencocokan rekening koran, settlement gateway, dan tutup buku dari satu tempat."
       eyebrow="Bendahara pusat"
       meta="Selesaikan pengecualian sebelum menutup periode"
     />
@@ -23,13 +23,13 @@ export default async function OperationsPage() {
       prerequisites={['Unduh mutasi resmi dari rekening utama.', 'Siapkan referensi dan tanggal settlement dari dashboard gateway.', 'Pastikan payout gagal sudah ditindaklanjuti di halaman Payout.']}
       steps={[
         'Bereskan antrean pengecualian: review top-up terlambat.',
-        'Impor mutasi bank, lalu cocokkan baris yang belum terjelaskan ke jurnal.',
+        'Cocokkan saldo tiap rekening kas dengan rekening koran, lalu jelaskan selisihnya bila ada.',
         'Posting settlement gateway sesuai bukti pencairan.',
         'Buka tab Tutup buku, penuhi seluruh checklist, baru kunci periode.',
       ]}
       notes={[
         'Jangan menutup periode jika masih ada selisih — checklist akan menahannya.',
-        'Reopen membutuhkan dua persetujuan berbeda dan hanya berlaku sekali pakai.',
+        'Membuka kembali periode tertutup butuh satu penyetuju selain yang mengajukan, dan alasannya tercatat permanen.',
         'Semua review manual tercatat di audit log beserta nama Anda.',
       ]}
       commonMistakes={[

@@ -103,7 +103,7 @@ export default async function CentralFinancePage() {
     <FinanceNav />
     <FinanceGuide
       purpose="Memberi gambaran cepat tentang posisi keuangan dan mengarahkan bendahara ke pekerjaan yang paling mendesak."
-      prerequisites={['Pastikan settlement gateway dan mutasi bank sudah diimpor di halaman Operasi.', 'Perhatikan scope global atau asrama yang tampil di bagian atas.']}
+      prerequisites={['Pastikan settlement gateway sudah diposting dan rekening sudah dicocokkan di halaman Operasi.', 'Perhatikan scope global atau asrama yang tampil di bagian atas.']}
       steps={[
         'Periksa empat kartu ringkasan untuk melihat posisi dana.',
         'Kerjakan antrean "Pengecualian butuh tindakan" dari yang nilainya terbesar.',
