@@ -536,7 +536,7 @@ export async function getJurnalGuru(startDate: string, endDate: string, marhalah
 export async function simpanAbsensiGuru(
   payload: any[],
   liburInput: { tanggal: string; sesi: SessionType; is_libur: boolean }[] = []
-) {
+): Promise<{ error?: string; success?: boolean; saved?: number }> {
   await ensureLiburPengajianTable()
   const session = await getSession()
   if (payload.length === 0 && liburInput.length === 0) return { error: 'Tidak ada data untuk disimpan' }
