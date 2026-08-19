@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ArrowClockwise, CheckCircle, MagnifyingGlass, ShieldCheck, Warning } from '@phosphor-icons/react'
 import {
-  EmptyState, FINANCE_FIELD_CLASS, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
+  EmptyState, FINANCE_FIELD_CLASS, FinanceTabs, FinanceTour, MetricCard, ResultBanner, SectionPanel, StatusBadge,
   useFinanceTour, type FinanceResult, type TourStep,
 } from '../_components/finance-ui'
 import { ExportButton, RupiahInput } from '../_components/finance-inputs'
@@ -69,6 +69,8 @@ export function FinanceControlClient({ data }: { data: any }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [result, setResult] = useState<FinanceResult | null>(null)
+  /** Audit adalah alasan utama halaman ini dibuka; pengaturan runtime jarang disentuh. */
+  const [tab, setTab] = useState<'audit' | 'pengaturan'>('audit')
   const tour = useFinanceTour('kontrol')
   const now = Number(data.nowMs)
 
@@ -100,11 +102,21 @@ export function FinanceControlClient({ data }: { data: any }) {
 
     <ResultBanner result={result} onDismiss={() => setResult(null)} />
 
-    <SettingsPanel data={data} act={act} pending={pending} />
+    <FinanceTabs
+      label="Kelompok pekerjaan kontrol"
+      active={tab}
+      onChange={id => setTab(id as typeof tab)}
+      tabs={[
+        { id: 'audit', label: 'Audit trail', hint: 'Telusuri siapa melakukan apa dan kapan' },
+        { id: 'pengaturan', label: 'Pengaturan runtime', hint: 'Nilai yang mengubah perilaku modul tanpa deploy' },
+      ]}
+    />
 
-    {data.canAudit
+    {tab === 'pengaturan' ? <SettingsPanel data={data} act={act} pending={pending} /> : null}
+
+    {tab === 'audit' ? (data.canAudit
       ? <AuditPanel data={data} now={now} />
-      : <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"><Warning className="mr-2 inline h-5 w-5" />Audit trail terperinci hanya tersedia untuk checker Dewan Santri.</div>}
+      : <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"><Warning className="mr-2 inline h-5 w-5" />Audit trail terperinci hanya tersedia untuk checker Dewan Santri.</div>) : null}
 
   </div>
 }

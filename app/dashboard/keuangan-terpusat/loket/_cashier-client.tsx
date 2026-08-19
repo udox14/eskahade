@@ -10,7 +10,7 @@ import { closeCashShift, identifyStudent, openCashShift, submitWithdrawal } from
 import type { CredentialKind } from '@/lib/finance/types'
 import { isQrToken, useKeyboardWedgeScanner } from '@/lib/finance/scanner-client'
 import { QrCameraScanner } from '@/components/finance/qr-camera-scanner'
-import { ConfirmAction, FinanceTour, ResultBanner, useFinanceTour, type FinanceResult, type TourStep } from '../_components/finance-ui'
+import { ConfirmAction, FinanceModal, FinanceTour, ResultBanner, useFinanceTour, type FinanceResult, type TourStep } from '../_components/finance-ui'
 
 type Unit = { id: string; name: string; asrama_scope: string | null; fixed_float_rupiah: number }
 type Shift = {
@@ -277,20 +277,13 @@ export function CashierClient({ units, shift: initialShift, operatorName, canCon
       </section>
     </div>
 
-    {showClose ? <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/60 p-4" onClick={() => setShowClose(false)}>
-      <section className="w-full max-w-lg rounded-xl bg-white p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
-        <div className="flex items-start gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-700"><Clock className="h-5 w-5" /></span><div><h2 className="font-bold">Tutup shift kas</h2><p className="mt-1 text-sm text-slate-500">Hitung seluruh uang fisik sebelum mengonfirmasi.</p></div></div>
-        {/* Perhitungan ditampilkan utuh supaya operator tahu asal angka selisih. */}
-        <dl className="mt-5 divide-y divide-slate-100 rounded-lg border border-slate-200 text-sm">
-          <div className="flex items-center justify-between px-3 py-2"><dt className="text-slate-500">Kas awal shift</dt><dd className="font-semibold tabular-nums">{rupiah(shift.opening_cash_rupiah)}</dd></div>
-          <div className="flex items-center justify-between px-3 py-2"><dt className="text-slate-500">Total dicairkan</dt><dd className="font-semibold tabular-nums text-red-700">− {rupiah(shift.paid_rupiah)}</dd></div>
-          <div className="flex items-center justify-between bg-slate-50 px-3 py-2"><dt className="font-bold text-slate-700">Kas seharusnya</dt><dd className="font-bold tabular-nums">{rupiah(shift.expected_cash_rupiah)}</dd></div>
-          <div className="flex items-center justify-between px-3 py-2"><dt className="text-slate-500">Hasil hitung fisik</dt><dd className="font-semibold tabular-nums">{rupiah(actualCash)}</dd></div>
-          <div className={`flex items-center justify-between px-3 py-2 ${discrepancy === 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`}><dt className="font-bold">Selisih</dt><dd className="font-bold tabular-nums">{discrepancy > 0 ? `Lebih ${rupiah(discrepancy)}` : discrepancy < 0 ? `Kurang ${rupiah(Math.abs(discrepancy))}` : 'Cocok'}</dd></div>
-        </dl>
-        <label className="mt-4 block text-sm font-bold">Kas fisik akhir<input autoFocus value={actualCash} onChange={event => setActualCash(Number(event.target.value))} type="number" min={0} className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-200 px-3 tabular-nums" /></label>
-        {discrepancy !== 0 ? <label className="mt-3 block text-sm font-bold text-amber-900">Catatan selisih<textarea value={closingNote} onChange={event => setClosingNote(event.target.value)} rows={3} placeholder="Jelaskan hasil pengecekan awal..." className="mt-1.5 w-full rounded-lg border border-amber-300 p-3 text-slate-900" /><span className="mt-1 block text-xs font-normal text-amber-800">Shift dengan selisih otomatis masuk antrean review bendahara. Jangan menyamakan angka agar terlihat cocok.</span></label> : null}
-        <div className="mt-5 grid grid-cols-2 gap-2"><button onClick={() => setShowClose(false)} className="min-h-11 rounded-lg border border-slate-200 font-bold">Batal</button><button disabled={pending || (discrepancy !== 0 && closingNote.trim().length < 5)} onClick={() => startTransition(async () => {
+    <FinanceModal
+      open={showClose}
+      title="Tutup shift kas"
+      description="Hitung seluruh uang fisik sebelum mengonfirmasi."
+      onClose={() => setShowClose(false)}
+      footer={<>
+        <div className="grid grid-cols-2 gap-2"><button onClick={() => setShowClose(false)} className="min-h-11 rounded-lg border border-slate-200 font-bold">Batal</button><button disabled={pending || (discrepancy !== 0 && closingNote.trim().length < 5)} onClick={() => startTransition(async () => {
           const closed = await closeCashShift({ shiftId: shift.id, actualClosingRupiah: actualCash, note: closingNote })
           if ('error' in closed) { setResult({ tone: 'error', message: closed.error ?? 'Shift gagal ditutup.' }); toast.error(closed.error); return }
           toast.success(closed.discrepancy === 0 ? 'Shift ditutup tanpa selisih.' : 'Shift ditutup dan dikirim untuk review.')
@@ -302,7 +295,17 @@ export function CashierClient({ units, shift: initialShift, operatorName, canCon
           setShowClose(false); setShift(null); setStudent(null); setToken(''); setClosingNote('')
           router.refresh()
         })} className="min-h-11 rounded-lg bg-slate-900 px-3 font-bold text-white disabled:opacity-50">Tutup shift</button></div>
-      </section>
-    </div> : null}
+      </>}>
+        {/* Perhitungan ditampilkan utuh supaya operator tahu asal angka selisih. */}
+        <dl className="mt-5 divide-y divide-slate-100 rounded-lg border border-slate-200 text-sm">
+          <div className="flex items-center justify-between px-3 py-2"><dt className="text-slate-500">Kas awal shift</dt><dd className="font-semibold tabular-nums">{rupiah(shift.opening_cash_rupiah)}</dd></div>
+          <div className="flex items-center justify-between px-3 py-2"><dt className="text-slate-500">Total dicairkan</dt><dd className="font-semibold tabular-nums text-red-700">− {rupiah(shift.paid_rupiah)}</dd></div>
+          <div className="flex items-center justify-between bg-slate-50 px-3 py-2"><dt className="font-bold text-slate-700">Kas seharusnya</dt><dd className="font-bold tabular-nums">{rupiah(shift.expected_cash_rupiah)}</dd></div>
+          <div className="flex items-center justify-between px-3 py-2"><dt className="text-slate-500">Hasil hitung fisik</dt><dd className="font-semibold tabular-nums">{rupiah(actualCash)}</dd></div>
+          <div className={`flex items-center justify-between px-3 py-2 ${discrepancy === 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`}><dt className="font-bold">Selisih</dt><dd className="font-bold tabular-nums">{discrepancy > 0 ? `Lebih ${rupiah(discrepancy)}` : discrepancy < 0 ? `Kurang ${rupiah(Math.abs(discrepancy))}` : 'Cocok'}</dd></div>
+        </dl>
+        <label className="mt-4 block text-sm font-bold">Kas fisik akhir<input autoFocus value={actualCash} onChange={event => setActualCash(Number(event.target.value))} type="number" min={0} className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-200 px-3 tabular-nums" /></label>
+        {discrepancy !== 0 ? <label className="mt-3 block text-sm font-bold text-amber-900">Catatan selisih<textarea value={closingNote} onChange={event => setClosingNote(event.target.value)} rows={3} placeholder="Jelaskan hasil pengecekan awal..." className="mt-1.5 w-full rounded-lg border border-amber-300 p-3 text-slate-900" /><span className="mt-1 block text-xs font-normal text-amber-800">Shift dengan selisih otomatis masuk antrean review bendahara. Jangan menyamakan angka agar terlihat cocok.</span></label> : null}
+    </FinanceModal>
   </div>
 }
