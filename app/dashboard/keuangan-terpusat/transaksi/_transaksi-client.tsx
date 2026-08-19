@@ -10,7 +10,7 @@ import { jenisTransaksi } from '@/lib/finance/postings'
 import { RupiahInput } from '../_components/finance-inputs'
 import {
   ConfirmAction, EmptyState, FINANCE_FIELD_CLASS as field, FormField, MetricCard,
-  ResultBanner, SectionPanel, StatusBadge, type FinanceResult,
+  FinanceModal, ResultBanner, SectionPanel, StatusBadge, type FinanceResult,
 } from '../_components/finance-ui'
 
 const rupiah = (value: number) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`
@@ -31,6 +31,7 @@ export function TransaksiClient({ data, initialSearch = '' }: { data: any; initi
   const [pending, startTransition] = useTransition()
   const [result, setResult] = useState<FinanceResult | null>(null)
   const [lapisJurnal, setLapisJurnal] = useState(false)
+  const [modalManual, setModalManual] = useState(false)
   const [cari, setCari] = useState(initialSearch)
   const [arahFilter, setArahFilter] = useState<'SEMUA' | 'MASUK' | 'KELUAR'>('SEMUA')
   const [reverseTarget, setReverseTarget] = useState<any>(null)
@@ -106,10 +107,16 @@ export function TransaksiClient({ data, initialSearch = '' }: { data: any; initi
       title="Daftar transaksi"
       description="Semua pergerakan uang, terbaru di atas. Klik satu baris untuk melihat rinciannya."
       action={data.canConfigure
-        ? <button type="button" onClick={() => setLapisJurnal(value => !value)}
+        ? <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => setLapisJurnal(value => !value)}
           className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold ${lapisJurnal ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'}`}>
           <Books className="h-4 w-4" />{lapisJurnal ? 'Sembunyikan jurnal' : 'Lihat jurnal'}
         </button>
+        {lapisJurnal ? <button type="button" onClick={() => setModalManual(true)}
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-bold">
+          Catatan manual
+        </button> : null}
+      </div>
         : null}>
 
       <div className="flex flex-col gap-2 border-b border-slate-100 p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -206,10 +213,13 @@ export function TransaksiClient({ data, initialSearch = '' }: { data: any; initi
       </div>
     </SectionPanel>
 
-    {data.canConfigure && lapisJurnal ? <SectionPanel
+    <FinanceModal
+      open={modalManual}
       title="Catatan manual bendahara"
-      description="Hanya untuk hal yang tidak punya jalur sendiri, misalnya koreksi pembukuan. Transaksi harian tidak perlu diketik di sini.">
-      <form action={form => act(() => postManualJournalAction(form), 'Catatan manual tersimpan.')} className="grid gap-3 p-4">
+      description="Hanya untuk hal yang tidak punya jalur sendiri, misalnya koreksi pembukuan. Transaksi harian tidak perlu diketik di sini."
+      size="lg"
+      onClose={() => setModalManual(false)}>
+      <form action={form => { setModalManual(false); act(() => postManualJournalAction(form), 'Catatan manual tersimpan.') }} className="grid gap-3">
         <div className="grid gap-3 sm:grid-cols-3">
           <FormField label="Tanggal berlaku" required><input type="date" name="effectiveDate" required className={field} /></FormField>
           <FormField label="Nomor dokumen" required hint="Minimal 3 karakter"><input name="externalReference" required minLength={3} className={field} /></FormField>
@@ -232,7 +242,7 @@ export function TransaksiClient({ data, initialSearch = '' }: { data: any; initi
         </div>)}
         <div><button disabled={pending} className="min-h-11 rounded-xl bg-slate-900 px-5 font-bold text-white disabled:opacity-50">Simpan catatan manual</button></div>
       </form>
-    </SectionPanel> : null}
+    </FinanceModal>
 
     <ConfirmAction
       open={konfirmasiBatal}

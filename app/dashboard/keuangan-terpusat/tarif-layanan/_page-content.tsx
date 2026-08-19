@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  FinanceTour, FormField, ResultBanner, SectionPanel, StatusBadge,
+  FINANCE_FIELD_CLASS, FinanceTabs, FinanceTour, FormField, ResultBanner, SectionPanel, StatusBadge,
   useFinanceTour, type FinanceResult, type TourStep,
 } from '../_components/finance-ui'
 import { RupiahInput, SantriPicker } from '../_components/finance-inputs'
@@ -53,36 +53,63 @@ export function TarifLayananClient({ initialData, exempted, bebasTahunan, skip }
   bebasTahunan: BebasTahunanRow[]
   skip: Record<MealServiceKind, ServiceBillSkipRow[]>
 }) {
-  const [tab, setTab] = useState<ServiceKind>('SPP')
-  const data = initialData[tab]
+  /** Jenis layanan turun jadi dropdown supaya tidak ada dua baris tab bertumpuk. */
+  const [layanan, setLayanan] = useState<ServiceKind>('SPP')
+  /** Tab mengelompokkan pekerjaan, bukan jenis layanan. */
+  const [tab, setTab] = useState<'tarif' | 'generate' | 'pengecualian'>('tarif')
+  const data = initialData[layanan]
   const tour = useFinanceTour('tarif-layanan')
+  const layananLabel = TABS.find(item => item.id === layanan)?.label ?? layanan
 
   return (
     <div className="space-y-4 sm:space-y-5">
       <FinanceTour steps={TOUR} running={tour.running} onFinish={tour.finish} />
-      <div data-tour="pembebasan"><PembebasanBiayaPanel exempted={exempted} bebasTahunan={bebasTahunan} /></div>
 
-      <nav data-tour="layanan" aria-label="Pilih layanan" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <div className="flex min-w-max gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-          {TABS.map(item => (
-            <button key={item.id} type="button" onClick={() => setTab(item.id)} aria-current={tab === item.id ? 'page' : undefined}
-              className={`flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs font-bold transition ${tab === item.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </nav>
+      <div data-tour="layanan" className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-end sm:justify-between">
+        <label className="text-xs font-bold text-slate-800">
+          Jenis layanan
+          <select value={layanan} onChange={event => setLayanan(event.target.value as ServiceKind)}
+            className={`mt-1 ${FINANCE_FIELD_CLASS} sm:w-64`}>
+            {TABS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+        </label>
+        <p className="text-[11px] leading-4 text-slate-500 sm:max-w-md sm:text-right">
+          Seluruh panel di bawah mengikuti jenis layanan yang dipilih di sini.
+          {layanan === 'SPP' ? ' SPP tidak punya generate bulanan maupun pengecualian per bulan.' : ''}
+        </p>
+      </div>
 
-      <BillingStartPanel serviceKind={tab} billingStart={data.billingStart} />
-      <TariffPanel serviceKind={tab} tariffs={data.tariffs} />
+      <FinanceTabs
+        label="Kelompok pekerjaan tarif layanan"
+        active={tab}
+        onChange={(id: string) => setTab(id as typeof tab)}
+        tabs={[
+          { id: 'tarif', label: 'Tarif', hint: `Tanggal awal dan riwayat tarif ${layananLabel}` },
+          { id: 'generate', label: 'Generate tagihan', hint: 'Buat tagihan bulanan dan catat tunggakan lama' },
+          { id: 'pengecualian', label: 'Pengecualian', hint: 'Lewati bulan tertentu dan bebaskan biaya santri' },
+        ]}
+      />
 
-      {tab !== 'SPP' && (
-        <>
-          <GenerateBillsPanel serviceKind={tab as MealServiceKind} />
-          <SkipTagihanPanel serviceKind={tab as MealServiceKind} rows={skip[tab as MealServiceKind]} />
-          <ArrearsPanel serviceKind={tab as MealServiceKind} arrears={data.arrears} />
-        </>
-      )}
+      {tab === 'tarif' ? <>
+        <BillingStartPanel serviceKind={layanan} billingStart={data.billingStart} />
+        <TariffPanel serviceKind={layanan} tariffs={data.tariffs} />
+      </> : null}
+
+      {tab === 'generate' ? (layanan === 'SPP'
+        ? <SectionPanel title="Tidak berlaku untuk SPP" description="Tagihan SPP dibuat lewat jadwal otomatis, bukan dari halaman ini.">
+            <p className="p-4 text-xs text-slate-500">Pilih Uang Makan atau Uang Laundry untuk memakai generate bulanan dan backfill tunggakan.</p>
+          </SectionPanel>
+        : <>
+            <GenerateBillsPanel serviceKind={layanan as MealServiceKind} />
+            <ArrearsPanel serviceKind={layanan as MealServiceKind} arrears={data.arrears} />
+          </>) : null}
+
+      {tab === 'pengecualian' ? <>
+        {layanan === 'SPP'
+          ? null
+          : <SkipTagihanPanel serviceKind={layanan as MealServiceKind} rows={skip[layanan as MealServiceKind]} />}
+        <div data-tour="pembebasan"><PembebasanBiayaPanel exempted={exempted} bebasTahunan={bebasTahunan} /></div>
+      </> : null}
     </div>
   )
 }

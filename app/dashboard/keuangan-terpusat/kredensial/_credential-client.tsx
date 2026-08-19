@@ -17,6 +17,7 @@ import { CredentialActions } from './_credential-actions'
 import {
   ConfirmAction, FinanceTour, ResultBanner, StatusBadge,
   useFinanceTour, type FinanceResult, type TourStep,
+  FinanceModal, FinanceTabs,
 } from '../_components/finance-ui'
 
 const TOUR: TourStep[] = [
@@ -197,24 +198,18 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
     <FinanceTour steps={TOUR} running={tour.running} onFinish={tour.finish} />
     <ResultBanner result={result} onDismiss={() => setResult(null)} />
 
-    <nav data-tour="tabs" aria-label="Bagian modul Keredensial"
-      className="sticky top-2 z-30 overflow-x-auto rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-sm backdrop-blur">
-      <div className="flex min-w-max gap-1" role="tablist">
-        {tabs.map(tab => {
-          const Icon = tab.icon
-          const active = activeTab === tab.id
-          return <button key={tab.id} type="button" role="tab" aria-selected={active} onClick={() => setActiveTab(tab.id)}
-            className={`relative flex min-h-14 min-w-36 items-center gap-2 rounded-xl px-3 py-2 text-left transition ${active ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
-            <Icon className="h-5 w-5 shrink-0" weight={active ? 'fill' : 'regular'} />
-            <span>
-              <span className="block text-sm font-bold leading-tight">{tab.label}</span>
-              <span className={`block text-[10px] ${active ? 'text-emerald-100' : 'text-slate-400'}`}>{tab.description}</span>
-            </span>
-            {tab.badge ? <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-black ${active ? 'bg-white text-emerald-800' : 'bg-emerald-50 text-emerald-700'}`}>{tab.badge}</span> : null}
-          </button>
-        })}
-      </div>
-    </nav>
+    <div data-tour="tabs"><FinanceTabs
+      label="Bagian modul Kredensial"
+      active={activeTab}
+      onChange={id => setActiveTab(id as CredentialTab)}
+      tabs={tabs.map(item => ({
+        id: item.id,
+        label: item.label,
+        icon: item.icon,
+        hint: item.description,
+        badge: typeof item.badge === 'number' ? item.badge : undefined,
+      }))}
+    /></div>
 
     {activeTab === 'settings' ? <section className="grid gap-4" role="tabpanel">
       <div className="rounded-xl border bg-white p-4">
@@ -367,15 +362,13 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
       </section>
     </div> : null}
 
-    {preview ? <div className="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-slate-950/75 p-4" onClick={() => setPreview(null)}>
-      <div className="w-full max-w-4xl rounded-2xl bg-white p-4" onClick={event => event.stopPropagation()}>
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="font-bold">Preview kartu CR80 dua sisi</h2>
-            <p className="text-xs text-slate-500">Tampilan diperkecil; PDF memakai ukuran fisik 85,60 × 53,98 mm.</p>
-          </div>
-          <button onClick={() => setPreview(null)} className="rounded-lg bg-slate-100 px-3 py-2 text-sm">Tutup</button>
-        </div>
+    <FinanceModal
+      open={Boolean(preview)}
+      title="Preview kartu CR80 dua sisi"
+      description="Tampilan diperkecil; PDF memakai ukuran fisik 85,60 x 53,98 mm."
+      size="xl"
+      onClose={() => setPreview(null)}>
+      {preview ? <>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="aspect-[1.586] overflow-hidden rounded-xl border bg-gradient-to-br from-white via-white to-emerald-50 p-5 shadow">
             <div className="flex items-center gap-3 border-b border-emerald-600 pb-3">
@@ -405,15 +398,17 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
             </div>
           </div>
         </div>
-      </div>
-    </div> : null}
+      </> : null}
+    </FinanceModal>
 
-    {showFilterModal ? <div className="fixed inset-0 z-[80] grid place-items-center overflow-y-auto bg-slate-950/75 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-black">Filter Lanjutan</h2>
-          <button onClick={() => setShowFilterModal(false)} className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-bold">Tutup</button>
-        </div>
+    <FinanceModal
+      open={showFilterModal}
+      title="Filter Lanjutan"
+      onClose={() => setShowFilterModal(false)}
+      footer={<div className="flex justify-end gap-3">
+        <button type="button" onClick={() => { resetFilters(); setShowFilterModal(false) }} className="min-h-11 rounded-xl px-4 text-sm font-bold text-slate-500">Reset Filter</button>
+        <button type="button" onClick={() => { void load(1); setShowFilterModal(false) }} className="min-h-11 rounded-xl bg-emerald-700 px-6 font-bold text-white shadow-sm">Terapkan Filter</button>
+      </div>}>
         <div className="grid gap-4">
           <label>
             <span className="mb-1 block text-sm font-bold">Asrama</span>
@@ -442,11 +437,6 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
             </select>
           </label>
         </div>
-        <div className="mt-6 flex justify-end gap-3">
-          <button onClick={() => { resetFilters(); setShowFilterModal(false) }} className="min-h-11 rounded-xl px-4 text-sm font-bold text-slate-500">Reset Filter</button>
-          <button onClick={() => { void load(1); setShowFilterModal(false) }} className="min-h-11 rounded-xl bg-emerald-700 px-6 font-bold text-white shadow-sm">Terapkan Filter</button>
-        </div>
-      </div>
-    </div> : null}
+    </FinanceModal>
   </div>
 }
