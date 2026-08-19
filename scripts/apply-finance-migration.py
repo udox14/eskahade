@@ -1,0 +1,67 @@
+"""Menerapkan skema Keuangan Terpusat yang baru ke satu database D1.
+
+    python scripts/apply-finance-migration.py eskahade-demo-finance
+    python scripts/apply-finance-migration.py eskahade-finance
+
+Kenapa skrip, bukan satu berkas SQL raksasa: pada 16 Agustus 2026 migrasi 0007
+gagal separuh jalan di produksi dan menghilangkan tabel finance_bills. Skrip ini
+menjalankan tiap berkas sebagai perintah --file terpisah dan BERHENTI di
+kegagalan pertama, supaya tidak ada berkas berikutnya yang jalan di atas skema
+yang sudah rusak sebagian.
+
+Urutan berkas tidak boleh diacak: seluruh tabel dibuat lebih dulu, seluruh
+trigger paling akhir. SQLite membuat trigger tanpa memvalidasi tabel yang hanya
+disebut di dalam body-nya, jadi trigger yang dibuat terlalu awal akan
+"menggantung" dan baru meledak belakangan.
+"""
+import subprocess, sys, shutil
+
+BERKAS = [
+    '0001a_drop_legacy',
+    '0001b_tables_core',
+    '0001c_tables_billing',
+    '0001d_tables_loket',
+    '0001e_tables_payout',
+    '0001f_tables_support',
+    '0001g_triggers',
+    '0001h_seed',
+]
+
+if len(sys.argv) < 2:
+    print('Pemakaian: python scripts/apply-finance-migration.py <nama-database-d1>')
+    print('Contoh   : python scripts/apply-finance-migration.py eskahade-demo-finance')
+    raise SystemExit(1)
+
+DB = sys.argv[1]
+NPX = shutil.which('npx') or 'npx'
+
+
+def wrangler(args):
+    return subprocess.run([NPX, 'wrangler', 'd1', 'execute', DB, '--remote'] + args,
+                          capture_output=True, text=True, shell=False)
+
+
+print('Menerapkan skema keuangan ke: %s' % DB)
+print('Jumlah berkas: %d\n' % len(BERKAS))
+
+for i, nama in enumerate(BERKAS, 1):
+    print('[%d/%d] %-24s ... ' % (i, len(BERKAS), nama), end='', flush=True)
+    hasil = wrangler(['--file', 'migrations-finance/%s.sql' % nama])
+    if hasil.returncode == 0:
+        print('OK')
+        continue
+    print('GAGAL\n')
+    print('--- keluaran wrangler ---')
+    print((hasil.stdout or '')[-2000:])
+    print((hasil.stderr or '')[-2000:])
+    print('\nBERHENTI. Jangan jalankan berkas berikutnya, jangan menambal manual.')
+    print('Pulihkan dari berkas export lalu ulangi dari awal.')
+    raise SystemExit(1)
+
+print('\nVerifikasi struktur:')
+cek = wrangler(['--command',
+                "SELECT type, COUNT(*) jumlah FROM sqlite_master "
+                "WHERE name LIKE 'finance_%' OR name='student_credentials' GROUP BY type;"])
+print(cek.stdout or cek.stderr)
+print('Yang harus terlihat: 37 tabel dan 21 trigger.')
+print('Kalau angkanya meleset, JANGAN lanjut ke deploy - pulihkan dari export.')

@@ -99,9 +99,16 @@ Jalankan satu per satu, **periksa hasilnya sebelum lanjut ke berkas berikutnya**
 | 7 | `0001g_triggers.sql` | **seluruh** trigger |
 | 8 | `0001h_seed.sql` | bagan akun, kebijakan kredensial, setelan awal |
 
-Contoh satu langkah:
+Cara termudah, jalankan skrip pembantu — ia menjalankan kedelapan berkas berurut
+dan berhenti sendiri di kegagalan pertama:
 
-```bash
+```
+python scripts/apply-finance-migration.py eskahade-finance
+```
+
+Kalau ingin manual, satu berkas satu perintah:
+
+```
 npx wrangler d1 execute eskahade-finance --remote --file migrations-finance/0001a_drop_legacy.sql
 ```
 
