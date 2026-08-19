@@ -12,6 +12,7 @@ UJI = [
     ('payout', 'T8     pencairan maker-checker'),
     ('gateway', 'T10-11 idempotensi & replay callback Duitku'),
     ('demo-seed', '       demo-seed cocok dengan skema'),
+    ('queries', '       setiap SQL keuangan di SELURUH repo sah terhadap skema'),
 ]
 
 os.makedirs('tmp', exist_ok=True)

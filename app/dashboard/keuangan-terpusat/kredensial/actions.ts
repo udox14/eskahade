@@ -60,29 +60,6 @@ export async function searchCredentialStudents(input:{q?:string;asrama?:string;k
   return {rows:rows.slice((page-1)*pageSize,page*pageSize),allSelectable:rows.map(row=>({id:row.id,qr_id:row.qr_id})),total,page,pageSize,totalPages:Math.max(1,Math.ceil(total/pageSize))}
 }
 
-export async function getRfidEnrollmentQueueAction(santriIds:string[]){
-  await requireFinanceAccess('CONFIGURE')
-  const unique=[...new Set(santriIds.filter(Boolean))].slice(0,5000)
-  if(!unique.length)return []
-  const students:CredentialStudentRow[]=[]
-  for(let offset=0;offset<unique.length;offset+=80){
-    const chunk=unique.slice(offset,offset+80)
-    const found=await query<Omit<CredentialStudentRow,'qr_id'|'qr_status'|'qr_card_number'>>(`SELECT s.id,s.nis,s.nama_lengkap,s.asrama,s.kamar,s.foto_url,k.nama_kelas kelas_pesantren
-      FROM santri s LEFT JOIN riwayat_pendidikan rp ON rp.santri_id=s.id AND rp.status_riwayat='aktif'
-      LEFT JOIN kelas k ON k.id=rp.kelas_id WHERE s.status_global='aktif' AND s.id IN (${chunk.map(()=>'?').join(',')})`,chunk)
-    students.push(...found.map(student=>({...student,qr_id:null,qr_status:null,qr_card_number:null})))
-  }
-  const existing=new Set<string>()
-  for(let offset=0;offset<unique.length;offset+=80){
-    const chunk=unique.slice(offset,offset+80)
-    const credentials=await financeQuery<{santri_id:string}>(`SELECT santri_id FROM student_credentials WHERE credential_kind='RFID_UID'
-      AND status IN ('ACTIVE','BLOCKED') AND santri_id IN (${chunk.map(()=>'?').join(',')})`,chunk)
-    credentials.forEach(row=>existing.add(row.santri_id))
-  }
-  const byId=new Map(students.map(student=>[student.id,student]))
-  return unique.map(id=>byId.get(id)).filter((student):student is CredentialStudentRow=>Boolean(student&&!existing.has(student.id)))
-}
-
 export async function issueCredentialAction(input:{nis?:string;santriId?:string;kind:CredentialKind;rawToken?:string;reissue?:boolean}){
   const session=await requireFinanceAccess('CONFIGURE')
   const student=input.santriId

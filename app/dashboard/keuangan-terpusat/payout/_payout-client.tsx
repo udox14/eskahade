@@ -153,7 +153,7 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
   const selectableReconcile: any[] = []
   const chosenCheck = selectableCheck.filter(row => selected.has(row.id))
   const chosenReconcile = selectableReconcile.filter(row => selected.has(row.id))
-  const canSelect = (row: any) => (row.status === 'DIAJUKAN' && capabilities.check) || (row.status === 'PROVIDER_SUCCESS' && capabilities.configure)
+  const canSelect = (row: any) => row.status === 'DIAJUKAN' && capabilities.check
 
   function toggle(id: string) {
     setSelected(current => {
@@ -498,9 +498,5 @@ export function PayoutClient({ payouts, recipients, apiFeeRupiah, capabilities, 
       }}
     />
 
-    {payouts.some(row => row.status === 'PROVIDER_SUCCESS') ? <p className="flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-900">
-      <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" />
-      Sukses di provider belum berarti selesai. Cocokkan dulu dengan mutasi rekening di halaman Operasi, baru tandai direkonsiliasi.
-    </p> : null}
   </div>
 }

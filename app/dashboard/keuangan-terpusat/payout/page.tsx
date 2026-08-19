@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 export default async function PayoutPage() {
   await guardPage('/dashboard/keuangan-terpusat/payout')
   const data = await getPayoutData()
-  const pending = data.payouts.filter((p: any) => !['RECONCILED', 'FAILED'].includes(p.status)).length
+  const pending = data.payouts.filter((p: any) => !['DIBAYAR', 'GAGAL', 'DIBATALKAN'].includes(p.status)).length
 
   return <main className="space-y-4 sm:space-y-5">
     <FinancePageHeader title="Payout" description="Kelola pengiriman dana lewat alur maker-checker: yang mengajukan bukan yang menyetujui." eyebrow="Pemisahan tugas wajib" meta="Pencairan final setelah dana terkirim dan buktinya tercatat" />
