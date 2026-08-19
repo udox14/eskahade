@@ -109,7 +109,7 @@ export function FinanceNavClient({ allowedHrefs, sandbox = false, badges = {}, c
     const active = item.href === '/dashboard/keuangan-terpusat' ? pathname === item.href : pathname.startsWith(item.href)
     const count = item.badge ? badges[item.badge] || 0 : 0
     return <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined} className={cn(
-      'flex min-h-11 items-center gap-1.5 rounded-lg px-3 py-2.5 text-xs font-bold transition-colors sm:text-sm',
+      'flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2.5 text-xs font-bold transition-colors',
       active ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
     )}>
       <item.icon className="h-4 w-4 shrink-0" weight={active ? 'fill' : 'regular'} />
@@ -127,28 +127,22 @@ export function FinanceNavClient({ allowedHrefs, sandbox = false, badges = {}, c
       <span>QR: <code>SKH1.DEMO.SANTRI.0001.TEST.CREDENTIAL</code> · PIN: <code>123456</code></span>
     </div> : null}
 
-    <nav aria-label="Navigasi keuangan terpusat" className="border-b border-slate-200 pb-2">
-      {/* Layar lebar: kelompok diberi label sehingga urutan kerjanya terbaca.
-          Layar sempit: tetap satu baris yang bisa digeser, tapi sudah terurut
-          per kelompok dan dipisah garis tipis. */}
-      <div className="hidden flex-wrap items-start gap-x-5 gap-y-2 lg:flex">
-        {groups.map(group => <div key={group.id}>
-          <p className="px-3 pb-0.5 text-[10px] font-black uppercase tracking-wider text-slate-400">{group.label}</p>
-          <div className="flex gap-1">{group.items.map(renderItem)}</div>
-        </div>)}
-        {commandPalette ? <div className="ml-auto self-end pb-0.5">{commandPalette}</div> : null}
-      </div>
-
-      <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden">
+    <nav aria-label="Navigasi keuangan terpusat" className="flex items-center gap-3 border-b border-slate-200 pb-2">
+      {/* Satu baris di semua ukuran layar: label kelompok dulu memakan satu baris
+          sendiri di layar lebar sehingga header terasa sesak. Urutan kerjanya
+          tetap terbaca lewat garis pemisah antar kelompok, dan barisnya bisa
+          digeser bila menu tidak muat. */}
+      <div className="-mx-4 min-w-0 flex-1 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex min-w-max items-center gap-1">
-          {groups.map((group, index) => <div key={group.id} className="flex items-center gap-1">
+          {groups.map((group, index) => <div key={group.id} role="group" aria-label={group.label} className="flex items-center gap-1">
             {index ? <span aria-hidden className="mx-1 h-6 w-px bg-slate-200" /> : null}
             {group.items.map(renderItem)}
           </div>)}
         </div>
       </div>
-      {commandPalette ? <div className="mt-2 lg:hidden">{commandPalette}</div> : null}
+      {commandPalette ? <div className="hidden shrink-0 lg:block">{commandPalette}</div> : null}
     </nav>
+    {commandPalette ? <div className="lg:hidden">{commandPalette}</div> : null}
   </div>
 }
 

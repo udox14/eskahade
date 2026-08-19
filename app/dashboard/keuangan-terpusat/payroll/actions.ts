@@ -8,11 +8,11 @@ import {
   approvePayrollPeriod,
   calculatePayrollPeriod,
   createPayrollPeriod,
-  setPayrollDays,
   setTeacherCompensation,
 } from '@/lib/finance/payroll'
 import { syncFinanceTeacherSnapshots } from '@/lib/finance/snapshots'
 import { runBulk } from '@/lib/finance/bulk'
+import { listKunciAbsensiGuru } from '@/lib/akademik/absensi-guru-kunci'
 
 const PATH = '/dashboard/keuangan-terpusat/payroll'
 const refresh = () => revalidatePath(PATH)
@@ -38,14 +38,6 @@ export async function approvePayrollAction(id: string) {
   return r
 }
 
-/** Dua angka per guru per bulan - ini satu-satunya input rutin payroll. */
-export async function setPayrollDaysAction(input: { itemId: string; alfaDays: number; badalDays: number; note?: string | null }) {
-  const s = await requireFinanceAccess('CONFIGURE')
-  const r = await setPayrollDays({ ...input, actorId: s.id })
-  if (r.success) refresh()
-  return r
-}
-
 export async function setTeacherCompensationAction(form: FormData) {
   const s = await requireFinanceAccess('CONFIGURE')
   const teacherId = String(form.get('teacherId'))
@@ -56,8 +48,8 @@ export async function setTeacherCompensationAction(form: FormData) {
     teacherId,
     effectiveFrom: String(form.get('effectiveFrom')),
     monthlySalaryRupiah: Number(form.get('monthlySalaryRupiah')),
-    alfaDeductionPerDayRupiah: Number(form.get('alfaDeductionPerDayRupiah') || 0),
-    badalDeductionPerDayRupiah: Number(form.get('badalDeductionPerDayRupiah') || 0),
+    alfaDeductionPerSesiRupiah: Number(form.get('alfaDeductionPerSesiRupiah') || 0),
+    badalDeductionPerSesiRupiah: Number(form.get('badalDeductionPerSesiRupiah') || 0),
     actorId: s.id,
   })
   if (r.success) refresh()
@@ -74,7 +66,7 @@ export async function syncTeachersAction() {
 
 export type CompensationImportRow = {
   row: number; teacherId: string; effectiveFrom: string
-  monthlySalaryRupiah: number; alfaDeductionPerDayRupiah: number; badalDeductionPerDayRupiah: number
+  monthlySalaryRupiah: number; alfaDeductionPerSesiRupiah: number; badalDeductionPerSesiRupiah: number
 }
 
 export async function importCompensationAction(rows: CompensationImportRow[]) {
@@ -117,9 +109,25 @@ export async function getPayrollData() {
     LEFT JOIN finance_teacher_snapshots g ON g.teacher_id=i.teacher_id
     ORDER BY p.period_key DESC,g.full_name LIMIT 500`)
 
+  // Status kunci rekap absensi ada di DB utama, jadi tidak bisa di-JOIN dengan
+  // periode payroll. Ditempelkan di sini supaya bendahara tahu kenapa tombol
+  // Hitung tidak bisa ditekan, tanpa harus membuka halaman akademik dulu.
+  const kunci = new Map((await listKunciAbsensiGuru(60)).map(row => [row.period_key, row]))
+
   const nama = (row: any, key = 'teacher_id') => row.teacher_name || teacherNames.get(String(row[key])) || row[key]
   return {
-    periods,
+    periods: periods.map(row => {
+      const lock = kunci.get(String(row.period_key)) || null
+      return {
+        ...row,
+        absensi_terkunci: Boolean(lock),
+        absensi_locked_at: lock?.locked_at ?? null,
+        absensi_locked_by_nama: lock?.locked_by_nama ?? null,
+        // Rekap sempat dibuka dan dikunci ulang setelah periode ini dihitung:
+        // angka di layar bukan lagi angka yang berlaku.
+        absensi_basi: Boolean(lock && row.attendance_locked_at && row.attendance_locked_at !== lock.locked_at),
+      }
+    }),
     compensation: compensation.map(row => ({ ...row, teacher_name: nama(row) })),
     items: items.map(row => ({ ...row, teacher_name: nama(row) })),
     teachers,

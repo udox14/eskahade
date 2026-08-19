@@ -4,10 +4,10 @@
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { CheckCircle, Calculator, CloudArrowUp } from '@phosphor-icons/react'
+import { CheckCircle, Calculator, CloudArrowUp, Lock, LockOpen, Warning } from '@phosphor-icons/react'
 import {
   approvePayrollAction, calculatePayrollAction, createPayrollPeriodAction,
-  importCompensationAction, setPayrollDaysAction, setTeacherCompensationAction, syncTeachersAction,
+  importCompensationAction, setTeacherCompensationAction, syncTeachersAction,
   type CompensationImportRow,
 } from './actions'
 import { BulkImport, asDateISO, asInteger, asText } from '../_components/bulk-import'
@@ -71,13 +71,13 @@ export function PayrollClient({ data }: { data: any }) {
       active={tab}
       onChange={id => setTab(id as typeof tab)}
       tabs={[
-        { id: 'perhitungan', label: 'Perhitungan bulanan', hint: 'Pekerjaan harian: hitung, isi hari alfa/badal, setujui', badge: data.periods.filter((row: any) => row.status === 'DIHITUNG').length },
+        { id: 'perhitungan', label: 'Perhitungan bulanan', hint: 'Pekerjaan bulanan: hitung dari rekap absensi, lalu setujui', badge: data.periods.filter((row: any) => row.status === 'DIHITUNG').length },
         { id: 'kompensasi', label: 'Kompensasi guru', hint: 'Data setup: gaji bulanan dan tarif potongan', badge: 0 },
       ]}
     />
 
     {tab === 'perhitungan' ? <>
-    <SectionPanel title="Periode bulanan" description="Buat periode, hitung, lalu setujui. Persetujuan mencatat kewajiban gaji di pembukuan — pencairan uangnya dilakukan dari halaman Payout.">
+    <SectionPanel title="Periode bulanan" description="Buat periode, hitung, lalu setujui. Jumlah sesi alfa dan badal ditarik dari rekap absensi guru yang sudah dikunci sekpen. Persetujuan mencatat kewajiban gaji di pembukuan — pencairan uangnya dilakukan dari halaman Payout.">
       <div className="flex flex-wrap items-end gap-3 p-4">
         <FormField label="Periode baru">
           <input type="month" value={periodKey} onChange={event => setPeriodKey(event.target.value)} className={FINANCE_FIELD_CLASS} />
@@ -91,7 +91,12 @@ export function PayrollClient({ data }: { data: any }) {
       <div className="divide-y divide-slate-100 border-t">
         {data.periods.length ? data.periods.map((row: any) => <button key={row.id} onClick={() => setSelectedPeriod(row.id)}
           className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm ${row.id === selectedPeriod ? 'bg-emerald-50' : ''}`}>
-          <span className="font-bold">{row.period_key}</span>
+          <span className="flex items-center gap-2 font-bold">
+            {row.absensi_terkunci
+              ? <Lock className="h-4 w-4 text-emerald-600" weight="fill" />
+              : <LockOpen className="h-4 w-4 text-amber-500" />}
+            {row.period_key}
+          </span>
           <span className="flex items-center gap-3">
             <span className="text-slate-500">{row.item_count} guru · {rupiah(row.total_net_rupiah)}</span>
             <StatusBadge tone={TONE[row.status] || 'slate'}>{row.status}</StatusBadge>
@@ -102,53 +107,58 @@ export function PayrollClient({ data }: { data: any }) {
 
     {period ? <SectionPanel
       title={`Perhitungan ${period.period_key}`}
-      description="Isi jumlah hari alfa dan hari badal per guru. Potongan dan gaji bersih dihitung otomatis. Guru yang hadir penuh cukup dibiarkan nol."
+      description="Jumlah sesi alfa dan badal ditarik dari rekap absensi guru dan tidak dapat diubah dari halaman ini. Bila ada yang keliru, minta sekpen memperbaikinya di Rekap Kinerja Guru, lalu tekan Hitung lagi."
       action={<div className="flex gap-2">
-        <button disabled={pending || !data.canConfigure || period.status === 'DISETUJUI'}
-          onClick={() => act(() => calculatePayrollAction(period.id), 'Payroll dihitung ulang.')}
+        <button disabled={pending || !data.canConfigure || period.status === 'DISETUJUI' || !period.absensi_terkunci}
+          onClick={() => act(() => calculatePayrollAction(period.id), 'Payroll dihitung ulang dari rekap absensi.')}
           className="inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold disabled:opacity-50">
           <Calculator className="h-4 w-4" />Hitung
         </button>
-        <button disabled={pending || !data.canCheck || period.status !== 'DIHITUNG' || !items.length}
+        <button disabled={pending || !data.canCheck || period.status !== 'DIHITUNG' || !items.length || period.absensi_basi}
           onClick={() => setConfirmApprove(period)}
           className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50">
           <CheckCircle className="h-4 w-4" />Setujui
         </button>
       </div>}>
+      <AbsensiBanner period={period} />
       {items.length
         ? <div className="overflow-x-auto">
-          <table className="w-full min-w-[46rem] text-sm">
+          <table className="w-full min-w-[52rem] text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-2">Guru</th>
                 <th className="px-4 py-2 text-right">Gaji bulanan</th>
-                <th className="px-4 py-2 text-center">Hari alfa</th>
-                <th className="px-4 py-2 text-center">Hari badal</th>
+                <th className="px-4 py-2 text-center">Sesi wajib</th>
+                <th className="px-4 py-2 text-center">Sesi alfa</th>
+                <th className="px-4 py-2 text-center">Sesi badal</th>
                 <th className="px-4 py-2 text-right">Potongan</th>
                 <th className="px-4 py-2 text-right">Bersih</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {items.map((row: any) => <PayrollRow key={row.id} row={row}
-                editable={data.canConfigure && period.status === 'DIHITUNG'} act={act} pending={pending} />)}
+              {items.map((row: any) => <PayrollRow key={row.id} row={row} />)}
             </tbody>
             <tfoot className="bg-slate-50 font-bold">
               <tr>
-                <td className="px-4 py-2" colSpan={4}>Total</td>
+                <td className="px-4 py-2" colSpan={5}>Total</td>
                 <td className="px-4 py-2 text-right">{rupiah(totalPotongan)}</td>
                 <td className="px-4 py-2 text-right">{rupiah(totalBersih)}</td>
               </tr>
             </tfoot>
           </table>
         </div>
-        : <EmptyState title="Belum dihitung" description="Tekan Hitung untuk menarik seluruh guru yang punya kompensasi berlaku pada periode ini." />}
+        : <EmptyState
+          title={period.absensi_terkunci ? 'Belum dihitung' : 'Menunggu rekap absensi dikunci'}
+          description={period.absensi_terkunci
+            ? 'Tekan Hitung untuk menarik seluruh guru yang punya kompensasi berlaku beserta jumlah sesi alfa dan badalnya.'
+            : 'Sekpen belum menyatakan rekap absensi bulan ini final, jadi angkanya masih bisa berubah. Payroll baru bisa dihitung setelah rekap dikunci.'} />}
     </SectionPanel> : null}
     </> : null}
 
     {tab === 'kompensasi' ? <>
     <SectionPanel
       title="Kompensasi guru"
-      description="Gaji bulanan dan tarif potongan per hari. Tarif potongan 0 berarti guru dibayar penuh berapa pun hari alfa/badalnya."
+      description="Gaji bulanan dan tarif potongan per sesi. Satu hari bisa berisi tiga sesi (shubuh, ashar, maghrib), sama seperti rekap absensinya. Tarif potongan 0 berarti guru dibayar penuh berapa pun sesi alfa/badalnya."
       action={data.canConfigure ? <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => setModal('impor-kompensasi')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-bold"><CloudArrowUp className="h-4 w-4" />Impor Excel</button>
         <button type="button" onClick={() => setModal('kompensasi')} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white">Tambah kompensasi</button>
@@ -169,8 +179,8 @@ export function PayrollClient({ data }: { data: any }) {
               <td className="px-4 py-2 font-bold">{row.teacher_name}</td>
               <td className="px-4 py-2">{row.effective_from}</td>
               <td className="px-4 py-2 text-right">{rupiah(row.monthly_salary_rupiah)}</td>
-              <td className="px-4 py-2 text-right">{Number(row.alfa_deduction_per_day_rupiah) ? rupiah(row.alfa_deduction_per_day_rupiah) : <span className="text-slate-400">tidak dipotong</span>}</td>
-              <td className="px-4 py-2 text-right">{Number(row.badal_deduction_per_day_rupiah) ? rupiah(row.badal_deduction_per_day_rupiah) : <span className="text-slate-400">tidak dipotong</span>}</td>
+              <td className="px-4 py-2 text-right">{Number(row.alfa_deduction_per_sesi_rupiah) ? rupiah(row.alfa_deduction_per_sesi_rupiah) : <span className="text-slate-400">tidak dipotong</span>}</td>
+              <td className="px-4 py-2 text-right">{Number(row.badal_deduction_per_sesi_rupiah) ? rupiah(row.badal_deduction_per_sesi_rupiah) : <span className="text-slate-400">tidak dipotong</span>}</td>
             </tr>) : <tr><td colSpan={5}><EmptyState title="Belum ada kompensasi" description="Isi minimal satu guru sebelum menghitung payroll." /></td></tr>}
           </tbody>
         </table>
@@ -180,7 +190,7 @@ export function PayrollClient({ data }: { data: any }) {
     <FinanceModal
       open={modal === 'kompensasi'}
       title="Kompensasi guru"
-      description="Tarif potongan 0 berarti guru dibayar penuh berapa pun hari alfa/badalnya."
+      description="Tarif potongan 0 berarti guru dibayar penuh berapa pun sesi alfa/badalnya."
       size="lg"
       onClose={() => setModal(null)}>
       <form action={form => { setModal(null); act(() => setTeacherCompensationAction(form), 'Kompensasi guru disimpan.') }} className="grid gap-3 sm:grid-cols-2">
@@ -196,11 +206,11 @@ export function PayrollClient({ data }: { data: any }) {
         <FormField label="Gaji bulanan" required>
           <RupiahInput name="monthlySalaryRupiah" defaultValue={0} />
         </FormField>
-        <FormField label="Potongan / hari alfa" hint="Kosongkan (0) bila tidak ada potongan">
-          <RupiahInput name="alfaDeductionPerDayRupiah" defaultValue={0} />
+        <FormField label="Potongan / sesi alfa" hint="Per sesi pengajian, bukan per hari. Kosongkan (0) bila tidak ada potongan">
+          <RupiahInput name="alfaDeductionPerSesiRupiah" defaultValue={0} />
         </FormField>
-        <FormField label="Potongan / hari badal" hint="Kosongkan (0) bila tidak ada potongan">
-          <RupiahInput name="badalDeductionPerDayRupiah" defaultValue={0} />
+        <FormField label="Potongan / sesi badal" hint="Per sesi pengajian, bukan per hari. Kosongkan (0) bila tidak ada potongan">
+          <RupiahInput name="badalDeductionPerSesiRupiah" defaultValue={0} />
         </FormField>
         <div className="sm:col-span-2 xl:col-span-5">
           <button disabled={pending || !data.canConfigure} className="min-h-11 rounded-xl bg-emerald-700 px-5 font-bold text-white disabled:opacity-50">Simpan kompensasi</button>
@@ -217,7 +227,7 @@ export function PayrollClient({ data }: { data: any }) {
       <div>
         <BulkImport<Omit<CompensationImportRow, 'row'>>
           title="Impor massal kompensasi guru"
-          description="Isi gaji bulanan dan tarif potongan banyak guru sekaligus. Tarif potongan boleh dikosongkan bila guru dibayar penuh."
+          description="Isi gaji bulanan dan tarif potongan banyak guru sekaligus. Tarif potongan dihitung per sesi pengajian dan boleh dikosongkan bila guru dibayar penuh."
           templateName="Template_Kompensasi_Guru"
           sheetName="Kompensasi"
           disabled={!data.canConfigure}
@@ -225,13 +235,14 @@ export function PayrollClient({ data }: { data: any }) {
             { key: 'idguru', label: 'ID Guru', example: '12' },
             { key: 'berlakudari', label: 'Berlaku dari', example: '2026-01-01' },
             { key: 'gaji', label: 'Gaji bulanan', example: 2000000 },
-            { key: 'potonganalfa', label: 'Potongan per hari alfa', example: 50000 },
-            { key: 'potonganbadal', label: 'Potongan per hari badal', example: 25000 },
+            { key: 'potonganalfa', label: 'Potongan per sesi alfa', example: 50000 },
+            { key: 'potonganbadal', label: 'Potongan per sesi badal', example: 25000 },
           ]}
           note={<>
             <p className="font-bold text-slate-900">Yang perlu diperhatikan</p>
             <ul className="mt-1 list-disc space-y-1 pl-4">
-              <li>Kolom potongan boleh dikosongkan atau diisi <strong>0</strong>; artinya guru itu dibayar penuh berapa pun hari alfa/badalnya.</li>
+              <li>Tarif dihitung <strong>per sesi</strong>, bukan per hari. Satu hari bisa berisi tiga sesi (shubuh, ashar, maghrib), jadi tarif harian lama perlu dibagi dulu sebelum diimpor.</li>
+              <li>Kolom potongan boleh dikosongkan atau diisi <strong>0</strong>; artinya guru itu dibayar penuh berapa pun sesi alfa/badalnya.</li>
               <li>Baris dengan ID guru yang tidak ada di master guru ditolak, tidak diam-diam dilewati.</li>
               <li>Mengimpor ulang tanggal berlaku yang sama akan menimpa angkanya, bukan membuat baris ganda.</li>
             </ul>
@@ -245,13 +256,13 @@ export function PayrollClient({ data }: { data: any }) {
             if (!teacherId) return { error: 'ID guru wajib diisi.' }
             if (!effectiveFrom) return { error: 'Tanggal berlaku tidak valid.' }
             if (monthlySalaryRupiah === null || monthlySalaryRupiah < 0) return { error: 'Gaji bulanan harus angka bulat tidak negatif.' }
-            if (alfa !== null && alfa < 0) return { error: 'Potongan per hari alfa tidak boleh negatif.' }
-            if (badal !== null && badal < 0) return { error: 'Potongan per hari badal tidak boleh negatif.' }
+            if (alfa !== null && alfa < 0) return { error: 'Potongan per sesi alfa tidak boleh negatif.' }
+            if (badal !== null && badal < 0) return { error: 'Potongan per sesi badal tidak boleh negatif.' }
             return {
               value: {
                 teacherId, effectiveFrom, monthlySalaryRupiah,
-                alfaDeductionPerDayRupiah: alfa ?? 0,
-                badalDeductionPerDayRupiah: badal ?? 0,
+                alfaDeductionPerSesiRupiah: alfa ?? 0,
+                badalDeductionPerSesiRupiah: badal ?? 0,
               },
             }
           }}
@@ -267,7 +278,7 @@ export function PayrollClient({ data }: { data: any }) {
       description={`${items.length} guru, total bersih ${rupiah(totalBersih)}.`}
       impact={[
         'Kewajiban gaji dicatat di pembukuan sebagai akrual dan tidak dapat diubah lagi.',
-        'Jumlah hari alfa dan badal terkunci setelah disetujui.',
+        'Rekap absensi bulan ini ikut terkunci permanen — sekpen tidak bisa membukanya lagi untuk koreksi.',
         'Uangnya belum berpindah — pencairan dilakukan terpisah dari halaman Payout.',
       ]}
       confirmLabel="Setujui payroll"
@@ -282,31 +293,52 @@ export function PayrollClient({ data }: { data: any }) {
   </div>
 }
 
-/** Satu baris guru. Dua kolom angka yang bisa diketik; sisanya hasil hitungan. */
-function PayrollRow({ row, editable, act, pending }: { row: any; editable: boolean; act: any; pending: boolean }) {
-  const [alfa, setAlfa] = useState(String(row.alfa_days ?? 0))
-  const [badal, setBadal] = useState(String(row.badal_days ?? 0))
-  const berubah = Number(alfa || 0) !== Number(row.alfa_days || 0) || Number(badal || 0) !== Number(row.badal_days || 0)
-
-  const simpan = () => {
-    if (!berubah) return
-    act(() => setPayrollDaysAction({ itemId: row.id, alfaDays: Number(alfa || 0), badalDays: Number(badal || 0) }),
-      `Hari alfa/badal ${row.teacher_name} disimpan.`)
+/**
+ * Keadaan rekap absensi bulan ini. Bendahara tidak bisa berbuat apa-apa untuk
+ * memperbaikinya sendiri, jadi yang ditampilkan adalah siapa yang harus
+ * dihubungi, bukan tombol yang menggodanya untuk menimpa angka orang lain.
+ */
+function AbsensiBanner({ period }: { period: any }) {
+  if (period.absensi_basi) {
+    return <div className="flex items-start gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <Warning className="mt-0.5 h-5 w-5 flex-none" />
+      <p>
+        <span className="font-black">Rekap absensi sudah dikoreksi setelah payroll ini dihitung.</span>{' '}
+        Angka di bawah sudah kedaluwarsa. Tekan <strong>Hitung</strong> untuk menariknya ulang sebelum menyetujui.
+      </p>
+    </div>
   }
+  if (!period.absensi_terkunci) {
+    return <div className="flex items-start gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <LockOpen className="mt-0.5 h-5 w-5 flex-none" />
+      <p>
+        <span className="font-black">Rekap absensi {period.period_key} belum dikunci sekpen.</span>{' '}
+        Angkanya masih bisa berubah, jadi payroll belum boleh dihitung. Mintakan penguncian di halaman Rekap Kinerja Guru.
+      </p>
+    </div>
+  }
+  return <div className="flex items-start gap-3 border-b border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+    <Lock className="mt-0.5 h-5 w-5 flex-none" weight="fill" />
+    <p>
+      Rekap absensi {period.period_key} final
+      {period.absensi_locked_by_nama ? ` menurut ${period.absensi_locked_by_nama}` : ''}
+      {period.absensi_locked_at ? ` sejak ${String(period.absensi_locked_at).slice(0, 16).replace('T', ' ')}` : ''}.
+    </p>
+  </div>
+}
 
-  const kolom = (value: string, set: (v: string) => void) => <input
-    type="number" min={0} inputMode="numeric" value={value}
-    disabled={!editable || pending}
-    onChange={event => set(event.target.value)}
-    onBlur={simpan}
-    onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }}
-    className="min-h-10 w-20 rounded-lg border border-slate-200 px-2 text-center disabled:bg-slate-50 disabled:text-slate-500" />
+/** Satu baris guru. Seluruhnya hasil hitungan - tidak ada yang bisa diketik di sini. */
+function PayrollRow({ row }: { row: any }) {
+  const angka = (value: number, tone: string) => Number(value)
+    ? <span className={`font-bold ${tone}`}>{Number(value)}</span>
+    : <span className="text-slate-300">0</span>
 
-  return <tr className={berubah ? 'bg-amber-50' : undefined}>
+  return <tr>
     <td className="px-4 py-2 font-bold">{row.teacher_name}</td>
     <td className="px-4 py-2 text-right">{rupiah(row.monthly_salary_rupiah)}</td>
-    <td className="px-4 py-2 text-center">{kolom(alfa, setAlfa)}</td>
-    <td className="px-4 py-2 text-center">{kolom(badal, setBadal)}</td>
+    <td className="px-4 py-2 text-center text-slate-500">{Number(row.wajib_sesi) || 0}</td>
+    <td className="px-4 py-2 text-center">{angka(row.alfa_sesi, 'text-red-700')}</td>
+    <td className="px-4 py-2 text-center">{angka(row.badal_sesi, 'text-amber-700')}</td>
     <td className="px-4 py-2 text-right">{Number(row.deduction_rupiah) ? <span className="text-red-700">−{rupiah(row.deduction_rupiah)}</span> : <span className="text-slate-400">—</span>}</td>
     <td className="px-4 py-2 text-right font-bold">{rupiah(row.net_rupiah)}</td>
   </tr>

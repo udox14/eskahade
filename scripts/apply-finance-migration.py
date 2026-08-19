@@ -25,6 +25,7 @@ BERKAS = [
     '0001f_tables_support',
     '0001g_triggers',
     '0001h_seed',
+    '0003_payroll_per_sesi',
 ]
 
 if len(sys.argv) < 2:

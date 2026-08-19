@@ -98,9 +98,23 @@ Jalankan satu per satu, **periksa hasilnya sebelum lanjut ke berkas berikutnya**
 | 6 | `0001f_tables_support.sql` | audit log, setelan, snapshot |
 | 7 | `0001g_triggers.sql` | **seluruh** trigger |
 | 8 | `0001h_seed.sql` | bagan akun, kebijakan kredensial, setelan awal |
+| 9 | `0003_payroll_per_sesi.sql` | payroll bersatuan sesi + kolom snapshot absensi |
 
-Cara termudah, jalankan skrip pembantu — ia menjalankan kedelapan berkas berurut
-dan berhenti sendiri di kegagalan pertama:
+**Berkas 9 tidak idempotent.** Isinya `ALTER TABLE RENAME COLUMN`, yang gagal
+bila dijalankan dua kali — disengaja, supaya penerapan ganda ketahuan alih-alih
+lewat diam-diam. Kalau berkas 1-8 sudah pernah diterapkan sebelumnya, jalankan
+**berkas 9 saja**:
+
+```
+npx wrangler d1 execute eskahade-finance --remote --file migrations-finance/0003_payroll_per_sesi.sql
+```
+
+Migrasi ini berpasangan dengan `migrations/0144_absensi_guru_kunci.sql` di DB
+**utama** (bukan DB keuangan). Tanpa 0144, payroll akan selalu menolak
+menghitung karena mengira rekap absensi belum pernah dikunci.
+
+Cara termudah untuk pemasangan baru, jalankan skrip pembantu — ia menjalankan
+kesembilan berkas berurut dan berhenti sendiri di kegagalan pertama:
 
 ```
 python scripts/apply-finance-migration.py eskahade-finance
@@ -123,7 +137,7 @@ trigger dengan `name LIKE 'finance_%'` — nama trigger diawali `trg_`, jadi fil
 itu selalu melaporkan nol secara diam-diam. Kalau meleset, jangan
 lanjut — pulihkan dari export.
 
-Untuk `DEMO_FINANCE_DB`, jalankan kedelapan berkas yang sama ditambah
+Untuk `DEMO_FINANCE_DB`, jalankan kesembilan berkas yang sama ditambah
 `0002_demo_sandbox_reset.sql`.
 
 ---

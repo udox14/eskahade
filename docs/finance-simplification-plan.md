@@ -337,6 +337,23 @@ bersih   = max(0, gaji_bulanan − potongan)
 Guru yang dibayar penuh: biarkan kedua tarif potongan `0`. Operator hanya mengetik
 dua angka per guru per bulan.
 
+> **Sudah tidak berlaku sejak 19 Agustus 2026.** Skema di atas adalah bentuk
+> awal; migrasi `migrations-finance/0003_payroll_per_sesi.sql` menggantinya.
+> Dua perubahan yang membatalkan uraian di bagian ini:
+>
+> 1. **Satuannya sesi, bukan hari.** `alfa_days` → `alfa_sesi`,
+>    `alfa_deduction_per_day_rupiah` → `alfa_deduction_per_sesi_rupiah`, dan
+>    seterusnya. Sumber angkanya (rekap absensi guru) menghitung shubuh, ashar,
+>    dan maghrib terpisah, jadi satu hari bisa berisi tiga sesi. Memakai satuan
+>    hari akan melipatgandakan potongan sampai tiga kali.
+> 2. **Bendahara tidak lagi mengetik angka apa pun tiap bulan.** Jumlah sesi
+>    alfa dan badal ditarik otomatis dari rekap absensi guru yang sudah dikunci
+>    sekpen (`migrations/0144_absensi_guru_kunci.sql` di DB utama), lalu
+>    dibekukan di baris payroll. Koreksi dilakukan sekpen di halaman rekap, bukan
+>    di halaman payroll.
+>
+> Rumus potongannya sendiri tidak berubah, hanya nama dan satuan variabelnya.
+
 Akrual payroll tetap masuk ledger lewat resep `PAYROLL_AKRUAL`
 (debit `5102` Beban Payroll, kredit `2104` Utang Payroll) — persis seperti sekarang,
 hanya sumber angkanya yang disederhanakan.

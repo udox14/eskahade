@@ -9,7 +9,7 @@ if os.path.exists('tmp/seed.db'):
     os.remove('tmp/seed.db')
 c = sqlite3.connect('tmp/seed.db')
 for f in ['0001a_drop_legacy', '0001b_tables_core', '0001c_tables_billing', '0001d_tables_loket',
-          '0001e_tables_payout', '0001f_tables_support', '0001g_triggers', '0001h_seed']:
+          '0001e_tables_payout', '0001f_tables_support', '0001g_triggers', '0001h_seed', '0003_payroll_per_sesi']:
     c.executescript(io.open('migrations-finance/%s.sql' % f, encoding='utf-8').read())
 c.commit()
 

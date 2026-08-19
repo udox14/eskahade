@@ -10,8 +10,9 @@ type SlipRow = {
   id: string
   period_key: string
   monthly_salary_rupiah: number
-  alfa_days: number
-  badal_days: number
+  alfa_sesi: number
+  badal_sesi: number
+  wajib_sesi: number
   deduction_rupiah: number
   net_rupiah: number
   status: string
@@ -22,10 +23,11 @@ export default async function TeacherPayslipPage() {
   const session = await guardPage('/dashboard/guru/slip-gaji')
   const user = await queryOne<{ guru_id: number | null }>(`SELECT guru_id FROM users WHERE id=?`, [session.id])
 
-  // Honor per sesi dan calculation_json sudah tidak ada sejak payroll disederhanakan
-  // menjadi gaji bulanan dikurangi potongan hari alfa dan hari badal.
+  // Gaji bulanan dikurangi potongan sesi alfa dan sesi badal. Jumlah sesinya
+  // berasal dari rekap absensi guru, jadi angka di slip ini bisa dicocokkan
+  // langsung dengan rekap yang sama - termasuk pembaginya, sesi wajib.
   const items = user?.guru_id
-    ? await query<SlipRow>(`SELECT i.id,p.period_key,i.monthly_salary_rupiah,i.alfa_days,i.badal_days,
+    ? await query<SlipRow>(`SELECT i.id,p.period_key,i.monthly_salary_rupiah,i.alfa_sesi,i.badal_sesi,i.wajib_sesi,
         i.deduction_rupiah,i.net_rupiah,i.status,i.note
         FROM finance_payroll_items i
         JOIN finance_payroll_periods p ON p.id=i.payroll_period_id
@@ -51,14 +53,19 @@ export default async function TeacherPayslipPage() {
         <dt>Gaji bulanan</dt>
         <dd className="text-right">{rupiah(item.monthly_salary_rupiah)}</dd>
 
-        {Number(item.alfa_days) > 0 ? <>
-          <dt>Hari alfa</dt>
-          <dd className="text-right">{item.alfa_days} hari</dd>
+        {Number(item.wajib_sesi) > 0 ? <>
+          <dt>Sesi wajib</dt>
+          <dd className="text-right">{item.wajib_sesi} sesi</dd>
         </> : null}
 
-        {Number(item.badal_days) > 0 ? <>
-          <dt>Hari badal</dt>
-          <dd className="text-right">{item.badal_days} hari</dd>
+        {Number(item.alfa_sesi) > 0 ? <>
+          <dt>Sesi alfa</dt>
+          <dd className="text-right">{item.alfa_sesi} sesi</dd>
+        </> : null}
+
+        {Number(item.badal_sesi) > 0 ? <>
+          <dt>Sesi badal</dt>
+          <dd className="text-right">{item.badal_sesi} sesi</dd>
         </> : null}
 
         <dt>Potongan</dt>

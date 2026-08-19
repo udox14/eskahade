@@ -95,7 +95,7 @@ export async function resetDemoFinanceDatabase(db: D1Database, demoUsers: DemoFi
     // Guru 1 kena potongan alfa/badal, guru 2 dibayar penuh (tarif potongan 0)
     // supaya kedua perilaku langsung terlihat di sandbox.
     db.prepare(`INSERT INTO finance_teacher_compensation
-      (id,teacher_id,effective_from,monthly_salary_rupiah,alfa_deduction_per_day_rupiah,badal_deduction_per_day_rupiah,created_by) VALUES
+      (id,teacher_id,effective_from,monthly_salary_rupiah,alfa_deduction_per_sesi_rupiah,badal_deduction_per_sesi_rupiah,created_by) VALUES
       ('demo-comp-1','1','2026-01-01',2500000,50000,25000,?),
       ('demo-comp-2','2','2026-01-01',3000000,0,0,?)`).bind(actorId, actorId),
     db.prepare(`INSERT INTO finance_cash_units(id,name,asrama_scope,fixed_float_rupiah)
