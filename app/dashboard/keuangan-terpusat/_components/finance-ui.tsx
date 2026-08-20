@@ -85,13 +85,7 @@ export const FINANCE_FIELD_CLASS = 'min-h-11 w-full rounded-lg border border-sla
 export function FinancePageHeader({ title, description, eyebrow, meta, action }: {
   title: string; description: string; eyebrow?: string; meta?: string; action?: React.ReactNode
 }) {
-  return <div className="space-y-3 sm:space-y-4">
-    <DashboardPageHeader title={title} description={description} action={action} className="[&_h1]:text-xl [&_p]:text-xs sm:[&_h1]:text-[1.75rem] sm:[&_p]:text-sm" />
-    <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs">
-      {eyebrow ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-bold text-emerald-700 ring-1 ring-emerald-100">{eyebrow}</span> : null}
-      {meta ? <span className="text-slate-500">{meta}</span> : null}
-    </div>
-  </div>
+  return <DashboardPageHeader title={title} description={description} action={action} className="[&_h1]:text-xl [&_p]:text-xs sm:[&_h1]:text-[1.75rem] sm:[&_p]:text-sm" />
 }
 
 export function FinanceNavClient({ allowedHrefs, sandbox = false, badges = {}, commandPalette }: {
