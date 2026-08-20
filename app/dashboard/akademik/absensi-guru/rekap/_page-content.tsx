@@ -12,14 +12,22 @@ import {
   kunciRekapBulanAction,
 } from './actions'
 import { useReactToPrint } from '@/lib/pdf/client'
-import { AlertTriangle, Filter, Search, Loader2, Printer, Palette, Circle, Users, UserRound, Lock, LockOpen } from 'lucide-react'
+import { AlertTriangle, ChevronDown, Filter, Search, Loader2, Printer, Palette, Circle, Users, UserRound, Lock, LockOpen } from 'lucide-react'
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { KalenderAbsensiGuru, type DetailRow } from './_kalender-guru'
+import {
+  NAMA_BULAN,
+  SESSION_COLORS,
+  SESSION_LABEL,
+  sourceLabel,
+  statusClass,
+  type GuruSession,
+} from './_ui-shared'
 
 type TabMode = 'semua' | 'per_guru'
 type PrintMode = 'colorful' | 'bw'
-type GuruSession = 'shubuh' | 'ashar' | 'maghrib'
 type StatusFilter = 'semua' | 'H' | 'B' | 'A' | 'A_B'
 
 const SESI_OPTIONS = [
@@ -50,18 +58,6 @@ const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: 'A_B', label: 'Alfa + Badal' },
 ]
 
-const SESSION_LABEL: Record<GuruSession, string> = {
-  shubuh: 'Shubuh',
-  ashar: 'Ashar',
-  maghrib: 'Maghrib',
-}
-
-const SESSION_COLORS: Record<GuruSession, string> = {
-  shubuh: 'border-sky-100 bg-sky-50 text-sky-700',
-  ashar: 'border-orange-100 bg-orange-50 text-orange-700',
-  maghrib: 'border-violet-100 bg-violet-50 text-violet-700',
-}
-
 function naturalSort(a: string, b: string) {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
 }
@@ -73,22 +69,11 @@ function getColorPerforma(p: number) {
   return '#dc2626'
 }
 
-function statusClass(status: string) {
-  if (status === 'A') return 'bg-red-50 text-red-700 border-red-100'
-  if (status === 'B') return 'bg-yellow-50 text-yellow-700 border-yellow-100'
-  return 'bg-green-50 text-green-700 border-green-100'
-}
-
 function statusPrintColor(status: string, isBW: boolean) {
   if (isBW) return { bg: '#ffffff', color: '#000000' }
   if (status === 'A') return { bg: '#fef2f2', color: '#dc2626' }
   if (status === 'B') return { bg: '#fffbeb', color: '#d97706' }
   return { bg: '#f0fdf4', color: '#16a34a' }
-}
-
-function sourceLabel(row: any) {
-  if (row?.sumber_guru === 'snapshot') return 'Snapshot'
-  return 'Jadwal'
 }
 
 function filterDetailRows(detail: any | null, statusFilter: StatusFilter) {
@@ -406,6 +391,8 @@ export default function RekapAbsensiGuruPage() {
           hasSearched={guruHasSearched}
           selectedGuru={selectedGuru}
           statusFilterLabel={statusFilterLabel}
+          startDate={startDate}
+          endDate={endDate}
         />
       )}
 
@@ -451,11 +438,6 @@ export default function RekapAbsensiGuruPage() {
     </div>
   )
 }
-
-const NAMA_BULAN = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
-]
 
 function labelBulan(periodKey: string) {
   const [tahun, bulan] = periodKey.split('-')
@@ -734,13 +716,15 @@ function SemuaGuruView({
   )
 }
 
-function PerGuruView({ detail, rawDetail, loading, hasSearched, selectedGuru, statusFilterLabel }: {
+function PerGuruView({ detail, rawDetail, loading, hasSearched, selectedGuru, statusFilterLabel, startDate, endDate }: {
   detail: any | null
   rawDetail: any | null
   loading: boolean
   hasSearched: boolean
   selectedGuru: string
   statusFilterLabel: string
+  startDate: string
+  endDate: string
 }) {
   if (!selectedGuru && !hasSearched) {
     return (
@@ -838,7 +822,65 @@ function PerGuruView({ detail, rawDetail, loading, hasSearched, selectedGuru, st
         {detail.detail.length === 0 ? (
           <div className="py-16 text-center text-slate-400">Tidak ada detail dengan status {statusFilterLabel.toLowerCase()} pada rentang yang dipilih.</div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <KalenderAbsensiGuru
+              rows={detail.detail}
+              startDate={startDate}
+              endDate={endDate}
+              statusDifilter={detail.detail.length !== rawDetailCount}
+            />
+            <TabelDetailLengkap rows={detail.detail} />
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Tabel detail versi lengkap, dilipat secara default. Kalender sudah menampilkan
+ * pola dan rinciannya, tapi tabel tetap dibutuhkan untuk membaca semua baris
+ * sekaligus dan mencocokkan dengan hasil cetak.
+ *
+ * Di bawah `sm` tabel diganti daftar kartu supaya ponsel tidak pernah dipaksa
+ * menggulir ke samping.
+ */
+function TabelDetailLengkap({ rows }: { rows: DetailRow[] }) {
+  const [terbuka, setTerbuka] = useState(false)
+
+  return (
+    <div className="border-t border-slate-100">
+      <button
+        type="button"
+        onClick={() => setTerbuka(v => !v)}
+        aria-expanded={terbuka}
+        className="flex w-full items-center justify-between px-4 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+      >
+        <span>{terbuka ? 'Sembunyikan' : 'Lihat'} tabel lengkap ({rows.length} baris)</span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${terbuka ? 'rotate-180' : ''}`} />
+      </button>
+
+      {terbuka && (
+        <>
+          <div className="space-y-2 p-3 sm:hidden">
+            {rows.map(row => (
+              <div key={`${row.tanggal}-${row.sesi}-${row.kelas}`} className="rounded-xl border border-slate-200 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-bold text-slate-800">{row.hari}, {row.tanggal}</span>
+                  <span className={`rounded-lg border px-2 py-0.5 text-[11px] font-bold ${SESSION_COLORS[row.sesi as GuruSession]}`}>{row.sesi_label}</span>
+                  <span className={`rounded-lg border px-2 py-0.5 text-[11px] font-black ${statusClass(row.status)}`}>{row.status_label}</span>
+                </div>
+                <p className="mt-2 text-sm text-slate-600">{row.kelas}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Sumber: {sourceLabel(row)}
+                  {row.snapshot_berbeda ? ` (snapshot: ${row.snapshot_guru_nama || '-'}; jadwal: ${row.jadwal_guru_nama || '-'})` : ''}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">Catatan: {row.catatan}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                 <tr>
@@ -851,7 +893,7 @@ function PerGuruView({ detail, rawDetail, loading, hasSearched, selectedGuru, st
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {detail.detail.map((row: any) => (
+                {rows.map(row => (
                   <tr key={`${row.tanggal}-${row.sesi}-${row.kelas}`} className="hover:bg-slate-50">
                     <td className="px-4 py-3">
                       <p className="font-bold text-slate-800">{row.hari}</p>
@@ -880,8 +922,8 @@ function PerGuruView({ detail, rawDetail, loading, hasSearched, selectedGuru, st
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   )
 }
