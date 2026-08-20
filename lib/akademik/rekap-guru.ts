@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { execute, query } from '@/lib/db'
+import { toWibDateInputValue } from '@/lib/date/wib'
 import {
   buildGabunganByKelas,
   buildGabunganMembersByGroup,
@@ -82,6 +83,28 @@ function isLibur(dayOfWeek: number, session: GuruSession): boolean {
   if (dayOfWeek === 4 && session === 'maghrib') return true
   if (dayOfWeek === 5 && (session === 'shubuh' || session === 'ashar')) return true
   return false
+}
+
+/**
+ * Memangkas rentang sampai hari ini (WIB).
+ *
+ * Sesi tanpa baris `absensi_guru` dibaca sebagai hadir - lihat pembacaan status
+ * di bawah. Tanpa pemangkasan ini, sisa hari pada bulan berjalan ikut masuk
+ * sebagai waktu wajib yang otomatis "hadir": total wajib membengkak dan
+ * persentase alfa jadi terlihat lebih kecil daripada kenyataannya.
+ *
+ * Pola yang sama sudah dipakai rekap absensi santri, dashboard pimpinan, dan
+ * portal ortu.
+ */
+export function rentangEfektifRekapGuru(startDate: string, endDate: string) {
+  const hariIni = toWibDateInputValue()
+  const dipangkas = Boolean(endDate) && endDate > hariIni
+  return {
+    start: startDate,
+    end: dipangkas ? hariIni : endDate,
+    dipangkas,
+    hariIni,
+  }
 }
 
 function getDateRange(startDate: string, endDate: string) {
@@ -351,12 +374,13 @@ export async function hitungRekapKinerjaGuru(
   tahunAjaranId: string = ''
 ): Promise<RekapKinerjaGuruRow[]> {
   await ensureRekapGuruSchema()
-  const kelasList = await getKelasListForRekap(marhalahId, tahunAjaranId, startDate, endDate)
+  const { start, end } = rentangEfektifRekapGuru(startDate, endDate)
+  const kelasList = await getKelasListForRekap(marhalahId, tahunAjaranId, start, end)
   if (!kelasList.length) return []
 
   const kelasIds = kelasList.map((k: any) => String(k.id))
-  const absensiMap = await getAbsensiMap(kelasIds, startDate, endDate)
-  const manualLiburSet = await getManualLiburSet(startDate, endDate)
+  const absensiMap = await getAbsensiMap(kelasIds, start, end)
+  const manualLiburSet = await getManualLiburSet(start, end)
   const ruleMap = buildWeeklyGuruRuleMap(await getWeeklyGuruRules(kelasIds))
   const gabungan = await getKelasGabunganPengajian(kelasIds)
   const gabunganByKelas = buildGabunganByKelas(gabungan)
@@ -383,7 +407,7 @@ export async function hitungRekapKinerjaGuru(
     return statsGuru.get(guruKey)
   }
 
-  const dates = getDateRange(startDate, endDate)
+  const dates = getDateRange(start, end)
   kelasList.forEach((kelas: any) => {
     dates.forEach(tanggal => {
       const dayOfWeek = new Date(tanggal).getDay()
@@ -406,13 +430,25 @@ export async function hitungRekapKinerjaGuru(
         const stat = initGuru(targetGuru.id, targetGuru.nama, kelasLabel, label)
         if (!stat) return
 
-        stat.total_wajib += 1
-        if (isDifferentGuru(snapshot, jadwalGuru)) stat.snapshot_berbeda += 1
+        // JANGAN ubah default 'H' ini menjadi "belum diinput".
+        //
+        // `absensi_guru` adalah jurnal pengecualian: grid input hanya mengirim
+        // sel yang disentuh petugas (lihat `dirtyKeys` di halaman absensi guru),
+        // dan sel yang tidak disentuh tampil hadir. Tidak adanya baris berarti
+        // "hadir", bukan "belum tercatat". Memperlakukannya sebagai data hilang
+        // akan menghapus hampir seluruh kehadiran dari penyebut dan membuat
+        // setiap guru tampak nyaris selalu alfa.
         const status = String(absen?.[session] || 'H').toUpperCase()
+        // Sesi yang ditandai libur bukan waktu efektif: tidak menambah wajib,
+        // dan selisih snapshot di dalamnya tidak perlu diperingatkan.
         if (status === 'L') {
           stat.libur += 1
-          stat.total_wajib = Math.max(stat.total_wajib - 1, 0)
-        } else if (status === 'A') {
+          return
+        }
+
+        stat.total_wajib += 1
+        if (isDifferentGuru(snapshot, jadwalGuru)) stat.snapshot_berbeda += 1
+        if (status === 'A') {
           stat.kosong += 1
         } else if (status === 'B') {
           stat.badal += 1
@@ -427,7 +463,11 @@ export async function hitungRekapKinerjaGuru(
     })
   })
 
-  const result = Array.from(statsGuru.values()).map(g => {
+  // Guru tanpa satu pun waktu efektif pada rentang ini tidak dinilai. Kalau
+  // dibiarkan, persentasenya jatuh ke 0% dan ia menempati puncak urutan
+  // "Performa (Terendah)" seolah tidak pernah hadir, padahal memang tidak ada
+  // yang bisa dihadiri.
+  const result = Array.from(statsGuru.values()).filter(g => g.total_wajib > 0).map(g => {
     const total_wajib = Math.max(g.total_wajib, 0)
     const pembilang = g.hadir + (badalAsHadir ? g.badal : 0)
     const persentase = total_wajib > 0 ? Math.round((pembilang / total_wajib) * 100) : 0
@@ -457,7 +497,8 @@ export async function hitungRekapDetailGuru(
   await ensureRekapGuruSchema()
   if (!guruId) return null
 
-  const kelasList = await getKelasListForRekap(marhalahId, tahunAjaranId, startDate, endDate)
+  const { start, end, dipangkas } = rentangEfektifRekapGuru(startDate, endDate)
+  const kelasList = await getKelasListForRekap(marhalahId, tahunAjaranId, start, end)
   if (!kelasList.length) return null
 
   const guruRows = await query<{ id: number | string; nama_lengkap: string }>(
@@ -468,13 +509,13 @@ export async function hitungRekapDetailGuru(
   if (!guru) return null
 
   const kelasIds = kelasList.map((k: any) => String(k.id))
-  const absensiMap = await getAbsensiMap(kelasIds, startDate, endDate)
-  const manualLiburSet = await getManualLiburSet(startDate, endDate)
+  const absensiMap = await getAbsensiMap(kelasIds, start, end)
+  const manualLiburSet = await getManualLiburSet(start, end)
   const ruleMap = buildWeeklyGuruRuleMap(await getWeeklyGuruRules(kelasIds))
   const gabungan = await getKelasGabunganPengajian(kelasIds)
   const gabunganByKelas = buildGabunganByKelas(gabungan)
   const gabunganMembersByGroup = buildGabunganMembersByGroup(gabungan)
-  const dates = getDateRange(startDate, endDate)
+  const dates = getDateRange(start, end)
   const targetGuruId = String(guruId)
   const total = emptyBreakdown()
   const perSesi: Record<GuruSession, GuruBreakdown> = {
@@ -505,6 +546,8 @@ export async function hitungRekapDetailGuru(
         const targetGuru = hasGuru(snapshot) ? snapshot : jadwalGuru
         if (String(targetGuru.id || '') !== targetGuruId) return
 
+        // Default 'H' disengaja - lihat penjelasan jurnal pengecualian di
+        // `hitungRekapKinerjaGuru`.
         const status = String(absen?.[session] || 'H').toUpperCase()
         if (status === 'L') return
 
@@ -536,6 +579,7 @@ export async function hitungRekapDetailGuru(
       id: String(guru.id),
       nama: guru.nama_lengkap,
     },
+    rentang_efektif: { start, end, dipangkas },
     kelas_ajar: Array.from(kelasAjar).join(', '),
     total: finalizeBreakdown(total, badalAsHadir),
     per_sesi: {

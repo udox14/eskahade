@@ -7,6 +7,7 @@ import {
   getMarhalahList,
   getRekapDetailGuru,
   getRekapKinerjaGuru,
+  getRentangEfektif,
   getStatusKunciBulan,
   getTahunAjaranList,
   kunciRekapBulanAction,
@@ -111,6 +112,7 @@ export default function RekapAbsensiGuruPage() {
   const [guruLoading, setGuruLoading] = useState(false)
   const [guruOptionsLoading, setGuruOptionsLoading] = useState(false)
   const [guruHasSearched, setGuruHasSearched] = useState(false)
+  const [rentangEfektif, setRentangEfektif] = useState<{ start: string; end: string; dipangkas: boolean } | null>(null)
 
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({
@@ -131,6 +133,11 @@ export default function RekapAbsensiGuruPage() {
       if (active) setSelectedTahunAjaran(String(active.id))
     })
   }, [])
+
+  useEffect(() => {
+    if (!startDate || !endDate) return
+    getRentangEfektif(startDate, endDate).then(setRentangEfektif)
+  }, [startDate, endDate])
 
   useEffect(() => {
     setGuruOptionsLoading(true)
@@ -329,6 +336,15 @@ export default function RekapAbsensiGuruPage() {
             </button>
           </div>
         </div>
+        {rentangEfektif?.dipangkas && (
+          <p className="flex items-start gap-2 rounded-lg border border-sky-100 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-none" />
+            <span>
+              Tanggal yang belum terjadi tidak dihitung. Rekap ini hanya memakai data sampai <b>{fmtDate(rentangEfektif.end)}</b>.
+            </span>
+          </p>
+        )}
+
         <div className="flex flex-col gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
             <span className="text-sm font-bold text-slate-700 flex items-center gap-2"><Filter className="w-4 h-4" /> Opsi Perhitungan:</span>
@@ -779,7 +795,16 @@ function PerGuruView({ detail, rawDetail, loading, hasSearched, selectedGuru, st
           </div>
           <div className="text-left lg:text-right">
             <p className="text-xs font-black uppercase tracking-widest text-slate-400">Performa</p>
-            <p className="text-4xl font-black mt-1" style={{ color: getColorPerforma(detail.total.persentase) }}>{detail.total.persentase}%</p>
+            {/* Tanpa waktu efektif tidak ada yang bisa dinilai; 0% akan terbaca
+                seolah guru ini tidak pernah hadir. */}
+            {detail.total.wajib > 0 ? (
+              <p className="text-4xl font-black mt-1" style={{ color: getColorPerforma(detail.total.persentase) }}>{detail.total.persentase}%</p>
+            ) : (
+              <>
+                <p className="mt-1 text-4xl font-black text-slate-300">–</p>
+                <p className="text-xs text-slate-400">Tidak ada waktu efektif</p>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -789,7 +814,7 @@ function PerGuruView({ detail, rawDetail, loading, hasSearched, selectedGuru, st
         <SummaryBox label="Hadir" value={detail.total.hadir} pct={detail.total.pct_hadir} color="text-green-600" bg="bg-green-50" />
         <SummaryBox label="Badal" value={detail.total.badal} pct={detail.total.pct_badal} color="text-yellow-600" bg="bg-yellow-50" />
         <SummaryBox label="Kosong/Alfa" value={detail.total.kosong} pct={detail.total.pct_kosong} color="text-red-600" bg="bg-red-50" />
-        <SummaryBox label="Persentase" value={`${detail.total.persentase}%`} color="text-indigo-700" bg="bg-indigo-50" />
+        <SummaryBox label="Persentase" value={detail.total.wajib > 0 ? `${detail.total.persentase}%` : '–'} color="text-indigo-700" bg="bg-indigo-50" />
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -828,6 +853,7 @@ function PerGuruView({ detail, rawDetail, loading, hasSearched, selectedGuru, st
               startDate={startDate}
               endDate={endDate}
               statusDifilter={detail.detail.length !== rawDetailCount}
+              hinggaTanggal={detail.rentang_efektif?.end}
             />
             <TabelDetailLengkap rows={detail.detail} />
           </>

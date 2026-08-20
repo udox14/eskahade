@@ -7,6 +7,7 @@ import {
   hitungGuruOptionsForRekap,
   hitungRekapDetailGuru,
   hitungRekapKinerjaGuru,
+  rentangEfektifRekapGuru,
 } from '@/lib/akademik/rekap-guru'
 import {
   bukaKunciAbsensiGuru,
@@ -43,6 +44,14 @@ export async function getGuruOptionsForRekap(
   endDate: string = ''
 ) {
   return hitungGuruOptionsForRekap(marhalahId, tahunAjaranId, startDate, endDate)
+}
+
+/**
+ * Rentang yang benar-benar dihitung. "Hari ini" ditentukan di server memakai
+ * WIB, bukan jam browser, supaya angka yang tampil sama untuk semua pemakai.
+ */
+export async function getRentangEfektif(startDate: string, endDate: string) {
+  return rentangEfektifRekapGuru(startDate, endDate)
 }
 
 export async function getRekapKinerjaGuru(

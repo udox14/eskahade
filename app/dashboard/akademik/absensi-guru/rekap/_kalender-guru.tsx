@@ -97,12 +97,14 @@ function ringkasanSel(bucket: DayBucket | undefined) {
     .join(' · ')
 }
 
-export function KalenderAbsensiGuru({ rows, startDate, endDate, statusDifilter }: {
+export function KalenderAbsensiGuru({ rows, startDate, endDate, statusDifilter, hinggaTanggal }: {
   rows: DetailRow[]
   startDate: string
   endDate: string
   /** True bila "Status Tampil" bukan "Semua Status" - sel abu belum tentu tanpa jadwal. */
   statusDifilter?: boolean
+  /** Tanggal efektif terakhir yang dihitung (WIB). Setelah ini ditandai belum terjadi. */
+  hinggaTanggal?: string
 }) {
   const buckets = useMemo(() => {
     const map = new Map<string, DayBucket>()
@@ -135,7 +137,7 @@ export function KalenderAbsensiGuru({ rows, startDate, endDate, statusDifilter }
 
   return (
     <div className="space-y-4 p-4">
-      <Legenda statusDifilter={statusDifilter} />
+      <Legenda statusDifilter={statusDifilter} adaBelumTerjadi={Boolean(hinggaTanggal && hinggaTanggal < endDate)} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
         <div className="min-w-0 space-y-4">
@@ -146,6 +148,7 @@ export function KalenderAbsensiGuru({ rows, startDate, endDate, statusDifilter }
               bulan={bulan}
               buckets={buckets}
               selectedDate={selectedDate}
+              hinggaTanggal={hinggaTanggal}
               onPilih={tanggal => setSelectedDate(current => (current === tanggal ? '' : tanggal))}
             />
           ))}
@@ -160,7 +163,7 @@ export function KalenderAbsensiGuru({ rows, startDate, endDate, statusDifilter }
   )
 }
 
-function Legenda({ statusDifilter }: { statusDifilter?: boolean }) {
+function Legenda({ statusDifilter, adaBelumTerjadi }: { statusDifilter?: boolean; adaBelumTerjadi?: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
       <span className="font-bold uppercase tracking-wide text-slate-400">Keterangan</span>
@@ -168,6 +171,7 @@ function Legenda({ statusDifilter }: { statusDifilter?: boolean }) {
       <LegendaItem tone={STATUS_TONE.B} label="Badal" />
       <LegendaItem tone={STATUS_TONE.A} label="Alfa" />
       <LegendaItem tone="bg-slate-200" label={statusDifilter ? 'Di luar filter status' : 'Tidak ada jadwal'} />
+      {adaBelumTerjadi && <LegendaItem tone="bg-slate-100 ring-1 ring-dashed ring-slate-300" label="Belum terjadi" />}
       <span className="text-slate-400">Tiga strip tiap tanggal = Shubuh, Ashar, Maghrib (kiri ke kanan).</span>
       {statusDifilter && (
         <span className="text-amber-600">Filter status aktif: sel abu bisa berarti ada jadwal yang statusnya sedang disembunyikan.</span>
@@ -185,11 +189,12 @@ function LegendaItem({ tone, label }: { tone: string; label: string }) {
   )
 }
 
-function GridBulan({ tahun, bulan, buckets, selectedDate, onPilih }: {
+function GridBulan({ tahun, bulan, buckets, selectedDate, hinggaTanggal, onPilih }: {
   tahun: number
   bulan: number
   buckets: Map<string, DayBucket>
   selectedDate: string
+  hinggaTanggal?: string
   onPilih: (tanggal: string) => void
 }) {
   const cells = useMemo(() => selRentangBulan(tahun, bulan), [tahun, bulan])
@@ -230,8 +235,9 @@ function GridBulan({ tahun, bulan, buckets, selectedDate, onPilih }: {
           const tanggal = `${tahun}-${pad(bulan)}-${pad(day)}`
           const bucket = buckets.get(tanggal)
           const adaData = Boolean(bucket?.rows.length)
+          const belumTerjadi = Boolean(hinggaTanggal && tanggal > hinggaTanggal)
           const terpilih = selectedDate === tanggal
-          const ringkasan = ringkasanSel(bucket)
+          const ringkasan = belumTerjadi ? 'Belum terjadi, tidak dihitung' : ringkasanSel(bucket)
 
           return (
             <button
@@ -243,31 +249,35 @@ function GridBulan({ tahun, bulan, buckets, selectedDate, onPilih }: {
               aria-label={`${day} ${NAMA_BULAN[bulan - 1]} ${tahun}. ${ringkasan}`}
               aria-pressed={terpilih}
               className={`relative flex min-h-[56px] min-w-0 flex-col rounded-lg border p-1 text-left transition sm:min-h-[72px] sm:rounded-xl sm:p-1.5 ${
-                adaData
-                  ? 'border-slate-200 bg-white hover:ring-2 hover:ring-indigo-300'
-                  : 'border-slate-100 bg-slate-50/60'
+                belumTerjadi
+                  ? 'border-dashed border-slate-200 bg-white'
+                  : adaData
+                    ? 'border-slate-200 bg-white hover:ring-2 hover:ring-indigo-300'
+                    : 'border-slate-100 bg-slate-50/60'
               } ${terpilih ? 'ring-2 ring-indigo-500' : ''}`}
             >
-              <span className={`text-[11px] font-bold sm:text-sm ${adaData ? 'text-slate-700' : 'text-slate-300'}`}>
+              <span className={`text-[11px] font-bold sm:text-sm ${adaData && !belumTerjadi ? 'text-slate-700' : 'text-slate-300'}`}>
                 {day}
               </span>
 
-              {bucket?.adaSnapshotBerbeda && (
+              {bucket?.adaSnapshotBerbeda && !belumTerjadi && (
                 <AlertTriangle className="absolute right-1 top-1 h-3 w-3 text-amber-500" />
               )}
 
-              <div className="mt-auto flex gap-0.5 pt-1.5 sm:gap-1">
-                {SESSIONS.map(sesi => {
-                  const rowsSesi = bucket?.perSesi[sesi]
-                  const tone = rowsSesi?.length ? STATUS_TONE[worstStatus(rowsSesi)] : 'bg-slate-200'
-                  return (
-                    <span
-                      key={sesi}
-                      className={`h-1.5 flex-1 rounded-full ${tone} ${rowsSesi && rowsSesi.length > 1 ? 'ring-1 ring-slate-900/25' : ''}`}
-                    />
-                  )
-                })}
-              </div>
+              {!belumTerjadi && (
+                <div className="mt-auto flex gap-0.5 pt-1.5 sm:gap-1">
+                  {SESSIONS.map(sesi => {
+                    const rowsSesi = bucket?.perSesi[sesi]
+                    const tone = rowsSesi?.length ? STATUS_TONE[worstStatus(rowsSesi)] : 'bg-slate-200'
+                    return (
+                      <span
+                        key={sesi}
+                        className={`h-1.5 flex-1 rounded-full ${tone} ${rowsSesi && rowsSesi.length > 1 ? 'ring-1 ring-slate-900/25' : ''}`}
+                      />
+                    )
+                  })}
+                </div>
+              )}
             </button>
           )
         })}
