@@ -4,6 +4,7 @@
 import { revalidatePath } from 'next/cache'
 import { financeQuery, financeQueryOne, generateId, getFinanceDB, query, queryOne } from '@/lib/db'
 import { financeAsramaScope, requireFinanceAccess } from '@/lib/finance/access'
+import { andExcludeAsramaSql, excludeAsramaSql } from '@/lib/finance/asrama'
 import { issueCredential } from '@/lib/finance/credentials'
 import { createCredentialBatch, getCredentialBatch, getLatestCredentialBatch, processQrCredentialBatch } from '@/lib/finance/credential-batches'
 import type { CredentialKind } from '@/lib/finance/types'
@@ -20,7 +21,7 @@ export async function getCredentialFilters(){
   // Bendahara asrama lolos VIEW, jadi daftar filter pun harus dibatasi scope-nya.
   // Menyembunyikan menu di navigasi bukan otorisasi; server action tetap bisa dipanggil.
   const scope=financeAsramaScope(await requireFinanceAccess('VIEW'))
-  const scoped=scope?`AND s.asrama=?`:''
+  const scoped=`${andExcludeAsramaSql('s.asrama')} ${scope?'AND s.asrama=?':''}`
   const args=scope?[scope]:[]
   const [asramas,kamars,kelas]=await Promise.all([
     query<{value:string}>(`SELECT DISTINCT s.asrama value FROM santri s WHERE s.status_global='aktif' AND s.asrama IS NOT NULL AND trim(s.asrama)<>'' ${scoped} ORDER BY s.asrama`,args),
@@ -32,7 +33,7 @@ export async function getCredentialFilters(){
 
 export async function searchCredentialStudents(input:{q?:string;asrama?:string;kamar?:string;kelas?:string;status?:string;page?:number;pageSize?:number}){
   const scope=financeAsramaScope(await requireFinanceAccess('VIEW'))
-  const params:unknown[]=[],where=[`s.status_global='aktif'`]
+  const params:unknown[]=[],where=[`s.status_global='aktif'`,excludeAsramaSql('s.asrama')]
   if(scope){where.push(`s.asrama=?`);params.push(scope)}
   const q=String(input.q||'').trim()
   if(q){where.push(`(s.nama_lengkap LIKE ? OR s.nis LIKE ?)`);params.push(`%${q}%`,`%${q}%`)}
@@ -63,8 +64,8 @@ export async function searchCredentialStudents(input:{q?:string;asrama?:string;k
 export async function issueCredentialAction(input:{nis?:string;santriId?:string;kind:CredentialKind;rawToken?:string;reissue?:boolean}){
   const session=await requireFinanceAccess('CONFIGURE')
   const student=input.santriId
-    ? await queryOne<{id:string}>(`SELECT id FROM santri WHERE id=? AND status_global='aktif'`,[input.santriId])
-    : await queryOne<{id:string}>(`SELECT id FROM santri WHERE nis=? AND status_global='aktif'`,[String(input.nis||'').trim()])
+    ? await queryOne<{id:string}>(`SELECT id FROM santri WHERE id=? AND status_global='aktif' ${andExcludeAsramaSql('asrama')}`,[input.santriId])
+    : await queryOne<{id:string}>(`SELECT id FROM santri WHERE nis=? AND status_global='aktif' ${andExcludeAsramaSql('asrama')}`,[String(input.nis||'').trim()])
   if(!student)return{error:'Santri aktif tidak ditemukan.'}
   await syncFinanceStudentSnapshot(student.id)
   const result=await issueCredential({santriId:student.id,kind:input.kind,rawToken:input.rawToken,actorId:session.id,reissue:Boolean(input.reissue)})
@@ -78,7 +79,7 @@ export async function createQrBatchAction(input:{santriIds:string[];filter?:Reco
   const valid:string[]=[]
   for(let offset=0;offset<unique.length;offset+=80){
     const chunk=unique.slice(offset,offset+80)
-    const rows=await query<{id:string}>(`SELECT id FROM santri WHERE status_global='aktif' AND id IN (${chunk.map(()=>'?').join(',')})`,chunk)
+    const rows=await query<{id:string}>(`SELECT id FROM santri WHERE status_global='aktif' ${andExcludeAsramaSql('asrama')} AND id IN (${chunk.map(()=>'?').join(',')})`,chunk)
     valid.push(...rows.map(row=>row.id))
   }
   if(valid.length!==unique.length)return{error:'Sebagian santri tidak ditemukan atau sudah nonaktif.'}
@@ -108,6 +109,6 @@ export async function getCredentialData(){
     policy:await financeQueryOne<any>(`SELECT * FROM finance_credential_policy WHERE singleton_id=1`),
     credentials:await financeQuery<any>(`SELECT c.id,c.santri_id,c.credential_kind,c.token_version,c.card_number,c.status,c.issued_at,c.expires_at,c.print_count,c.last_printed_at,s.nis,s.full_name nama_lengkap
       FROM student_credentials c JOIN finance_student_snapshots s ON s.santri_id=c.santri_id
-      WHERE 1=1 ${scope?'AND s.asrama=?':''} ORDER BY c.issued_at DESC LIMIT 100`,scope?[scope]:[]),
+      WHERE 1=1 ${andExcludeAsramaSql('s.asrama')} ${scope?'AND s.asrama=?':''} ORDER BY c.issued_at DESC LIMIT 100`,scope?[scope]:[]),
   }
 }

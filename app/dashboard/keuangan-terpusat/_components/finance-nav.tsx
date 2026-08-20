@@ -12,6 +12,7 @@ const href={
   credentials:'/dashboard/keuangan-terpusat/kredensial',
   payout:'/dashboard/keuangan-terpusat/payout',
   payroll:'/dashboard/keuangan-terpusat/payroll',
+  bills:'/dashboard/keuangan-terpusat/tagihan',
   ledger:'/dashboard/keuangan-terpusat/transaksi',
   allocation:'/dashboard/keuangan-terpusat/alokasi',
   control:'/dashboard/keuangan-terpusat/kontrol',
@@ -34,8 +35,8 @@ export async function FinanceNav(){
   // dihapus: kalau admin memang perlu mengurus keuangan, beri dia peran bendahara.
   if(demo)Object.values(href).forEach(item=>allowed.add(item))
   if(central)Object.values(href).forEach(item=>allowed.add(item))
-  if(council)[href.home,href.payout,href.payroll,href.ledger,href.allocation,href.control,href.operations,href.tariffs].forEach(item=>allowed.add(item))
-  if(dorm)[href.home,href.payout,href.ledger,href.allocation].forEach(item=>allowed.add(item))
+  if(council)[href.home,href.payout,href.payroll,href.bills,href.ledger,href.allocation,href.control,href.operations,href.tariffs].forEach(item=>allowed.add(item))
+  if(dorm)[href.home,href.payout,href.bills,href.ledger,href.allocation].forEach(item=>allowed.add(item))
   if(operator)allowed.add(href.cashier)
 
   const counts=await getFinanceWorkCounts(financeAsramaScope(session))

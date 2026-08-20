@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { financeQuery as query,query as mainQuery,queryOne } from '@/lib/db'
 import { runBulk } from '@/lib/finance/bulk'
 import { financeCapabilities, requireFinanceAccess } from '@/lib/finance/access'
+import { andExcludeAsramaSql } from '@/lib/finance/asrama'
 import { createFinanceBill,voidFinanceBill } from '@/lib/finance/billing'
 import { reviewLateTopup } from '@/lib/finance/payments'
 import { closeFinancePeriod,financePeriodReadiness,reopenFinancePeriod } from '@/lib/finance/periods'
@@ -13,7 +14,7 @@ import { syncFinanceStudentSnapshot } from '@/lib/finance/snapshots'
 import { AKUN_KAS_MASUK } from '@/lib/finance/postings'
 const PATH='/dashboard/keuangan-terpusat/operasi'
 function refreshOperations(){revalidatePath(PATH);revalidatePath('/dashboard/keuangan-terpusat')}
-export async function createBillAction(form:FormData){const s=await requireFinanceAccess('CONFIGURE'),student=await queryOne<{id:string}>(`SELECT id FROM santri WHERE nis=? AND status_global='aktif'`,[String(form.get('nis')||'').trim()]);if(!student)return{error:'Santri tidak ditemukan.'};await syncFinanceStudentSnapshot(student.id);const r=await createFinanceBill({santriId:student.id,billKind:String(form.get('kind')) as 'SPP'|'USPP'|'NON_SPP',title:String(form.get('title')),periodKey:String(form.get('period')||'')||null,amountRupiah:Number(form.get('amount')),dueDate:String(form.get('dueDate')||'')||null,actorId:s.id});if(r.success)revalidatePath(PATH);return r}
+export async function createBillAction(form:FormData){const s=await requireFinanceAccess('CONFIGURE'),student=await queryOne<{id:string}>(`SELECT id FROM santri WHERE nis=? AND status_global='aktif' ${andExcludeAsramaSql('asrama')}`,[String(form.get('nis')||'').trim()]);if(!student)return{error:'Santri tidak ditemukan.'};await syncFinanceStudentSnapshot(student.id);const r=await createFinanceBill({santriId:student.id,billKind:String(form.get('kind')) as 'SPP'|'USPP'|'NON_SPP',title:String(form.get('title')),periodKey:String(form.get('period')||'')||null,amountRupiah:Number(form.get('amount')),dueDate:String(form.get('dueDate')||'')||null,actorId:s.id});if(r.success)revalidatePath(PATH);return r}
 export async function recordReconciliationAction(form:FormData){
   const s=await requireFinanceAccess('CONFIGURE')
   const r=await recordReconciliationCheck({
@@ -65,7 +66,7 @@ export async function importBillsAction(rows:BillImportRow[]){
   const session=await requireFinanceAccess('CONFIGURE')
   const list=[...new Set(rows.map(item=>item.nis).filter(Boolean))]
   const students=list.length
-    ? await mainQuery<{id:string;nis:string}>(`SELECT id,nis FROM santri WHERE status_global='aktif' AND nis IN (${list.map(()=>'?').join(',')})`,list)
+    ? await mainQuery<{id:string;nis:string}>(`SELECT id,nis FROM santri WHERE status_global='aktif' ${andExcludeAsramaSql('asrama')} AND nis IN (${list.map(()=>'?').join(',')})`,list)
     : []
   const byNis=new Map(students.map(student=>[student.nis,student.id]))
   // Snapshot disinkronkan sekali per santri, bukan tiap baris tagihannya.
@@ -113,8 +114,9 @@ export async function getOperationsData(){
       s.nis,s.full_name nama_lengkap
       FROM finance_payment_intents p
       LEFT JOIN finance_student_snapshots s ON s.santri_id=p.santri_id
-      WHERE p.status='PAID' AND p.review_status='REQUIRED'
+      WHERE p.status='PAID' AND p.review_status='REQUIRED' ${andExcludeAsramaSql('s.asrama')}
       ORDER BY p.paid_at DESC LIMIT 100`),
-    bills:await query<any>(`SELECT b.*,s.nis,s.full_name nama_lengkap FROM finance_bills b JOIN finance_student_snapshots s ON s.santri_id=b.santri_id ORDER BY b.created_at DESC LIMIT 30`),
+    bills:await query<any>(`SELECT b.*,s.nis,s.full_name nama_lengkap FROM finance_bills b JOIN finance_student_snapshots s ON s.santri_id=b.santri_id
+      WHERE 1=1 ${andExcludeAsramaSql('s.asrama')} ORDER BY b.created_at DESC LIMIT 30`),
   }
 }

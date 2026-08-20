@@ -2,6 +2,7 @@
 
 import { query } from '@/lib/db'
 import { requireFinanceAccess } from '@/lib/finance/access'
+import { andExcludeAsramaSql } from '@/lib/finance/asrama'
 
 export type SantriSearchRow = { id: string; nama_lengkap: string; nis: string; asrama: string | null; kamar: string | null }
 
@@ -18,6 +19,7 @@ export async function searchSantriByName(keyword: string): Promise<SantriSearchR
   return query<SantriSearchRow>(
     `SELECT id, nama_lengkap, nis, asrama, kamar FROM santri
      WHERE status_global='aktif' AND (nama_lengkap LIKE ? OR nis LIKE ?)
+       ${andExcludeAsramaSql('asrama')}
      ORDER BY nama_lengkap LIMIT 10`,
     [like, like]
   )
@@ -30,7 +32,7 @@ export async function findSantriByNis(nis: string): Promise<SantriSearchRow | nu
   if (!trimmed) return null
   const rows = await query<SantriSearchRow>(
     `SELECT id, nama_lengkap, nis, asrama, kamar FROM santri
-     WHERE status_global='aktif' AND nis=? LIMIT 1`,
+     WHERE status_global='aktif' AND nis=? ${andExcludeAsramaSql('asrama')} LIMIT 1`,
     [trimmed]
   )
   return rows[0] ?? null

@@ -10,6 +10,7 @@
 // Tidak ada baris yang ditulis ke spp_log atau pembayaran_tahunan di sini.
 
 import { execute, query, queryOne, financeQuery, financeQueryOne, getFinanceDB as getDB } from '@/lib/db'
+import { andExcludeAsramaSql } from './asrama'
 import { prepareJournalStatements, prepareWalletStatements } from './ledger'
 import { financeError } from './errors'
 import { duplicateOf } from './idempotency'
@@ -63,7 +64,7 @@ export async function listPortalSubmissions(
     FROM portal_payment_submission ps
     JOIN santri s ON s.id = ps.santri_id
     LEFT JOIN users u ON u.id = ps.confirmed_by
-    WHERE ps.kategori = ? ${scopeWhere} ${statusWhere}
+    WHERE ps.kategori = ? ${andExcludeAsramaSql('s.asrama')} ${scopeWhere} ${statusWhere}
     ORDER BY CASE ps.status WHEN 'menunggu_konfirmasi' THEN 0 ELSE 1 END, datetime(ps.created_at) DESC
     LIMIT 200
   `, params)

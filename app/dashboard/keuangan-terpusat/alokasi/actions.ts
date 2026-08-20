@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { financeQuery } from '@/lib/db'
 import { financeAsramaScope, financeCapabilities, requireFinanceAccess } from '@/lib/finance/access'
 import { returnUnusedAllocation } from '@/lib/finance/wallet'
+import { andExcludeAsramaSql } from '@/lib/finance/asrama'
 
 const PATH = '/dashboard/keuangan-terpusat/alokasi'
 
@@ -35,7 +36,7 @@ export async function getAllocationData() {
     LEFT JOIN finance_student_snapshots s ON s.santri_id=a.santri_id
     LEFT JOIN finance_allocation_bill_items abi ON abi.allocation_id=a.id
     LEFT JOIN finance_bills b ON b.id=abi.bill_id
-    WHERE 1=1 ${scope ? 'AND s.asrama=?' : ''}
+    WHERE 1=1 ${andExcludeAsramaSql('s.asrama')} ${scope ? 'AND s.asrama=?' : ''}
     GROUP BY a.id ORDER BY a.created_at DESC LIMIT 300`, params)
   const capabilities = await financeCapabilities(session)
   return {

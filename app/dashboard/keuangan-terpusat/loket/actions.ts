@@ -4,6 +4,7 @@
 import { revalidatePath } from 'next/cache'
 import { getFinanceDB as getDB, generateId, financeQuery as query, financeQueryOne as queryOne, queryOne as mainQueryOne } from '@/lib/db'
 import { canConfigureCashUnits, requireCashierOperator } from '@/lib/finance/access'
+import { andExcludeAsramaSql, cashUnitScopeLabel, resolveCashUnitScope } from '@/lib/finance/asrama'
 import { resolveCredential } from '@/lib/finance/credentials'
 import { withdrawPocketMoney } from '@/lib/finance/withdrawal'
 import type { CredentialKind } from '@/lib/finance/types'
@@ -39,13 +40,18 @@ export async function identifyStudent(shiftId: string, kind: CredentialKind, raw
 
   const credential = await resolveCredential(kind, String(rawToken || '').trim())
   if (!credential) return { error: 'Kartu/QR tidak aktif atau tidak sesuai mode.' }
+  // Scope unit bisa berupa satu asrama atau gabungan (semua putra/putri), jadi
+  // selalu diterjemahkan dulu menjadi daftar asrama sebelum dipakai memfilter.
+  const scopeList = resolveCashUnitScope(shift.asrama_scope)
   const master = await mainQueryOne<{
     id: string; nis: string; nama_lengkap: string; asrama: string | null; kamar: string | null; foto_url: string | null
   }>(`SELECT id,nis,nama_lengkap,asrama,kamar,foto_url
-    FROM santri WHERE id=? AND status_global='aktif' ${shift.asrama_scope ? 'AND asrama=?' : ''}`,
-    shift.asrama_scope ? [credential.santri_id, shift.asrama_scope] : [credential.santri_id])
+    FROM santri WHERE id=? AND status_global='aktif'
+      ${scopeList ? `AND asrama IN (${scopeList.map(() => '?').join(',')})` : ''}
+      ${andExcludeAsramaSql('asrama')}`,
+    scopeList ? [credential.santri_id, ...scopeList] : [credential.santri_id])
   if (master) await syncFinanceStudentSnapshot(master.id)
-  if (!master) return { error: shift.asrama_scope ? `Santri tidak termasuk scope ${shift.asrama_scope}.` : 'Santri tidak ditemukan dalam scope loket.' }
+  if (!master) return { error: scopeList ? `Santri tidak termasuk scope ${cashUnitScopeLabel(shift.asrama_scope)}.` : 'Santri tidak ditemukan dalam scope loket.' }
 
   const wallet = await queryOne<{ balance_rupiah: number }>(
     `SELECT balance_rupiah FROM finance_student_wallets WHERE santri_id=? AND wallet_kind='JAJAN'`, [master.id])

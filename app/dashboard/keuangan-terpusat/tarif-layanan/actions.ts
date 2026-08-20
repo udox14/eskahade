@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { query, queryOne, execute, generateId } from '@/lib/db'
 import { requireFinanceAccess } from '@/lib/finance/access'
+import { andExcludeAsramaSql } from '@/lib/finance/asrama'
 import { searchSantriByName as searchSantri } from '@/lib/finance/santri-search'
 import { syncFinanceStudentSnapshot } from '@/lib/finance/snapshots'
 import {
@@ -67,7 +68,7 @@ export async function addArrearsAction(input: {
 }): Promise<{ error: string } | { success: true; id: string }> {
   const session = await requireFinanceAccess('CONFIGURE')
   const student = await queryOne<{ id: string }>(
-    `SELECT id FROM santri WHERE id=? AND status_global='aktif'`,
+    `SELECT id FROM santri WHERE id=? AND status_global='aktif' ${andExcludeAsramaSql('asrama')}`,
     [input.santriId]
   )
   if (!student) return { error: 'Santri tidak ditemukan atau tidak aktif.' }
@@ -163,6 +164,7 @@ export async function getBebasTahunanData(): Promise<BebasTahunanRow[]> {
      FROM pembayaran_tahunan p
      JOIN santri s ON s.id = p.santri_id
      WHERE p.nominal_bayar = 0 AND COALESCE(p.status,'AKTIF') != 'VOID'
+       ${andExcludeAsramaSql('s.asrama')}
      ORDER BY s.nama_lengkap, p.jenis_biaya`
   )
 }

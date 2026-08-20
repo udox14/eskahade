@@ -66,6 +66,7 @@ export const FINANCE_NAV_GROUPS = [
   },
   {
     id: 'kontrol', label: 'Kontrol & penelusuran', items: [
+      { href: '/dashboard/keuangan-terpusat/tagihan', label: 'Tagihan', icon: ReceiptText, badge: null },
       { href: '/dashboard/keuangan-terpusat/transaksi', label: 'Transaksi', icon: BookOpenText, badge: null },
       { href: '/dashboard/keuangan-terpusat/kontrol', label: 'Kontrol', icon: ShieldCheck, badge: null },
     ],
@@ -127,12 +128,15 @@ export function FinanceNavClient({ allowedHrefs, sandbox = false, badges = {}, c
       <span>QR: <code>SKH1.DEMO.SANTRI.0001.TEST.CREDENTIAL</code> · PIN: <code>123456</code></span>
     </div> : null}
 
-    <nav aria-label="Navigasi keuangan terpusat" className="flex items-center gap-3 border-b border-slate-200 pb-2">
-      {/* Satu baris di semua ukuran layar: label kelompok dulu memakan satu baris
-          sendiri di layar lebar sehingga header terasa sesak. Urutan kerjanya
-          tetap terbaca lewat garis pemisah antar kelompok, dan barisnya bisa
-          digeser bila menu tidak muat. */}
-      <div className="-mx-4 min-w-0 flex-1 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <nav aria-label="Navigasi keuangan terpusat" className="border-b border-slate-200 pb-2">
+      {/* Satu baris di semua ukuran layar untuk menunya sendiri: label
+          kelompok dulu memakan satu baris sendiri di layar lebar sehingga
+          header terasa sesak. Urutan kerjanya tetap terbaca lewat garis
+          pemisah antar kelompok, dan barisnya bisa digeser bila menu tidak
+          muat. Kotak cari selalu di barisnya sendiri di bawah — kalau
+          dipaksa sebaris dengan menu yang lebarnya dinamis, keduanya
+          gampang berdesakan di lebar layar tertentu. */}
+      <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex min-w-max items-center gap-1">
           {groups.map((group, index) => <div key={group.id} role="group" aria-label={group.label} className="flex items-center gap-1">
             {index ? <span aria-hidden className="mx-1 h-6 w-px bg-slate-200" /> : null}
@@ -140,9 +144,8 @@ export function FinanceNavClient({ allowedHrefs, sandbox = false, badges = {}, c
           </div>)}
         </div>
       </div>
-      {commandPalette ? <div className="hidden shrink-0 lg:block">{commandPalette}</div> : null}
     </nav>
-    {commandPalette ? <div className="lg:hidden">{commandPalette}</div> : null}
+    {commandPalette ? <div>{commandPalette}</div> : null}
   </div>
 }
 

@@ -11,6 +11,7 @@ import {
   queryOne as mainQueryOne,
 } from '@/lib/db'
 import { requireFinanceAccess } from '@/lib/finance/access'
+import { isCashUnitScopeValid } from '@/lib/finance/asrama'
 
 const PATH = '/dashboard/keuangan-terpusat/unit-kas'
 
@@ -30,6 +31,7 @@ function cleanUnitInput(input: { name: string; asramaScope?: string | null; fixe
   const fixedFloatRupiah = Number(input.fixedFloatRupiah)
   if (name.length < 3) return { error: 'Nama Unit Kas minimal 3 karakter.' } as const
   if (!Number.isSafeInteger(fixedFloatRupiah) || fixedFloatRupiah < 0) return { error: 'Saldo tetap harus berupa rupiah bulat dan tidak negatif.' } as const
+  if (!isCashUnitScopeValid(asramaScope)) return { error: 'Scope asrama tidak dikenal.' } as const
   return { name, asramaScope, fixedFloatRupiah }
 }
 
@@ -78,6 +80,32 @@ export async function setCashUnitActive(id: string, active: boolean) {
   }
   await (await getDB()).prepare('UPDATE finance_cash_units SET is_active=? WHERE id=?').bind(active ? 1 : 0, id).run()
   await audit(session.id, active ? 'ACTIVATE_CASH_UNIT' : 'DEACTIVATE_CASH_UNIT', 'CASH_UNIT', id, current, { ...current, is_active: active ? 1 : 0 })
+  revalidatePath(PATH)
+  revalidatePath('/dashboard/keuangan-terpusat/loket')
+  return { success: true as const }
+}
+
+/**
+ * Hapus permanen. Batasnya uang, bukan sekadar jejak: shift percobaan yang
+ * sudah ditutup dan tidak pernah mencairkan apa pun ikut terhapus, tapi begitu
+ * ada satu pencairan saja unit wajib dipertahankan karena jurnal kasnya
+ * menunjuk ke sini.
+ */
+export async function deleteCashUnit(id: string) {
+  const session = await requireFinanceAccess('CONFIGURE')
+  const current = await financeQueryOne<any>('SELECT * FROM finance_cash_units WHERE id=?', [id])
+  if (!current) return { error: 'Unit Kas tidak ditemukan.' }
+  const open = await financeQueryOne<{ id: string }>(`SELECT id FROM finance_cash_shifts WHERE cash_unit_id=? AND status='OPEN' LIMIT 1`, [id])
+  if (open) return { error: 'Tutup dulu shift yang masih terbuka sebelum menghapus Unit Kas ini.' }
+  const withdrawal = await financeQueryOne<{ id: string }>('SELECT id FROM finance_withdrawals WHERE cash_unit_id=? LIMIT 1', [id])
+  if (withdrawal) return { error: 'Unit Kas sudah pernah mencairkan uang dan tidak dapat dihapus. Nonaktifkan unit ini saja.' }
+  const db = await getDB()
+  await db.batch([
+    db.prepare('DELETE FROM finance_cash_shifts WHERE cash_unit_id=?').bind(id),
+    db.prepare('DELETE FROM finance_cash_unit_operators WHERE cash_unit_id=?').bind(id),
+    db.prepare('DELETE FROM finance_cash_units WHERE id=?').bind(id),
+  ])
+  await audit(session.id, 'DELETE_CASH_UNIT', 'CASH_UNIT', id, current, null)
   revalidatePath(PATH)
   revalidatePath('/dashboard/keuangan-terpusat/loket')
   return { success: true as const }
@@ -137,7 +165,9 @@ export async function getCashUnitManagementData() {
     ORDER BY full_name,email`)
   const units = await financeQuery<any>(`SELECT cu.*,
       (SELECT COUNT(*) FROM finance_cash_unit_operators a WHERE a.cash_unit_id=cu.id AND a.is_active=1) operator_count,
-      (SELECT COUNT(*) FROM finance_cash_shifts sh WHERE sh.cash_unit_id=cu.id AND sh.status='OPEN') open_shift_count
+      (SELECT COUNT(*) FROM finance_cash_shifts sh WHERE sh.cash_unit_id=cu.id AND sh.status='OPEN') open_shift_count,
+      (SELECT COUNT(*) FROM finance_cash_shifts sh WHERE sh.cash_unit_id=cu.id) shift_count,
+      (SELECT COUNT(*) FROM finance_withdrawals w WHERE w.cash_unit_id=cu.id) withdrawal_count
     FROM finance_cash_units cu ORDER BY cu.is_active DESC,cu.name`)
   const assignments = await financeQuery<any>(`SELECT cash_unit_id,operator_id,is_active
     FROM finance_cash_unit_operators WHERE is_active=1`)

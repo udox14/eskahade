@@ -26,6 +26,8 @@ export default async function CashUnitPage() {
       ]}
       notes={[
         'Unit dan penugasan dengan shift terbuka tidak dapat dinonaktifkan.',
+        'Scope dapat diisi satu asrama atau gabungan: semua asrama putra (AL-FALAH, BAHAGIA, AS-SALAM) atau semua asrama putri (ASY-SYIFA 1–4).',
+        'Penghapusan permanen hanya untuk unit yang belum pernah mencairkan uang; sisanya cukup dinonaktifkan agar jurnal kas tetap utuh.',
         'Operator tetap wajib menghitung kas fisik saat buka dan tutup shift.',
         'Review bendahara mencatat pemeriksaan, tidak mengubah nilai selisih.',
       ]}

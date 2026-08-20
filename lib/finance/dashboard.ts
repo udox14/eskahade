@@ -1,5 +1,6 @@
 import { financeQuery, financeQueryOne, query } from '@/lib/db'
 import { AKUN_TITIPAN_WALI, AKUN_KAS_MASUK } from './postings'
+import { andExcludeAsramaSql } from './asrama'
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export type FinanceDashboard = {
@@ -17,7 +18,7 @@ export async function getFinanceDashboard(asramaScope: string | null): Promise<F
   const scopeFilter = asramaScope ? `AND EXISTS (SELECT 1 FROM finance_journal_entries se WHERE se.journal_id=j.id AND se.asrama_scope=?)` : ''
   const scopeParams = asramaScope ? [asramaScope] : []
   const scopedStudents = asramaScope
-    ? await query<{ id: string }>(`SELECT id FROM santri WHERE asrama=? AND status_global='aktif'`, [asramaScope])
+    ? await query<{ id: string }>(`SELECT id FROM santri WHERE asrama=? AND status_global='aktif' ${andExcludeAsramaSql('asrama')}`, [asramaScope])
     : []
   let softConfig={topup_rupiah:5000000,student_balance_rupiah:10000000,aggregate_float_rupiah:500000000}
   try{softConfig={...softConfig,...JSON.parse((await financeQueryOne<{value:string}>(`SELECT value FROM finance_settings WHERE key='finance_soft_alerts'`))?.value||'{}')}}catch{}

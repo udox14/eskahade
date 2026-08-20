@@ -5,9 +5,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { CheckCircle, Gear, PencilSimple, Plus, Power, UserPlus, Warning } from '@phosphor-icons/react'
-import { createCashUnit, reviewCashDiscrepancy, setCashUnitActive, setCashUnitOperator, updateCashUnit } from './actions'
-import { ALL_ASRAMA_LIST } from '@/lib/asrama'
+import { CheckCircle, Gear, PencilSimple, Plus, Power, Trash, UserPlus, Warning } from '@phosphor-icons/react'
+import { createCashUnit, deleteCashUnit, reviewCashDiscrepancy, setCashUnitActive, setCashUnitOperator, updateCashUnit } from './actions'
+import { CASH_UNIT_SCOPE_OPTIONS, cashUnitScopeLabel } from '@/lib/finance/asrama'
 import { RupiahInput } from '../_components/finance-inputs'
 import {
   ConfirmAction, EmptyState, FINANCE_FIELD_CLASS, FinanceModal, FinanceTabs, FinanceTour, ResultBanner, SectionPanel, StatusBadge,
@@ -21,7 +21,7 @@ const TOUR: TourStep[] = [
 ]
 
 /** Nilai kosong berarti unit pusat yang melayani seluruh asrama. */
-const ASRAMA = ['', ...ALL_ASRAMA_LIST]
+const ASRAMA = CASH_UNIT_SCOPE_OPTIONS
 const rupiah = (value: number) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`
 const field = FINANCE_FIELD_CLASS
 
@@ -34,6 +34,7 @@ export function CashUnitClient({ data }: { data: { units: any[]; operators: any[
   const [editingId, setEditingId] = useState<string | null>(null)
   const [result, setResult] = useState<FinanceResult | null>(null)
   const [confirmDeactivate, setConfirmDeactivate] = useState<any>(null)
+  const [confirmDelete, setConfirmDelete] = useState<any>(null)
   const tour = useFinanceTour('unit-kas')
   const selected = data.units.find(unit => unit.id === selectedId)
   const assigned = useMemo(() => new Set(data.assignments.filter(row => row.cash_unit_id === selectedId && Number(row.is_active) === 1).map(row => row.operator_id)), [data.assignments, selectedId])
@@ -71,7 +72,7 @@ export function CashUnitClient({ data }: { data: { units: any[]; operators: any[
     {tab === 'unit' ? <>
     <SectionPanel title="Daftar Unit Kas" description="Pilih unit untuk mengubah detail dan penugasan operator." action={<button onClick={() => setShowCreate(value => !value)} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white"><Plus className="h-4 w-4" />Buat Unit Kas</button>}>
       <div data-tour="units" className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-3">{data.units.length ? data.units.map(unit => <button key={unit.id} onClick={() => setSelectedId(unit.id)} className={`rounded-xl border p-3 text-left transition ${selectedId === unit.id ? 'border-emerald-400 bg-emerald-50/60 ring-1 ring-emerald-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
-        <div className="flex items-start justify-between gap-3"><div><strong className="text-sm text-slate-900">{unit.name}</strong><p className="mt-1 text-xs text-slate-500">{unit.asrama_scope || 'Pusat / semua asrama'}</p></div><StatusBadge tone={Number(unit.is_active) ? 'emerald' : 'slate'}>{Number(unit.is_active) ? 'Aktif' : 'Nonaktif'}</StatusBadge></div>
+        <div className="flex items-start justify-between gap-3"><div><strong className="text-sm text-slate-900">{unit.name}</strong><p className="mt-1 text-xs text-slate-500">{cashUnitScopeLabel(unit.asrama_scope)}</p></div><StatusBadge tone={Number(unit.is_active) ? 'emerald' : 'slate'}>{Number(unit.is_active) ? 'Aktif' : 'Nonaktif'}</StatusBadge></div>
         <div className="mt-3 flex gap-3 text-[11px] text-slate-500"><span>{unit.operator_count} operator</span><span>{unit.open_shift_count} shift terbuka</span><span>{rupiah(unit.fixed_float_rupiah)}</span></div>
       </button>) : <div className="col-span-full"><EmptyState icon={Gear} title="Belum ada Unit Kas" description="Buat satu Unit Kas untuk tiap loket fisik, lalu tugaskan operatornya. Tanpa ini, loket tidak dapat dibuka." /></div>}</div>
     </SectionPanel>
@@ -84,7 +85,7 @@ export function CashUnitClient({ data }: { data: { units: any[]; operators: any[
       onClose={() => setShowCreate(false)}>
       <form className="grid gap-3 sm:grid-cols-2" action={form => mutate(() => createCashUnit({ name: String(form.get('name')), asramaScope: String(form.get('scope') || '') || null, fixedFloatRupiah: Number(form.get('float')) }), 'Unit Kas dibuat.')}>
         <label className="text-xs font-bold text-slate-700">Nama unit<input name="name" required minLength={3} placeholder="Contoh: Loket Putra" className={`mt-1.5 ${field}`} /></label>
-        <label className="text-xs font-bold text-slate-700">Scope asrama<select name="scope" className={`mt-1.5 ${field}`}>{ASRAMA.map(value => <option key={value || 'pusat'} value={value}>{value || 'Pusat / semua'}</option>)}</select></label>
+        <label className="text-xs font-bold text-slate-700">Scope asrama<select name="scope" className={`mt-1.5 ${field}`}>{ASRAMA.map(option => <option key={option.value || 'pusat'} value={option.value}>{option.label}</option>)}</select></label>
         <label className="text-xs font-bold text-slate-700">Saldo kas tetap<div className="mt-1.5"><RupiahInput name="float" min={0} hint="Nilai awal yang disarankan saat operator membuka shift." /></div></label>
         <button disabled={pending} className="min-h-11 self-end rounded-lg bg-slate-900 px-4 text-sm font-bold text-white disabled:opacity-50">Simpan unit</button>
       </form>
@@ -95,12 +96,20 @@ export function CashUnitClient({ data }: { data: { units: any[]; operators: any[
       <SectionPanel title="Detail Unit Kas" description="Saldo tetap menjadi nilai awal saat operator membuka shift." action={<button onClick={() => setEditingId(editingId === selected.id ? null : selected.id)} className="inline-flex min-h-9 items-center justify-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-bold"><PencilSimple />Ubah</button>}>
         {editingId === selected.id ? <form className="grid gap-3 p-4" action={form => mutate(() => updateCashUnit({ id: selected.id, name: String(form.get('name')), asramaScope: String(form.get('scope') || '') || null, fixedFloatRupiah: Number(form.get('float')) }), 'Unit Kas diperbarui.')}>
           <label className="text-xs font-bold">Nama<input name="name" defaultValue={selected.name} required minLength={3} className={`mt-1.5 ${field}`} /></label>
-          <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold">Scope asrama<select name="scope" defaultValue={selected.asrama_scope || ''} className={`mt-1.5 ${field}`}>{ASRAMA.map(value => <option key={value || 'pusat'} value={value}>{value || 'Pusat / semua'}</option>)}</select></label><label className="text-xs font-bold">Saldo kas tetap<div className="mt-1.5"><RupiahInput name="float" defaultValue={Number(selected.fixed_float_rupiah) || 0} min={0} /></div></label></div>
+          <div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold">Scope asrama<select name="scope" defaultValue={selected.asrama_scope || ''} className={`mt-1.5 ${field}`}>{ASRAMA.map(option => <option key={option.value || 'pusat'} value={option.value}>{option.label}</option>)}</select></label><label className="text-xs font-bold">Saldo kas tetap<div className="mt-1.5"><RupiahInput name="float" defaultValue={Number(selected.fixed_float_rupiah) || 0} min={0} /></div></label></div>
           <button disabled={pending} className="min-h-11 rounded-lg bg-emerald-700 text-sm font-bold text-white">Simpan perubahan</button>
-        </form> : <div className="grid gap-3 p-4 text-sm sm:grid-cols-3"><div><span className="text-xs text-slate-500">Lokasi/scope</span><strong className="mt-1 block">{selected.asrama_scope || 'Pusat / semua'}</strong></div><div><span className="text-xs text-slate-500">Saldo tetap</span><strong className="mt-1 block tabular-nums">{rupiah(selected.fixed_float_rupiah)}</strong></div><div><span className="text-xs text-slate-500">Status</span><strong className="mt-1 block">{Number(selected.is_active) ? 'Aktif' : 'Nonaktif'}</strong></div></div>}
+        </form> : <div className="grid gap-3 p-4 text-sm sm:grid-cols-3"><div><span className="text-xs text-slate-500">Lokasi/scope</span><strong className="mt-1 block">{cashUnitScopeLabel(selected.asrama_scope)}</strong></div><div><span className="text-xs text-slate-500">Saldo tetap</span><strong className="mt-1 block tabular-nums">{rupiah(selected.fixed_float_rupiah)}</strong></div><div><span className="text-xs text-slate-500">Status</span><strong className="mt-1 block">{Number(selected.is_active) ? 'Aktif' : 'Nonaktif'}</strong></div></div>}
         <div className="border-t border-slate-100 p-4">
-          <button disabled={pending} onClick={() => Number(selected.is_active) ? setConfirmDeactivate(selected) : mutate(() => setCashUnitActive(selected.id, true), 'Unit diaktifkan.')} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-xs font-bold ${Number(selected.is_active) ? 'border border-amber-300 bg-amber-50 text-amber-900' : 'bg-emerald-700 text-white'}`}><Power />{Number(selected.is_active) ? 'Nonaktifkan unit' : 'Aktifkan unit'}</button>
+          <div className="flex flex-wrap gap-2">
+            <button disabled={pending} onClick={() => Number(selected.is_active) ? setConfirmDeactivate(selected) : mutate(() => setCashUnitActive(selected.id, true), 'Unit diaktifkan.')} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-xs font-bold ${Number(selected.is_active) ? 'border border-amber-300 bg-amber-50 text-amber-900' : 'bg-emerald-700 text-white'}`}><Power />{Number(selected.is_active) ? 'Nonaktifkan unit' : 'Aktifkan unit'}</button>
+            <button disabled={pending || Number(selected.withdrawal_count) > 0 || Number(selected.open_shift_count) > 0} onClick={() => setConfirmDelete(selected)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-3 text-xs font-bold text-rose-900 disabled:cursor-not-allowed disabled:opacity-50"><Trash />Hapus unit</button>
+          </div>
           <p className="mt-2 text-[11px] leading-4 text-slate-500">{Number(selected.is_active) ? 'Unit nonaktif tidak dapat dipakai membuka shift baru. Riwayat dan shift yang sudah tertutup tetap tersimpan.' : 'Aktifkan kembali agar operator yang ditugaskan dapat membuka shift di unit ini.'}</p>
+          <p className="mt-1 text-[11px] leading-4 text-slate-500">{Number(selected.withdrawal_count) > 0
+            ? 'Unit ini sudah pernah mencairkan uang, jadi hanya bisa dinonaktifkan — jurnal kasnya menunjuk ke sini.'
+            : Number(selected.open_shift_count) > 0
+              ? 'Tutup dulu shift yang masih terbuka sebelum unit ini bisa dihapus.'
+              : `Unit ini belum pernah mencairkan uang, jadi masih boleh dihapus permanen${Number(selected.shift_count) > 0 ? ` beserta ${selected.shift_count} shift percobaannya` : ''}.`}</p>
         </div>
       </SectionPanel>
 
@@ -154,6 +163,28 @@ export function CashUnitClient({ data }: { data: { units: any[]; operators: any[
         const target = confirmDeactivate
         setConfirmDeactivate(null)
         mutate(() => setCashUnitActive(target.id, false), 'Unit dinonaktifkan.')
+      }}
+    />
+
+    <ConfirmAction
+      open={Boolean(confirmDelete)}
+      title={`Hapus ${confirmDelete?.name ?? 'unit ini'}?`}
+      description="Unit Kas dihapus permanen beserta penugasan operator dan shift percobaannya. Tindakan ini tidak dapat dibatalkan."
+      impact={[
+        'Unit yang pernah mencairkan uang tidak bisa dihapus — cukup dinonaktifkan.',
+        'Semua penugasan operator dan riwayat shift unit ini ikut terhapus.',
+        'Unit langsung hilang dari pilihan loket.',
+      ]}
+      confirmLabel="Hapus unit"
+      confirmPhrase="HAPUS"
+      tone="red"
+      pending={pending}
+      onCancel={() => setConfirmDelete(null)}
+      onConfirm={() => {
+        const target = confirmDelete
+        setConfirmDelete(null)
+        setSelectedId(null)
+        mutate(() => deleteCashUnit(target.id), 'Unit Kas dihapus.')
       }}
     />
   </div>

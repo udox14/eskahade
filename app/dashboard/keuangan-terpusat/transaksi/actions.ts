@@ -4,6 +4,7 @@
 import { revalidatePath } from 'next/cache'
 import { financeQuery, financeQueryOne, generateId, getFinanceDB, queryOne } from '@/lib/db'
 import { financeAsramaScope, financeCapabilities, requireFinanceAccess } from '@/lib/finance/access'
+import { andExcludeAsramaSql } from '@/lib/finance/asrama'
 import { contentKey } from '@/lib/finance/idempotency'
 import { postJournal, reverseJournal } from '@/lib/finance/ledger'
 import { syncFinanceStudentSnapshot } from '@/lib/finance/snapshots'
@@ -34,7 +35,7 @@ export async function postManualJournalAction(form: FormData) {
     let santriId: string | null = null
     let asramaScope = asramaScopes[index] || null
     if (studentNumbers[index]) {
-      const student = await queryOne<{ id: string; asrama: string | null }>(`SELECT id,asrama FROM santri WHERE nis=? AND status_global='aktif'`, [studentNumbers[index]])
+      const student = await queryOne<{ id: string; asrama: string | null }>(`SELECT id,asrama FROM santri WHERE nis=? AND status_global='aktif' ${andExcludeAsramaSql('asrama')}`, [studentNumbers[index]])
       if (!student) return { success: false as const, error: `Santri dengan NIS ${studentNumbers[index]} tidak ditemukan.` }
       if (asramaScope && student.asrama && asramaScope !== student.asrama) return { success: false as const, error: `Scope baris ${index + 1} tidak cocok dengan asrama santri.` }
       santriId = student.id

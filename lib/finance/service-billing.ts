@@ -10,6 +10,7 @@
 import { getFinanceDB as getDB, getDB as getMainDB, generateId, financeQuery, financeQueryOne } from '@/lib/db'
 import { getSppStudentBillingStart, isSppBillablePeriod, BULAN_SPP } from '@/lib/spp/tunggakan'
 import { BILLING_START_KEY, parseBillingStart } from './service-tariffs'
+import { andExcludeAsramaSql } from './asrama'
 
 export type MealServiceKind = 'MAKAN' | 'LAUNDRY'
 
@@ -71,7 +72,8 @@ export async function generateMonthlyServiceBillsCore(
   const vendorColumn = VENDOR_COLUMN[serviceKind]
   const santriList = (await db.prepare(
     `SELECT id, tanggal_masuk, created_at FROM santri
-     WHERE status_global = 'aktif' AND ${vendorColumn} IS NOT NULL`
+     WHERE status_global = 'aktif' AND ${vendorColumn} IS NOT NULL
+       ${andExcludeAsramaSql('asrama')}`
   ).all<{ id: string; tanggal_masuk: string | null; created_at: string | null }>()).results ?? []
 
   // Santri yang dibebaskan permanen (lib/finance/exemptions.ts, DB utama) —

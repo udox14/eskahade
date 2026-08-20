@@ -9,6 +9,7 @@ import { Clock, Money, Scan, SignOut, Wallet } from '@phosphor-icons/react'
 import { closeCashShift, identifyStudent, openCashShift, submitWithdrawal } from './actions'
 import type { CredentialKind } from '@/lib/finance/types'
 import { isQrToken, useKeyboardWedgeScanner } from '@/lib/finance/scanner-client'
+import { cashUnitScopeLabel } from '@/lib/finance/asrama'
 import { QrCameraScanner } from '@/components/finance/qr-camera-scanner'
 import { ConfirmAction, FinanceModal, FinanceTour, ResultBanner, useFinanceTour, type FinanceResult, type TourStep } from '../_components/finance-ui'
 
@@ -139,9 +140,9 @@ export function CashierClient({ units, shift: initialShift, operatorName, canCon
           <ResultBanner result={result} onDismiss={() => setResult(null)} />
           <label data-tour="unit" className="text-sm font-bold text-slate-700">Unit Kas
             <select value={selectedUnitId} onChange={event => selectUnit(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm">
-              {units.map(unit => <option key={unit.id} value={unit.id}>{unit.name}{unit.asrama_scope ? ` · ${unit.asrama_scope}` : ''}</option>)}
+              {units.map(unit => <option key={unit.id} value={unit.id}>{unit.name}{unit.asrama_scope ? ` · ${cashUnitScopeLabel(unit.asrama_scope)}` : ''}</option>)}
             </select>
-            <span className="mt-1 block text-xs font-normal text-slate-500">{selectedUnit?.asrama_scope ? `Hanya santri asrama ${selectedUnit.asrama_scope} yang dapat dilayani dari unit ini.` : 'Unit ini melayani seluruh santri tanpa batasan asrama.'}</span>
+            <span className="mt-1 block text-xs font-normal text-slate-500">{selectedUnit?.asrama_scope ? `Hanya santri dari ${cashUnitScopeLabel(selectedUnit.asrama_scope)} yang dapat dilayani dari unit ini.` : 'Unit ini melayani seluruh santri tanpa batasan asrama.'}</span>
           </label>
           <label data-tour="opening-cash" className="text-sm font-bold text-slate-700">Kas fisik awal
             <input value={openingCash} onChange={event => setOpeningCash(Number(event.target.value))} type="number" min={0} inputMode="numeric" className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-200 px-3 text-sm tabular-nums" />
@@ -181,7 +182,7 @@ export function CashierClient({ units, shift: initialShift, operatorName, canCon
     <section data-tour="shift-summary" className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 shadow-sm">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-700 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white">Shift aktif</span><strong>{shift.unit_name}</strong>{shift.asrama_scope ? <span className="text-xs text-slate-500">Scope {shift.asrama_scope}</span> : null}</div>
+          <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-700 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white">Shift aktif</span><strong>{shift.unit_name}</strong>{shift.asrama_scope ? <span className="text-xs text-slate-500">Scope {cashUnitScopeLabel(shift.asrama_scope)}</span> : null}</div>
           <p className="mt-1 text-xs text-slate-500">{operatorName} · Terminal {shift.terminal_id}</p>
         </div>
         <div className="grid grid-cols-3 gap-2 text-xs sm:min-w-[440px]">
