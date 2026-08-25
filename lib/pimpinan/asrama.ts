@@ -17,7 +17,6 @@ export type AsramaMonitoring = {
   perizinan: {
     total: number
     pulang: number
-    keluar: number
     aktif: number
     tepat: number
     telat: number
@@ -49,14 +48,12 @@ async function getPerizinan(period: MonthPeriod): Promise<AsramaMonitoring['peri
     const rows = await query<{
       total: number
       pulang: number
-      keluar: number
       aktif: number
       tepat: number
       telat: number
     }>(
       `SELECT COUNT(p.id) AS total,
               SUM(CASE WHEN p.jenis = 'PULANG' THEN 1 ELSE 0 END) AS pulang,
-              SUM(CASE WHEN p.jenis = 'KELUAR_KOMPLEK' THEN 1 ELSE 0 END) AS keluar,
               SUM(CASE WHEN p.status = 'AKTIF' THEN 1 ELSE 0 END) AS aktif,
               SUM(CASE WHEN p.status = 'KEMBALI' AND p.tgl_kembali_aktual <= p.tgl_selesai_rencana THEN 1 ELSE 0 END) AS tepat,
               SUM(CASE WHEN p.status = 'KEMBALI' AND p.tgl_kembali_aktual > p.tgl_selesai_rencana THEN 1 ELSE 0 END) AS telat
@@ -69,13 +66,12 @@ async function getPerizinan(period: MonthPeriod): Promise<AsramaMonitoring['peri
     return {
       total: safeNumber(row?.total),
       pulang: safeNumber(row?.pulang),
-      keluar: safeNumber(row?.keluar),
       aktif: safeNumber(row?.aktif),
       tepat: safeNumber(row?.tepat),
       telat: safeNumber(row?.telat),
     }
   } catch {
-    return { total: 0, pulang: 0, keluar: 0, aktif: 0, tepat: 0, telat: 0 }
+    return { total: 0, pulang: 0, aktif: 0, tepat: 0, telat: 0 }
   }
 }
 

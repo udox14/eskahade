@@ -40,7 +40,7 @@ export async function getSantriTelat(tanggalRef: string) {
         nis: item.nis,
         asrama: item.asrama || 'NON-ASRAMA',
         kamar: item.kamar || '-',
-        jenis: item.jenis === 'PULANG' ? 'IZIN PULANG' : 'KELUAR KOMPLEK',
+        jenis: 'IZIN PULANG',
         rencana_kembali: item.tgl_selesai_rencana,
         durasi_telat: telat,
       })

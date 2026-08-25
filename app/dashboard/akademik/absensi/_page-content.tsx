@@ -41,6 +41,30 @@ export default function AbsensiPage() {
   const [inputMode, setInputMode] = useState<InputMode>('table')
   const [mobileSearch, setMobileSearch] = useState('')
 
+  // Pecah value Kelas: "kelasId" biasa, atau "kelasId::L/P" untuk Mutawassithah putra/putri
+  const { kelasId, kelasGender } = useMemo(() => {
+    const parts = selectedKelas.split('::')
+    if (parts.length === 2 && (parts[1] === 'L' || parts[1] === 'P')) {
+      return { kelasId: parts[0], kelasGender: parts[1] as 'L' | 'P' }
+    }
+    return { kelasId: selectedKelas, kelasGender: '' }
+  }, [selectedKelas])
+
+  // Opsi dropdown Kelas: khusus marhalah Mutawassithah dipecah Putra (PA) & Putri (PI)
+  const kelasOptions = useMemo(() => {
+    const isMutawassithah = (marhalahId: unknown) =>
+      marhalahList.some(m => String(m.id) === String(marhalahId) && /mutawassithah/i.test(m.nama))
+    return kelasList
+      .filter(k => !selectedMarhalah || k.marhalah_id == selectedMarhalah)
+      .flatMap((k: { id: string; nama_kelas: string; marhalah_id: string }) => {
+        if (!isMutawassithah(k.marhalah_id)) return [{ id: k.id, label: k.nama_kelas }]
+        return [
+          { id: `${k.id}::L`, label: `${k.nama_kelas} (PA)` },
+          { id: `${k.id}::P`, label: `${k.nama_kelas} (PI)` },
+        ]
+      })
+  }, [kelasList, marhalahList, selectedMarhalah])
+
   // 1. Load Data Master
   useEffect(() => {
     getKelasList().then(setKelasList)
@@ -64,9 +88,10 @@ export default function AbsensiPage() {
     const loadToast = toast.loading("Memuat data absensi...")
 
     getAbsensiData(selectedDate, { 
-      kelasId: selectedKelas, 
+      kelasId: kelasId, 
       asrama: selectedAsrama, 
-      marhalahId: selectedMarhalah 
+      marhalahId: selectedMarhalah,
+      jenisKelamin: kelasGender || undefined
     }).then((data: any) => {
       setDataSantri(data.santri || [])
       
@@ -628,13 +653,15 @@ export default function AbsensiPage() {
                   onChange={handleClassChange}
                 >
                   <option value="">Semua Kelas</option>
-                  {kelasList
-                    .filter(k => !selectedMarhalah || k.marhalah_id == selectedMarhalah)
-                    .map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)
-                  }
+                  {kelasOptions.map(k => <option key={k.id} value={k.id}>{k.label}</option>)}
                 </select>
                 <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
+              {kelasGender && (
+                <p className="text-[10px] font-bold mt-1 text-green-600">
+                  Input {kelasGender === 'L' ? 'Putra (PA)' : 'Putri (PI)'} — data tersimpan di kelas yang sama.
+                </p>
+              )}
             </div>
 
             <div>

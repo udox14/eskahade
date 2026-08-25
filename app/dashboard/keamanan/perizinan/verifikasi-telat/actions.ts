@@ -60,7 +60,7 @@ export async function getAntrianTelat() {
       santri_id:     item.santri_id,
       nama:          item.nama_lengkap,
       info:          `${item.asrama || '-'} / ${item.kamar || '-'}`,
-      jenis:         item.jenis === 'PULANG' ? 'IZIN PULANG' : 'KELUAR KOMPLEK',
+      jenis:         'IZIN PULANG',
       sumber:        'perizinan' as const,
       alasan:        item.alasan,
       batas_kembali: item.tgl_selesai_rencana,

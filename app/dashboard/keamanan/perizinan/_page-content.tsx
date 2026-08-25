@@ -22,8 +22,6 @@ import {
   formatWibDate,
   formatWibDateTime,
   toWibDateInputValue,
-  toWibDateTimeLocalValue,
-  toWibTimeInputValue,
 } from '@/lib/date/wib'
 
 const LIST_PEMBERI_IZIN = [
@@ -37,13 +35,9 @@ const DEFAULT_LIST_ALASAN = [
   "MEMBUAT PERSYARATAN", "ORANGTUA MENINGGAL", "KELUARGA MENINGGAL"
 ]
 
-function formatIzinWaktu(jenis: string, value: string | null | undefined) {
+function formatIzinWaktu(value: string | null | undefined) {
   if (!value) return 'Belum Kembali'
-  return jenis === 'PULANG' ? formatWibDate(value) : formatWibDateTime(value)
-}
-
-function getDefaultReturnValue(jenis: 'PULANG' | 'KELUAR_KOMPLEK') {
-  return jenis === 'PULANG' ? toWibDateInputValue() : toWibDateTimeLocalValue()
+  return formatWibDate(value)
 }
 
 interface Props {
@@ -95,23 +89,18 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const [searchSantri, setSearchSantri] = useState('')
   const [hasilCari, setHasilCari] = useState<any[]>([])
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
-  const [jenisIzin, setJenisIzin] = useState<'PULANG' | 'KELUAR_KOMPLEK'>('KELUAR_KOMPLEK')
   const [alasanDropdown, setAlasanDropdown] = useState('SAKIT')
   const [deskripsiIzin, setDeskripsiIzin] = useState('')
   const [pemberiIzin, setPemberiIzin] = useState('')
   
   // Date states for forms
-  const [formDateSingle, setFormDateSingle] = useState('')
-  const [formTimeStart, setFormTimeStart] = useState('')
-  const [formTimeEnd, setFormTimeEnd] = useState('')
   const [formDateStart, setFormDateStart] = useState('')
   const [formDateEnd, setFormDateEnd] = useState('')
 
   // Modal Kembali
   const [isOpenReturn, setIsOpenReturn] = useState(false)
   const [selectedReturnId, setSelectedReturnId] = useState('')
-  const [selectedReturnJenis, setSelectedReturnJenis] = useState<'PULANG' | 'KELUAR_KOMPLEK'>('KELUAR_KOMPLEK')
-  const [waktuKembali, setWaktuKembali] = useState(getDefaultReturnValue('KELUAR_KOMPLEK'))
+  const [waktuKembali, setWaktuKembali] = useState(toWibDateInputValue())
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // Pengajuan asrama state (dewan_santri only)
@@ -206,13 +195,9 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   }
 
   const resetFormState = () => {
-    setJenisIzin(isAsrama ? 'PULANG' : 'KELUAR_KOMPLEK')
     setAlasanDropdown(alasanOptions[0] || 'SAKIT')
     setDeskripsiIzin('')
     setPemberiIzin('')
-    setFormDateSingle(toWibDateInputValue())
-    setFormTimeStart('')
-    setFormTimeEnd('')
     setFormDateStart('')
     setFormDateEnd('')
   }
@@ -229,7 +214,6 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
     resetFormState()
     setEditData(item)
     setSelectedSantri({ id: item.santri_id, nama_lengkap: item.nama, nis: item.nis, kelas: item.kelas, asrama: item.asrama, kamar: item.kamar })
-    setJenisIzin(item.jenis as 'PULANG' | 'KELUAR_KOMPLEK')
     
     // Parse Alasan
     const parsedAlasan = item.alasan || ''
@@ -252,14 +236,8 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
     // Parse Dates (Assuming +07:00 was saved, taking substring to fit input)
     // Tgl Mulai: 2023-12-12T08:00:00.000Z representing UTC, but we want local time.
     // If we create new Date(), it parses into browser local time.
-    if (item.jenis === 'PULANG') {
-      setFormDateStart(toWibDateInputValue(item.tgl_mulai))
-      setFormDateEnd(toWibDateInputValue(item.tgl_selesai_rencana))
-    } else {
-      setFormDateSingle(toWibDateInputValue(item.tgl_mulai))
-      setFormTimeStart(toWibTimeInputValue(item.tgl_mulai))
-      setFormTimeEnd(toWibTimeInputValue(item.tgl_selesai_rencana))
-    }
+    setFormDateStart(toWibDateInputValue(item.tgl_mulai))
+    setFormDateEnd(toWibDateInputValue(item.tgl_selesai_rencana))
 
     setIsOpenEdit(true)
   }
@@ -272,7 +250,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
     try {
       const formData = new FormData(e.currentTarget)
       if (!isOpenEdit && selectedSantri) formData.append('santri_id', selectedSantri.id)
-      formData.append('jenis', jenisIzin)
+      formData.append('jenis', 'PULANG')
       formData.append('alasan_dropdown', alasanDropdown)
 
       const res = isOpenEdit
@@ -324,8 +302,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
 
   const openReturnModal = (item: any) => {
     setSelectedReturnId(item.id)
-    setSelectedReturnJenis(item.jenis as 'PULANG' | 'KELUAR_KOMPLEK')
-    setWaktuKembali(getDefaultReturnValue(item.jenis as 'PULANG' | 'KELUAR_KOMPLEK'))
+    setWaktuKembali(toWibDateInputValue())
     setIsOpenReturn(true)
   }
 
@@ -368,13 +345,13 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
         "NIS": d.nis,
         "Asrama": d.asrama,
         "Kamar": d.kamar,
-        "Jenis Izin": d.jenis === 'PULANG' ? 'Izin Pulang' : 'Keluar Komplek',
+        "Jenis Izin": 'Izin Pulang',
         "Alasan / Keperluan": d.alasan,
         "Pemberi Izin": d.pemberi_izin,
         "Status Izin": d.status,
-        "Keberangkatan": formatIzinWaktu(d.jenis, d.tgl_mulai),
-        "Batas Rencana Kembali": formatIzinWaktu(d.jenis, d.tgl_selesai_rencana),
-        "Waktu Tiba Aktual": d.tgl_kembali_aktual ? formatIzinWaktu(d.jenis, d.tgl_kembali_aktual) : 'Belum Kembali'
+        "Keberangkatan": formatIzinWaktu(d.tgl_mulai),
+        "Batas Rencana Kembali": formatIzinWaktu(d.tgl_selesai_rencana),
+        "Waktu Tiba Aktual": d.tgl_kembali_aktual ? formatIzinWaktu(d.tgl_kembali_aktual) : 'Belum Kembali'
       }))
 
       const ws = XLSX.utils.json_to_sheet(remappedData)
@@ -510,55 +487,21 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
     <>
       <div>
         <label className="block text-[11px] font-bold text-slate-500 uppercase mb-2">Jenis & Waktu Izin</label>
-        {isAsrama ? (
-          <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 mb-3 flex items-center gap-3">
-            <Home className="w-5 h-5 text-purple-600 shrink-0" />
-            <span className="text-sm font-bold text-purple-700">IZIN PULANG</span>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <label className={`cursor-pointer p-3 rounded-xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 ${jenisIzin === 'KELUAR_KOMPLEK' ? 'bg-blue-50 text-blue-700 border-blue-500 shadow-sm' : 'bg-white text-slate-500 hover:bg-slate-50 border-slate-200'}`}>
-              <input type="radio" name="rad_jenis" className="hidden" checked={jenisIzin === 'KELUAR_KOMPLEK'} onChange={() => setJenisIzin('KELUAR_KOMPLEK')}/>
-              <MapPin className={`w-5 h-5 ${jenisIzin === 'KELUAR_KOMPLEK' ? 'text-blue-600' : 'text-slate-400'}`} />
-              <span className="text-xs font-bold">KELUAR KOMPLEK</span>
-            </label>
-            <label className={`cursor-pointer p-3 rounded-xl border-2 text-center transition-all flex flex-col items-center justify-center gap-1 ${jenisIzin === 'PULANG' ? 'bg-purple-50 text-purple-700 border-purple-500 shadow-sm' : 'bg-white text-slate-500 hover:bg-slate-50 border-slate-200'}`}>
-              <input type="radio" name="rad_jenis" className="hidden" checked={jenisIzin === 'PULANG'} onChange={() => setJenisIzin('PULANG')}/>
-              <Home className={`w-5 h-5 ${jenisIzin === 'PULANG' ? 'text-purple-600' : 'text-slate-400'}`} />
-              <span className="text-xs font-bold">IZIN PULANG</span>
-            </label>
-          </div>
-        )}
+        <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 mb-3 flex items-center gap-3">
+          <Home className="w-5 h-5 text-purple-600 shrink-0" />
+          <span className="text-sm font-bold text-purple-700">IZIN PULANG</span>
+        </div>
 
-        {jenisIzin === 'PULANG' ? (
-          <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Tanggal Pulang</span>
-              <input type="date" name="date_start" value={formDateStart} onChange={e => setFormDateStart(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-purple-500 font-medium"/>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Batas Kembali</span>
-              <input type="date" name="date_end" value={formDateEnd} onChange={e => setFormDateEnd(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-purple-500 font-medium"/>
-            </div>
+        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+          <div>
+            <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Tanggal Pulang</span>
+            <input type="date" name="date_start" value={formDateStart} onChange={e => setFormDateStart(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-purple-500 font-medium"/>
           </div>
-        ) : (
-          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-3">
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Tanggal Izin</span>
-              <input type="date" name="date_single" value={formDateSingle} onChange={e => setFormDateSingle(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-blue-500 font-medium"/>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Berangkat Pukul</span>
-                <input type="time" name="time_start" value={formTimeStart} onChange={e => setFormTimeStart(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-blue-500 font-medium"/>
-              </div>
-              <div>
-                <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Batas Kembali Pukul</span>
-                <input type="time" name="time_end" value={formTimeEnd} onChange={e => setFormTimeEnd(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-blue-500 font-medium"/>
-              </div>
-            </div>
+          <div>
+            <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Batas Kembali</span>
+            <input type="date" name="date_end" value={formDateEnd} onChange={e => setFormDateEnd(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-purple-500 font-medium"/>
           </div>
-        )}
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -669,8 +612,8 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                   <div className="bg-slate-50 rounded-xl p-3 text-xs text-slate-600 space-y-1 border border-slate-100">
                     <p className="italic text-slate-500">"{item.alasan}"</p>
                     <div className="flex gap-4 pt-1 border-t border-slate-100">
-                      <span><span className="text-[10px] font-bold text-slate-400 block">Berangkat</span>{formatIzinWaktu(item.jenis, item.tgl_mulai)}</span>
-                      <span><span className="text-[10px] font-bold text-slate-400 block">Batas Kembali</span>{formatIzinWaktu(item.jenis, item.tgl_selesai_rencana)}</span>
+                      <span><span className="text-[10px] font-bold text-slate-400 block">Berangkat</span>{formatIzinWaktu(item.tgl_mulai)}</span>
+                      <span><span className="text-[10px] font-bold text-slate-400 block">Batas Kembali</span>{formatIzinWaktu(item.tgl_selesai_rencana)}</span>
                     </div>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-2">
@@ -769,7 +712,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
         </button>
         <DashboardPageHeader
           title="Perizinan Santri"
-          description="Monitoring santri keluar, masuk komplek, dan pulang."
+          description="Monitoring izin pulang santri."
           className="flex-1"
         />
       </div>
@@ -912,9 +855,9 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                       const tglMulai = new Date(item.tgl_mulai)
                       const tglRencana = new Date(item.tgl_selesai_rencana)
                       const isTelat = item.tgl_kembali_aktual ? new Date(item.tgl_kembali_aktual) > tglRencana : (item.status === 'AKTIF' && new Date() > tglRencana)
-                      const waktuMulai = formatIzinWaktu(item.jenis, item.tgl_mulai)
-                      const waktuRencana = formatIzinWaktu(item.jenis, item.tgl_selesai_rencana)
-                      const waktuAktual = item.tgl_kembali_aktual ? formatIzinWaktu(item.jenis, item.tgl_kembali_aktual) : null
+                      const waktuMulai = formatIzinWaktu(item.tgl_mulai)
+                      const waktuRencana = formatIzinWaktu(item.tgl_selesai_rencana)
+                      const waktuAktual = item.tgl_kembali_aktual ? formatIzinWaktu(item.tgl_kembali_aktual) : null
                       
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
@@ -924,11 +867,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                           </td>
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-1.5 mb-1">
-                              {item.jenis === 'PULANG' ? (
-                                <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded flex items-center gap-1 border border-purple-100"><Home className="w-3 h-3"/> Pulang</span>
-                              ) : (
-                                <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded flex items-center gap-1 border border-blue-100"><MapPin className="w-3 h-3"/> Keluar</span>
-                              )}
+                              <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded flex items-center gap-1 border border-purple-100"><Home className="w-3 h-3"/> Pulang</span>
                               <span className="text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded truncate max-w-[120px]" title={item.pemberi_izin}>{item.pemberi_izin}</span>
                             </div>
                             <p className="text-xs text-slate-600 line-clamp-1 italic max-w-xs leading-tight" title={item.alasan}>"{item.alasan}"</p>
@@ -989,9 +928,9 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                   const tglMulai = new Date(item.tgl_mulai)
                   const tglRencana = new Date(item.tgl_selesai_rencana)
                   const isTelat = item.tgl_kembali_aktual ? new Date(item.tgl_kembali_aktual) > tglRencana : (item.status === 'AKTIF' && new Date() > tglRencana)
-                  const waktuMulai = formatIzinWaktu(item.jenis, item.tgl_mulai)
-                  const waktuRencana = formatIzinWaktu(item.jenis, item.tgl_selesai_rencana)
-                  const waktuAktual = item.tgl_kembali_aktual ? formatIzinWaktu(item.jenis, item.tgl_kembali_aktual) : null
+                  const waktuMulai = formatIzinWaktu(item.tgl_mulai)
+                  const waktuRencana = formatIzinWaktu(item.tgl_selesai_rencana)
+                  const waktuAktual = item.tgl_kembali_aktual ? formatIzinWaktu(item.tgl_kembali_aktual) : null
 
                   return (
                     <div key={item.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative">
@@ -1022,9 +961,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                         </div>
 
                         <div className="flex items-center gap-1.5">
-                          {item.jenis === 'PULANG' 
-                            ? <span className="bg-purple-50 border border-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-bold"><Home className="w-3 h-3 inline mr-1"/>PULANG</span>
-                            : <span className="bg-blue-50 border border-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-bold"><MapPin className="w-3 h-3 inline mr-1"/>KELUAR</span>}
+                          <span className="bg-purple-50 border border-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-bold"><Home className="w-3 h-3 inline mr-1"/>PULANG</span>
                           <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">Via {item.pemberi_izin}</span>
                         </div>
 
@@ -1075,7 +1012,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
           <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-600"/> Dasbor Analisis Perizinan</h2>
-              <p className="text-xs text-slate-500 mt-1">Laporan tren izin keluar berdasarkan filter di bawah ini.</p>
+              <p className="text-xs text-slate-500 mt-1">Laporan tren izin pulang berdasarkan filter di bawah ini.</p>
             </div>
             <div className="w-full md:w-auto flex flex-wrap gap-2">
                <input type="date" value={tglAwal} onChange={e => {setTglAwal(e.target.value);}} className="flex-1 min-w-[120px] border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-xs text-slate-700" title="Awal Periode"/>
@@ -1106,10 +1043,6 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                     <div>
                       <div className="flex justify-between text-xs font-bold mb-1.5"><span className="text-slate-300 flex items-center gap-1.5"><Home className="w-3.5 h-3.5"/> Izin Pulang</span><span className="text-white">{analitikData.pulang}</span></div>
                       <div className="h-1.5 w-full bg-slate-700/50 rounded-full overflow-hidden"><div className="h-full bg-purple-400 rounded-full" style={{ width: `${(analitikData.pulang/analitikData.total)*100}%`}}></div></div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-xs font-bold mb-1.5"><span className="text-slate-300 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5"/> Keluar Komplek</span><span className="text-white">{analitikData.keluar}</span></div>
-                      <div className="h-1.5 w-full bg-slate-700/50 rounded-full overflow-hidden"><div className="h-full bg-blue-400 rounded-full" style={{ width: `${(analitikData.keluar/analitikData.total)*100}%`}}></div></div>
                     </div>
                   </div>
                 )}
@@ -1145,7 +1078,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
                   <div>
                     <p className="font-bold text-blue-900 text-sm">Santri Sedang Izin</p>
-                    <p className="text-[10px] text-blue-700 font-medium mt-0.5">Belum melapor tiba di komplek.</p>
+                    <p className="text-[10px] text-blue-700 font-medium mt-0.5">Belum melapor tiba di pondok.</p>
                   </div>
                   <div className="bg-white border border-blue-200 px-4 py-2 rounded-xl text-2xl font-black text-blue-600 shadow-sm">{analitikData.aktif}</div>
                 </div>
@@ -1258,7 +1191,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                 </h3>
                 {!isOpenEdit && (
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {isAsrama ? 'Pengajuan akan diteruskan ke dewan santri untuk disetujui.' : 'Berikan akses keluar/pulang untuk santri.'}
+                    {isAsrama ? 'Pengajuan akan diteruskan ke dewan santri untuk disetujui.' : 'Berikan izin pulang untuk santri.'}
                   </p>
                 )}
               </div>
@@ -1369,8 +1302,8 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                         <p><span className="font-bold text-slate-400 uppercase tracking-wide">Keperluan:</span> {item.alasan}</p>
                         <p><span className="font-bold text-slate-400 uppercase tracking-wide">Pemberi Izin:</span> {item.pemberi_izin}</p>
                         <div className="flex gap-4 pt-1 border-t border-slate-200">
-                          <p><span className="font-bold text-slate-400 block">Berangkat</span>{formatIzinWaktu(item.jenis, item.tgl_mulai)}</p>
-                          <p><span className="font-bold text-slate-400 block">Batas Kembali</span>{formatIzinWaktu(item.jenis, item.tgl_selesai_rencana)}</p>
+                          <p><span className="font-bold text-slate-400 block">Berangkat</span>{formatIzinWaktu(item.tgl_mulai)}</p>
+                          <p><span className="font-bold text-slate-400 block">Batas Kembali</span>{formatIzinWaktu(item.tgl_selesai_rencana)}</p>
                         </div>
                         {item.submitted_by_name && (
                           <p className="text-slate-400 pt-1 border-t border-slate-200">
@@ -1432,16 +1365,14 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
             
             <div className="p-6">
               <label className="text-[11px] font-bold text-slate-500 uppercase mb-2 block text-center">
-                {selectedReturnJenis === 'PULANG' ? 'Tanggal Tiba Aktual' : 'Waktu Aktual Tiba'}
+                Tanggal Tiba Aktual
               </label>
               <input 
-                type={selectedReturnJenis === 'PULANG' ? 'date' : 'datetime-local'}
+                type="date"
                 value={waktuKembali}
                 onChange={(e) => setWaktuKembali(e.target.value)}
                 className="w-full p-3 border-2 border-slate-200 focus:border-emerald-500 rounded-xl text-center font-bold text-slate-800 mb-6 outline-none transition-colors"
-                title={selectedReturnJenis === 'PULANG'
-                  ? 'Tanggal kedatangan dibaca dengan timezone WIB'
-                  : 'Waktu kepulangan dibaca dengan timezone WIB'}
+                title="Tanggal kedatangan dibaca dengan timezone WIB"
               />
               <p className="text-[11px] text-slate-400 text-center -mt-3 mb-6">Semua waktu diproses dalam WIB.</p>
 

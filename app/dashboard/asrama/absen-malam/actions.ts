@@ -76,7 +76,8 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
   try {
     izinList = await query<any>(
       `SELECT p.id, p.santri_id, p.jenis, p.alasan, p.tgl_selesai_rencana FROM perizinan p
-       WHERE p.tgl_mulai <= ?
+       WHERE p.jenis = 'PULANG'
+         AND p.tgl_mulai <= ?
          AND (p.tgl_kembali_aktual IS NULL OR p.tgl_kembali_aktual > ?)
          AND p.santri_id IN (${ph})`,
       [tanggalWindow.end, tanggalWindow.end, ...ids]
@@ -215,7 +216,8 @@ export async function batchSaveAbsenMalam(
     ? new Set((await query<{ santri_id: string }>(
         `SELECT DISTINCT santri_id
          FROM perizinan
-         WHERE tgl_mulai <= ?
+         WHERE jenis = 'PULANG'
+           AND tgl_mulai <= ?
            AND (tgl_kembali_aktual IS NULL OR tgl_kembali_aktual > ?)
            AND santri_id IN (${santriIds.map(() => '?').join(',')})`,
         [tanggalWindow.end, tanggalWindow.end, ...santriIds]

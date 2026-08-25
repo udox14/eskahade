@@ -316,7 +316,7 @@ export function SantriProfileView({
                           <span className="text-xs text-gray-500">{safeFormat(p.created_at, 'dd MMM yyyy')}</span>
                        </div>
                        <p className="font-medium text-gray-800 text-sm mb-1">{p.alasan}</p>
-                       <p className="text-xs text-gray-500 flex items-center gap-1"><MapPin className="w-3 h-3"/> {p.jenis}</p>
+                       <p className="text-xs text-gray-500 flex items-center gap-1"><Home className="w-3 h-3"/> {p.jenis === 'PULANG' ? 'IZIN PULANG' : 'IZIN'}</p>
                     </div>
                  ))}
               </div>

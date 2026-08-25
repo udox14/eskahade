@@ -38,7 +38,7 @@ function getWeekRange(date: Date) {
   return { start, end }
 }
 
-export async function getAbsensiData(tanggalRef: string, filters: { kelasId?: string, asrama?: string, marhalahId?: string }) {
+export async function getAbsensiData(tanggalRef: string, filters: { kelasId?: string, asrama?: string, marhalahId?: string, jenisKelamin?: string }) {
   await ensureLiburPengajianTable()
   const { start, end } = getWeekRange(new Date(tanggalRef))
   const startStr = start.toISOString().split('T')[0]
@@ -58,6 +58,10 @@ export async function getAbsensiData(tanggalRef: string, filters: { kelasId?: st
   if (filters.marhalahId) {
     whereClauses.push("k.marhalah_id = ?")
     params.push(filters.marhalahId)
+  }
+  if (filters.jenisKelamin) {
+    whereClauses.push("s.jenis_kelamin = ?")
+    params.push(filters.jenisKelamin)
   }
 
   const whereSql = whereClauses.join(" AND ")

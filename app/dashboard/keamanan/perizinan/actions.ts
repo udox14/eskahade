@@ -4,7 +4,7 @@ import { query, queryOne, execute, generateId } from '@/lib/db'
 import { assertFeature } from '@/lib/auth/feature'
 import { getSession, hasAnyRole } from '@/lib/auth/session'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
-import { parseWibDate, parseWibDateTime } from '@/lib/date/wib'
+import { parseWibDate } from '@/lib/date/wib'
 import { revalidatePath } from 'next/cache'
 
 const DEFAULT_PAGE_SIZE = 10
@@ -32,34 +32,19 @@ function buildIzinPayload(formData: FormData): {
   const pemberi_izin = String(formData.get('pemberi_izin') ?? '').trim()
 
   if (!jenis) return { error: 'Jenis izin wajib dipilih.' }
+  if (jenis !== 'PULANG') return { error: 'Jenis izin tidak dikenali.' }
   if (!alasan_dropdown) return { error: 'Keperluan dasar wajib dipilih.' }
   if (!pemberi_izin) return { error: 'Pemberi izin wajib dipilih.' }
 
   const alasan_final = deskripsi ? `${alasan_dropdown} - ${deskripsi}` : alasan_dropdown
 
-  let mulai: Date
-  let selesai: Date
+  const dStart = String(formData.get('date_start') ?? '').trim()
+  const dEnd = String(formData.get('date_end') ?? '').trim()
 
-  if (jenis === 'PULANG') {
-    const dStart = String(formData.get('date_start') ?? '').trim()
-    const dEnd = String(formData.get('date_end') ?? '').trim()
+  if (!dStart || !dEnd) return { error: 'Tanggal pulang dan batas kembali wajib diisi.' }
 
-    if (!dStart || !dEnd) return { error: 'Tanggal pulang dan batas kembali wajib diisi.' }
-
-    mulai = parseWibDate(dStart, 'start')
-    selesai = parseWibDate(dEnd, 'end')
-  } else if (jenis === 'KELUAR_KOMPLEK') {
-    const date = String(formData.get('date_single') ?? '').trim()
-    const tStart = String(formData.get('time_start') ?? '').trim()
-    const tEnd = String(formData.get('time_end') ?? '').trim()
-
-    if (!date || !tStart || !tEnd) return { error: 'Tanggal dan jam izin wajib diisi lengkap.' }
-
-    mulai = new Date(`${date}T${tStart}:00+07:00`)
-    selesai = new Date(`${date}T${tEnd}:00+07:00`)
-  } else {
-    return { error: 'Jenis izin tidak dikenali.' }
-  }
+  const mulai = parseWibDate(dStart, 'start')
+  const selesai = parseWibDate(dEnd, 'end')
 
   if (!isValidDateValue(mulai) || !isValidDateValue(selesai)) {
     return { error: 'Format tanggal atau jam izin tidak valid.' }
@@ -289,7 +274,6 @@ export async function getAnalitikIzin(params: {
     SELECT 
       COUNT(p.id) as total_izin,
       SUM(CASE WHEN p.jenis = 'PULANG' THEN 1 ELSE 0 END) as izin_pulang,
-      SUM(CASE WHEN p.jenis = 'KELUAR_KOMPLEK' THEN 1 ELSE 0 END) as izin_keluar,
       SUM(CASE WHEN p.status = 'AKTIF' THEN 1 ELSE 0 END) as belum_kembali,
       SUM(CASE WHEN p.status = 'KEMBALI' AND p.tgl_kembali_aktual <= p.tgl_selesai_rencana THEN 1 ELSE 0 END) as tepat_waktu,
       SUM(CASE WHEN p.status = 'KEMBALI' AND p.tgl_kembali_aktual > p.tgl_selesai_rencana THEN 1 ELSE 0 END) as terlambat_kembali
@@ -301,7 +285,6 @@ export async function getAnalitikIzin(params: {
   return {
     total: statsRow?.total_izin || 0,
     pulang: statsRow?.izin_pulang || 0,
-    keluar: statsRow?.izin_keluar || 0,
     aktif: statsRow?.belum_kembali || 0,
     tepat: statsRow?.tepat_waktu || 0,
     telat: statsRow?.terlambat_kembali || 0,
@@ -438,9 +421,7 @@ export async function setSudahDatang(id: string, waktuDatang: string): Promise<{
   )
   if (!izin) return { error: 'Data izin tidak ditemukan.' }
 
-  const aktual = izin.jenis === 'PULANG'
-    ? parseWibDate(waktuDatang, 'start')
-    : parseWibDateTime(waktuDatang)
+  const aktual = parseWibDate(waktuDatang, 'start')
   if (!isValidDateValue(aktual)) return { error: 'Waktu datang tidak valid.' }
 
   const rencana = new Date(izin.tgl_selesai_rencana)

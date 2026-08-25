@@ -80,10 +80,9 @@ export default async function PimpinanAsramaPage({
         </SectionCard>
 
         <div className="grid gap-5 lg:grid-cols-2">
-          <SectionCard title="Perizinan" subtitle="Rekap izin pulang dan keluar komplek.">
-            <div className="grid grid-cols-2 gap-3">
+          <SectionCard title="Perizinan" subtitle="Rekap izin pulang santri.">
+            <div className="grid grid-cols-3 gap-3">
               <KpiCard label="Izin Pulang" value={data.perizinan.pulang} />
-              <KpiCard label="Izin Keluar" value={data.perizinan.keluar} />
               <KpiCard label="Tepat Waktu" value={data.perizinan.tepat} tone="good" />
               <KpiCard label="Telat Kembali" value={data.perizinan.telat} tone={data.perizinan.telat > 0 ? 'bad' : 'good'} />
             </div>
