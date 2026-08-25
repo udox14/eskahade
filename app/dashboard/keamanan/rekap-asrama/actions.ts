@@ -57,6 +57,139 @@ export async function getRekapAbsenMalam(asrama: string, bulan: string, tanggal?
   return { santriList: Object.values(santriMap), alfaPerSantri, detailPerSantri }
 }
 
+export type InputDay = {
+  ada: boolean
+  viaLog: boolean
+  viaRecord: boolean
+  petugas: string[]
+  kamarDisimpan: string[]
+  sesiSimpan: number
+  alfa: number
+}
+
+type InputDayAcc = {
+  ada: boolean
+  viaLog: boolean
+  viaRecord: boolean
+  petugas: string[]
+  kamarDisimpan: string[]
+  sesiSimpan: number
+  alfaLog: number
+  alfaRecord: number
+}
+
+type AbsenMalamLogRow = {
+  tanggal: string
+  actor_name: string | null
+  details_json: string | null
+}
+
+type AbsenMalamRecordRow = {
+  tanggal: string
+  total_record: number | null
+  total_alfa: number | null
+}
+
+// Kontrol Input Absen Malam: per tanggal — apakah ada pengabsenan (tombol SIMPAN / record alfa) atau tidak.
+// Dibaca dari: 1) log aktivitas penyimpanan absen malam (bukti simpan per kamar), 2) record absen_malam_v2 (alfa/keterangan).
+export async function getRekapInputAbsenMalam(asrama: string, bulan: string) {
+  if (isAsramaTanpaKamar(asrama)) return { tanggalData: {} as Record<string, InputDay> }
+
+  const [tahun, bln] = bulan.split('-')
+  const startDate = `${tahun}-${bln}-01`
+  const endDate = `${tahun}-${bln}-31`
+
+  // 1) Bukti log: peristiwa penyimpanan absen malam (satu log per kamar yang disimpan)
+  let logs: AbsenMalamLogRow[] = []
+  try {
+    logs = await query<AbsenMalamLogRow>(`
+      SELECT al.entity_id AS tanggal, al.actor_name, al.details_json
+      FROM activity_log al
+      WHERE al.module = 'asrama_absen_malam'
+        AND al.entity_type = 'absen_malam_batch'
+        AND al.status = 'success'
+        AND al.entity_id >= ?
+        AND al.entity_id <= ?
+      ORDER BY al.created_at ASC
+    `, [startDate, endDate])
+  } catch {
+    // Tabel activity_log tidak tersedia (DB lama) → lewati, tetap pakai bukti record.
+  }
+
+  // 2) Bukti record: data alfa/keterangan yang tersimpan pada tanggal tsb.
+  const records = await query<AbsenMalamRecordRow>(`
+    SELECT a.tanggal,
+           COUNT(*) AS total_record,
+           SUM(CASE WHEN a.status = 'ALFA' THEN 1 ELSE 0 END) AS total_alfa
+    FROM absen_malam_v2 a
+    JOIN santri s ON a.santri_id = s.id
+    WHERE a.tanggal >= ? AND a.tanggal <= ?
+      AND s.asrama = ? AND s.status_global = 'aktif'
+    GROUP BY a.tanggal
+  `, [startDate, endDate, asrama])
+
+  const hari: Record<string, InputDayAcc> = {}
+
+  const getHari = (tanggal: string) => {
+    if (!hari[tanggal]) {
+      hari[tanggal] = {
+        ada: false, viaLog: false, viaRecord: false,
+        petugas: [], kamarDisimpan: [], sesiSimpan: 0,
+        alfaLog: 0, alfaRecord: 0,
+      }
+    }
+    return hari[tanggal]
+  }
+
+  logs.forEach((log) => {
+    let details: Record<string, unknown> | null = null
+    try {
+      const parsed: unknown = JSON.parse(log.details_json || 'null')
+      details = (typeof parsed === 'object' && parsed !== null) ? (parsed as Record<string, unknown>) : null
+    } catch {}
+    const rawScope = details?.scope
+    const scope: Record<string, unknown>[] = Array.isArray(rawScope) ? rawScope as Record<string, unknown>[] : []
+    // Log harus jelas milik asrama ini (semua simpanan dibatasi per kamar asrama).
+    if (!scope.some(x => x?.asrama === asrama)) return
+
+    const day = getHari(log.tanggal)
+    day.ada = true
+    day.viaLog = true
+    day.sesiSimpan += 1
+    if (log.actor_name && !day.petugas.includes(log.actor_name)) {
+      day.petugas.push(log.actor_name)
+    }
+    scope.forEach(x => {
+      if (x?.kamar && !day.kamarDisimpan.includes(String(x.kamar))) {
+        day.kamarDisimpan.push(String(x.kamar))
+      }
+    })
+    day.alfaLog += Number(details?.alfa_count ?? 0)
+  })
+
+  records.forEach((rec) => {
+    const day = getHari(rec.tanggal)
+    day.ada = true
+    day.viaRecord = true
+    day.alfaRecord += Number(rec.total_alfa || 0)
+  })
+
+  const result: Record<string, InputDay> = {}
+  Object.entries(hari).forEach(([tanggal, day]) => {
+    result[tanggal] = {
+      ada: day.ada,
+      viaLog: day.viaLog,
+      viaRecord: day.viaRecord,
+      petugas: day.petugas,
+      kamarDisimpan: day.kamarDisimpan,
+      sesiSimpan: day.sesiSimpan,
+      alfa: day.viaRecord ? day.alfaRecord : day.alfaLog,
+    }
+  })
+
+  return { tanggalData: result }
+}
+
 // Riwayat ALFA absen malam: semua bulan, supaya histori lama tetap mudah dicek.
 export async function getRiwayatAlfaAbsenMalam(asrama: string) {
   if (isAsramaTanpaKamar(asrama)) return []

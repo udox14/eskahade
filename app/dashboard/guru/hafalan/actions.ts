@@ -243,9 +243,10 @@ export async function simpanHafalanProgressBatch(payload: {
   const changes = Array.from(requestedChanges.entries()).map(([blokId, change]) => ({ blokId, ...change }))
   const guruId = await getGuruIdForSession(session)
 
-  // Validasi urutan hafalan (berlaku untuk semua jenis): sebuah blok hanya
-  // boleh ditandai hafal bila semua blok sebelumnya dalam bab yang sama
-  // (urutannya lebih kecil) sudah punya progres. Uncheck selalu diizinkan.
+  // Validasi urutan hafalan (kecuali hadits: input bebas, boleh hafalkan
+  // bagian mana pun dulu): sebuah blok hanya boleh ditandai hafal bila semua
+  // blok sebelumnya dalam bab yang sama (urutannya lebih kecil) sudah punya
+  // progres. Uncheck selalu diizinkan.
   // D1 batasi maksimal 100 bound param/query, jadi IN (...) dipecah per chunk.
   const SQL_VAR_CHUNK = 90
   const orderRows: { id: number; bab_id: number; urutan: number }[] = []
@@ -288,6 +289,7 @@ export async function simpanHafalanProgressBatch(payload: {
   const skippedBlokIds: number[] = []
   const applied = changes.filter(change => {
     if (!change.checked) return true
+    if (payload.jenis === 'hadits') return true
     if (prefixReadyByBlok.get(change.blokId) !== false) return true
     skippedBlokIds.push(change.blokId)
     return false

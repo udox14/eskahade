@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ArrowLeft, ArrowUp, BookOpenCheck, Check, ChevronRight, Languages, Loader2, Lock,
+  ArrowDown, ArrowLeft, ArrowUp, BookOpenCheck, Check, ChevronRight, Languages, Loader2,
   RotateCcw, Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -69,6 +69,7 @@ export default function HafalanPageContent() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+  const [atScrollTop, setAtScrollTop] = useState(true)
 
   // ── Undo & Range Selection state/refs ──
   const [showUndo, setShowUndo] = useState(false)
@@ -285,6 +286,19 @@ export default function HafalanPageContent() {
   }, [selectedSantriId])
 
   useEffect(() => {
+    const mainEl = document.querySelector('main') as HTMLElement | null
+    if (!mainEl) return
+    const update = () => setAtScrollTop(mainEl.scrollTop < 120)
+    update()
+    mainEl.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => {
+      mainEl.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [])
+
+  useEffect(() => {
     setQuranTargetAyat('')
     if (quranTargetTimerRef.current) {
       clearTimeout(quranTargetTimerRef.current)
@@ -304,6 +318,7 @@ export default function HafalanPageContent() {
   const selectedBab = useMemo(() => data.bab.find((i: any) => i.id === selectedBabId), [data.bab, selectedBabId])
   const isQuran = selectedType?.key === 'quran'
   const isJurumiyah = selectedType?.key === 'jurumiyah'
+  const isHadits = selectedType?.key === 'hadits'
 
   const wordsOf = (blok: any): string[] => String(blok?.teks?.arab || '').split(/\s+/).filter(Boolean)
   const lockedWords = (blokId: number): Set<number> => new Set(data.progressHighlightLocked?.[`${selectedSantriId}:${blokId}`] || [])
@@ -312,7 +327,9 @@ export default function HafalanPageContent() {
 
   // Aturan hafalan berurutan: blok hanya boleh ditandai jika semua blok
   // sebelumnya dalam bab yang sama sudah ditandai. Uncheck selalu bebas.
+  // Hadits dikecualikan: input bebas, boleh hafalkan bagian mana pun dulu.
   const firstUncheckedBefore = (bab: any, blok: any, checkedSet = localCheckedRef.current): any | null => {
+    if (isHadits) return null
     const list = orderedBabBloks(bab.blok)
     const idx = list.findIndex(b => b.id === blok.id)
     if (idx <= 0) return null
@@ -868,7 +885,7 @@ export default function HafalanPageContent() {
         startIdx = Math.min(lastIdx, targetIdx)
         endIdx = Math.max(lastIdx, targetIdx)
       }
-    } else if (targetVal) {
+    } else if (targetVal && !isHadits) {
       const firstUncheckedIdx = ordered.findIndex(b => canEditBlok(b) && !localCheckedRef.current.has(b.id))
       if (firstUncheckedIdx !== -1 && firstUncheckedIdx < targetIdx) {
         startIdx = firstUncheckedIdx
@@ -1078,6 +1095,22 @@ export default function HafalanPageContent() {
       : !selectedSantriId ? 'santri'
         : !selectedBabId ? 'bab'
           : 'blok'
+
+  const lastMemorizedBlokId = useMemo(() => {
+    if (step !== 'blok' || !selectedBab) return null
+    const ordered = orderedBabBloks(selectedBab.blok)
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      if (localChecked.has(ordered[i].id)) return ordered[i].id
+    }
+    return null
+  }, [step, selectedBab, localChecked])
+
+  const scrollToLastMemorized = () => {
+    if (lastMemorizedBlokId == null) return
+    const el = document.querySelector(`[data-blok-id="${lastMemorizedBlokId}"]`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
 
   const selectBab = (babId: number) => {
     setSelectedBabId(babId)
@@ -1344,7 +1377,7 @@ export default function HafalanPageContent() {
       {step === 'blok' && selectedBab && (
         <div className="space-y-3">
           {isQuran && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
+            <div className="sticky top-2 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/95 px-4 py-3 shadow-sm backdrop-blur">
               <div className="min-w-0">
                 <p className="text-sm font-bold text-emerald-900">Input sampai ayat</p>
                 <p className="mt-0.5 text-xs font-semibold text-emerald-700">
@@ -1390,9 +1423,11 @@ export default function HafalanPageContent() {
           <p className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500">
             {isQuran
               ? 'Tap ayat untuk menandai hafal. Perubahan disimpan otomatis setelah 1 detik. Hafalan harus berurutan — ayat 1 dulu, baru ayat berikutnya.'
-              : dragMode
-                ? 'Mode Blok aktif: geser jari untuk menandai beberapa bagian sekaligus (scroll dimatikan sementara).'
-                : 'Tap bagian untuk menandai hafal. Perubahan disimpan otomatis setelah 1 detik. Hafalan harus berurutan — bagian 1 dulu, baru bagian berikutnya.'}
+              : isHadits
+                ? 'Tap bagian untuk menandai hafal. Perubahan disimpan otomatis setelah 1 detik. Urutan bebas — boleh hafalkan bagian mana pun, tidak harus berurutan.'
+                : dragMode
+                  ? 'Mode Blok aktif: geser jari untuk menandai beberapa bagian sekaligus (scroll dimatikan sementara).'
+                  : 'Tap bagian untuk menandai hafal. Perubahan disimpan otomatis setelah 1 detik. Hafalan harus berurutan — bagian 1 dulu, baru bagian berikutnya.'}
           </p>
 
           {isJurumiyah && selectedBab.blok[0] ? (
@@ -1450,7 +1485,7 @@ export default function HafalanPageContent() {
                     : checked ? 'border-emerald-500 bg-emerald-50'
                     : 'cursor-pointer border-slate-200 bg-white hover:border-emerald-300'}`}>
                   <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-black ${checked ? 'bg-emerald-600 text-white' : readonly ? 'bg-sky-200 text-sky-700' : blocked ? 'bg-slate-200 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                    {checked ? <Check className="h-5 w-5" /> : blocked ? <Lock className="h-4 w-4" /> : num}
+                    {checked ? <Check className="h-5 w-5" /> : num}
                   </div>
                   <div className="min-w-0 flex-1">
                     {blok.teks?.arab ? (
@@ -1473,7 +1508,7 @@ export default function HafalanPageContent() {
         </div>
       )}
 
-      {step !== 'home' && (
+      {step !== 'home' && !atScrollTop && (
         <button
           type="button"
           onClick={scrollMainToTop}
@@ -1482,6 +1517,17 @@ export default function HafalanPageContent() {
           className="fixed bottom-32 right-4 z-40 inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg transition hover:border-emerald-300 hover:text-emerald-700 sm:bottom-20 sm:right-6"
         >
           <ArrowUp className="h-5 w-5" />
+        </button>
+      )}
+      {step === 'blok' && atScrollTop && lastMemorizedBlokId != null && (
+        <button
+          type="button"
+          onClick={scrollToLastMemorized}
+          aria-label="Scroll ke bagian terakhir yang dihafal"
+          title="Scroll ke bagian terakhir yang dihafal"
+          className="fixed bottom-32 right-4 z-40 inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-lg transition hover:border-emerald-300 hover:text-emerald-700 sm:bottom-20 sm:right-6"
+        >
+          <ArrowDown className="h-5 w-5" />
         </button>
       )}
 

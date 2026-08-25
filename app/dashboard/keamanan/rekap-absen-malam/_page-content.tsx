@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { getSessionRekap, getRekapAbsenMalam, getKamarList, getRiwayatAlfaAbsenMalam, deleteAbsenMalamRecord } from '../rekap-asrama/actions'
-import { CalendarDays, History, Moon, Home, Loader2, ChevronLeft, ChevronRight, Search, X, FileSpreadsheet, Clock } from 'lucide-react'
+import { getSessionRekap, getRekapAbsenMalam, getKamarList, getRiwayatAlfaAbsenMalam, getRekapInputAbsenMalam, deleteAbsenMalamRecord } from '../rekap-asrama/actions'
+import { CalendarDays, History, Moon, Home, Loader2, ChevronLeft, ChevronRight, Search, X, FileSpreadsheet, Clock, CalendarCheck, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ROOM_REQUIRED_ASRAMA_LIST, isAsramaTanpaKamar } from '@/lib/asrama'
 import { toast } from 'sonner'
@@ -21,6 +21,12 @@ function formatBulan(bulan: string) {
 function formatTanggal(tanggal: string) {
   return new Date(`${tanggal}T00:00:00`).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
 }
+function hariNama(tanggal: string) {
+  return new Date(`${tanggal}T00:00:00`).toLocaleDateString('id-ID', { weekday: 'long' })
+}
+function todayWibStr() {
+  return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10)
+}
 function prevBulan(b: string) {
   const [y, m] = b.split('-').map(Number)
   return new Date(y, m - 2).toISOString().slice(0, 7)
@@ -37,7 +43,7 @@ export default function RekapAbsenMalamPage() {
   const [tanggal, setTanggal] = useState('')
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
-  const [activeTab, setActiveTab] = useState<'bulan' | 'riwayat'>('bulan')
+  const [activeTab, setActiveTab] = useState<'bulan' | 'riwayat' | 'input'>('bulan')
   const [filterKamar, setFilterKamar] = useState('Semua')
   const [searchQuery, setSearchQuery] = useState('')
   const [availableKamars, setAvailableKamars] = useState<string[]>([])
@@ -47,6 +53,7 @@ export default function RekapAbsenMalamPage() {
   const [malamAlfa, setMalamAlfa] = useState<Record<string, number>>({})
   const [malamDetail, setMalamDetail] = useState<Record<string, Record<string, string>>>({})
   const [riwayatAlfa, setRiwayatAlfa] = useState<any[]>([])
+  const [inputDays, setInputDays] = useState<Record<string, any>>({})
 
   const sessionInfoRef = useRef<any>(null)
   const asramaRef = useRef(asrama)
@@ -85,14 +92,16 @@ export default function RekapAbsenMalamPage() {
   async function load() {
     setLoading(true)
     try {
-      const [malam, riwayat] = await Promise.all([
+      const [malam, riwayat, input] = await Promise.all([
         getRekapAbsenMalam(asramaRef.current, bulanRef.current, tanggalRef.current || undefined),
         getRiwayatAlfaAbsenMalam(asramaRef.current),
+        getRekapInputAbsenMalam(asramaRef.current, bulanRef.current),
       ])
       setMalamSantri(malam.santriList)
       setMalamAlfa(malam.alfaPerSantri)
       setMalamDetail(malam.detailPerSantri)
       setRiwayatAlfa(riwayat)
+      setInputDays(input.tanggalData || {})
       setHasLoaded(true)
     } catch (error: any) {
       console.error(error)
@@ -209,6 +218,15 @@ export default function RekapAbsenMalamPage() {
     const matchSearch = s.nama_lengkap.toLowerCase().includes(searchQuery.toLowerCase()) || (s.nis || '').includes(searchQuery)
     return matchKamar && matchSearch
   })
+
+  const todayWib = todayWibStr()
+  const inputDayList = (tanggal ? [tanggal] : daysArr).map(d => {
+    const info = inputDays[d] || { ada: false, viaLog: false, viaRecord: false, petugas: [], kamarDisimpan: [], sesiSimpan: 0, alfa: 0 }
+    return { tanggal: d, ...info }
+  })
+  const inputAdaCount = inputDayList.filter(d => d.ada).length
+  const inputTanpaCount = inputDayList.filter(d => !d.ada && d.tanggal <= todayWib).length
+
   const roomFeatureBlocked = isAsramaTanpaKamar(sessionInfo?.asrama_binaan ?? asrama)
 
   return (
@@ -321,6 +339,15 @@ export default function RekapAbsenMalamPage() {
               <History className="h-4 w-4" />
               Riwayat Semua Alfa
             </button>
+            <button
+              onClick={() => setActiveTab('input')}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                activeTab === 'input' ? 'bg-white text-slate-800 shadow' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <CalendarCheck className="h-4 w-4" />
+              Kontrol Input
+            </button>
           </div>
           <div className="flex w-full gap-2 sm:w-auto">
             {activeTab === 'bulan' && (
@@ -393,6 +420,22 @@ export default function RekapAbsenMalamPage() {
                 <p className="text-xs text-slate-400 mt-1">Riwayat Semua Alfa</p>
               </div>
             )}
+            {activeTab === 'input' && (
+              <>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center shadow-sm">
+                  <p className="text-2xl font-black text-emerald-600">{inputAdaCount}</p>
+                  <p className="text-xs text-emerald-500 mt-1">Hari Ada Input</p>
+                </div>
+                <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center shadow-sm">
+                  <p className="text-2xl font-black text-red-600">{inputTanpaCount}</p>
+                  <p className="text-xs text-red-400 mt-1">Hari Tanpa Input</p>
+                </div>
+                <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
+                  <p className="text-2xl font-black text-slate-800">{inputDayList.length}</p>
+                  <p className="text-xs text-slate-400 mt-1">Total Hari</p>
+                </div>
+              </>
+            )}
           </div>
 
           {activeTab === 'riwayat' && (
@@ -443,6 +486,84 @@ export default function RekapAbsenMalamPage() {
                 ))}
               </div>
             )}
+          </div>
+          )}
+
+          {activeTab === 'input' && (
+          <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+            <div className="bg-indigo-900 text-white px-4 py-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-bold">Kontrol Input Pengabsenan</p>
+                <p className="text-xs text-slate-400">
+                  Deteksi tanggal dengan input absen (tombol SIMPAN / record alfa) dan tanggal tanpa input sama sekali.
+                </p>
+              </div>
+              <span className="text-xs text-slate-400">
+                {formatBulan(bulan)}{tanggal ? ` • ${formatTanggal(tanggal)}` : ''}
+              </span>
+            </div>
+            {inputDayList.length === 0 ? (
+              <div className="py-10 text-center text-slate-400">
+                Tidak ada tanggal untuk ditampilkan.
+              </div>
+            ) : (
+              <div className="divide-y">
+                {inputDayList.map(day => {
+                  const isFuture = day.tanggal > todayWib
+                  return (
+                    <div key={day.tanggal} className={`px-4 py-3 flex items-center gap-3 sm:gap-4 ${!day.ada && !isFuture ? 'bg-red-50/60' : ''}`}>
+                      <div className="w-20 shrink-0 text-center border-r border-slate-100 sm:pr-4">
+                        <p className="text-base font-black text-slate-800 leading-none">{day.tanggal.slice(8)}</p>
+                        <p className="mt-0.5 text-[10px] font-semibold text-slate-400 uppercase">{hariNama(day.tanggal)}</p>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        {day.ada ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Ada Input
+                          </span>
+                        ) : isFuture ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-400">
+                            Belum Tepat Waktu
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-xs font-black text-red-700">
+                            <AlertTriangle className="h-3.5 w-3.5" /> Tanpa Input
+                          </span>
+                        )}
+                        {day.ada && day.petugas.length > 0 && (
+                          <p className="mt-1.5 text-xs text-slate-500 truncate">
+                            Petugas: <span className="font-semibold text-slate-700">{day.petugas.join(', ')}</span>
+                          </p>
+                        )}
+                        {day.ada && day.petugas.length === 0 && (
+                          <p className="mt-1.5 text-xs text-slate-400">Data tersimpan, petugas tercatat tidak ditemukan.</p>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        {day.ada ? (
+                          <>
+                            <p className="text-xs font-bold text-slate-600">
+                              {day.viaLog
+                                ? `${day.kamarDisimpan.length} kamar disimpan`
+                                : 'Data tersimpan'}
+                              {day.sesiSimpan > 0 && day.viaLog ? ` • ${day.sesiSimpan}x simpan` : ''}
+                            </p>
+                            <p className={`text-[10px] font-semibold ${day.alfa > 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                              {day.alfa > 0 ? `${day.alfa} alfa` : 'tanpa alfa'}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-slate-300">—</p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <div className="border-t bg-slate-50 px-4 py-3 text-[11px] text-slate-500">
+              Hari berwarna merah menandakan petugas tidak menekan <strong>SIMPAN</strong> pada malam itu — konfirmasi ke petugas jaga. Tanggal ke depan ditampilkan netral.
+            </div>
           </div>
           )}
 
