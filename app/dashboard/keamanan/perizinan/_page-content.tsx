@@ -130,6 +130,17 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const [newAlasan, setNewAlasan] = useState('')
   const [savingAlasan, setSavingAlasan] = useState(false)
 
+  // Export Excel state
+  const [isOpenExport, setIsOpenExport] = useState(false)
+  const [exportDari, setExportDari] = useState(() => {
+    const d = new Date()
+    d.setDate(1)
+    return toWibDateInputValue(d)
+  })
+  const [exportSampai, setExportSampai] = useState(() => toWibDateInputValue())
+  const [exportSemuaData, setExportSemuaData] = useState(false)
+  const [exporting, setExporting] = useState(false)
+
   const loadRiwayat = useCallback(async () => {
     if (!isAsrama) return
     setLoadingRiwayat(true)
@@ -217,7 +228,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const openEditModal = (item: any) => {
     resetFormState()
     setEditData(item)
-    setSelectedSantri({ id: item.santri_id, nama_lengkap: item.nama, nis: item.nis, asrama: item.asrama, kamar: item.kamar })
+    setSelectedSantri({ id: item.santri_id, nama_lengkap: item.nama, nis: item.nis, kelas: item.kelas, asrama: item.asrama, kamar: item.kamar })
     setJenisIzin(item.jenis as 'PULANG' | 'KELUAR_KOMPLEK')
     
     // Parse Alasan
@@ -331,15 +342,29 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
     }
   }
 
-  const handleExportExcel = async () => {
+  const handleExportExcel = async (dari: string, sampai: string, semuaData: boolean) => {
+    setExporting(true)
     const loadingToast = toast.loading("Menyiapkan data export...")
     try {
+      if (!semuaData && (!dari || !sampai)) {
+        toast.dismiss(loadingToast)
+        toast.warning("Pilih rentang tanggal sebelum export, atau centang opsi semua data.")
+        return
+      }
+      if (!semuaData && sampai < dari) {
+        toast.dismiss(loadingToast)
+        toast.warning("Rentang tanggal tidak valid: tanggal akhir lebih awal dari tanggal awal.")
+        return
+      }
+      const tglAwal = semuaData ? undefined : dari
+      const tglAkhir = semuaData ? undefined : sampai
       const data = await exportDataIzin({ search, asrama, tglAwal, tglAkhir, statusFilter })
       if (!data || data.length === 0) { toast.dismiss(loadingToast); toast.info("Tidak ada data untuk diexport"); return }
-      
+
       // Remapping columns manually to ensure clean ID headers and avoid SQLite alias errors
       const remappedData = data.map((d: any) => ({
         "Nama Lengkap": d.nama_lengkap,
+        "Kelas": d.kelas || '-',
         "NIS": d.nis,
         "Asrama": d.asrama,
         "Kamar": d.kamar,
@@ -353,10 +378,10 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
       }))
 
       const ws = XLSX.utils.json_to_sheet(remappedData)
-      
+
       // Adjust column widths automatically
       const colWidths = [
-         {wch: 25}, {wch: 15}, {wch: 15}, {wch: 10},
+         {wch: 25}, {wch: 20}, {wch: 15}, {wch: 15}, {wch: 10},
          {wch: 18}, {wch: 35}, {wch: 22}, {wch: 15},
          {wch: 22}, {wch: 22}, {wch: 22}
       ];
@@ -364,18 +389,21 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
 
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, "Data Perizinan")
-      XLSX.writeFile(wb, `Laporan_Perizinan_${toWibDateInputValue()}.xlsx`)
+      const dateStamp = semuaData ? toWibDateInputValue() : `${dari}_${sampai}`
+      XLSX.writeFile(wb, `Laporan_Perizinan_${dateStamp}.xlsx`)
+      setIsOpenExport(false)
       toast.success("Berhasil export Excel!")
     } catch(e) {
       toast.error("Gagal export data")
     } finally {
       toast.dismiss(loadingToast)
+      setExporting(false)
     }
   }
 
   const openEditPengajuan = (item: any) => {
     resetFormState()
-    setSelectedSantri({ id: item.santri_id, nama_lengkap: item.nama, nis: item.nis, asrama: item.asrama, kamar: item.kamar })
+    setSelectedSantri({ id: item.santri_id, nama_lengkap: item.nama, nis: item.nis, kelas: item.kelas, asrama: item.asrama, kamar: item.kamar })
     setFormDateStart(toWibDateInputValue(item.tgl_mulai))
     setFormDateEnd(toWibDateInputValue(item.tgl_selesai_rencana))
     const matchedPrefix = alasanOptions.find(a => item.alasan.startsWith(a + ' - '))
@@ -609,7 +637,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                   <div className="flex justify-between items-start mb-2">
                     <div>
                       <p className="font-bold text-slate-900 text-sm">{item.nama}</p>
-                      <p className="text-[11px] text-slate-500">{item.nis} · {item.asrama} / {item.kamar}</p>
+                      <p className="text-[11px] text-slate-500">{item.kelas || '-'} · {item.asrama} / {item.kamar}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       {statusBadge(item.status)}
@@ -686,27 +714,27 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                       <div className="mt-3 divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden shadow-sm">
                         {hasilCari.map(s => (
                           <div key={s.id} onClick={() => setSelectedSantri(s)} className="p-3 bg-white hover:bg-slate-50 cursor-pointer flex justify-between items-center transition-colors">
-                            <div>
-                              <p className="text-sm font-bold text-slate-800">{s.nama_lengkap}</p>
-                              <p className="text-[10px] text-slate-400">{s.nis}</p>
-                            </div>
-                            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">{s.asrama} / {s.kamar}</span>
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">{s.nama_lengkap}</p>
+                            <p className="text-[10px] text-slate-400">{s.kelas || '-'}</p>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="bg-purple-50 p-3.5 rounded-xl flex justify-between items-center border border-purple-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
-                        <User className="w-5 h-5 text-purple-600"/>
-                      </div>
-                      <div>
-                        <p className="font-bold text-sm text-slate-800">{selectedSantri.nama_lengkap}</p>
-                        <p className="text-[11px] font-medium text-slate-500">{selectedSantri.nis} · {selectedSantri.asrama} - {selectedSantri.kamar}</p>
-                      </div>
+                          <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">{s.asrama} / {s.kamar}</span>
+                        </div>
+                      ))}
                     </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-purple-50 p-3.5 rounded-xl flex justify-between items-center border border-purple-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+                      <User className="w-5 h-5 text-purple-600"/>
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-slate-800">{selectedSantri.nama_lengkap}</p>
+                      <p className="text-[11px] font-medium text-slate-500">{selectedSantri.kelas || '-'} · {selectedSantri.asrama} - {selectedSantri.kamar}</p>
+                    </div>
+                  </div>
                     {!editingPengajuan && (
                       <button type="button" onClick={() => setSelectedSantri(null)} className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-100 px-3 py-2 rounded-lg hover:bg-rose-100 transition-colors">Ganti</button>
                     )}
@@ -829,7 +857,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                 <button type="button" onClick={() => loadData(1, pageSize, searchInput, asrama, tglAwal, tglAkhir, statusFilter)} className="flex-1 sm:flex-none bg-slate-900 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-black transition-colors">
                   <Filter className="w-4 h-4" /> Terapkan
                 </button>
-                <button type="button" onClick={handleExportExcel} className="flex-1 sm:flex-none bg-emerald-600 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-emerald-700 transition-colors">
+                <button type="button" onClick={() => setIsOpenExport(true)} className="flex-1 sm:flex-none bg-emerald-600 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-emerald-700 transition-colors">
                   <Download className="w-4 h-4" /> Export
                 </button>
               </div>
@@ -892,7 +920,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                         <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-3 py-2 focus:outline-none">
                             <p className="font-bold text-slate-800">{item.nama}</p>
-                            <p className="text-[11px] text-slate-500">{item.nis} · {item.asrama}/{item.kamar}</p>
+                            <p className="text-[11px] text-slate-500">{item.kelas || '-'} · {item.asrama}/{item.kamar}</p>
                           </td>
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-1.5 mb-1">
@@ -977,7 +1005,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                         <div className="flex justify-between items-start">
                           <div className="min-w-0 pr-2">
                             <p className="font-bold text-slate-900 text-sm leading-tight">{item.nama}</p>
-                            <p className="text-[10px] text-slate-500 mt-0.5">{item.nis} · {item.asrama}/{item.kamar}</p>
+                            <p className="text-[10px] text-slate-500 mt-0.5">{item.kelas || '-'} · {item.asrama}/{item.kamar}</p>
                           </div>
                           {!isAsrama && (canUpdate || canDelete) && (
                             <div className="shrink-0 flex gap-1">
@@ -1256,7 +1284,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                         <div key={s.id} onClick={() => setSelectedSantri(s)} className="p-3 bg-white hover:bg-slate-50 cursor-pointer flex justify-between items-center transition-colors">
                           <div>
                             <p className="text-sm font-bold text-slate-800">{s.nama_lengkap}</p>
-                            <p className="text-[10px] text-slate-400">{s.nis}</p>
+                            <p className="text-[10px] text-slate-400">{s.kelas || '-'}</p>
                           </div>
                           <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded">{s.asrama} / {s.kamar}</span>
                         </div>
@@ -1272,7 +1300,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                     </div>
                     <div>
                       <p className="font-bold text-sm text-slate-800">{selectedSantri.nama_lengkap}</p>
-                      <p className="text-[11px] font-medium text-slate-500">{selectedSantri.nis} · {selectedSantri.asrama} - {selectedSantri.kamar}</p>
+                      <p className="text-[11px] font-medium text-slate-500">{selectedSantri.kelas || '-'} · {selectedSantri.asrama} - {selectedSantri.kamar}</p>
                     </div>
                   </div>
                   {!isOpenEdit && <button type="button" onClick={() => setSelectedSantri(null)} className="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-100 px-3 py-2 rounded-lg hover:bg-rose-100 transition-colors">Ganti Tgt</button>}
@@ -1330,7 +1358,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <p className="font-bold text-slate-900">{item.nama}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">{item.nis} · {item.asrama} / {item.kamar}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{item.kelas || '-'} · {item.asrama} / {item.kamar}</p>
                         </div>
                         <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-100 flex items-center gap-1">
                           <Home className="w-3 h-3" /> PULANG
@@ -1421,6 +1449,68 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                 <button type="button" onClick={() => setIsOpenReturn(false)} className="flex-1 py-2.5 rounded-xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors">Batal</button>
                 <button type="button" onClick={handleSimpanKembali} className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-colors shadow-sm shadow-emerald-200">Simpan Final</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL EXPORT EXCEL --- */}
+      {isOpenExport && (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end md:items-center justify-center p-0 md:p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in slide-in-from-bottom-5">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                  <Download className="w-5 h-5 text-emerald-600" /> Export Excel
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">Tentukan rentang tanggal data yang ingin diexport.</p>
+              </div>
+              <button type="button" onClick={() => setIsOpenExport(false)} className="p-2 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-full transition-colors border border-slate-200"><X className="w-5 h-5"/></button>
+            </div>
+
+            <div className="p-5 max-h-[75vh] overflow-y-auto space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Dari Tanggal</label>
+                  <input type="date" value={exportDari} onChange={e => setExportDari(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-slate-700" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Sampai Tanggal</label>
+                  <input type="date" value={exportSampai} onChange={e => setExportSampai(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-slate-700" />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={exportSemuaData}
+                  onChange={e => setExportSemuaData(e.target.checked)}
+                  className="w-4 h-4 accent-emerald-600"
+                />
+                <span className="text-xs font-bold text-slate-700">Export semua data <span className="text-slate-400 font-medium">(abaikan rentang tanggal)</span></span>
+              </label>
+
+              <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-[11px] text-slate-500 leading-relaxed">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Catatan</p>
+                <p>
+                  Rentang dihitung dari tanggal mulai izin hingga kedatangan (untuk izin yang sudah kembali).
+                  Default: awal bulan sampai hari ini. Export juga mengikuti filter aktif di daftar (pencarian, asrama, status).
+                </p>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 border-t bg-slate-50 flex gap-3">
+              <button type="button" onClick={() => setIsOpenExport(false)} className="flex-1 py-3 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors">
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportExcel(exportDari, exportSampai, exportSemuaData)}
+                disabled={exporting}
+                className="flex-1 py-3 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {exporting ? <Clock className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} {exporting ? 'Menyiapkan...' : 'Download Excel'}
+              </button>
             </div>
           </div>
         </div>

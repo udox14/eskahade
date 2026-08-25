@@ -226,7 +226,9 @@ export async function getPerizinanList(params: {
   const where = clauses.length > 0 ? clauses.join(' AND ') : '1=1'
 
   const countRow = await queryOne<{ total: number }>(
-    `SELECT COUNT(*) AS total FROM perizinan p JOIN santri s ON s.id = p.santri_id WHERE ${where}`,
+    `SELECT COUNT(*) AS total FROM perizinan p JOIN santri s ON s.id = p.santri_id
+     LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+     WHERE ${where}`,
     baseParams
   )
   const total = countRow?.total ?? 0
@@ -234,9 +236,12 @@ export async function getPerizinanList(params: {
   const rows = await query<any>(
     `SELECT p.id, p.created_at, p.status, p.jenis, p.alasan, p.pemberi_izin,
             p.tgl_mulai, p.tgl_selesai_rencana, p.tgl_kembali_aktual,
-            s.nama_lengkap AS nama, s.nis, s.asrama, s.kamar
+            s.nama_lengkap AS nama, s.nis, s.asrama, s.kamar,
+            k.nama_kelas AS kelas
      FROM perizinan p
      JOIN santri s ON s.id = p.santri_id
+     LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+     LEFT JOIN kelas k ON k.id = rp.kelas_id
      WHERE ${where}
      ORDER BY p.status ASC, p.created_at DESC
      LIMIT ? OFFSET ?`,
@@ -259,10 +264,13 @@ export async function exportDataIzin(params: {
 
   return query<any>(`
     SELECT s.nama_lengkap, s.nis, s.asrama, s.kamar,
+           k.nama_kelas AS kelas,
            p.jenis, p.alasan, p.pemberi_izin, p.status,
            p.tgl_mulai, p.tgl_selesai_rencana, p.tgl_kembali_aktual
     FROM perizinan p
     JOIN santri s ON s.id = p.santri_id
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
     WHERE ${where}
     ORDER BY p.status ASC, p.tgl_mulai DESC
   `, baseParams)
@@ -470,9 +478,12 @@ export async function setSudahDatang(id: string, waktuDatang: string): Promise<{
 
 export async function cariSantri(keyword: string) {
   return query<any>(`
-    SELECT id, nama_lengkap, nis, asrama, kamar
-    FROM santri
-    WHERE nama_lengkap LIKE ?
+    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
+           k.nama_kelas AS kelas
+    FROM santri s
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
+    WHERE s.nama_lengkap LIKE ?
     LIMIT 5
   `, [`%${keyword}%`])
 }
@@ -501,9 +512,12 @@ async function ensurePengajuanTable() {
 export async function cariSantriAsrama(keyword: string, asramaBinaan: string) {
   if (!asramaBinaan) return []
   return query<any>(`
-    SELECT id, nama_lengkap, nis, asrama, kamar
-    FROM santri
-    WHERE nama_lengkap LIKE ? AND asrama = ? AND status_global = 'aktif'
+    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
+           k.nama_kelas AS kelas
+    FROM santri s
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
+    WHERE s.nama_lengkap LIKE ? AND s.asrama = ? AND s.status_global = 'aktif'
     LIMIT 5
   `, [`%${keyword}%`, asramaBinaan])
 }
@@ -585,9 +599,12 @@ export async function getRiwayatPengajuanAsrama(): Promise<any[]> {
              pq.tgl_mulai, pq.tgl_selesai_rencana, pq.status,
              pq.santri_id,
              s.nama_lengkap AS nama, s.nis, s.asrama, s.kamar,
+             k.nama_kelas AS kelas,
              u.full_name AS submitted_by_name
       FROM perizinan_pengajuan pq
       JOIN santri s ON s.id = pq.santri_id
+      LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+      LEFT JOIN kelas k ON k.id = rp.kelas_id
       LEFT JOIN users u ON u.id = pq.submitted_by
       WHERE s.asrama = ?
       ORDER BY pq.created_at DESC
@@ -659,9 +676,12 @@ export async function getPengajuanPendingAsrama(): Promise<any[]> {
              pq.tgl_mulai, pq.tgl_selesai_rencana, pq.status,
              pq.santri_id,
              s.nama_lengkap AS nama, s.nis, s.asrama, s.kamar,
+             k.nama_kelas AS kelas,
              u.full_name AS submitted_by_name
       FROM perizinan_pengajuan pq
       JOIN santri s ON s.id = pq.santri_id
+      LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+      LEFT JOIN kelas k ON k.id = rp.kelas_id
       LEFT JOIN users u ON u.id = pq.submitted_by
       WHERE pq.status = 'PENDING'
       ORDER BY pq.created_at ASC
