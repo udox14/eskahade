@@ -2,6 +2,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { medicalEventDetail } from '@/lib/poskestren/medical-detail'
+import { claim, normalizePrescription } from '@/lib/poskestren/clinical'
+import { registerDormVisit } from './clinical-workflow-actions'
 
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { generateId, getDB, query, queryOne } from '@/lib/db'
@@ -17,9 +20,12 @@ import {
   encodeCursor,
   normalizePoskestrenListQuery,
 } from '@/lib/poskestren/query'
-import { normalizeClinicalMedicines, prepareStockMutation } from '@/lib/poskestren/stock'
+import { prepareStockMutation } from '@/lib/poskestren/stock'
 import type {
   ClinicalMedicineDraftItem,
+  MedicalRecordSummaryRow,
+  MedicalRecordSummaryPatient,
+  MedicalRecordSummaryEvent,
   PoskestrenListQuery,
   PrescriptionDraftItem,
 } from '@/lib/poskestren/types'
@@ -101,7 +107,7 @@ export async function searchHealthSantri(keyword: string) {
   return query<any>(
     `SELECT s.id, s.poskestren_code, s.nis, s.nama_lengkap, s.asrama, s.kamar,
             s.tanggal_lahir, s.foto_url, p.id AS patient_id,
-            p.allergies AS drug_allergies, p.special_conditions AS disease_history
+            ${access.mode === 'FULL' ? 'p.allergies AS drug_allergies, p.special_conditions AS disease_history' : 'NULL AS drug_allergies, NULL AS disease_history'}
      FROM santri s
      LEFT JOIN poskestren_patient p ON p.santri_id = s.id
      WHERE ${where.join(' AND ')}
@@ -164,6 +170,9 @@ export async function getMedicalRecordPatients(
 ) {
   const access = await requirePoskestrenHealthRead()
   const normalized = normalizePoskestrenListQuery(input)
+  if(access.mode!=='FULL' && (input.diagnosisId || input.personnelId || input.medicineId || input.status)) {
+    throw new Error('Filter klinis hanya tersedia untuk petugas dan dokter.')
+  }
   const cursor = decodeCursor(normalized.cursor)
   const eventWhere: string[] = []
   const eventParams: unknown[] = []
@@ -184,29 +193,44 @@ export async function getMedicalRecordPatients(
     params.push(normalized.q, normalized.q.toUpperCase(), like, like, like)
   }
   if (input.diagnosisId) {
-    where.push(`EXISTS (
+    where.push(`(EXISTS (
       SELECT 1 FROM poskestren_visit vx
       WHERE vx.patient_id = p.id AND vx.diagnosis_id = ?
         AND vx.status IN ('SELESAI','DIRUJUK')
-    )`)
-    params.push(input.diagnosisId)
+    ) OR EXISTS (
+      SELECT 1 FROM poskestren_clinical_exam ce
+      LEFT JOIN poskestren_dorm_visit cd ON cd.id=ce.dorm_visit_id
+      LEFT JOIN poskestren_observation co ON co.id=ce.observation_id
+      WHERE COALESCE(cd.patient_id,co.patient_id)=p.id AND json_extract(ce.clinical_json,'$.diagnosisId') = ?
+    ))`)
+    params.push(input.diagnosisId, input.diagnosisId)
   }
   if (input.personnelId) {
-    where.push(`EXISTS (
+    where.push(`(EXISTS (
       SELECT 1 FROM poskestren_visit vx
       WHERE vx.patient_id = p.id AND vx.personnel_id = ?
         AND vx.status IN ('SELESAI','DIRUJUK')
-    )`)
-    params.push(input.personnelId)
+    ) OR EXISTS (
+      SELECT 1 FROM poskestren_clinical_exam ce
+      LEFT JOIN poskestren_dorm_visit cd ON cd.id=ce.dorm_visit_id
+      LEFT JOIN poskestren_observation co ON co.id=ce.observation_id
+      WHERE COALESCE(cd.patient_id,co.patient_id)=p.id AND ce.personnel_id = ?
+    ))`)
+    params.push(input.personnelId, input.personnelId)
   }
   if (input.medicineId) {
-    where.push(`EXISTS (
+    where.push(`(EXISTS (
       SELECT 1 FROM poskestren_visit vx
       JOIN poskestren_prescription rx ON rx.visit_id = vx.id
       JOIN poskestren_prescription_item rxi ON rxi.prescription_id = rx.id
       WHERE vx.patient_id = p.id AND rxi.medicine_id = ?
-    )`)
-    params.push(input.medicineId)
+    ) OR EXISTS (
+      SELECT 1 FROM poskestren_clinical_exam ce
+      LEFT JOIN poskestren_dorm_visit cd ON cd.id=ce.dorm_visit_id
+      LEFT JOIN poskestren_observation co ON co.id=ce.observation_id
+      WHERE COALESCE(cd.patient_id,co.patient_id)=p.id AND EXISTS(SELECT 1 FROM poskestren_clinical_prescription_item ci WHERE ci.exam_id=ce.id AND ci.medicine_id=?)
+    ))`)
+    params.push(input.medicineId, input.medicineId)
   }
   if (['SELESAI', 'DIRUJUK'].includes(normalized.status || '')) {
     where.push(`EXISTS (
@@ -228,7 +252,7 @@ export async function getMedicalRecordPatients(
               complaint, COALESCE(d.name, v.diagnosis) AS result_text
        FROM poskestren_visit v
        LEFT JOIN poskestren_diagnosis d ON d.id = v.diagnosis_id
-       WHERE v.status IN ('SELESAI','DIRUJUK')
+       WHERE (v.status IN ('SELESAI','DIRUJUK') OR v.awaiting_medicine=1)
        UNION ALL
        SELECT patient_id, SUBSTR(visited_at,1,10), visited_at, 'VISIT_ASRAMA', complaint, complaint
        FROM poskestren_dorm_visit
@@ -270,7 +294,7 @@ export async function getMedicalRecordPatients(
   const items = rows.slice(0, normalized.limit)
   const last = items.at(-1)
   return {
-    items,
+    items: access.mode==='FULL' ? items : items.map(row=>({patient_id:row.patient_id,nama_lengkap:row.nama_lengkap,last_event_at:toWibDateInputValue(row.last_event_at)} satisfies MedicalRecordSummaryRow)),
     nextCursor: hasMore && last ? encodeCursor([last.last_event_at, last.patient_id]) : null,
     hasMore,
     truncated: normalized.isAll && hasMore,
@@ -288,7 +312,7 @@ export async function getPatientMedicalTimeline(input: {
   const limit = [20, 50, 100].includes(Number(input.limit)) ? Number(input.limit) : 20
   const patient = await queryOne<any>(
     `SELECT p.id AS patient_id, p.medical_record_no, p.allergies, p.special_conditions,
-            p.routine_medicines, p.notes, s.id AS santri_id, s.poskestren_code,
+            p.routine_medicines, p.notes, p.blood_type, p.emergency_contact, p.profile_version, s.id AS santri_id, s.poskestren_code,
             s.nis, s.nama_lengkap, s.asrama, s.kamar, s.foto_url, s.tanggal_lahir
      FROM poskestren_patient p JOIN santri s ON s.id = p.santri_id
      WHERE p.id = ?`,
@@ -309,15 +333,15 @@ export async function getPatientMedicalTimeline(input: {
   const rows = await query<any>(
     `WITH timeline AS (
        SELECT v.id AS event_id, 'PEMERIKSAAN' AS event_type,
-              COALESCE(v.completed_at, v.created_at) AS event_at, v.status,
+              COALESCE(v.completed_at, v.updated_at, v.created_at) AS event_at, v.status,
               v.complaint AS summary, COALESCE(d.name, v.diagnosis) AS result_text,
               v.referral_destination, pp.full_name AS personnel_name
        FROM poskestren_visit v
        LEFT JOIN poskestren_diagnosis d ON d.id = v.diagnosis_id
        LEFT JOIN poskestren_personnel pp ON pp.id = v.personnel_id
-       WHERE v.patient_id = ? AND v.status IN ('SELESAI','DIRUJUK')
+       WHERE v.patient_id = ? AND (v.status IN ('SELESAI','DIRUJUK') OR v.awaiting_medicine=1)
        UNION ALL
-       SELECT dv.id, 'VISIT_ASRAMA', dv.visited_at, 'SELESAI',
+       SELECT dv.id, 'VISIT_ASRAMA', dv.visited_at, CASE WHEN dv.status='LEGACY' THEN 'SELESAI' ELSE dv.status END,
               dv.complaint, NULL, NULL, u.full_name
        FROM poskestren_dorm_visit dv LEFT JOIN users u ON u.id = dv.created_by
        WHERE dv.patient_id = ?
@@ -340,21 +364,13 @@ export async function getPatientMedicalTimeline(input: {
   const hasMore = rows.length > limit
   const items = rows.slice(0, limit)
   const last = items.at(-1)
-  const safePatient = access.mode === 'FULL'
-    ? patient
-    : {
-        patient_id: patient.patient_id,
-        medical_record_no: patient.medical_record_no,
-        poskestren_code: patient.poskestren_code,
-        nis: patient.nis,
-        nama_lengkap: patient.nama_lengkap,
-        asrama: patient.asrama,
-        kamar: patient.kamar,
-        foto_url: patient.foto_url,
-      }
+  const safePatient = access.mode==='FULL' ? patient : {patient_id:patient.patient_id,nama_lengkap:patient.nama_lengkap} satisfies MedicalRecordSummaryPatient
+  const safeItems = access.mode==='FULL'
+    ? await Promise.all(items.map(async row=>({...row,detail:await medicalEventDetail(row.event_type,row.event_id)})))
+    : items.map(row=>({event_id:row.event_id,event_at:toWibDateInputValue(row.event_at)} satisfies MedicalRecordSummaryEvent))
   return {
     patient: safePatient,
-    items,
+    items: safeItems,
     nextCursor: hasMore && last ? encodeCursor([last.event_at, last.event_id]) : null,
     hasMore,
     accessMode: access.mode,
@@ -445,106 +461,12 @@ export async function beginVisitWithSession(input: { visitId: string; practiceSe
 }
 
 export async function createDormVisit(input: {
-  santriId: string
-  visitedAt: string
-  temperatureCelsius?: number | null
-  systolicPressure?: number | null
-  diastolicPressure?: number | null
-  weightKg?: number | null
-  complaint: string
-  diseaseHistory?: string
-  notes?: string
-  medicines?: ClinicalMedicineDraftItem[]
+  santriId:string;visitedAt:string;complaint:string;allergies?:string;diseaseHistory?:string;notes?:string;
+  temperatureCelsius?:number|null;systolicPressure?:number|null;diastolicPressure?:number|null;weightKg?:number|null;
+  medicines?:ClinicalMedicineDraftItem[]
 }) {
-  const session = await requirePoskestrenClinicalWrite()
-  const complaint = cleanText(input.complaint)
-  if (!complaint) return { success: false as const, error: 'Keluhan wajib diisi.' }
-  const visitedAt = new Date(input.visitedAt)
-  if (Number.isNaN(visitedAt.getTime())) return { success: false as const, error: 'Tanggal Visit Asrama tidak valid.' }
-  const patientId = await ensurePatient(input.santriId, session.id)
-  const patient = await queryOne<{ asrama: string | null }>(
-    `SELECT s.asrama
-     FROM poskestren_patient p JOIN santri s ON s.id = p.santri_id
-     WHERE p.id = ?`,
-    [patientId]
-  )
-  const medicines = normalizeClinicalMedicines(input.medicines || [])
-  const stockIds = medicines.filter(item => item.sourceType === 'STOCK').map(item => item.medicineId)
-  if (new Set(stockIds).size !== stockIds.length) {
-    return { success: false as const, error: 'Obat stok yang sama tidak boleh diulang.' }
-  }
-  const id = generateId()
-  const db = await getDB()
-  const statements: D1PreparedStatement[] = [
-    db.prepare(
-      `INSERT INTO poskestren_dorm_visit(
-         id, patient_id, visited_at, temperature_celsius, systolic_pressure,
-         diastolic_pressure, weight_kg, complaint, disease_history_snapshot,
-         notes, created_by
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id, patientId, visitedAt.toISOString(),
-      input.temperatureCelsius ?? null,
-      input.systolicPressure ?? null,
-      input.diastolicPressure ?? null,
-      input.weightKg ?? null,
-      complaint,
-      cleanText(input.diseaseHistory),
-      cleanText(input.notes),
-      session.id
-    ),
-  ]
-  // Field riwayat penyakit di form Visit Asrama sering dibiarkan kosong
-  // (petugas hanya mau catat keluhan hari itu). Kosong bukan berarti riwayat
-  // penyakit pasien dihapus — hanya timpa data master kalau benar-benar diisi.
-  const diseaseHistoryText = cleanText(input.diseaseHistory)
-  if (diseaseHistoryText) {
-    statements.push(
-      db.prepare(
-        `UPDATE poskestren_patient
-         SET special_conditions = ?, updated_at = datetime('now')
-         WHERE id = ?`
-      ).bind(diseaseHistoryText, patientId)
-    )
-  }
-  for (const item of medicines) {
-    const itemId = generateId()
-    let medicineName = item.medicineName
-    if (item.sourceType === 'STOCK') {
-      const mutation = await prepareStockMutation(db, {
-        medicineId: item.medicineId!,
-        quantityDelta: -Number(item.quantityBase),
-        movementType: 'PATIENT',
-        movementDate: visitedAt.toISOString().slice(0, 10),
-        referenceType: 'DORM_MEDICINE',
-        referenceId: itemId,
-        actorId: session.id,
-        notes: item.dosage,
-        locationId: item.locationId,
-        preferredAsrama: patient?.asrama,
-      })
-      medicineName = mutation.medicineName
-      statements.push(...mutation.statements)
-    }
-    statements.push(
-      db.prepare(
-        `INSERT INTO poskestren_dorm_visit_medicine(
-           id, dorm_visit_id, source_type, medicine_id, medicine_name,
-           quantity_base, dosage, notes, created_by
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        itemId, id, item.sourceType, item.medicineId || null, medicineName,
-        item.quantityBase, item.dosage, item.notes, session.id
-      )
-    )
-  }
-  await db.batch(statements)
-  await audit(session, 'create', 'poskestren_dorm_visit', id, 'Mencatat Visit Asrama', {
-    patient_id: patientId,
-    medicine_count: medicines.length,
-  })
-  refreshHealth()
-  return { success: true as const, id }
+  if(input.medicines?.length) throw new Error('Resep Visit Asrama harus diinput dokter setelah pendaftaran.')
+  return registerDormVisit({...input,requestId:generateId()})
 }
 
 export async function getDormVisits(input: PoskestrenListQuery = {}) {
@@ -560,7 +482,7 @@ export async function getDormVisits(input: PoskestrenListQuery = {}) {
     params.push(normalized.q, normalized.q.toUpperCase(), like, like, like)
   }
   const rows = await query<any>(
-    `SELECT dv.id, dv.visited_at, dv.temperature_celsius, dv.systolic_pressure,
+    `SELECT dv.id, dv.status, dv.personnel_id, dv.completed_at, dv.visited_at, dv.temperature_celsius, dv.systolic_pressure,
             dv.diastolic_pressure, dv.weight_kg, dv.complaint,
             s.poskestren_code, s.nis, s.nama_lengkap, s.asrama, s.kamar,
             GROUP_CONCAT(dvm.medicine_name, ', ') AS medicine_names,
@@ -777,18 +699,9 @@ export async function reviseCompletedVisitFull(input: {
     [input.diagnosisId]
   )
   if (!diagnosis) return { success: false as const, error: 'Diagnosis tidak valid.' }
-  const cleanItems = (input.prescriptionItems || []).filter(item => item.medicineId).map(item => ({
-    medicineId: item.medicineId,
-    quantity: Number(item.requestedQuantityBase),
-    dosage: cleanText(item.dosage, 200),
-    notes: cleanText(item.notes, 200),
-  }))
-  if (cleanItems.some(item => !Number.isInteger(item.quantity) || item.quantity <= 0)) {
-    return { success: false as const, error: 'Jumlah resep harus bilangan bulat positif.' }
-  }
-  if (new Set(cleanItems.map(item => item.medicineId)).size !== cleanItems.length) {
-    return { success: false as const, error: 'Obat resep yang sama tidak boleh diulang.' }
-  }
+  const normalizedItems = await normalizePrescription(input.prescriptionItems||[])
+  const cleanItems = normalizedItems.filter(item=>item.sourceType==='STOCK')
+  const externalItems = normalizedItems.filter(item=>item.sourceType==='EXTERNAL')
   const oldItems = await query<any>(
     `SELECT rxi.medicine_id, rxi.dispensed_quantity_base, rxi.dosage, rxi.notes
      FROM poskestren_prescription rx
@@ -821,10 +734,14 @@ export async function reviseCompletedVisitFull(input: {
     'SELECT id FROM poskestren_prescription WHERE visit_id = ?',
     [before.id]
   )
-  const prescriptionId = prescription?.id || (cleanItems.length ? generateId() : null)
+  const prescriptionId = prescription?.id || (normalizedItems.length ? generateId() : null)
+  const oldExternal = prescription ? await query<any>('SELECT * FROM poskestren_prescription_external_item WHERE prescription_id=?',[prescription.id]) : []
+  statements.unshift(claim(db,'revise:'+before.id+':'+revisionNo,
+    'EXISTS(SELECT 1 FROM poskestren_visit WHERE id=? AND revision_no=?)',[before.id,Number(before.revision_no||0)]))
   const beforeSnapshot = {
     visit: before,
     prescriptionItems: oldItems,
+    externalItems: oldExternal,
   }
   statements.push(
     db.prepare(
@@ -857,9 +774,15 @@ export async function reviseCompletedVisitFull(input: {
       db.prepare(
         `UPDATE poskestren_prescription
          SET status = ?, updated_at = datetime('now') WHERE id = ?`
-      ).bind(cleanItems.length ? 'DISPENSED' : 'CANCELLED', prescriptionId)
+      ).bind(normalizedItems.length ? 'DISPENSED' : 'CANCELLED', prescriptionId)
     )
   }
+  if(prescriptionId) {
+    statements.push(db.prepare('DELETE FROM poskestren_prescription_external_item WHERE prescription_id=?').bind(prescriptionId))
+    for(const item of externalItems) statements.push(db.prepare('INSERT INTO poskestren_prescription_external_item(id,prescription_id,medicine_name,quantity,unit,dosage,notes) VALUES(?,?,?,?,?,?,?)')
+      .bind(generateId(),prescriptionId,item.medicineName,item.quantity,item.unit,item.dosage,item.notes))
+  }
+  if(cleanText(input.followUp)!==cleanText(before.follow_up)) statements.push(db.prepare('UPDATE poskestren_visit SET fee_category=? WHERE id=?').bind(cleanText(input.followUp)?'TREATMENT':'NORMAL',before.id))
   const referralDestination = cleanText(input.referralDestination, 200)
   const finalStatus = referralDestination ? 'DIRUJUK' : 'SELESAI'
   statements.push(

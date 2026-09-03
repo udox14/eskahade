@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
+import { MedicineCombobox } from '@/components/poskestren/medicine-combobox'
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import {
@@ -7,13 +8,14 @@ import {
   ChevronRight,
   Edit3,
   Loader2,
-  Plus,
   Search,
   ShieldAlert,
-  Trash2,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { MedicalEventDetail } from '@/components/poskestren/medical-event-detail'
+import { PrescriptionEditor } from '@/components/poskestren/clinical-form'
+import { encounterLabels, observationLabels } from '@/lib/poskestren/clinical-labels'
 
 import { EmptyState } from '@/components/poskestren/poskestren-shell'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
@@ -107,6 +109,14 @@ export function MedicalRecordsTab({ isFull }: { isFull: boolean }) {
   }
 
   const rows = result.items || []
+  if(!isFull) return <section className="space-y-3 rounded-lg border bg-white p-4">
+    <input aria-label="Cari nama" className={input} value={filters.q} onChange={e=>setFilters({...filters,q:e.target.value})} placeholder="Cari nama..."/>
+    <div className="flex gap-2"><input aria-label="Dari tanggal" type="date" className={input} value={filters.from} onChange={e=>setFilters({...filters,from:e.target.value})}/><input aria-label="Sampai tanggal" type="date" className={input} value={filters.to} onChange={e=>setFilters({...filters,to:e.target.value})}/></div>
+    {rows.map((r:any)=><button key={r.patient_id} className="block w-full rounded border p-3 text-left" onClick={()=>void openDetail(r.patient_id)}><b>{r.nama_lengkap}</b><p>{String(r.last_event_at).slice(0,10)}</p></button>)}
+    {!rows.length?<p>{loading?'Memuat...':'Tidak ada riwayat berobat.'}</p>:null}
+    {result.hasMore?<button disabled={loading} className={secondary} onClick={()=>void load(true)}>Muat berikutnya</button>:null}
+    {detail?<TimelineModal initial={detail} isFull={false} onClose={()=>setDetail(null)} onChanged={()=>{}}/>:null}
+  </section>
   const hasFilter = Boolean(filters.q || filters.asrama || filters.diagnosisId || filters.personnelId || filters.medicineId || filters.status || filters.from || filters.to)
   return <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
     <div className="space-y-3 border-b bg-slate-50 p-4">
@@ -120,7 +130,7 @@ export function MedicalRecordsTab({ isFull }: { isFull: boolean }) {
         <input value={filters.asrama} onChange={event => setFilters(value => ({ ...value, asrama: event.target.value }))} placeholder="Asrama persis..." className={input} />
         <select value={filters.diagnosisId} onChange={event => setFilters(value => ({ ...value, diagnosisId: event.target.value }))} className={input}><option value="">Semua diagnosis</option>{options.diagnoses.map((row: any) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
         <select value={filters.personnelId} onChange={event => setFilters(value => ({ ...value, personnelId: event.target.value }))} className={input}><option value="">Semua dokter</option>{options.doctors.map((row: any) => <option key={row.id} value={row.id}>{row.full_name}</option>)}</select>
-        <select value={filters.medicineId} onChange={event => setFilters(value => ({ ...value, medicineId: event.target.value }))} className={input}><option value="">Semua obat</option>{options.medicines.map((row: any) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+        <MedicineCombobox value={filters.medicineId} onChange={event => setFilters(value => ({ ...value, medicineId: event.target.value }))} className={input}><option value="">Semua obat</option>{options.medicines.map((row: any) => <option key={row.id} value={row.id}>{row.name}</option>)}</MedicineCombobox>
         <select value={filters.status} onChange={event => setFilters(value => ({ ...value, status: event.target.value }))} className={input}><option value="">Semua hasil</option><option value="SELESAI">Selesai/Sembuh</option><option value="DIRUJUK">Dirujuk</option></select>
       </div> : <p className="text-xs font-medium text-amber-700">Tampilan ringkas: resep, riwayat penyakit, dan catatan sensitif tidak dikirim oleh server.</p>}
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -141,6 +151,7 @@ export function MedicalRecordsTab({ isFull }: { isFull: boolean }) {
 
 function TimelineModal({ initial, isFull, onClose, onChanged }: any) {
   const [timeline, setTimeline] = useState(initial)
+  useEffect(()=>setTimeline(initial),[initial])
   const [loadingMore, setLoadingMore] = useState(false)
   const [editor, setEditor] = useState<any>(null)
   const [loadingEditor, setLoadingEditor] = useState(false)
@@ -160,11 +171,16 @@ function TimelineModal({ initial, isFull, onClose, onChanged }: any) {
     } catch (error) { toast.error(error instanceof Error ? error.message : 'Gagal memuat timeline berikutnya.') }
     finally { setLoadingMore(false) }
   }
+  if(!isFull) return <Modal title={patient.nama_lengkap} onClose={onClose}>
+    <div className="space-y-2">{timeline.items.map((r:any)=><p key={r.event_id} className="rounded border p-3">{String(r.event_at).slice(0,10)}</p>)}</div>
+    {timeline.hasMore?<button disabled={loadingMore} onClick={()=>void loadMore()} className={secondary}>Muat berikutnya</button>:null}
+  </Modal>
   return <Modal title={`Rekam Kesehatan · ${patient.nama_lengkap}`} onClose={onClose} wide>
     <div className="space-y-4">
       <div className="flex gap-4 rounded-lg bg-slate-50 p-4"><SantriPhotoAvatar name={patient.nama_lengkap} src={patient.foto_url} size="md" /><div><p className="text-lg font-black">{patient.nama_lengkap}</p><p className="text-sm text-slate-500">{patient.poskestren_code || patient.medical_record_no} · {patient.nis}</p><p className="text-sm text-slate-500">{patient.asrama || '—'} / {patient.kamar || '—'}</p></div></div>
       {timeline.accessMode === 'FULL' ? <div className="grid gap-3 text-sm sm:grid-cols-3"><div className="rounded-lg border p-3"><b>Alergi Obat</b><p>{patient.allergies || 'Tidak ada catatan'}</p></div><div className="rounded-lg border p-3"><b>Riwayat Penyakit</b><p>{patient.special_conditions || 'Tidak ada catatan'}</p></div><div className="rounded-lg border p-3"><b>Obat Rutin</b><p>{patient.routine_medicines || 'Tidak ada catatan'}</p></div></div> : null}
-      <div className="relative space-y-3 border-l-2 border-emerald-100 pl-5">{timeline.items.map((row: any) => <article key={`${row.event_type}-${row.event_id}`} className="relative rounded-lg border p-3 before:absolute before:-left-[27px] before:top-4 before:h-3 before:w-3 before:rounded-full before:bg-emerald-500"><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-black">{row.event_type}</span>{isFull && row.event_type === 'PEMERIKSAAN' ? <button disabled={loadingEditor} onClick={() => void editVisit(row.event_id)} className="inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-black text-blue-700 hover:bg-blue-50"><Edit3 className="h-3 w-3" /> Edit</button> : null}</div><span className="text-xs text-slate-400">{String(row.event_at).slice(0, 16).replace('T', ' ')}</span></div><p className="mt-2 font-bold">{row.summary || '—'}</p><p className="text-sm text-slate-600">{row.result_text || row.status}</p>{row.referral_destination ? <p className="text-xs font-bold text-rose-600">Rujukan: {row.referral_destination}</p> : null}<p className="mt-1 text-xs text-slate-400">{row.personnel_name || '—'}</p></article>)}</div>
+      <div className="grid gap-2 text-sm sm:grid-cols-3"><p>Golongan darah: {patient.blood_type||'—'}</p><p>Kontak darurat: {patient.emergency_contact||'—'}</p><p>Catatan: {patient.notes||'—'}</p></div>
+      <div className="relative space-y-3 border-l-2 border-emerald-100 pl-5">{timeline.items.map((row: any) => <article key={`${row.event_type}-${row.event_id}`} className="relative rounded-lg border p-3 before:absolute before:-left-[27px] before:top-4 before:h-3 before:w-3 before:rounded-full before:bg-emerald-500"><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><span className="rounded bg-slate-100 px-2 py-1 text-[10px] font-black">{encounterLabels[row.event_type]||row.event_type}</span>{isFull && row.event_type === 'PEMERIKSAAN' ? <button disabled={loadingEditor} onClick={() => void editVisit(row.event_id)} className="inline-flex items-center gap-1 rounded px-2 py-1 text-[10px] font-black text-blue-700 hover:bg-blue-50"><Edit3 className="h-3 w-3" /> Edit</button> : null}</div><span className="text-xs text-slate-400">{String(row.event_at).slice(0, 16).replace('T', ' ')}</span></div><p className="mt-2 font-bold">{row.summary || '—'}</p><p className="text-sm text-slate-600">{observationLabels[row.result_text] || row.result_text || observationLabels[row.status] || row.status}</p>{row.referral_destination ? <p className="text-xs font-bold text-rose-600">Rujukan: {row.referral_destination}</p> : null}<p className="mt-1 text-xs text-slate-400">{row.personnel_name || '—'}</p><MedicalEventDetail detail={row.detail}/></article>)}</div>
       {timeline.hasMore ? <button disabled={loadingMore} onClick={() => void loadMore()} className={`${secondary} w-full`}>{loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Muat timeline berikutnya</button> : null}
     </div>
     {editor ? <RevisionModal data={editor} onClose={() => setEditor(null)} onSaved={async () => { setEditor(null); await onChanged() }} /> : null}
@@ -173,11 +189,12 @@ function TimelineModal({ initial, isFull, onClose, onChanged }: any) {
 
 function RevisionModal({ data, onClose, onSaved }: any) {
   const [pending, startTransition] = useTransition()
-  const [items, setItems] = useState<Array<PrescriptionDraftItem & { localId: string }>>(
+  const [items, setItems] = useState<PrescriptionDraftItem[]>(
     data.prescriptionItems.map((item: any) => ({
       localId: item.id,
-      medicineId: item.medicine_id,
-      requestedQuantityBase: Number(item.dispensed_quantity_base),
+      medicineId: item.medicine_id || '',
+      sourceType: item.source_type || 'STOCK',medicineName:item.medicine_name,unit:item.unit,
+      requestedQuantityBase: Number(item.source_type==='EXTERNAL'?item.quantity:item.dispensed_quantity_base),
       dosage: item.dosage || '',
       notes: item.notes || '',
     }))
@@ -214,11 +231,11 @@ function RevisionModal({ data, onClose, onSaved }: any) {
           <label className="text-xs font-bold">Dokter / sesi pelayanan *<select required name="practiceSessionId" defaultValue={visit.practice_session_id || ''} className={`${input} mt-1`}><option value="">Pilih sesi</option>{data.sessions.map((row: any) => <option key={row.id} value={row.id}>{row.full_name} · {row.session_date} · {row.status}</option>)}</select></label>
           <label className="text-xs font-bold">Diagnosis *<select required name="diagnosisId" defaultValue={visit.diagnosis_id || ''} className={`${input} mt-1`}><option value="">Pilih diagnosis</option>{data.diagnoses.map((row: any) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
           <label className="text-xs font-bold">Keluhan *<textarea required name="complaint" defaultValue={visit.complaint || ''} className={`${input} mt-1 min-h-24`} /></label>
-          <label className="text-xs font-bold">Tindakan<textarea name="treatment" defaultValue={visit.treatment || ''} className={`${input} mt-1 min-h-24`} /></label>
-          <label className="text-xs font-bold">Tindak lanjut<textarea name="followUp" defaultValue={visit.follow_up || ''} className={`${input} mt-1 min-h-20`} /></label>
-          <div className="space-y-3"><label className="text-xs font-bold">Tujuan rujukan<input name="referralDestination" defaultValue={visit.referral_destination || ''} className={`${input} mt-1`} /></label><label className="text-xs font-bold">Catatan rujukan<input name="referralNotes" defaultValue={visit.referral_notes || ''} className={`${input} mt-1`} /></label></div>
+          <label className="text-xs font-bold">Pemeriksaan<textarea name="treatment" defaultValue={visit.treatment || ''} className={`${input} mt-1 min-h-24`} /></label>
+          <label className="text-xs font-bold">Tindakan<textarea name="followUp" defaultValue={visit.follow_up || ''} className={`${input} mt-1 min-h-20`} /></label>
+          <div className="space-y-3"><label className="text-xs font-bold">Rujukan<input name="referralDestination" defaultValue={visit.referral_destination || ''} className={`${input} mt-1`} /></label><label className="text-xs font-bold">Catatan rujukan<input name="referralNotes" defaultValue={visit.referral_notes || ''} className={`${input} mt-1`} /></label></div>
         </div>
-        <div className="rounded-lg border"><div className="flex items-center justify-between border-b bg-slate-50 p-3"><div><b>Obat yang benar-benar diberikan</b><p className="text-[11px] text-slate-500">Selisih otomatis menjadi pengeluaran atau reversal stok.</p></div><button type="button" onClick={() => setItems(rows => [...rows, { localId: crypto.randomUUID(), medicineId: '', requestedQuantityBase: 1, dosage: '' }])} className={secondary}><Plus className="h-4 w-4" /> Obat</button></div><div className="space-y-2 p-3">{items.map((item, index) => <div key={item.localId} className="grid gap-2 rounded-lg border p-2 sm:grid-cols-[1fr_120px_1fr_auto]"><select value={item.medicineId} onChange={event => setItems(rows => rows.map((row, rowIndex) => rowIndex === index ? { ...row, medicineId: event.target.value } : row))} className={input}><option value="">Pilih obat</option>{data.medicines.map((medicine: any) => <option key={medicine.id} value={medicine.id}>{medicine.name} · stok {medicine.total_stock_base}</option>)}</select><input type="number" min={1} value={item.requestedQuantityBase} onChange={event => setItems(rows => rows.map((row, rowIndex) => rowIndex === index ? { ...row, requestedQuantityBase: Number(event.target.value) } : row))} className={input} /><input value={item.dosage || ''} onChange={event => setItems(rows => rows.map((row, rowIndex) => rowIndex === index ? { ...row, dosage: event.target.value } : row))} placeholder="Dosis" className={input} /><button type="button" onClick={() => setItems(rows => rows.filter((_, rowIndex) => rowIndex !== index))} className="rounded-lg p-3 text-rose-600"><Trash2 className="h-4 w-4" /></button></div>)}</div></div>
+        <PrescriptionEditor items={items} onChange={setItems} medicines={data.medicines}/>
         {data.revisions.length ? <details className="rounded-lg border p-3"><summary className="cursor-pointer text-sm font-bold">Riwayat revisi ({data.revisions.length})</summary><div className="mt-2 space-y-2">{data.revisions.map((row: any) => <div key={row.revision_no} className="rounded bg-slate-50 p-2 text-xs"><b>Revisi {row.revision_no}</b> · {row.created_at} · {row.revised_by_name || '—'}<p>{row.reason}</p></div>)}</div></details> : null}
         <button disabled={pending} className={`${primary} w-full`}>{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Edit3 className="h-4 w-4" />} Simpan revisi</button>
       </form>

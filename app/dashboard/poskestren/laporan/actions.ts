@@ -246,7 +246,7 @@ export async function getPayrollReport(month: string) {
            FROM poskestren_visit v
            WHERE v.personnel_id IS NOT NULL
              AND v.status IN ('SELESAI','DIRUJUK')
-             AND (v.treatment IS NULL OR TRIM(v.treatment) = '')
+             AND v.fee_category = 'NORMAL'
              AND v.queue_date BETWEEN ? AND ?
            UNION ALL
            SELECT v.personnel_id, 'PATIENT_TREATMENT' AS event_type, v.queue_date AS event_date,
@@ -260,8 +260,16 @@ export async function getPayrollReport(month: string) {
            FROM poskestren_visit v
            WHERE v.personnel_id IS NOT NULL
              AND v.status IN ('SELESAI','DIRUJUK')
-             AND v.treatment IS NOT NULL AND TRIM(v.treatment) <> ''
+             AND v.fee_category = 'TREATMENT'
              AND v.queue_date BETWEEN ? AND ?
+           UNION ALL
+           SELECT dv.personnel_id, 'DORM_PATIENT', DATE(dv.visited_at,'+7 hours'),
+             COALESCE((SELECT ch.patient_rate_rupiah FROM poskestren_compensation_history ch
+               WHERE ch.personnel_id=dv.personnel_id AND ch.effective_from<=DATE(dv.visited_at,'+7 hours')
+               ORDER BY ch.effective_from DESC LIMIT 1),0)
+           FROM poskestren_dorm_visit dv
+           WHERE dv.status='SELESAI' AND dv.completed_at IS NOT NULL AND dv.personnel_id IS NOT NULL
+             AND DATE(dv.visited_at,'+7 hours') BETWEEN ? AND ?
          ) rated
          GROUP BY rated.personnel_id, rated.event_type, rated.event_date, rated.rate
        ) e ON e.personnel_id = p.id
@@ -269,7 +277,7 @@ export async function getPayrollReport(month: string) {
          AND (p.employment_start IS NULL OR p.employment_start <= ?)
          AND (p.employment_end IS NULL OR p.employment_end >= ?)
        ORDER BY p.full_name, e.event_type, e.event_date`,
-      [from, to, from, to, from, to, to, from]
+      [from, to, from, to, from, to, from, to, to, from]
     ),
     query<any>(
       `SELECT p.id, p.full_name, p.position_name,
@@ -300,6 +308,8 @@ export async function getPayrollReport(month: string) {
       session_count: 0,
       visit_count: 0,
       visit_treatment_count: 0,
+      dorm_visit_count: 0,
+      dorm_subtotal: 0,
       session_rates: [] as string[],
       patient_rates: [] as string[],
       patient_treatment_rates: [] as string[],
@@ -316,12 +326,15 @@ export async function getPayrollReport(month: string) {
       row.visit_count += Number(event.event_count)
       row.patient_subtotal += Number(event.subtotal)
       row.patient_rates.push(`${event.event_date}:${event.rate}`)
+    } else if (event.event_type === 'DORM_PATIENT') {
+      row.dorm_visit_count += Number(event.event_count)
+      row.dorm_subtotal += Number(event.subtotal)
     } else if (event.event_type === 'PATIENT_TREATMENT') {
       row.visit_treatment_count += Number(event.event_count)
       row.patient_treatment_subtotal += Number(event.subtotal)
       row.patient_treatment_rates.push(`${event.event_date}:${event.rate}`)
     }
-    row.total = row.session_subtotal + row.patient_subtotal + row.patient_treatment_subtotal
+    row.total = row.session_subtotal + row.patient_subtotal + row.patient_treatment_subtotal + row.dorm_subtotal
     medicalMap.set(event.id, row)
   }
   const medicalRows = [...medicalMap.values()]

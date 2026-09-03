@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { Check, Loader2, Package, Search } from 'lucide-react'
 import { toast } from 'sonner'
+import { MedicineDetail } from '@/components/poskestren/medical-event-detail'
 
 import { EmptyState } from '@/components/poskestren/poskestren-shell'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
@@ -208,6 +209,7 @@ function DeliveryModal({ visit, onClose, onSaved }: { visit: any; onClose: () =>
                 </div>
                 {data.visit.referral_destination ? <p className="text-xs font-bold text-rose-600">Rujukan: {data.visit.referral_destination}</p> : null}
               </div>
+              <MedicineDetail items={(data.externalItems||[]).map((i:any)=>({...i,source_type:'EXTERNAL'}))}/>
               {items.length ? (
                 <div className="space-y-3">
                   {items.map((item: any) => {

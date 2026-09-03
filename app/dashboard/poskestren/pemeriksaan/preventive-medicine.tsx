@@ -1,4 +1,5 @@
 'use client'
+import { MedicineCombobox } from '@/components/poskestren/medicine-combobox'
 
 import { useMemo, useState, useTransition } from 'react'
 import { Pill, Plus, X } from 'lucide-react'
@@ -103,7 +104,7 @@ export function PreventiveMedicineButton({ programId }: { programId: string }) {
               <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 text-xs text-emerald-800">Pemakaian disimpan sebagai transaksi PREVENTIVE. Sistem menolak jumlah yang melebihi stok tersedia.</div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="space-y-1 sm:col-span-2"><span className="text-xs font-bold text-slate-600">Cari obat</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Nama, bentuk, atau kekuatan" className={inputClass} /></label>
-                <label className="space-y-1 sm:col-span-2"><span className="text-xs font-bold text-slate-600">Obat *</span><select value={medicineId} onChange={event => setMedicineId(event.target.value)} className={inputClass}><option value="">Pilih obat</option>{visibleOptions.map(row => <option key={row.id} value={row.id}>{row.name} · {row.form}{row.strength ? ` · ${row.strength}` : ''} (stok {row.total_stock_base})</option>)}</select></label>
+                <label className="space-y-1 sm:col-span-2"><span className="text-xs font-bold text-slate-600">Obat *</span><MedicineCombobox value={medicineId} onChange={event => setMedicineId(event.target.value)} className={inputClass}><option value="">Pilih obat</option>{visibleOptions.map(row => <option key={row.id} value={row.id}>{row.name} · {row.form}{row.strength ? ` · ${row.strength}` : ''} (stok {row.total_stock_base})</option>)}</MedicineCombobox></label>
                 <label className="space-y-1"><span className="text-xs font-bold text-slate-600">Jumlah *</span><input type="number" min="1" step="1" value={quantity} onChange={event => setQuantity(event.target.value)} className={inputClass} /></label>
                 <label className="space-y-1"><span className="text-xs font-bold text-slate-600">Dosis</span><input value={dosage} onChange={event => setDosage(event.target.value)} placeholder="Contoh: 1 tablet" className={inputClass} /></label>
                 <label className="space-y-1 sm:col-span-2"><span className="text-xs font-bold text-slate-600">Catatan</span><textarea value={notes} onChange={event => setNotes(event.target.value)} className={`${inputClass} min-h-20`} /></label>

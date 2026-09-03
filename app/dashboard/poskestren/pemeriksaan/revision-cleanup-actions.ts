@@ -76,7 +76,8 @@ export async function getVisitRevisionEditorData(visitId: string) {
       [visit.id]
     ),
   ])
-  return { visit, sessions, diagnoses, medicines, prescriptionItems, revisions }
+  const externalItems = await query<any>("SELECT i.*,'EXTERNAL' AS source_type FROM poskestren_prescription_external_item i JOIN poskestren_prescription r ON r.id=i.prescription_id WHERE r.visit_id=?",[visit.id])
+  return { visit, sessions, diagnoses, medicines, prescriptionItems:[...prescriptionItems,...externalItems], revisions }
 }
 
 export async function getSampleCleanupState() {

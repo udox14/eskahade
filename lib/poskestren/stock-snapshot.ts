@@ -1,3 +1,4 @@
+import { stockGuard } from './clinical'
 import { generateId, getDB, queryOne } from '@/lib/db'
 
 import { cleanText } from './query'
@@ -77,6 +78,7 @@ export async function prepareStockMutationFromSnapshot(
     stockBefore: input.stockBefore,
     stockAfter: after,
     statements: [
+      stockGuard(db, input.medicineId, input.stockBefore, locationId, locationBefore),
       db.prepare(
         `INSERT OR IGNORE INTO poskestren_medicine_location_stock(
            medicine_id, location_id, quantity_base

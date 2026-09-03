@@ -67,3 +67,6 @@ next-env.d.ts
 # cloudflare wrangler
 /.wrangler/
 .superdesign/tmp/
+
+# POSKESTREN browser test screenshots
+/tmp/poskestren-ui/

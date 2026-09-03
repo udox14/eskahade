@@ -1,3 +1,4 @@
+import { stockGuard } from './clinical'
 import { generateId, queryOne } from '@/lib/db'
 
 import { cleanText, parsePositiveInteger } from './query'
@@ -123,7 +124,8 @@ export async function prepareStockMutation(
       locationId,
       locationBefore: Number(locationStock?.quantity_base || 0),
       locationAfter: Number(locationStock?.quantity_base || 0),
-      statements: [],
+      statements: [
+],
     }
   }
 
@@ -148,6 +150,7 @@ export async function prepareStockMutation(
     locationBefore,
     locationAfter,
     statements: [
+      stockGuard(db, medicine.id, before, locationId, locationBefore),
       db.prepare(
         `INSERT OR IGNORE INTO poskestren_medicine_location_stock(
            medicine_id, location_id, quantity_base

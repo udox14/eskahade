@@ -18,7 +18,6 @@ import {
   Search,
   Stethoscope,
   UserPlus,
-  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -58,16 +57,19 @@ import {
   getDoctorsAndSessions,
   startPracticeForDoctor,
 } from './clinical-actions'
-import { DormVisitsTab, OutsideTreatmentTab } from './clinical-tabs'
+import { OutsideTreatmentTab } from './clinical-tabs'
+import { DormVisitsTab, ClinicalDeliveries } from './clinical-workflow'
+import { DiagnosisManagerButton } from './diagnosis-manager'
+import { ClinicalFields, PrescriptionEditor, readClinicalForm } from '@/components/poskestren/clinical-form'
 import { MedicalRecordsTab } from './medical-records-tab'
 import { MedicineDeliveryTab } from './medicine-delivery-tab'
-import { DiagnosisManagerButton } from './diagnosis-manager'
 import { PreventiveMedicineButton } from './preventive-medicine'
 
 
-type Tab = 'pasien' | 'hari-ini' | 'penyerahan' | 'pemeriksaan' | 'preventif' | 'visit-asrama' | 'berobat-keluar'
+type Tab = 'rekam-medis' | 'pasien' | 'hari-ini' | 'penyerahan' | 'pemeriksaan' | 'preventif' | 'visit-asrama' | 'berobat-keluar'
 
 const TABS = [
+  { value: 'rekam-medis' as const, label: 'Rekam Medis', icon: History },
   { value: 'pasien' as const, label: 'Daftar Pasien', icon: UserPlus },
   { value: 'hari-ini' as const, label: 'Pasien Hari Ini', icon: CalendarDays },
   { value: 'penyerahan' as const, label: 'Penyerahan Obat', icon: Package },
@@ -146,10 +148,10 @@ export default function PoskestrenPemeriksaanContent() {
       .catch(error => toast.error(error instanceof Error ? error.message : 'Akses Pemeriksaan ditolak.'))
   }, [])
   const visibleTabs = useMemo(
-    () => access?.isFull ? TABS : TABS.filter(tab => tab.value === 'pemeriksaan' || tab.value === 'berobat-keluar'),
+    () => access?.isFull ? TABS : TABS.filter(tab => tab.value === 'rekam-medis' || tab.value === 'berobat-keluar'),
     [access]
   )
-  const effectiveActiveTab = visibleTabs.some(tab => tab.value === activeTab) ? activeTab : 'pemeriksaan'
+  const effectiveActiveTab = visibleTabs.some(tab => tab.value === activeTab) ? activeTab : 'rekam-medis'
 
   function changeTab(tab: Tab) {
     setActiveTab(tab)
@@ -172,8 +174,9 @@ export default function PoskestrenPemeriksaanContent() {
       <PoskestrenTabs tabs={visibleTabs} active={effectiveActiveTab} onChange={changeTab} />
       {effectiveActiveTab === 'pasien' ? <PatientTab /> : null}
       {effectiveActiveTab === 'hari-ini' ? <TodayTab onGoToDelivery={() => changeTab('penyerahan')} /> : null}
-      {effectiveActiveTab === 'penyerahan' ? <MedicineDeliveryTab /> : null}
-      {effectiveActiveTab === 'pemeriksaan' ? <MedicalRecordsTab isFull={access.isFull} /> : null}
+      {effectiveActiveTab === 'penyerahan' ? <><MedicineDeliveryTab /><ClinicalDeliveries /></> : null}
+      {effectiveActiveTab === 'rekam-medis' ? <MedicalRecordsTab isFull={access.isFull} /> : null}
+      {effectiveActiveTab === 'pemeriksaan' && access.isFull ? <HistoryTab /> : null}
       {effectiveActiveTab === 'preventif' ? <PreventiveTab canWrite={access.isFull} /> : null}
       {effectiveActiveTab === 'visit-asrama' && access.isFull ? <DormVisitsTab /> : null}
       {effectiveActiveTab === 'berobat-keluar' ? <OutsideTreatmentTab isFull={access.isFull} canWrite={access.canWriteOutsideTreatment} /> : null}
@@ -315,13 +318,12 @@ function PatientTab() {
   function submitPatientUpdate(formData: FormData) {
     if (!editingPatient) return
     startTransition(async () => {
-      const result = await updatePatient({
-        id: editingPatient.id,
-        allergies: String(formData.get('allergies') || ''),
-        specialConditions: String(formData.get('specialConditions') || ''),
-        routineMedicines: String(formData.get('routineMedicines') || ''),
-        notes: String(formData.get('notes') || ''),
-      })
+      const changes: Record<string,string> = {}
+      for(const [name,column] of Object.entries({allergies:'allergies',specialConditions:'special_conditions',routineMedicines:'routine_medicines',notes:'notes'})) {
+        const value=String(formData.get(name)||'')
+        if(value!==String(editingPatient[column]||''))changes[name]=value
+      }
+      const result = await updatePatient({id:editingPatient.id,profileVersion:editingPatient.profile_version,...changes})
       if (!result.success) { toast.error(result.error); return }
       toast.success('Profil medis diperbarui.')
       setEditingPatient(null)
@@ -341,15 +343,15 @@ function PatientTab() {
             <button className={buttonSecondary} onClick={() => void openSickModal()}>
               <Hospital className="h-4 w-4" /> Data Sakit
             </button>
-            <button className={buttonPrimary} onClick={() => setShowAdd(true)}>
-              <Plus className="h-4 w-4" /> Daftar pasien
+            <button className={buttonPrimary} onClick={() => document.getElementById('pos-patient-search')?.focus()}>
+              <Search className="h-4 w-4" /> Cari profil
             </button>
           </div>
         </div>
         <div className="flex flex-col gap-3 bg-slate-50/70 p-4 sm:flex-row">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input value={queryText} onChange={event => setQueryText(event.target.value)} placeholder="Nama, NIS, nomor RM, asrama, kamar..." className={`${inputClass} pl-9`} />
+            <input id="pos-patient-search" value={queryText} onChange={event => setQueryText(event.target.value)} placeholder="Nama, NIS, nomor RM, asrama, kamar..." className={`${inputClass} pl-9`} />
           </div>
           <PageSizeSelect value={pageSize} onChange={setPageSize} hasFilter={Boolean(queryText)} />
         </div>
@@ -708,7 +710,7 @@ function TodayTab({ onGoToDelivery }: { onGoToDelivery: () => void }) {
   const [loading, setLoading] = useState(true)
   const [pending, startTransition] = useTransition()
   const [examVisit, setExamVisit] = useState<any>(null)
-  const [prescription, setPrescription] = useState<Array<PrescriptionDraftItem & { localId: string }>>([])
+  const [prescription, setPrescription] = useState<PrescriptionDraftItem[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -765,29 +767,18 @@ function TodayTab({ onGoToDelivery }: { onGoToDelivery: () => void }) {
   }, [result.items])
 
   function submitExam(formData: FormData) {
-    if (!examVisit) return
-    const diagnosisId = String(formData.get('diagnosisId') || '')
-    const diagnosis = diagnoses.find(item => item.id === diagnosisId)
-    if (!diagnosis) {
-      toast.error('Pilih diagnosis dari master diagnosis.')
-      return
-    }
-    run(
-      () => completeVisit({
-        visitId: examVisit.id,
-        complaint: String(formData.get('complaint') || ''),
-        diagnosisId,
-        diagnosis: diagnosis.name,
-        treatment: String(formData.get('treatment') || ''),
-        followUp: String(formData.get('followUp') || ''),
-        referralDestination: String(formData.get('referralDestination') || ''),
-        referralNotes: String(formData.get('referralNotes') || ''),
-        prescriptionItems: prescription,
-      }),
-      'Pemeriksaan disimpan. Obat dapat diserahkan di tab Penyerahan Obat.'
-    )
-    setExamVisit(null)
-    setPrescription([])
+    if(!examVisit)return
+    const data=readClinicalForm(formData)
+    const diagnosis=diagnoses.find(item=>item.id===data.diagnosisId)
+    if(!diagnosis){toast.error('Pilih diagnosis.');return}
+    startTransition(async()=>{
+      try {
+        const response=await completeVisit({...data,visitId:examVisit.id,diagnosis:diagnosis.name,prescriptionItems:prescription})
+        if(!response.success){toast.error(response.error);return}
+        toast.success('Pemeriksaan disimpan. Resep menunggu penyerahan.')
+        setExamVisit(null);setPrescription([]);await load()
+      }catch(e){toast.error(e instanceof Error?e.message:'Gagal menyimpan pemeriksaan.')}
+    })
   }
 
   const selectedDoctor = doctorData.doctors.find((doctor: any) => doctor.id === selectedDoctorId)
@@ -915,25 +906,12 @@ function TodayTab({ onGoToDelivery }: { onGoToDelivery: () => void }) {
                   <div><span className="text-xs font-bold text-slate-400">Alergi obat</span><p className="font-semibold text-rose-600">{examVisit.allergies || 'Tidak ada catatan'}</p></div>
                 </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Keluhan *"><textarea required name="complaint" defaultValue={examVisit.complaint || ''} className={`${inputClass} min-h-24`} /></Field>
-                <div><Field label="Diagnosis *"><select required name="diagnosisId" className={inputClass}><option value="">Pilih diagnosis</option>{diagnoses.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><DiagnosisManagerButton onChanged={load} /></div>
-                <Field label="Tindakan"><textarea name="treatment" className={`${inputClass} min-h-24`} /></Field>
-                <Field label="Tindak lanjut"><textarea name="followUp" className={`${inputClass} min-h-24`} /></Field>
-                <Field label="Tujuan rujukan"><input name="referralDestination" className={inputClass} /></Field>
-                <Field label="Catatan rujukan"><input name="referralNotes" className={inputClass} /></Field>
-              </div>
-              <div className="rounded-2xl border border-slate-200">
-                <div className="flex items-center justify-between border-b bg-slate-50 p-3"><div><p className="font-bold">Resep</p><p className="text-xs text-slate-500">Jumlah menggunakan satuan dasar obat.</p></div><button type="button" onClick={() => setPrescription(rows => [...rows, { localId: crypto.randomUUID(), medicineId: '', requestedQuantityBase: 1, dosage: '' }])} className={buttonSecondary}><Plus className="h-4 w-4" /> Obat</button></div>
-                {prescription.length ? <div className="space-y-3 p-3">{prescription.map((item, index) => (
-                  <div key={item.localId} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-[1fr_120px_1fr_auto]">
-                    <select value={item.medicineId} onChange={event => setPrescription(rows => rows.map(row => row.localId === item.localId ? { ...row, medicineId: event.target.value } : row))} className={inputClass}><option value="">Pilih obat</option>{medicines.map(medicine => <option key={medicine.id} value={medicine.id}>{medicine.name} · stok {medicine.total_stock_base} {medicine.base_unit}</option>)}</select>
-                    <input type="number" min={1} value={item.requestedQuantityBase} onChange={event => setPrescription(rows => rows.map(row => row.localId === item.localId ? { ...row, requestedQuantityBase: Number(event.target.value) } : row))} className={inputClass} />
-                    <input placeholder="Dosis, mis. 3×1" value={item.dosage || ''} onChange={event => setPrescription(rows => rows.map(row => row.localId === item.localId ? { ...row, dosage: event.target.value } : row))} className={inputClass} />
-                    <button type="button" title={`Hapus obat ${index + 1}`} onClick={() => setPrescription(rows => rows.filter(row => row.localId !== item.localId))} className="rounded-xl p-3 text-rose-600 hover:bg-rose-50"><X className="h-4 w-4" /></button>
-                  </div>
-                ))}</div> : <p className="p-5 text-center text-sm text-slate-500">Tidak ada obat.</p>}
-              </div>
+              <ClinicalFields initial={{complaint:examVisit.complaint,allergies:examVisit.allergies,diseaseHistory:examVisit.special_conditions,
+                temperatureCelsius:examVisit.temperature_celsius,systolicPressure:examVisit.systolic_pressure,
+                diastolicPressure:examVisit.diastolic_pressure,weightKg:examVisit.weight_kg,
+                ...(examVisit.clinical_snapshot?JSON.parse(examVisit.clinical_snapshot):{})}} diagnoses={diagnoses}/>
+              <DiagnosisManagerButton onChanged={load}/>
+              <PrescriptionEditor items={prescription} onChange={setPrescription} medicines={medicines}/>
               <button disabled={pending} className={`${buttonPrimary} w-full`}>{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Selesaikan pemeriksaan</button>
               </form>
             </div>
@@ -944,7 +922,6 @@ function TodayTab({ onGoToDelivery }: { onGoToDelivery: () => void }) {
   )
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function HistoryTab() {
   const today = toWibDateInputValue()
   const [from, setFrom] = useState(`${today.slice(0, 7)}-01`)
@@ -987,7 +964,7 @@ function HistoryTab() {
                   <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                     <div><dt className="text-xs font-bold text-slate-400">Keluhan</dt><dd>{row.complaint || '—'}</dd></div>
                     <div><dt className="text-xs font-bold text-slate-400">Diagnosis</dt><dd>{row.diagnosis || '—'}</dd></div>
-                    <div><dt className="text-xs font-bold text-slate-400">Tindakan</dt><dd>{row.treatment || '—'}</dd></div>
+                    <div><dt className="text-xs font-bold text-slate-400">Pemeriksaan</dt><dd>{row.treatment || '—'}</dd></div>
                     <div><dt className="text-xs font-bold text-slate-400">Obat</dt><dd>{row.medicine_names || '—'}</dd></div>
                   </dl>
                 </div>
@@ -1013,7 +990,7 @@ function HistoryTab() {
               <tr>
                 <th className="px-4 py-3 font-bold">Tanggal / Pasien</th>
                 <th className="px-4 py-3 font-bold">Keluhan</th>
-                <th className="px-4 py-3 font-bold">Diagnosis / Tindakan</th>
+                <th className="px-4 py-3 font-bold">Diagnosis / Pemeriksaan</th>
                 <th className="px-4 py-3 font-bold">Obat</th>
                 <th className="px-4 py-3 text-right font-bold">Aksi</th>
               </tr>

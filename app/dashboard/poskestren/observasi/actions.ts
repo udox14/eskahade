@@ -2,12 +2,14 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { medicalEventDetail } from '@/lib/poskestren/medical-detail'
+import { parseWibDateTime } from '@/lib/date/wib'
+import { claim, normalizeClinical, type ClinicalInput } from '@/lib/poskestren/clinical'
 
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { generateId, getDB, query, queryOne } from '@/lib/db'
 import { requirePoskestrenClinicalWrite } from '@/lib/poskestren/access'
 import { cleanText, normalizePoskestrenListQuery } from '@/lib/poskestren/query'
-import { normalizeClinicalMedicines, prepareStockMutation } from '@/lib/poskestren/stock'
 import type { ClinicalMedicineDraftItem, PoskestrenListQuery } from '@/lib/poskestren/types'
 
 const PATH = '/dashboard/poskestren/observasi'
@@ -84,14 +86,20 @@ export async function getObservations(input: PoskestrenListQuery = {}) {
 export async function createObservation(input: {
   santriId: string
   admittedAt: string
+  requestId?: string
+  clinicalSnapshot?: ClinicalInput
   symptoms: string
   notes?: string
 }) {
   const session = await requirePoskestrenClinicalWrite()
   const symptoms = cleanText(input.symptoms)
-  const admittedAt = new Date(input.admittedAt)
+  const admittedAt = parseWibDateTime(input.admittedAt)
   if (!symptoms || Number.isNaN(admittedAt.getTime())) {
     return { success: false as const, error: 'Tanggal masuk dan gejala wajib diisi.' }
+  }
+  if(input.requestId) {
+    const existing=await queryOne<{id:string}>('SELECT id FROM poskestren_observation WHERE id=?',[input.requestId])
+    if(existing)return {success:true as const,id:existing.id}
   }
   const patientId = await ensurePatient(input.santriId, session.id)
   const active = await queryOne<{ id: string }>(
@@ -99,12 +107,12 @@ export async function createObservation(input: {
     [patientId]
   )
   if (active) return { success: false as const, error: 'Santri masih memiliki observasi aktif.' }
-  const id = generateId()
-  await (await getDB()).prepare(
-    `INSERT INTO poskestren_observation(
-       id, patient_id, admitted_at, symptoms, notes, status, created_by
-     ) VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?)`
-  ).bind(id, patientId, admittedAt.toISOString(), symptoms, cleanText(input.notes), session.id).run()
+  const id = input.requestId || generateId()
+  const db=await getDB()
+  const clinical = input.clinicalSnapshot ? normalizeClinical(input.clinicalSnapshot) : null
+  await db.batch([claim(db,'observe:'+id),
+    db.prepare("INSERT INTO poskestren_observation(id,patient_id,admitted_at,symptoms,notes,status,created_by,clinical_snapshot) VALUES(?,?,?,?,?,'ACTIVE',?,?)")
+    .bind(id,patientId,admittedAt.toISOString(),symptoms,cleanText(input.notes),session.id,clinical?JSON.stringify(clinical):null)])
   await audit(session, 'create', 'poskestren_observation', id, 'Membuka observasi pasien', { patient_id: patientId })
   refresh()
   return { success: true as const, id }
@@ -130,68 +138,17 @@ export async function getObservationDetail(id: string) {
      ORDER BY om.administered_at DESC, om.id DESC`,
     [id]
   )
-  return { observation, medicines }
+  return { observation, medicines, medicalDetail: await medicalEventDetail('OBSERVASI',id) }
 }
 
-export async function addObservationMedicine(input: {
+export async function addObservationMedicine(_input: {
   observationId: string
   administeredAt: string
   medicine: ClinicalMedicineDraftItem
 }) {
-  const session = await requirePoskestrenClinicalWrite()
-  const observation = await queryOne<{ id: string; status: string; asrama: string | null }>(
-    `SELECT o.id, o.status, s.asrama
-     FROM poskestren_observation o
-     JOIN poskestren_patient p ON p.id = o.patient_id
-     JOIN santri s ON s.id = p.santri_id
-     WHERE o.id = ?`,
-    [input.observationId]
-  )
-  if (!observation || observation.status !== 'ACTIVE') {
-    return { success: false as const, error: 'Observasi sudah selesai atau tidak ditemukan.' }
-  }
-  const administeredAt = new Date(input.administeredAt)
-  if (Number.isNaN(administeredAt.getTime())) return { success: false as const, error: 'Waktu pemberian obat tidak valid.' }
-  const [medicine] = normalizeClinicalMedicines([input.medicine])
-  const id = generateId()
-  const db = await getDB()
-  const statements: D1PreparedStatement[] = []
-  let medicineName = medicine.medicineName
-  if (medicine.sourceType === 'STOCK') {
-    const mutation = await prepareStockMutation(db, {
-      medicineId: medicine.medicineId!,
-      quantityDelta: -Number(medicine.quantityBase),
-      movementType: 'PATIENT',
-      movementDate: administeredAt.toISOString().slice(0, 10),
-      referenceType: 'OBSERVATION_MEDICINE',
-      referenceId: id,
-      actorId: session.id,
-      notes: medicine.dosage,
-      locationId: medicine.locationId,
-      preferredAsrama: observation.asrama,
-    })
-    medicineName = mutation.medicineName
-    statements.push(...mutation.statements)
-  }
-  statements.push(
-    db.prepare(
-      `INSERT INTO poskestren_observation_medicine(
-         id, observation_id, administered_at, source_type, medicine_id,
-         medicine_name, quantity_base, dosage, notes, created_by
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      id, observation.id, administeredAt.toISOString(), medicine.sourceType,
-      medicine.medicineId || null, medicineName, medicine.quantityBase,
-      medicine.dosage, medicine.notes, session.id
-    )
-  )
-  await db.batch(statements)
-  await audit(session, 'create', 'poskestren_observation_medicine', id, 'Mencatat pemberian obat observasi', {
-    observation_id: observation.id,
-    source_type: medicine.sourceType,
-  })
-  refresh()
-  return { success: true as const, id }
+  void _input
+  await requirePoskestrenClinicalWrite()
+  return {success:false as const,error:'Gunakan resep dokter dan Penyerahan Obat untuk pemberian obat Observasi.'}
 }
 
 export async function closeObservation(input: {
@@ -201,13 +158,15 @@ export async function closeObservation(input: {
   referralDestination?: string
 }) {
   const session = await requirePoskestrenClinicalWrite()
-  const dischargedAt = new Date(input.dischargedAt)
+  const dischargedAt = parseWibDateTime(input.dischargedAt)
   const referralDestination = cleanText(input.referralDestination, 200)
   if (Number.isNaN(dischargedAt.getTime())) return { success: false as const, error: 'Tanggal keluar tidak valid.' }
   if (!['RECOVERED','REFERRED'].includes(input.result)) return { success: false as const, error: 'Hasil observasi tidak valid.' }
   if (input.result === 'REFERRED' && !referralDestination) {
     return { success: false as const, error: 'Tujuan rujukan wajib diisi.' }
   }
+  const current=await queryOne<{admitted_at:string}>('SELECT admitted_at FROM poskestren_observation WHERE id=?',[input.observationId])
+  if(!current || dischargedAt.getTime()<new Date(current.admitted_at).getTime()) return {success:false as const,error:'Tanggal keluar tidak boleh sebelum tanggal masuk.'}
   const result = await (await getDB()).prepare(
     `UPDATE poskestren_observation
      SET status = ?, discharged_at = ?, referral_destination = ?,

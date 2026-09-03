@@ -36,6 +36,10 @@ export type PoskestrenListResult<T> = {
 }
 
 export type PrescriptionDraftItem = {
+  localId?: string
+  sourceType?: PoskestrenMedicineSource
+  medicineName?: string | null
+  unit?: string | null
   medicineId: string
   locationId?: string | null
   requestedQuantityBase: number
@@ -66,3 +70,11 @@ export const POSKESTREN_HREF = {
   management: '/dashboard/poskestren/manajemen',
 } as const
 
+
+
+export type MedicalRecordSummaryPatient = {
+  patient_id: string
+  nama_lengkap: string
+}
+export type MedicalRecordSummaryRow = MedicalRecordSummaryPatient & { last_event_at: string }
+export type MedicalRecordSummaryEvent = { event_id: string; event_at: string }

@@ -2,6 +2,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { claim, normalizeClinical, normalizePrescription, type ClinicalInput } from '@/lib/poskestren/clinical'
 
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { generateId, getDB, query, queryOne } from '@/lib/db'
@@ -14,7 +15,6 @@ import {
   encodeCursor,
   normalizePoskestrenListQuery,
   parseNonNegativeInteger,
-  parsePositiveInteger,
   toFtsPrefixQuery,
 } from '@/lib/poskestren/query'
 import { prepareStockMutationFromSnapshot } from '@/lib/poskestren/stock-snapshot'
@@ -30,6 +30,7 @@ const PATH = POSKESTREN_HREF.examination
 const refresh = () => revalidatePath(PATH)
 
 type PatientRow = {
+  profile_version: number
   id: string
   santri_id: string
   medical_record_no: string
@@ -161,7 +162,7 @@ export async function createPatient(input: {
     'SELECT id FROM poskestren_patient WHERE santri_id = ?',
     [santri.id]
   )
-  if (existing) return { success: false as const, error: 'Santri sudah terdaftar sebagai pasien.' }
+  if (existing) return { success: false as const, error: 'Profil santri sudah tersedia. Gunakan Edit profil medis pada Daftar Pasien.' }
 
   const id = generateId()
   await (await getDB()).prepare(
@@ -191,6 +192,7 @@ export async function createPatient(input: {
 
 export async function updatePatient(input: {
   id: string
+  profileVersion: number
   bloodType?: string
   allergies?: string
   specialConditions?: string
@@ -207,20 +209,16 @@ export async function updatePatient(input: {
   )
   if (!patient) return { success: false as const, error: 'Pasien tidak ditemukan.' }
 
-  await (await getDB()).prepare(
-    `UPDATE poskestren_patient
-     SET blood_type = ?, allergies = ?, special_conditions = ?, routine_medicines = ?,
-         emergency_contact = ?, notes = ?, updated_at = datetime('now')
-     WHERE id = ?`
-  ).bind(
-    cleanText(input.bloodType, 10),
-    cleanText(input.allergies),
-    cleanText(input.specialConditions),
-    cleanText(input.routineMedicines),
-    cleanText(input.emergencyContact, 200),
-    cleanText(input.notes),
-    input.id
-  ).run()
+  const mapping = {bloodType:'blood_type',allergies:'allergies',specialConditions:'special_conditions',
+    routineMedicines:'routine_medicines',emergencyContact:'emergency_contact',notes:'notes'} as const
+  const fields = Object.entries(mapping).filter(([key])=>Object.prototype.hasOwnProperty.call(input,key))
+  if(!fields.length) return {success:true as const}
+  const values = fields.map(([key])=>cleanText(input[key as keyof typeof mapping]))
+  const result = await (await getDB()).prepare(
+    'UPDATE poskestren_patient SET '+fields.map(([,column])=>column+'=?').join(',')+
+    ",profile_version=profile_version+1,updated_at=datetime('now') WHERE id=? AND profile_version=?"
+  ).bind(...values,input.id,input.profileVersion).run()
+  if(!result.meta.changes) return {success:false as const,error:'Profil telah diubah. Muat ulang sebelum menyimpan.'}
 
   await writeAudit(session, 'update', 'poskestren_patient', input.id, `Memperbarui profil medis ${patient.nama_lengkap}`)
   refresh()
@@ -245,7 +243,7 @@ export async function getPatients(input: PoskestrenListQuery = {}): Promise<Posk
   }
 
   const rows = await query<PatientRow>(
-    `SELECT p.id, p.santri_id, p.medical_record_no, p.blood_type, p.allergies,
+    `SELECT p.id, p.santri_id, p.medical_record_no, p.profile_version, p.blood_type, p.allergies,
             p.special_conditions, p.routine_medicines, p.emergency_contact, p.notes, p.created_at,
             s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah,
             s.status_global, s.foto_url
@@ -418,25 +416,10 @@ function parseVitals(input: {
 }
 
 function patientAnamnesisStatement(
-  db: Awaited<ReturnType<typeof getDB>>,
-  patientId: string,
-  allergies?: string,
-  diseaseHistory?: string
+  db: Awaited<ReturnType<typeof getDB>>, visitId: string, allergies?: string, diseaseHistory?: string
 ) {
-  // Hanya timpa kolom yang benar-benar dikirim pemanggil — kalau salah satu
-  // field (misal diseaseHistory) tidak disertakan, kolom itu harus tetap
-  // apa adanya, bukan ditimpa NULL.
-  return db.prepare(
-    `UPDATE poskestren_patient
-     SET allergies = CASE WHEN ? THEN ? ELSE allergies END,
-         special_conditions = CASE WHEN ? THEN ? ELSE special_conditions END,
-         updated_at = datetime('now')
-     WHERE id = ?`
-  ).bind(
-    allergies !== undefined ? 1 : 0, cleanText(allergies),
-    diseaseHistory !== undefined ? 1 : 0, cleanText(diseaseHistory),
-    patientId
-  )
+  return db.prepare("UPDATE poskestren_visit SET clinical_snapshot=json_object('allergies',CASE WHEN ? THEN ? ELSE (SELECT allergies FROM poskestren_patient WHERE id=patient_id) END,'diseaseHistory',CASE WHEN ? THEN ? ELSE (SELECT special_conditions FROM poskestren_patient WHERE id=patient_id) END) WHERE id=?")
+    .bind(allergies!==undefined?1:0,cleanText(allergies),diseaseHistory!==undefined?1:0,cleanText(diseaseHistory),visitId)
 }
 
 export async function registerManualVisit(input: {
@@ -477,9 +460,7 @@ export async function registerManualVisit(input: {
     diastolicPressure: vitals.diastolicPressure,
     weightKg: vitals.weightKg,
   })
-  if (input.allergies !== undefined || input.diseaseHistory !== undefined) {
-    await patientAnamnesisStatement(db, patient.id, input.allergies, input.diseaseHistory).run()
-  }
+  await patientAnamnesisStatement(db, id, input.allergies, input.diseaseHistory).run()
   await writeAudit(session, 'create', 'poskestren_visit', id, `Mendaftarkan kunjungan ${patient.nama_lengkap}`, {
     complaint,
   })
@@ -544,9 +525,7 @@ export async function importSickEpisode(input: {
       diastolicPressure: vitals.diastolicPressure,
       weightKg: vitals.weightKg,
     })
-    if (input.allergies !== undefined || input.diseaseHistory !== undefined) {
-      await patientAnamnesisStatement(db, patientId, input.allergies, input.diseaseHistory).run()
-    }
+    await patientAnamnesisStatement(db, id, input.allergies, input.diseaseHistory).run()
     await writeAudit(session, 'create', 'poskestren_visit', id, `Mengimpor Data Sakit ${source.nama_lengkap}`, {
       source_episode_id: resolvedEpisodeId,
     })
@@ -614,7 +593,7 @@ export async function getVisits(input: PoskestrenListQuery & { date?: string } =
     special_conditions: string | null
     personnel_name: string | null
   }>(
-    `SELECT v.id, v.patient_id, v.queue_date, v.queue_number, v.status, v.source_type,
+    `SELECT v.clinical_snapshot, v.id, v.patient_id, v.queue_date, v.queue_number, v.status, v.source_type,
             v.complaint, v.diagnosis, v.treatment, v.follow_up,
             v.referral_destination, v.referral_notes, v.personnel_id, v.practice_session_id,
             v.started_at, v.completed_at, v.awaiting_medicine,
@@ -814,7 +793,7 @@ export async function getMedicineOptions() {
   )
 }
 
-export async function completeVisit(input: {
+export async function completeVisit(input: ClinicalInput & {
   visitId: string
   complaint: string
   diagnosis: string
@@ -851,35 +830,13 @@ export async function completeVisit(input: {
     return { success: false as const, error: 'Kunjungan belum aktif atau sudah selesai.' }
   }
 
-  const cleanItems = (input.prescriptionItems || [])
-    .filter(item => item.medicineId)
-    .map(item => ({
-      medicineId: item.medicineId,
-      requested: parsePositiveInteger(item.requestedQuantityBase, 'Jumlah obat'),
-      dosage: cleanText(item.dosage, 200),
-      notes: cleanText(item.notes, 200),
-    }))
-
-  const uniqueMedicineIds = [...new Set(cleanItems.map(item => item.medicineId))]
-  if (uniqueMedicineIds.length !== cleanItems.length) {
-    return { success: false as const, error: 'Obat yang sama tidak boleh muncul dua kali.' }
-  }
-
+  const normalizedItems = await normalizePrescription(input.prescriptionItems || [])
+  const cleanItems = normalizedItems.filter(item=>item.sourceType==='STOCK').map(item=>({...item,requested:item.quantity}))
+  const externalItems = normalizedItems.filter(item=>item.sourceType==='EXTERNAL')
+  const clinical = normalizeClinical(input)
   const db = await getDB()
-  const medicineRows = uniqueMedicineIds.length
-    ? await query<{ id: string }>(
-        `SELECT id
-         FROM poskestren_medicine
-         WHERE id IN (${uniqueMedicineIds.map(() => '?').join(',')}) AND is_active = 1`,
-        uniqueMedicineIds
-      )
-    : []
-  if (medicineRows.length !== uniqueMedicineIds.length) {
-    return { success: false as const, error: 'Salah satu obat tidak ditemukan.' }
-  }
-
   const statements: any[] = []
-  const prescriptionId = cleanItems.length ? generateId() : null
+  const prescriptionId = normalizedItems.length ? generateId() : null
   if (prescriptionId) {
     statements.push(db.prepare(
       `INSERT INTO poskestren_prescription(id, visit_id, status, created_by)
@@ -898,6 +855,12 @@ export async function completeVisit(input: {
     )
   }
 
+  statements.unshift(claim(db,'complete-visit:'+visit.id,"EXISTS(SELECT 1 FROM poskestren_visit WHERE id=? AND status='DIPERIKSA' AND awaiting_medicine=0)",[visit.id]))
+  for (const item of externalItems) statements.push(db.prepare(
+    'INSERT INTO poskestren_prescription_external_item(id,prescription_id,medicine_name,quantity,unit,dosage,notes) VALUES(?,?,?,?,?,?,?)'
+  ).bind(generateId(),prescriptionId,item.medicineName,item.quantity,item.unit,item.dosage,item.notes))
+  statements.push(db.prepare('UPDATE poskestren_visit SET clinical_snapshot=?,fee_category=? WHERE id=?')
+    .bind(JSON.stringify(clinical), clinical.followUp ? 'TREATMENT' : 'NORMAL',visit.id))
   const now = new Date().toISOString()
   statements.push(
     db.prepare(
@@ -1017,7 +980,8 @@ export async function getVisitPrescriptionForDelivery(visitId: string) {
         [prescription.id]
       )
     : []
-  return { visit, prescription, items }
+  const externalItems = prescription ? await query<any>('SELECT * FROM poskestren_prescription_external_item WHERE prescription_id=?',[prescription.id]) : []
+  return { visit, prescription, items, externalItems }
 }
 
 export async function deliverVisitMedicines(input: {
@@ -1054,8 +1018,8 @@ export async function deliverVisitMedicines(input: {
     return { success: false as const, error: 'Obat sudah pernah diserahkan.' }
   }
   const prescriptionItems = prescription
-    ? await query<{ id: string; medicine_id: string; dosage: string | null }>(
-        `SELECT id, medicine_id, dosage
+    ? await query<{ id: string; medicine_id: string; dosage: string | null; requested_quantity_base: number }>(
+        `SELECT id, medicine_id, dosage, requested_quantity_base
          FROM poskestren_prescription_item WHERE prescription_id = ?`,
         [prescription.id]
       )
@@ -1071,6 +1035,9 @@ export async function deliverVisitMedicines(input: {
   if (new Set(cleaned.map(item => item.medicineId)).size !== cleaned.length) {
     return { success: false as const, error: 'Obat yang sama tidak boleh diulang.' }
   }
+  if (cleaned.some(item => item.quantity > Number(prescriptionItems.find(row=>row.medicine_id===item.medicineId)?.requested_quantity_base ?? -1))) {
+    return {success:false as const,error:'Jumlah penyerahan melebihi resep.'}
+  }
   const allowedIds = new Set(prescriptionItems.map(item => item.medicine_id))
   if (cleaned.some(item => !allowedIds.has(item.medicineId))) {
     return { success: false as const, error: 'Ada obat yang tidak ada di resep dokter.' }
@@ -1080,7 +1047,8 @@ export async function deliverVisitMedicines(input: {
   }
 
   const db = await getDB()
-  const statements: any[] = []
+  const statements: any[] = [claim(db,'deliver-visit:'+visit.id,
+    "EXISTS(SELECT 1 FROM poskestren_visit WHERE id=? AND awaiting_medicine=1)",[visit.id])]
   const medicineRows = cleaned.length
     ? await query<{ id: string; name: string; total_stock_base: number }>(
         `SELECT id, name, total_stock_base
@@ -1188,6 +1156,9 @@ export async function reviseCompletedVisit(input: {
   const finalStatus = cleanText(input.referralDestination, 200) ? 'DIRUJUK' : 'SELESAI'
   const db = await getDB()
   await db.batch([
+    claim(db,'basic-revise:'+input.visitId+':'+revisionNo,'EXISTS(SELECT 1 FROM poskestren_visit WHERE id=? AND revision_no=?)',[input.visitId,Number(before.revision_no||0)]),
+    db.prepare("UPDATE poskestren_visit SET fee_category=CASE WHEN COALESCE(follow_up,'')<>? THEN ? ELSE fee_category END WHERE id=?")
+      .bind(cleanText(input.followUp)||'',cleanText(input.followUp)?'TREATMENT':'NORMAL',input.visitId),
     db.prepare(
       `INSERT INTO poskestren_visit_revision(
          id, visit_id, revision_no, before_json, reason, revised_by
