@@ -210,6 +210,7 @@ const FITUR_DESC: Record<string, string> = {
   '/dashboard/akademik/administrasi-guru':           'Cetak bundle administrasi guru per kelas dalam format PDF atau Word.',
   '/dashboard/laporan/rapor':                        'Cetak rapor santri dalam format PDF siap print.',
   '/dashboard/akademik/absensi':                     'Input absensi pengajian santri secara mingguan.',
+  '/dashboard/guru/absensi':                         'Catat absensi pribadi pengajar per kelas dan sesi pengajian.',
   '/dashboard/akademik/absensi/rekap':               'Lihat rekap absensi santri per periode and filter.',
   '/dashboard/akademik/absensi/verifikasi':          'Verifikasi dan proses sidang alfa santri mingguan.',
   '/dashboard/akademik/absensi/vonis-final':         'Proses vonis final alfa pengajian dari hasil pemanggilan.',

@@ -407,6 +407,7 @@ async function ensureGuruFeatureSchemaOnce() {
     INSERT OR IGNORE INTO fitur_akses (group_name, title, href, icon, roles, is_active, urutan, is_bottomnav, bottomnav_urutan)
     VALUES
       ('Akademik', 'Nilai Harian', '/dashboard/guru/nilai-harian', 'BookOpen', '["admin","sekpen","akademik","guru"]', 1, 8, 1, 3),
+      ('Nilai & Rapor', 'Absensi', '/dashboard/guru/absensi', 'CalendarCheck', '["admin","sekpen","akademik","guru"]', 1, 5, 0, 0),
       ('Akademik', 'Hafalan', '/dashboard/guru/hafalan', 'ClipboardCheck', '["admin","sekpen","akademik","guru"]', 1, 9, 1, 4),
       ('Master Data', 'Master Hafalan', '/dashboard/master/hafalan', 'Database', '["admin"]', 1, 11, 0, 0)
   `)
