@@ -59,7 +59,6 @@ import {
 } from './clinical-actions'
 import { OutsideTreatmentTab } from './clinical-tabs'
 import { DormVisitsTab, ClinicalDeliveries } from './clinical-workflow'
-import { DiagnosisManagerButton } from './diagnosis-manager'
 import { ClinicalFields, PrescriptionEditor, readClinicalForm } from '@/components/poskestren/clinical-form'
 import { MedicalRecordsTab } from './medical-records-tab'
 import { MedicineDeliveryTab } from './medicine-delivery-tab'
@@ -910,7 +909,6 @@ function TodayTab({ onGoToDelivery }: { onGoToDelivery: () => void }) {
                 temperatureCelsius:examVisit.temperature_celsius,systolicPressure:examVisit.systolic_pressure,
                 diastolicPressure:examVisit.diastolic_pressure,weightKg:examVisit.weight_kg,
                 ...(examVisit.clinical_snapshot?JSON.parse(examVisit.clinical_snapshot):{})}} diagnoses={diagnoses}/>
-              <DiagnosisManagerButton onChanged={load}/>
               <PrescriptionEditor items={prescription} onChange={setPrescription} medicines={medicines}/>
               <button disabled={pending} className={`${buttonPrimary} w-full`}>{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Selesaikan pemeriksaan</button>
               </form>

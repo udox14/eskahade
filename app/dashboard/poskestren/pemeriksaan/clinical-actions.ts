@@ -135,6 +135,14 @@ export async function getDiagnosisOptions(q = '') {
   )
 }
 
+export async function getDiagnosisMaster() {
+  await requirePoskestrenClinicalWrite()
+  return query<{ id: string; name: string; is_active: number }>(
+    'SELECT id, name, is_active FROM poskestren_diagnosis ORDER BY is_active DESC, name COLLATE NOCASE LIMIT 1000'
+  )
+}
+
+
 export async function saveDiagnosis(input: { id?: string; name: string; isActive?: boolean }) {
   const session = await requirePoskestrenClinicalWrite()
   const name = cleanText(input.name, 160)
@@ -157,6 +165,7 @@ export async function saveDiagnosis(input: { id?: string; name: string; isActive
   }
   await audit(session, input.id ? 'update' : 'create', 'poskestren_diagnosis', id, `Menyimpan diagnosis ${name}`)
   refreshHealth()
+  revalidatePath('/dashboard/poskestren/penyakit')
   return { success: true as const, id }
 }
 

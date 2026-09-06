@@ -2,13 +2,14 @@
 
 import type { ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, FileSpreadsheet, FileText, Printer, Users } from 'lucide-react'
+import { Activity, ArrowLeft, FileSpreadsheet, FileText, Printer, Users } from 'lucide-react'
 
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
 import { MonthlyReport, PayrollReport } from '../laporan/_page-content'
+import { DiseaseReport } from '../penyakit/disease-report'
 
-type View = 'menu' | 'laporan-bulanan' | 'penggajian'
+type View = 'menu' | 'laporan-bulanan' | 'penggajian' | 'laporan-penyakit'
 
 const MENU_ITEMS: Array<{
   view: Exclude<View, 'menu'>
@@ -28,10 +29,16 @@ const MENU_ITEMS: Array<{
     description: 'Rekap honor tenaga medis dan gaji karyawan berdasarkan periode yang dipilih.',
     icon: Users,
   },
+  {
+    view: 'laporan-penyakit',
+    label: 'Laporan Kasus Penyakit',
+    description: 'Rekap santri dan episode per diagnosis dengan filter periode, asrama, serta jenis kelamin.',
+    icon: Activity,
+  },
 ]
 
 function isView(value: string | null): value is View {
-  return value === 'laporan-bulanan' || value === 'penggajian'
+  return value === 'laporan-bulanan' || value === 'penggajian' || value === 'laporan-penyakit'
 }
 
 function currentMonth() {
@@ -67,6 +74,20 @@ export default function CetakPoskestrenPageContent() {
   }
 
   const period = searchParams.get('periode') || currentMonth()
+  if (view === 'laporan-penyakit') {
+    return (
+      <div className="mx-auto max-w-7xl space-y-6 pb-20">
+        <div className="no-print border-b border-slate-200 pb-4">
+          <button type="button" onClick={() => changeView('menu')} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+            <ArrowLeft className="h-4 w-4" />
+            Menu Cetak
+          </button>
+        </div>
+        <DiseaseReport basePath="/dashboard/poskestren/cetak" />
+      </div>
+    )
+  }
+
 
   if (view === 'laporan-bulanan') {
     return (

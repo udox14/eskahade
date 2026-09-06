@@ -14,6 +14,7 @@
     "deploy:cf": "next build --webpack && opennextjs-cloudflare build --skipNextBuild && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "test:poskestren": "node scripts/test-poskestren-clinical.cjs",
+    "test:poskestren:disease": "node scripts/test-poskestren-disease-report.cjs",
     "test:poskestren:ui": "node scripts/test-poskestren-ui.cjs"
   },
   "dependencies": {

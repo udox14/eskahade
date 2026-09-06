@@ -63,6 +63,7 @@ export const POSKESTREN_ALL_LIMIT = 1000
 
 export const POSKESTREN_HREF = {
   examination: '/dashboard/poskestren/pemeriksaan',
+  disease: '/dashboard/poskestren/penyakit',
   observation: '/dashboard/poskestren/observasi',
   finance: '/dashboard/poskestren/keuangan',
   reports: '/dashboard/poskestren/cetak',
