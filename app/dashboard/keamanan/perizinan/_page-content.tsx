@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import {
   getPerizinanList, simpanIzin, setSudahDatang, cariSantri, hapusIzin,
   getAsramaList, exportDataIzin, getAnalitikIzin, getTopSantriIzin, updateIzin,
-  getAlasanIzinList, simpanAlasanIzinList,
+  getAlasanIzinList, simpanAlasanIzinList, getPemberiIzinList, simpanPemberiIzinList,
   ajukanIzinAsrama, getPengajuanPendingAsrama, approveIzinAsrama, rejectIzinAsrama,
   getRiwayatPengajuanAsrama, cariSantriAsrama, updatePengajuanAsrama, hapusPengajuanAsrama
 } from './actions'
@@ -23,11 +23,6 @@ import {
   formatWibDateTime,
   toWibDateInputValue,
 } from '@/lib/date/wib'
-
-const LIST_PEMBERI_IZIN = [
-  "Muhammad Fakhri", "Gungun T. Aminullah", "Yusup Fallo", 
-  "Ryan M. Ridwan", "M. Jihad Robbani", "Wahid Hasyim", "Abdul Halim"
-]
 
 const DEFAULT_LIST_ALASAN = [
   "SAKIT", "BEROBAT", "KONTROL", "ACARA KELUARGA", "ACARA",
@@ -65,6 +60,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const [loading, setLoading] = useState(true)
   const [asramaOptions, setAsramaOptions] = useState<string[]>([])
   const [alasanOptions, setAlasanOptions] = useState<string[]>(DEFAULT_LIST_ALASAN)
+  const [pemberiIzinOptions, setPemberiIzinOptions] = useState<string[]>([])
   const [analitikData, setAnalitikData] = useState<any>(null)
   const [topSantri, setTopSantri] = useState<any[]>([])
 
@@ -84,6 +80,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const [isOpenInput, setIsOpenInput] = useState(false)
   const [isOpenEdit, setIsOpenEdit] = useState(false)
   const [isOpenAlasan, setIsOpenAlasan] = useState(false)
+  const [settingsTab, setSettingsTab] = useState<'ALASAN' | 'PEMBERI_IZIN'>('ALASAN')
   const [editData, setEditData] = useState<any>(null)
 
   const [searchSantri, setSearchSantri] = useState('')
@@ -118,6 +115,11 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const [draftAlasan, setDraftAlasan] = useState<string[]>(DEFAULT_LIST_ALASAN)
   const [newAlasan, setNewAlasan] = useState('')
   const [savingAlasan, setSavingAlasan] = useState(false)
+  const [draftPemberiIzin, setDraftPemberiIzin] = useState<string[]>([])
+  const [newPemberiIzin, setNewPemberiIzin] = useState('')
+  const [editingPemberiIzin, setEditingPemberiIzin] = useState<string | null>(null)
+  const [editingPemberiIzinValue, setEditingPemberiIzinValue] = useState('')
+  const [savingPemberiIzin, setSavingPemberiIzin] = useState(false)
 
   // Export Excel state
   const [isOpenExport, setIsOpenExport] = useState(false)
@@ -148,6 +150,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
       setDraftAlasan(rows)
       if (rows.length > 0) setAlasanDropdown(rows[0])
     })
+    getPemberiIzinList().then(setPemberiIzinOptions)
     if (isDewanOrAdmin) {
       getPengajuanPendingAsrama().then(rows => setPengajuanCount(rows.length))
     }
@@ -442,6 +445,11 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const openAlasanModal = () => {
     setDraftAlasan(alasanOptions)
     setNewAlasan('')
+    setDraftPemberiIzin(pemberiIzinOptions)
+    setNewPemberiIzin('')
+    setEditingPemberiIzin(null)
+    setEditingPemberiIzinValue('')
+    setSettingsTab('ALASAN')
     setIsOpenAlasan(true)
   }
 
@@ -480,6 +488,76 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
     if (!rows.includes(alasanDropdown)) setAlasanDropdown(rows[0])
     setIsOpenAlasan(false)
     toast.success('Alasan izin diperbarui')
+  }
+
+  const normalizePemberiIzinInput = (value: string) => value.replace(/\s+/g, ' ').trim()
+
+  const handleTambahPemberiIzin = () => {
+    const normalized = normalizePemberiIzinInput(newPemberiIzin)
+    if (normalized.length < 2) {
+      toast.warning('Nama pemberi izin minimal 2 karakter.')
+      return
+    }
+    if (draftPemberiIzin.some(item => item.toLocaleLowerCase() === normalized.toLocaleLowerCase())) {
+      toast.info('Pemberi izin itu sudah ada.')
+      return
+    }
+    setDraftPemberiIzin(prev => [...prev, normalized])
+    setNewPemberiIzin('')
+  }
+
+  const handleMulaiEditPemberiIzin = (nama: string) => {
+    setEditingPemberiIzin(nama)
+    setEditingPemberiIzinValue(nama)
+  }
+
+  const handleBatalEditPemberiIzin = () => {
+    setEditingPemberiIzin(null)
+    setEditingPemberiIzinValue('')
+  }
+
+  const handleSimpanEditPemberiIzin = () => {
+    if (!editingPemberiIzin) return
+    const normalized = normalizePemberiIzinInput(editingPemberiIzinValue)
+    if (normalized.length < 2) {
+      toast.warning('Nama pemberi izin minimal 2 karakter.')
+      return
+    }
+    if (draftPemberiIzin.some(item => item !== editingPemberiIzin && item.toLocaleLowerCase() === normalized.toLocaleLowerCase())) {
+      toast.info('Pemberi izin itu sudah ada.')
+      return
+    }
+    setDraftPemberiIzin(prev => prev.map(item => item === editingPemberiIzin ? normalized : item))
+    handleBatalEditPemberiIzin()
+  }
+
+  const handleHapusPemberiIzin = async (nama: string) => {
+    if (!await confirm(`Hapus pemberi izin "${nama}" dari daftar?`)) return
+    setDraftPemberiIzin(prev => prev.filter(item => item !== nama))
+    if (editingPemberiIzin === nama) handleBatalEditPemberiIzin()
+  }
+
+  const handleSimpanPemberiIzin = async () => {
+    setSavingPemberiIzin(true)
+    try {
+      const res = await simpanPemberiIzinList(draftPemberiIzin)
+      if ('error' in res) {
+        toast.error('Gagal menyimpan pemberi izin', { description: res.error })
+        return
+      }
+
+      const rows = res.rows
+      setPemberiIzinOptions(rows)
+      if (pemberiIzin && !rows.includes(pemberiIzin)) setPemberiIzin('')
+      setIsOpenAlasan(false)
+      toast.success('Pemberi izin diperbarui')
+    } catch (error: unknown) {
+      toast.error('Gagal menyimpan pemberi izin', {
+        description: error instanceof Error ? error.message : 'Terjadi kesalahan saat memproses permintaan.',
+      })
+    } finally {
+      setSavingPemberiIzin(false)
+    }
   }
 
   // Common Form Fields for Tambah & Edit Modal
@@ -521,7 +599,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
         <label className="block text-[11px] font-bold text-slate-500 uppercase mb-2">Pemberi Izin (ACC)</label>
         <select name="pemberi_izin" value={pemberiIzin} onChange={e => setPemberiIzin(e.target.value)} required className="w-full p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
           <option value="">-- Pilih Ustadz Pengurus --</option>
-          {LIST_PEMBERI_IZIN.map(nama => <option key={nama} value={nama}>{nama}</option>)}
+          {pemberiIzinOptions.map(nama => <option key={nama} value={nama}>{nama}</option>)}
         </select>
       </div>
     </>
@@ -723,7 +801,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
             <>
               {canUpdate && (
                 <button onClick={openAlasanModal} className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95">
-                  <Settings className="w-4 h-4" /> Alasan
+                  <Settings className="w-4 h-4" /> Pengaturan
                 </button>
               )}
               {(canCreate || canUpdate) && (
@@ -1126,56 +1204,160 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
           <div className="bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-5">
             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <div>
-                <h3 className="font-bold text-slate-900 text-lg">Atur Alasan Izin</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Daftar ini dipakai di pilihan keperluan dasar.</p>
+                <h3 className="font-bold text-slate-900 text-lg">Pengaturan Perizinan</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {settingsTab === 'ALASAN' ? 'Kelola pilihan keperluan dasar izin.' : 'Kelola nama yang dapat dipilih sebagai pemberi izin.'}
+                </p>
               </div>
               <button type="button" onClick={() => setIsOpenAlasan(false)} className="p-2 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-full transition-colors border border-slate-200"><X className="w-5 h-5"/></button>
             </div>
 
-            <div className="p-5 max-h-[75vh] overflow-y-auto space-y-4">
-              <div className="flex gap-2">
-                <input
-                  value={newAlasan}
-                  onChange={e => setNewAlasan(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleTambahAlasan()
-                    }
-                  }}
-                  placeholder="Tulis alasan baru..."
-                  className="flex-1 p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700"
-                />
-                <button type="button" onClick={handleTambahAlasan} className="bg-slate-900 hover:bg-black text-white px-4 rounded-xl font-bold text-sm flex items-center gap-2">
-                  <Plus className="w-4 h-4" /> Tambah
+            <div className="px-5 pt-4">
+              <div className="flex gap-1 rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Pengaturan perizinan">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={settingsTab === 'ALASAN'}
+                  onClick={() => setSettingsTab('ALASAN')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold transition-colors ${settingsTab === 'ALASAN' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Alasan
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={settingsTab === 'PEMBERI_IZIN'}
+                  onClick={() => setSettingsTab('PEMBERI_IZIN')}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold transition-colors ${settingsTab === 'PEMBERI_IZIN' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Pemberi Izin
                 </button>
               </div>
+            </div>
 
-              <div className="space-y-2">
-                {draftAlasan.map(alasan => (
-                  <div key={alasan} className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
-                    <span className="text-sm font-bold text-slate-700">{alasan}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleHapusAlasan(alasan)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                      title="Hapus alasan"
-                    >
-                      <Trash2 className="w-4 h-4" />
+            {settingsTab === 'ALASAN' ? (
+              <>
+                <div className="p-5 max-h-[75vh] overflow-y-auto space-y-4">
+                  <div className="flex gap-2">
+                    <input
+                      value={newAlasan}
+                      onChange={e => setNewAlasan(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleTambahAlasan()
+                        }
+                      }}
+                      placeholder="Tulis alasan baru..."
+                      className="flex-1 p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700"
+                    />
+                    <button type="button" onClick={handleTambahAlasan} className="bg-slate-900 hover:bg-black text-white px-4 rounded-xl font-bold text-sm flex items-center gap-2">
+                      <Plus className="w-4 h-4" /> Tambah
                     </button>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            <div className="px-5 py-4 border-t bg-slate-50 flex gap-3">
-              <button type="button" onClick={() => setIsOpenAlasan(false)} className="flex-1 py-3 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors">
-                Batal
-              </button>
-              <button type="button" onClick={handleSimpanAlasan} disabled={savingAlasan} className="flex-1 py-3 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-60 flex items-center justify-center gap-2">
-                <Save className="w-4 h-4" /> {savingAlasan ? 'Menyimpan...' : 'Simpan Alasan'}
-              </button>
-            </div>
+                  <div className="space-y-2">
+                    {draftAlasan.map(alasan => (
+                      <div key={alasan} className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+                        <span className="text-sm font-bold text-slate-700">{alasan}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleHapusAlasan(alasan)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                          title="Hapus alasan"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="px-5 py-4 border-t bg-slate-50 flex gap-3">
+                  <button type="button" onClick={() => setIsOpenAlasan(false)} className="flex-1 py-3 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors">
+                    Batal
+                  </button>
+                  <button type="button" onClick={handleSimpanAlasan} disabled={savingAlasan} className="flex-1 py-3 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-60 flex items-center justify-center gap-2">
+                    <Save className="w-4 h-4" /> {savingAlasan ? 'Menyimpan...' : 'Simpan Alasan'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="p-5 max-h-[75vh] overflow-y-auto space-y-4">
+                  <div className="flex gap-2">
+                    <input
+                      value={newPemberiIzin}
+                      onChange={e => setNewPemberiIzin(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleTambahPemberiIzin()
+                        }
+                      }}
+                      placeholder="Tulis nama pemberi izin baru..."
+                      className="flex-1 p-2.5 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700"
+                    />
+                    <button type="button" onClick={handleTambahPemberiIzin} className="bg-slate-900 hover:bg-black text-white px-4 rounded-xl font-bold text-sm flex items-center gap-2">
+                      <Plus className="w-4 h-4" /> Tambah
+                    </button>
+                  </div>
+
+                  <p className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-800">
+                    Nama yang masih dipakai pada riwayat izin atau pengajuan tidak dapat dihapus atau diubah agar data lama tetap utuh.
+                  </p>
+
+                  <div className="space-y-2">
+                    {draftPemberiIzin.map(nama => (
+                      <div key={nama} className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+                        {editingPemberiIzin === nama ? (
+                          <>
+                            <input
+                              autoFocus
+                              value={editingPemberiIzinValue}
+                              onChange={e => setEditingPemberiIzinValue(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  handleSimpanEditPemberiIzin()
+                                }
+                                if (e.key === 'Escape') handleBatalEditPemberiIzin()
+                              }}
+                              className="min-w-0 flex-1 p-2 border border-blue-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700"
+                            />
+                            <button type="button" onClick={handleSimpanEditPemberiIzin} className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50" title="Simpan perubahan">
+                              <Save className="w-4 h-4" />
+                            </button>
+                            <button type="button" onClick={handleBatalEditPemberiIzin} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-200" title="Batal edit">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="min-w-0 flex-1 text-sm font-bold text-slate-700">{nama}</span>
+                            <button type="button" onClick={() => handleMulaiEditPemberiIzin(nama)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50" title="Edit pemberi izin">
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button type="button" onClick={() => handleHapusPemberiIzin(nama)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50" title="Hapus pemberi izin">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="px-5 py-4 border-t bg-slate-50 flex gap-3">
+                  <button type="button" onClick={() => setIsOpenAlasan(false)} className="flex-1 py-3 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors">
+                    Batal
+                  </button>
+                  <button type="button" onClick={handleSimpanPemberiIzin} disabled={savingPemberiIzin} className="flex-1 py-3 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-60 flex items-center justify-center gap-2">
+                    <Save className="w-4 h-4" /> {savingPemberiIzin ? 'Menyimpan...' : 'Simpan Pemberi Izin'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

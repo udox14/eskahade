@@ -55,6 +55,17 @@ function patientRecordNo(nis: string) {
   return `RM-${String(nis).trim().toUpperCase().replace(/[^A-Z0-9-]/g, '')}`
 }
 
+// Migration 0147 creates an empty, permanent profile for every santri. A profile
+// only belongs in Daftar Pasien after it is explicitly registered or used by a
+// clinical service.
+const listedPatientSql = (alias = 'p') => `(
+  ${alias}.created_by IS NOT NULL
+  OR EXISTS (SELECT 1 FROM poskestren_visit v WHERE v.patient_id = ${alias}.id)
+  OR EXISTS (SELECT 1 FROM poskestren_dorm_visit dv WHERE dv.patient_id = ${alias}.id)
+  OR EXISTS (SELECT 1 FROM poskestren_observation o WHERE o.patient_id = ${alias}.id)
+  OR EXISTS (SELECT 1 FROM poskestren_outside_treatment ot WHERE ot.patient_id = ${alias}.id)
+)`
+
 async function writeAudit(
   session: Awaited<ReturnType<typeof requirePoskestrenStaffFeature>>,
   action: string,
@@ -93,7 +104,7 @@ export async function searchActiveSantri(keyword: string) {
     has_patient: number
   }>(
     `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.foto_url,
-            CASE WHEN p.id IS NULL THEN 0 ELSE 1 END AS has_patient
+            CASE WHEN p.id IS NOT NULL AND ${listedPatientSql()} THEN 1 ELSE 0 END AS has_patient
      FROM santri s
      LEFT JOIN poskestren_patient p ON p.santri_id = s.id
      WHERE s.status_global = 'aktif'
@@ -158,11 +169,37 @@ export async function createPatient(input: {
   )
   if (!santri) return { success: false as const, error: 'Santri aktif tidak ditemukan.' }
 
-  const existing = await queryOne<{ id: string }>(
-    'SELECT id FROM poskestren_patient WHERE santri_id = ?',
+  const existing = await queryOne<{ id: string; is_listed: number }>(
+    `SELECT p.id, CASE WHEN ${listedPatientSql()} THEN 1 ELSE 0 END AS is_listed
+     FROM poskestren_patient p WHERE p.santri_id = ?`,
     [santri.id]
   )
-  if (existing) return { success: false as const, error: 'Profil santri sudah tersedia. Gunakan Edit profil medis pada Daftar Pasien.' }
+  if (existing?.is_listed) return { success: false as const, error: 'Profil santri sudah tersedia. Gunakan Edit profil medis pada Daftar Pasien.' }
+
+  if (existing) {
+    await (await getDB()).prepare(
+      `UPDATE poskestren_patient SET
+         blood_type = ?, allergies = ?, special_conditions = ?, routine_medicines = ?,
+         emergency_contact = ?, notes = ?, created_by = ?,
+         profile_version = profile_version + 1, updated_at = datetime('now')
+       WHERE id = ?`
+    ).bind(
+      cleanText(input.bloodType, 10),
+      cleanText(input.allergies),
+      cleanText(input.specialConditions),
+      cleanText(input.routineMedicines),
+      cleanText(input.emergencyContact, 200),
+      cleanText(input.notes),
+      session.id,
+      existing.id
+    ).run()
+
+    await writeAudit(session, 'create', 'poskestren_patient', existing.id, `Mendaftarkan pasien ${santri.nama_lengkap}`, {
+      santri_id: santri.id,
+    })
+    refresh()
+    return { success: true as const, id: existing.id }
+  }
 
   const id = generateId()
   await (await getDB()).prepare(
@@ -229,7 +266,7 @@ export async function getPatients(input: PoskestrenListQuery = {}): Promise<Posk
   await requirePoskestrenStaffFeature(PATH)
   const normalized = normalizePoskestrenListQuery(input)
   const cursor = decodeCursor(normalized.cursor)
-  const where = ['1=1']
+  const where = [listedPatientSql()]
   const params: unknown[] = []
 
   if (normalized.q) {

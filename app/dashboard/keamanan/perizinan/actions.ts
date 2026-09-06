@@ -14,6 +14,11 @@ const DEFAULT_ALASAN_IZIN = [
   "SURVEI SEKOLAH / KULIAH", "TEST SEKOLAH / KULIAH",
   "MEMBUAT PERSYARATAN", "ORANGTUA MENINGGAL", "KELUARGA MENINGGAL"
 ]
+const PEMBERI_IZIN_KEY = 'keamanan_perizinan_pemberi_izin'
+const DEFAULT_PEMBERI_IZIN = [
+  "Muhammad Fakhri", "Gungun T. Aminullah", "Yusup Fallo",
+  "Ryan M. Ridwan", "M. Jihad Robbani", "Wahid Hasyim", "Abdul Halim"
+]
 
 function isValidDateValue(value: Date) {
   return !Number.isNaN(value.getTime())
@@ -81,6 +86,29 @@ function normalizeAlasanList(items: unknown[]) {
   )]
 }
 
+function normalizePemberiIzinName(value: unknown) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim()
+}
+
+function pemberiIzinKey(value: unknown) {
+  return normalizePemberiIzinName(value).toLocaleLowerCase()
+}
+
+function normalizePemberiIzinList(items: unknown[]) {
+  const seen = new Set<string>()
+  const normalized: string[] = []
+
+  for (const item of items) {
+    const name = normalizePemberiIzinName(item)
+    const key = pemberiIzinKey(name)
+    if (!name || seen.has(key)) continue
+    seen.add(key)
+    normalized.push(name)
+  }
+
+  return normalized
+}
+
 export async function getAlasanIzinList() {
   await ensureAppSettingsTable()
   const row = await queryOne<{ value: string }>(
@@ -128,6 +156,102 @@ export async function simpanAlasanIzinList(items: string[]) {
     summary: 'Memperbarui daftar alasan izin',
     details: {
       total_alasan: normalized.length,
+    },
+  })
+
+  revalidatePath('/dashboard/keamanan/perizinan')
+  return { success: true, rows: normalized }
+}
+
+export async function getPemberiIzinList() {
+  await ensureAppSettingsTable()
+  const row = await queryOne<{ value: string }>(
+    'SELECT value FROM app_settings WHERE key = ?',
+    [PEMBERI_IZIN_KEY]
+  )
+
+  if (!row?.value) return DEFAULT_PEMBERI_IZIN
+
+  try {
+    const parsed = JSON.parse(row.value)
+    if (!Array.isArray(parsed)) return DEFAULT_PEMBERI_IZIN
+    const normalized = normalizePemberiIzinList(parsed)
+    return normalized.length ? normalized : DEFAULT_PEMBERI_IZIN
+  } catch {
+    return DEFAULT_PEMBERI_IZIN
+  }
+}
+
+async function validatePemberiIzin(value: string) {
+  const options = await getPemberiIzinList()
+  if (!options.some(option => pemberiIzinKey(option) === pemberiIzinKey(value))) {
+    return { error: 'Pemberi izin tidak tersedia di Pengaturan. Muat ulang daftar lalu pilih nama yang valid.' }
+  }
+  return null
+}
+
+export async function simpanPemberiIzinList(items: string[]) {
+  const access = await assertFeature('/dashboard/keamanan/perizinan', 'update')
+  if ('error' in access) return access
+  const session = await getSession()
+
+  const rawItems = Array.isArray(items) ? items : []
+  const normalized = normalizePemberiIzinList(rawItems)
+  if (normalized.length === 0) return { error: 'Minimal harus ada 1 pemberi izin.' }
+  if (normalized.some(name => name.length < 2 || name.length > 100)) {
+    return { error: 'Nama pemberi izin harus terdiri dari 2 sampai 100 karakter.' }
+  }
+
+  const current = await getPemberiIzinList()
+  const nextKeys = new Set(normalized.map(pemberiIzinKey))
+  const removed = current.filter(name => !nextKeys.has(pemberiIzinKey(name)))
+
+  if (removed.length > 0) {
+    await ensurePengajuanTable()
+    const placeholders = removed.map(() => '?').join(', ')
+    const usedRows = await query<{ pemberi_izin: string }>(
+      `SELECT DISTINCT pemberi_izin FROM (
+         SELECT pemberi_izin FROM perizinan
+         UNION ALL
+         SELECT pemberi_izin FROM perizinan_pengajuan
+       )
+       WHERE pemberi_izin IS NOT NULL
+         AND LOWER(TRIM(pemberi_izin)) IN (${placeholders})`,
+      removed.map(pemberiIzinKey)
+    )
+
+    if (usedRows.length > 0) {
+      const usedNames = usedRows
+        .map(row => normalizePemberiIzinName(row.pemberi_izin))
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(', ')
+      return {
+        error: `Pemberi izin ${usedNames} masih dipakai pada riwayat atau pengajuan. Tambahkan kembali nama tersebut sebelum menyimpan.`,
+      }
+    }
+  }
+
+  await ensureAppSettingsTable()
+  await execute(
+    `INSERT INTO app_settings (key, value, updated_at)
+     VALUES (?, ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    [PEMBERI_IZIN_KEY, JSON.stringify(normalized)]
+  )
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'keamanan_perizinan',
+    action: 'update',
+    fiturHref: '/dashboard/keamanan/perizinan',
+    logKind: 'update',
+    entityType: 'app_setting',
+    entityId: PEMBERI_IZIN_KEY,
+    entityLabel: 'Pemberi izin',
+    summary: 'Memperbarui daftar pemberi izin',
+    details: {
+      total_pemberi_izin: normalized.length,
     },
   })
 
@@ -327,6 +451,8 @@ export async function updateIzin(id: string, formData: FormData): Promise<{ succ
   if ('error' in payload) return payload
 
   const { jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
+  const pemberiIzinError = await validatePemberiIzin(pemberi_izin)
+  if (pemberiIzinError) return pemberiIzinError
 
   await execute(`
     UPDATE perizinan 
@@ -371,6 +497,8 @@ export async function simpanIzin(formData: FormData): Promise<{ success: boolean
   if ('error' in payload) return payload
 
   const { jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
+  const pemberiIzinError = await validatePemberiIzin(pemberi_izin)
+  if (pemberiIzinError) return pemberiIzinError
   const izinId = generateId()
   const actorSession = await getSession()
   const santri = await queryOne<{ nama_lengkap: string | null; nis: string | null }>(
@@ -520,6 +648,8 @@ export async function ajukanIzinAsrama(formData: FormData): Promise<{ success: b
   if ('error' in payload) return payload
 
   const { jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
+  const pemberiIzinError = await validatePemberiIzin(pemberi_izin)
+  if (pemberiIzinError) return pemberiIzinError
   if (jenis !== 'PULANG') return { error: 'Pengajuan dari asrama hanya untuk izin pulang.' }
 
   const santri = await queryOne<{ nama_lengkap: string | null; nis: string | null; asrama: string | null }>(
@@ -616,6 +746,8 @@ export async function updatePengajuanAsrama(id: string, formData: FormData): Pro
   if ('error' in payload) return payload
 
   const { tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
+  const pemberiIzinError = await validatePemberiIzin(pemberi_izin)
+  if (pemberiIzinError) return pemberiIzinError
 
   await execute(`
     UPDATE perizinan_pengajuan
