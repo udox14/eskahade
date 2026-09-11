@@ -22,6 +22,8 @@ import {
   formatWibDate,
   formatWibDateTime,
   toWibDateInputValue,
+  toWibDateTimeLocalValue,
+  toWibTimeInputValue,
 } from '@/lib/date/wib'
 
 const DEFAULT_LIST_ALASAN = [
@@ -30,9 +32,13 @@ const DEFAULT_LIST_ALASAN = [
   "MEMBUAT PERSYARATAN", "ORANGTUA MENINGGAL", "KELUARGA MENINGGAL"
 ]
 
-function formatIzinWaktu(value: string | null | undefined) {
+function formatIzinWaktu(jenis: string, value: string | null | undefined) {
   if (!value) return 'Belum Kembali'
-  return formatWibDate(value)
+  return jenis === 'PULANG' ? formatWibDate(value) : formatWibDateTime(value)
+}
+
+function getDefaultReturnValue(jenis: 'PULANG' | 'KELUAR_KOMPLEK') {
+  return jenis === 'PULANG' ? toWibDateInputValue() : toWibDateTimeLocalValue()
 }
 
 interface Props {
@@ -73,6 +79,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const [tglAwal, setTglAwal] = useState('')
   const [tglAkhir, setTglAkhir] = useState('')
   const [statusFilter, setStatusFilter] = useState<'SEMUA' | 'BELUM_KEMBALI' | 'SUDAH_KEMBALI' | 'TERLAMBAT' | 'TEPAT_WAKTU'>('SEMUA')
+  const [jenisFilter, setJenisFilter] = useState<'SEMUA' | 'PULANG' | 'KELUAR_KOMPLEK'>('SEMUA')
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
 
@@ -86,18 +93,23 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const [searchSantri, setSearchSantri] = useState('')
   const [hasilCari, setHasilCari] = useState<any[]>([])
   const [selectedSantri, setSelectedSantri] = useState<any>(null)
+  const [jenisIzin, setJenisIzin] = useState<'PULANG' | 'KELUAR_KOMPLEK'>('KELUAR_KOMPLEK')
   const [alasanDropdown, setAlasanDropdown] = useState('SAKIT')
   const [deskripsiIzin, setDeskripsiIzin] = useState('')
   const [pemberiIzin, setPemberiIzin] = useState('')
   
   // Date states for forms
+  const [formDateSingle, setFormDateSingle] = useState('')
+  const [formTimeStart, setFormTimeStart] = useState('')
+  const [formTimeEnd, setFormTimeEnd] = useState('')
   const [formDateStart, setFormDateStart] = useState('')
   const [formDateEnd, setFormDateEnd] = useState('')
 
   // Modal Kembali
   const [isOpenReturn, setIsOpenReturn] = useState(false)
   const [selectedReturnId, setSelectedReturnId] = useState('')
-  const [waktuKembali, setWaktuKembali] = useState(toWibDateInputValue())
+  const [selectedReturnJenis, setSelectedReturnJenis] = useState<'PULANG' | 'KELUAR_KOMPLEK'>('KELUAR_KOMPLEK')
+  const [waktuKembali, setWaktuKembali] = useState(getDefaultReturnValue('KELUAR_KOMPLEK'))
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // Pengajuan asrama state (dewan_santri only)
@@ -162,7 +174,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const loadData = useCallback(async (pg = page, ps = pageSize, s = search, a = asrama, ta = tglAwal, tk = tglAkhir, st = statusFilter) => {
     setLoading(true)
     try {
-      const res = await getPerizinanList({ page: pg, pageSize: ps, search: s, asrama: a, tglAwal: ta, tglAkhir: tk, statusFilter: st })
+      const res = await getPerizinanList({ page: pg, pageSize: ps, search: s, asrama: a, tglAwal: ta, tglAkhir: tk, statusFilter: st, jenisFilter })
       setList(res.rows)
       setTotal(res.total)
       setTotalPages(res.totalPages)
@@ -170,21 +182,21 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
     } finally {
       setLoading(false)
     }
-  }, [page, pageSize, search, asrama, tglAwal, tglAkhir, statusFilter])
+  }, [page, pageSize, search, asrama, tglAwal, tglAkhir, statusFilter, jenisFilter])
 
   const loadAnalitik = useCallback(async (a = asrama, ta = tglAwal, tk = tglAkhir) => {
     try {
-      const data = await getAnalitikIzin({ asrama: a, tglAwal: ta, tglAkhir: tk })
+      const data = await getAnalitikIzin({ asrama: a, tglAwal: ta, tglAkhir: tk, jenisFilter })
       setAnalitikData(data)
-      const top = await getTopSantriIzin({ asrama: a, tglAwal: ta, tglAkhir: tk })
+      const top = await getTopSantriIzin({ asrama: a, tglAwal: ta, tglAkhir: tk, jenisFilter })
       setTopSantri(top)
     } catch(e) { console.error(e) }
-  }, [asrama, tglAwal, tglAkhir])
+  }, [asrama, tglAwal, tglAkhir, jenisFilter])
 
   useEffect(() => {
     if (activeTab === 'DAFTAR') loadData(page, pageSize, search, asrama, tglAwal, tglAkhir, statusFilter)
     else loadAnalitik(asrama, tglAwal, tglAkhir)
-  }, [activeTab, page, pageSize, search, asrama, tglAwal, tglAkhir, statusFilter, loadData, loadAnalitik])
+  }, [activeTab, page, pageSize, search, asrama, tglAwal, tglAkhir, statusFilter, jenisFilter, loadData, loadAnalitik])
 
   // --- HANDLERS ---
   const handleCariSantri = async (e: React.FormEvent) => {
@@ -198,9 +210,13 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   }
 
   const resetFormState = () => {
+    setJenisIzin('KELUAR_KOMPLEK')
     setAlasanDropdown(alasanOptions[0] || 'SAKIT')
     setDeskripsiIzin('')
     setPemberiIzin('')
+    setFormDateSingle(toWibDateInputValue())
+    setFormTimeStart('')
+    setFormTimeEnd('')
     setFormDateStart('')
     setFormDateEnd('')
   }
@@ -217,6 +233,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
     resetFormState()
     setEditData(item)
     setSelectedSantri({ id: item.santri_id, nama_lengkap: item.nama, nis: item.nis, kelas: item.kelas, asrama: item.asrama, kamar: item.kamar })
+    setJenisIzin(item.jenis as 'PULANG' | 'KELUAR_KOMPLEK')
     
     // Parse Alasan
     const parsedAlasan = item.alasan || ''
@@ -239,8 +256,14 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
     // Parse Dates (Assuming +07:00 was saved, taking substring to fit input)
     // Tgl Mulai: 2023-12-12T08:00:00.000Z representing UTC, but we want local time.
     // If we create new Date(), it parses into browser local time.
-    setFormDateStart(toWibDateInputValue(item.tgl_mulai))
-    setFormDateEnd(toWibDateInputValue(item.tgl_selesai_rencana))
+    if (item.jenis === 'PULANG') {
+      setFormDateStart(toWibDateInputValue(item.tgl_mulai))
+      setFormDateEnd(toWibDateInputValue(item.tgl_selesai_rencana))
+    } else {
+      setFormDateSingle(toWibDateInputValue(item.tgl_mulai))
+      setFormTimeStart(toWibTimeInputValue(item.tgl_mulai))
+      setFormTimeEnd(toWibTimeInputValue(item.tgl_selesai_rencana))
+    }
 
     setIsOpenEdit(true)
   }
@@ -253,7 +276,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
     try {
       const formData = new FormData(e.currentTarget)
       if (!isOpenEdit && selectedSantri) formData.append('santri_id', selectedSantri.id)
-      formData.append('jenis', 'PULANG')
+      formData.append('jenis', jenisIzin)
       formData.append('alasan_dropdown', alasanDropdown)
 
       const res = isOpenEdit
@@ -305,7 +328,8 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
 
   const openReturnModal = (item: any) => {
     setSelectedReturnId(item.id)
-    setWaktuKembali(toWibDateInputValue())
+    setSelectedReturnJenis(item.jenis as 'PULANG' | 'KELUAR_KOMPLEK')
+    setWaktuKembali(getDefaultReturnValue(item.jenis as 'PULANG' | 'KELUAR_KOMPLEK'))
     setIsOpenReturn(true)
   }
 
@@ -338,7 +362,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
       }
       const tglAwal = semuaData ? undefined : dari
       const tglAkhir = semuaData ? undefined : sampai
-      const data = await exportDataIzin({ search, asrama, tglAwal, tglAkhir, statusFilter })
+      const data = await exportDataIzin({ search, asrama, tglAwal, tglAkhir, statusFilter, jenisFilter })
       if (!data || data.length === 0) { toast.dismiss(loadingToast); toast.info("Tidak ada data untuk diexport"); return }
 
       // Remapping columns manually to ensure clean ID headers and avoid SQLite alias errors
@@ -348,13 +372,13 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
         "NIS": d.nis,
         "Asrama": d.asrama,
         "Kamar": d.kamar,
-        "Jenis Izin": 'Izin Pulang',
+        "Jenis Izin": d.jenis === 'PULANG' ? 'Izin Pulang' : 'Keluar Komplek',
         "Alasan / Keperluan": d.alasan,
         "Pemberi Izin": d.pemberi_izin,
         "Status Izin": d.status,
-        "Keberangkatan": formatIzinWaktu(d.tgl_mulai),
-        "Batas Rencana Kembali": formatIzinWaktu(d.tgl_selesai_rencana),
-        "Waktu Tiba Aktual": d.tgl_kembali_aktual ? formatIzinWaktu(d.tgl_kembali_aktual) : 'Belum Kembali'
+        "Keberangkatan": formatIzinWaktu(d.jenis, d.tgl_mulai),
+        "Batas Rencana Kembali": formatIzinWaktu(d.jenis, d.tgl_selesai_rencana),
+        "Waktu Tiba Aktual": d.tgl_kembali_aktual ? formatIzinWaktu(d.jenis, d.tgl_kembali_aktual) : 'Belum Kembali'
       }))
 
       const ws = XLSX.utils.json_to_sheet(remappedData)
@@ -565,21 +589,31 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
     <>
       <div>
         <label className="block text-[11px] font-bold text-slate-500 uppercase mb-2">Jenis & Waktu Izin</label>
-        <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 mb-3 flex items-center gap-3">
-          <Home className="w-5 h-5 text-purple-600 shrink-0" />
-          <span className="text-sm font-bold text-purple-700">IZIN PULANG</span>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <label className={`cursor-pointer p-3 rounded-xl border-2 text-center flex flex-col items-center gap-1 ${jenisIzin === 'KELUAR_KOMPLEK' ? 'bg-blue-50 text-blue-700 border-blue-500' : 'bg-white text-slate-500 border-slate-200'}`}>
+            <input type="radio" className="hidden" checked={jenisIzin === 'KELUAR_KOMPLEK'} onChange={() => setJenisIzin('KELUAR_KOMPLEK')} />
+            <MapPin className="w-5 h-5" /><span className="text-xs font-bold">KELUAR KOMPLEK</span>
+          </label>
+          <label className={`cursor-pointer p-3 rounded-xl border-2 text-center flex flex-col items-center gap-1 ${jenisIzin === 'PULANG' ? 'bg-purple-50 text-purple-700 border-purple-500' : 'bg-white text-slate-500 border-slate-200'}`}>
+            <input type="radio" className="hidden" checked={jenisIzin === 'PULANG'} onChange={() => setJenisIzin('PULANG')} />
+            <Home className="w-5 h-5" /><span className="text-xs font-bold">IZIN PULANG</span>
+          </label>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-          <div>
-            <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Tanggal Pulang</span>
-            <input type="date" name="date_start" value={formDateStart} onChange={e => setFormDateStart(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-purple-500 font-medium"/>
+        {jenisIzin === 'PULANG' ? (
+          <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+            <div><span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Tanggal Pulang</span><input type="date" name="date_start" value={formDateStart} onChange={e => setFormDateStart(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm" /></div>
+            <div><span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Batas Kembali</span><input type="date" name="date_end" value={formDateEnd} onChange={e => setFormDateEnd(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm" /></div>
           </div>
-          <div>
-            <span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Batas Kembali</span>
-            <input type="date" name="date_end" value={formDateEnd} onChange={e => setFormDateEnd(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm outline-none focus:border-purple-500 font-medium"/>
+        ) : (
+          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-3">
+            <div><span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Tanggal Izin</span><input type="date" name="date_single" value={formDateSingle} onChange={e => setFormDateSingle(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Berangkat Pukul</span><input type="time" name="time_start" value={formTimeStart} onChange={e => setFormTimeStart(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm" /></div>
+              <div><span className="text-[10px] font-bold uppercase text-slate-400 mb-1.5 block">Batas Kembali Pukul</span><input type="time" name="time_end" value={formTimeEnd} onChange={e => setFormTimeEnd(e.target.value)} required className="w-full p-2 border border-slate-200 rounded-lg bg-white text-sm" /></div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -622,7 +656,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
           </button>
           <DashboardPageHeader
             title="Pengajuan Izin Pulang"
-            description="Ajukan izin pulang santri. Persetujuan diberikan oleh dewan santri."
+            description="Ajukan izin pulang atau keluar kompleks. Persetujuan diberikan oleh dewan santri."
             className="flex-1"
           />
         </div>
@@ -634,7 +668,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
               onClick={openTambahModal}
               className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95"
             >
-              <Plus className="w-4 h-4" /> Ajukan Izin Pulang
+              <Plus className="w-4 h-4" /> Ajukan Perizinan
             </button>
           </div>
         )}
@@ -690,8 +724,8 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                   <div className="bg-slate-50 rounded-xl p-3 text-xs text-slate-600 space-y-1 border border-slate-100">
                     <p className="italic text-slate-500">"{item.alasan}"</p>
                     <div className="flex gap-4 pt-1 border-t border-slate-100">
-                      <span><span className="text-[10px] font-bold text-slate-400 block">Berangkat</span>{formatIzinWaktu(item.tgl_mulai)}</span>
-                      <span><span className="text-[10px] font-bold text-slate-400 block">Batas Kembali</span>{formatIzinWaktu(item.tgl_selesai_rencana)}</span>
+                      <span><span className="text-[10px] font-bold text-slate-400 block">Berangkat</span>{formatIzinWaktu(item.jenis, item.tgl_mulai)}</span>
+                      <span><span className="text-[10px] font-bold text-slate-400 block">Batas Kembali</span>{formatIzinWaktu(item.jenis, item.tgl_selesai_rencana)}</span>
                     </div>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-2">
@@ -712,7 +746,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
               <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                 <div>
                   <h3 className="font-bold text-slate-900 text-lg">
-                    {editingPengajuan ? 'Edit Pengajuan Izin Pulang' : 'Ajukan Izin Pulang'}
+                    {editingPengajuan ? 'Edit Pengajuan Perizinan' : 'Ajukan Perizinan'}
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {editingPengajuan ? 'Perbarui detail pengajuan (masih menunggu persetujuan).' : 'Pengajuan akan diteruskan ke dewan santri untuk disetujui.'}
@@ -769,7 +803,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                     <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3.5 rounded-xl font-bold shadow-sm shadow-purple-200 active:scale-95 transition-all flex items-center justify-center gap-2">
                       {editingPengajuan
                         ? <><CheckCircle className="w-5 h-5" /> SIMPAN PERUBAHAN</>
-                        : <><Home className="w-5 h-5" /> KIRIM PENGAJUAN IZIN PULANG</>}
+                        : <><Home className="w-5 h-5" /> KIRIM PENGAJUAN IZIN</>}
                     </button>
                   </div>
                 )}
@@ -790,7 +824,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
         </button>
         <DashboardPageHeader
           title="Perizinan Santri"
-          description="Monitoring izin pulang santri."
+          description="Monitoring izin pulang dan keluar kompleks santri."
           className="flex-1"
         />
       </div>
@@ -818,7 +852,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
           )}
           {canCreate && (
             <button onClick={openTambahModal} className={`${isAsrama ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm font-bold text-sm transition-all active:scale-95`}>
-              <Plus className="w-4 h-4" /> {isAsrama ? 'Ajukan Izin Pulang' : 'Izin Baru'}
+              <Plus className="w-4 h-4" /> {isAsrama ? 'Ajukan Perizinan' : 'Izin Baru'}
             </button>
           )}
         </div>
@@ -857,6 +891,14 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                 <input type="date" value={tglAkhir} onChange={e => {setTglAkhir(e.target.value); setPage(1)}} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700" />
               </div>
               <div className="min-w-[150px] flex-1 xl:flex-none">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Jenis Izin</label>
+                <select value={jenisFilter} onChange={e => {setJenisFilter(e.target.value as any); setPage(1)}} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
+                  <option value="SEMUA">Semua Jenis</option>
+                  <option value="PULANG">Izin Pulang</option>
+                  <option value="KELUAR_KOMPLEK">Keluar Komplek</option>
+                </select>
+              </div>
+              <div className="min-w-[150px] flex-1 xl:flex-none">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Filter Status</label>
                 <select value={statusFilter} onChange={e => {setStatusFilter(e.target.value as any); setPage(1)}} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
                   <option value="SEMUA">- Semua Status -</option>
@@ -883,10 +925,10 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                 </button>
               </div>
             </div>
-            {(search || tglAwal || tglAkhir || asrama !== 'SEMUA' || statusFilter !== 'SEMUA') && (
+            {(search || tglAwal || tglAkhir || asrama !== 'SEMUA' || statusFilter !== 'SEMUA' || jenisFilter !== 'SEMUA') && (
               <div className="mt-3 flex items-center gap-2">
                 <span className="text-xs text-slate-500">Filter Aktif:</span>
-                <button onClick={() => {setSearchInput(''); setSearch(''); setTglAwal(''); setTglAkhir(''); setAsrama('SEMUA'); setStatusFilter('SEMUA'); setPage(1)}} className="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-lg transition-colors">
+                <button onClick={() => {setSearchInput(''); setSearch(''); setTglAwal(''); setTglAkhir(''); setAsrama('SEMUA'); setStatusFilter('SEMUA'); setJenisFilter('SEMUA'); setPage(1)}} className="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-lg transition-colors">
                   Kosongkan Filter
                 </button>
               </div>
@@ -933,9 +975,9 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                       const tglMulai = new Date(item.tgl_mulai)
                       const tglRencana = new Date(item.tgl_selesai_rencana)
                       const isTelat = item.tgl_kembali_aktual ? new Date(item.tgl_kembali_aktual) > tglRencana : (item.status === 'AKTIF' && new Date() > tglRencana)
-                      const waktuMulai = formatIzinWaktu(item.tgl_mulai)
-                      const waktuRencana = formatIzinWaktu(item.tgl_selesai_rencana)
-                      const waktuAktual = item.tgl_kembali_aktual ? formatIzinWaktu(item.tgl_kembali_aktual) : null
+                      const waktuMulai = formatIzinWaktu(item.jenis, item.tgl_mulai)
+                      const waktuRencana = formatIzinWaktu(item.jenis, item.tgl_selesai_rencana)
+                      const waktuAktual = item.tgl_kembali_aktual ? formatIzinWaktu(item.jenis, item.tgl_kembali_aktual) : null
                       
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
@@ -945,7 +987,10 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                           </td>
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-1.5 mb-1">
-                              <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded flex items-center gap-1 border border-purple-100"><Home className="w-3 h-3"/> Pulang</span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 border ${item.jenis === 'PULANG' ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-blue-50 text-blue-700 border-blue-100'}`}>
+                                {item.jenis === 'PULANG' ? <Home className="w-3 h-3"/> : <MapPin className="w-3 h-3"/>}
+                                {item.jenis === 'PULANG' ? 'Pulang' : 'Keluar Komplek'}
+                              </span>
                               <span className="text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded truncate max-w-[120px]" title={item.pemberi_izin}>{item.pemberi_izin}</span>
                             </div>
                             <p className="text-xs text-slate-600 line-clamp-1 italic max-w-xs leading-tight" title={item.alasan}>"{item.alasan}"</p>
@@ -1006,9 +1051,9 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                   const tglMulai = new Date(item.tgl_mulai)
                   const tglRencana = new Date(item.tgl_selesai_rencana)
                   const isTelat = item.tgl_kembali_aktual ? new Date(item.tgl_kembali_aktual) > tglRencana : (item.status === 'AKTIF' && new Date() > tglRencana)
-                  const waktuMulai = formatIzinWaktu(item.tgl_mulai)
-                  const waktuRencana = formatIzinWaktu(item.tgl_selesai_rencana)
-                  const waktuAktual = item.tgl_kembali_aktual ? formatIzinWaktu(item.tgl_kembali_aktual) : null
+                  const waktuMulai = formatIzinWaktu(item.jenis, item.tgl_mulai)
+                  const waktuRencana = formatIzinWaktu(item.jenis, item.tgl_selesai_rencana)
+                  const waktuAktual = item.tgl_kembali_aktual ? formatIzinWaktu(item.jenis, item.tgl_kembali_aktual) : null
 
                   return (
                     <div key={item.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col relative">
@@ -1039,7 +1084,10 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                         </div>
 
                         <div className="flex items-center gap-1.5">
-                          <span className="bg-purple-50 border border-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-bold"><Home className="w-3 h-3 inline mr-1"/>PULANG</span>
+                          <span className={`border px-1.5 py-0.5 rounded text-[10px] font-bold ${item.jenis === 'PULANG' ? 'bg-purple-50 border-purple-100 text-purple-700' : 'bg-blue-50 border-blue-100 text-blue-700'}`}>
+                            {item.jenis === 'PULANG' ? <Home className="w-3 h-3 inline mr-1"/> : <MapPin className="w-3 h-3 inline mr-1"/>}
+                            {item.jenis === 'PULANG' ? 'PULANG' : 'KELUAR KOMPLEK'}
+                          </span>
                           <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">Via {item.pemberi_izin}</span>
                         </div>
 
@@ -1090,7 +1138,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
           <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-600"/> Dasbor Analisis Perizinan</h2>
-              <p className="text-xs text-slate-500 mt-1">Laporan tren izin pulang berdasarkan filter di bawah ini.</p>
+              <p className="text-xs text-slate-500 mt-1">Laporan tren izin pulang dan keluar kompleks berdasarkan filter di bawah ini.</p>
             </div>
             <div className="w-full md:w-auto flex flex-wrap gap-2">
                <input type="date" value={tglAwal} onChange={e => {setTglAwal(e.target.value);}} className="flex-1 min-w-[120px] border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-xs text-slate-700" title="Awal Periode"/>
@@ -1121,6 +1169,10 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                     <div>
                       <div className="flex justify-between text-xs font-bold mb-1.5"><span className="text-slate-300 flex items-center gap-1.5"><Home className="w-3.5 h-3.5"/> Izin Pulang</span><span className="text-white">{analitikData.pulang}</span></div>
                       <div className="h-1.5 w-full bg-slate-700/50 rounded-full overflow-hidden"><div className="h-full bg-purple-400 rounded-full" style={{ width: `${(analitikData.pulang/analitikData.total)*100}%`}}></div></div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs font-bold mb-1.5"><span className="text-slate-300 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5"/> Keluar Komplek</span><span className="text-white">{analitikData.keluarKomplek}</span></div>
+                      <div className="h-1.5 w-full bg-slate-700/50 rounded-full overflow-hidden"><div className="h-full bg-blue-400 rounded-full" style={{ width: `${(analitikData.keluarKomplek/analitikData.total)*100}%`}}></div></div>
                     </div>
                   </div>
                 )}
@@ -1369,11 +1421,11 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
             <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <div>
                 <h3 className="font-bold text-slate-900 text-lg">
-                  {isOpenEdit ? 'Ubah Perizinan' : isAsrama ? 'Ajukan Izin Pulang' : 'Buat Perizinan Baru'}
+                  {isOpenEdit ? 'Ubah Perizinan' : isAsrama ? 'Ajukan Perizinan' : 'Buat Perizinan Baru'}
                 </h3>
                 {!isOpenEdit && (
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {isAsrama ? 'Pengajuan akan diteruskan ke dewan santri untuk disetujui.' : 'Berikan izin pulang untuk santri.'}
+                    {isAsrama ? 'Pengajuan akan diteruskan ke dewan santri untuk disetujui.' : 'Berikan izin pulang atau keluar kompleks untuk santri.'}
                   </p>
                 )}
               </div>
@@ -1431,7 +1483,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                     {isOpenEdit
                       ? <><CheckCircle className="w-5 h-5" /> SIMPAN PERUBAHAN EDIT</>
                       : isAsrama
-                        ? <><Home className="w-5 h-5" /> KIRIM PENGAJUAN IZIN PULANG</>
+                        ? <><Home className="w-5 h-5" /> KIRIM PENGAJUAN IZIN</>
                         : <><CheckCircle className="w-5 h-5" /> REKAM PERIZINAN BARU</>}
                   </button>
                 </div>
@@ -1476,7 +1528,8 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                           <p className="text-xs text-slate-500 mt-0.5">{item.kelas || '-'} · {item.asrama} / {item.kamar}</p>
                         </div>
                         <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-100 flex items-center gap-1">
-                          <Home className="w-3 h-3" /> PULANG
+                          {item.jenis === 'PULANG' ? <Home className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                          {item.jenis === 'PULANG' ? 'PULANG' : 'KELUAR KOMPLEK'}
                         </span>
                       </div>
 
@@ -1484,8 +1537,8 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                         <p><span className="font-bold text-slate-400 uppercase tracking-wide">Keperluan:</span> {item.alasan}</p>
                         <p><span className="font-bold text-slate-400 uppercase tracking-wide">Pemberi Izin:</span> {item.pemberi_izin}</p>
                         <div className="flex gap-4 pt-1 border-t border-slate-200">
-                          <p><span className="font-bold text-slate-400 block">Berangkat</span>{formatIzinWaktu(item.tgl_mulai)}</p>
-                          <p><span className="font-bold text-slate-400 block">Batas Kembali</span>{formatIzinWaktu(item.tgl_selesai_rencana)}</p>
+                          <p><span className="font-bold text-slate-400 block">Berangkat</span>{formatIzinWaktu(item.jenis, item.tgl_mulai)}</p>
+                          <p><span className="font-bold text-slate-400 block">Batas Kembali</span>{formatIzinWaktu(item.jenis, item.tgl_selesai_rencana)}</p>
                         </div>
                         {item.submitted_by_name && (
                           <p className="text-slate-400 pt-1 border-t border-slate-200">
@@ -1547,10 +1600,10 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
             
             <div className="p-6">
               <label className="text-[11px] font-bold text-slate-500 uppercase mb-2 block text-center">
-                Tanggal Tiba Aktual
+                {selectedReturnJenis === 'PULANG' ? 'Tanggal Tiba Aktual' : 'Waktu Tiba Aktual'}
               </label>
               <input 
-                type="date"
+                type={selectedReturnJenis === 'PULANG' ? 'date' : 'datetime-local'}
                 value={waktuKembali}
                 onChange={(e) => setWaktuKembali(e.target.value)}
                 className="w-full p-3 border-2 border-slate-200 focus:border-emerald-500 rounded-xl text-center font-bold text-slate-800 mb-6 outline-none transition-colors"

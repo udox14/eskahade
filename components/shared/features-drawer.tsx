@@ -70,7 +70,7 @@ const parentPortalServices = [
   },
   {
     title: 'Perizinan & Perpulangan',
-    description: 'Pantau status izin pulang santri, tanggal batas kembali, dan riwayat perizinan secara resmi.',
+    description: 'Pantau izin pulang atau keluar kompleks, batas kembali, dan riwayat perizinan santri.',
     icon: CheckCircle2,
   },
   {

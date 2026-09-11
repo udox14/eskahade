@@ -98,7 +98,6 @@ export default function AbsenMalamPage() {
   const izin  = santriKamar.filter(s => (localStatus[s.id] ?? 'HADIR') === 'IZIN').length
 
   const toggle = (id: string) => {
-    if (santriKamar.find(s => s.id === id)?.is_izin) return
     setLocalStatus(prev => ({ ...prev, [id]: prev[id] === 'ALFA' ? 'HADIR' : 'ALFA' }))
     setSavedKamars(prev => { const n = new Set(prev); n.delete(activeKamar); return n })
   }
@@ -137,7 +136,6 @@ export default function AbsenMalamPage() {
   const saveKamar = async () => {
     setSaving(true)
     const records = santriKamar
-      .filter(s => !s.is_izin)
       .map(s => ({
         santri_id: s.id,
         status: localStatus[s.id] || 'HADIR',
@@ -265,8 +263,8 @@ export default function AbsenMalamPage() {
               const st = localStatus[s.id] || 'HADIR'
               const keterangan = localKeterangan[s.id] || ''
               const isAlfa = st === 'ALFA'
-              const isIzin = s.is_izin
-              const canMarkReturned = isIzin && s.izin_jenis === 'PULANG'
+              const isIzin = s.is_izin && !isAlfa
+              const canMarkReturned = s.is_izin && ['PULANG', 'KELUAR_KOMPLEK'].includes(s.izin_jenis)
               return (
                 <div key={s.id} role={isIzin ? undefined : 'button'} tabIndex={isIzin ? undefined : 0} onClick={() => !isIzin && toggle(s.id)}
                   className={`w-full grid grid-cols-[auto_1fr_auto] gap-3 px-4 py-3.5 transition-colors active:scale-[0.98] text-left ${
@@ -285,7 +283,7 @@ export default function AbsenMalamPage() {
                     {isIzin && s.izin_alasan ? (
                       <p className="text-[10px] text-blue-500 font-semibold truncate mt-0.5">{s.izin_alasan}</p>
                     ) : null}
-                    {!isIzin ? (
+                    {!isIzin || isAlfa ? (
                       <div className="mt-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
                         <MessageSquareText className={`w-4 h-4 shrink-0 ${keterangan ? 'text-amber-500' : 'text-slate-300'}`} />
                         <input
@@ -293,7 +291,7 @@ export default function AbsenMalamPage() {
                           onClick={event => event.stopPropagation()}
                           onKeyDown={event => event.stopPropagation()}
                           onChange={event => updateKeterangan(s.id, event.target.value)}
-                          placeholder="Keterangan opsional"
+                          placeholder={s.is_izin ? 'Alasan override ALFA (wajib)' : 'Keterangan opsional'}
                           className="min-w-0 flex-1 bg-transparent text-xs font-medium text-slate-700 outline-none placeholder:text-slate-300"
                         />
                       </div>
@@ -319,6 +317,15 @@ export default function AbsenMalamPage() {
                       >
                         {returningId === s.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <LogIn className="w-3 h-3" />}
                         Kembali
+                      </button>
+                    ) : null}
+                    {s.is_izin ? (
+                      <button
+                        type="button"
+                        onClick={(event) => { event.stopPropagation(); toggle(s.id) }}
+                        className={`rounded-lg px-2.5 py-1 text-[10px] font-black ${isAlfa ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}
+                      >
+                        {isAlfa ? 'Kembalikan IZIN' : 'Override ALFA'}
                       </button>
                     ) : null}
                   </div>

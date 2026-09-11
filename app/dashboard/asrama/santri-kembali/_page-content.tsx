@@ -12,11 +12,11 @@ import {
   type SantriKembaliRow,
   type SessionInfo,
 } from './actions'
-import { formatWibDate, toWibDateInputValue } from '@/lib/date/wib'
+import { formatWibDate, formatWibDateTime, toWibDateTimeLocalValue } from '@/lib/date/wib'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 
-function formatDateTime(value: string) {
-  return formatWibDate(value)
+function formatDateTime(value: string, jenis?: string) {
+  return jenis === 'PULANG' ? formatWibDate(value) : formatWibDateTime(value)
 }
 
 function isOverdue(row: SantriKembaliRow) {
@@ -33,7 +33,7 @@ export default function SantriKembaliPageContent() {
   const [totalRows, setTotalRows] = useState(0)
   const [overdueTotal, setOverdueTotal] = useState(0)
   const [selectedRow, setSelectedRow] = useState<SantriKembaliRow | null>(null)
-  const [waktuDatang, setWaktuDatang] = useState(toWibDateInputValue())
+  const [waktuDatang, setWaktuDatang] = useState(toWibDateTimeLocalValue())
   const [pending, startTransition] = useTransition()
 
   // Pagination states
@@ -42,7 +42,7 @@ export default function SantriKembaliPageContent() {
 
   // Selection states
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [waktuDatangBulk, setWaktuDatangBulk] = useState(toWibDateInputValue())
+  const [waktuDatangBulk, setWaktuDatangBulk] = useState(toWibDateTimeLocalValue())
   const [pendingBulk, startTransitionBulk] = useTransition()
 
   const loadBootstrap = async () => {
@@ -88,7 +88,7 @@ export default function SantriKembaliPageContent() {
 
   const openConfirm = (row: SantriKembaliRow) => {
     setSelectedRow(row)
-    setWaktuDatang(toWibDateInputValue())
+    setWaktuDatang(toWibDateTimeLocalValue())
   }
 
   const handleConfirm = () => {
@@ -141,7 +141,7 @@ export default function SantriKembaliPageContent() {
       <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 border-b pb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Santri Kembali</h1>
-          <p className="text-sm text-slate-500 mt-1">Konfirmasi kedatangan santri yang izin pulang ke asrama.</p>
+          <p className="text-sm text-slate-500 mt-1">Konfirmasi kedatangan santri dari izin pulang atau keluar kompleks.</p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex">
           <div className="bg-white border rounded-2xl px-4 py-3">
@@ -158,9 +158,9 @@ export default function SantriKembaliPageContent() {
       <section className="bg-white border rounded-2xl overflow-hidden">
         <div className="px-5 py-4 border-b bg-slate-50 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
           <div>
-            <h2 className="font-bold text-slate-800">Izin Pulang Belum Kembali</h2>
+            <h2 className="font-bold text-slate-800">Santri Berizin Belum Kembali</h2>
             <p className="text-sm text-slate-500">
-              Yang tampil hanya perizinan dengan jenis izin pulang. Memuat {rows.length} dari {totalRows} data.
+              Menampilkan izin pulang dan keluar kompleks. Memuat {rows.length} dari {totalRows} data.
               {loadedOverdueCount > 0 ? ` ${loadedOverdueCount} yang terlihat sudah lewat batas.` : ''}
             </p>
           </div>
@@ -203,7 +203,7 @@ export default function SantriKembaliPageContent() {
                 </th>
                 <th className="px-4 py-3 text-left font-bold min-w-[240px]">Santri</th>
                 <th className="px-4 py-3 text-left font-bold w-40">Asrama</th>
-                <th className="px-4 py-3 text-left font-bold min-w-[220px]">Izin Pulang</th>
+                <th className="px-4 py-3 text-left font-bold min-w-[220px]">Perizinan</th>
                 <th className="px-4 py-3 text-left font-bold min-w-[180px]">Batas Kembali</th>
                 <th className="px-4 py-3 text-right font-bold w-32">Aksi</th>
               </tr>
@@ -212,7 +212,7 @@ export default function SantriKembaliPageContent() {
               {loading ? (
                 <tr><td colSpan={6} className="py-12 text-center text-slate-400"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={6} className="py-12 text-center text-slate-400">Tidak ada izin pulang yang belum kembali.</td></tr>
+                <tr><td colSpan={6} className="py-12 text-center text-slate-400">Tidak ada santri berizin yang belum kembali.</td></tr>
               ) : rows.map(row => {
                 const late = isOverdue(row)
                 const isSelected = selectedIds.includes(row.id)
@@ -243,11 +243,14 @@ export default function SantriKembaliPageContent() {
                     </td>
                     <td className="px-4 py-3 text-slate-600">{row.asrama || '-'}</td>
                     <td className="px-4 py-3">
+                      <span className={`inline-flex mb-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${row.jenis === 'PULANG' ? 'bg-purple-50 text-purple-700' : 'bg-blue-50 text-blue-700'}`}>
+                        {row.jenis === 'PULANG' ? 'IZIN PULANG' : 'KELUAR KOMPLEK'}
+                      </span>
                       <p className="font-semibold text-slate-700">{row.alasan}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">Mulai {formatDateTime(row.tgl_mulai)} - via {row.pemberi_izin}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">Mulai {formatDateTime(row.tgl_mulai, row.jenis)} - via {row.pemberi_izin}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <p className={`font-bold ${late ? 'text-rose-700' : 'text-emerald-700'}`}>{formatDateTime(row.tgl_selesai_rencana)}</p>
+                      <p className={`font-bold ${late ? 'text-rose-700' : 'text-emerald-700'}`}>{formatDateTime(row.tgl_selesai_rencana, row.jenis)}</p>
                       {late ? (
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full mt-1">
                           <AlertTriangle className="w-3 h-3" /> Lewat batas
@@ -342,20 +345,20 @@ export default function SantriKembaliPageContent() {
             <div className="p-5 space-y-4">
               <div className="border rounded-2xl p-4 bg-slate-50">
                 <p className="font-bold text-slate-800">{selectedRow.asrama || '-'} / Kamar {selectedRow.kamar || '-'}</p>
-                <p className="text-xs text-slate-500 mt-1">Batas kembali: {formatDateTime(selectedRow.tgl_selesai_rencana)}</p>
+                <p className="text-xs text-slate-500 mt-1">Batas kembali: {formatDateTime(selectedRow.tgl_selesai_rencana, selectedRow.jenis)}</p>
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-500 uppercase">Tanggal Datang Aktual</label>
+                <label className="text-xs font-bold text-slate-500 uppercase">Waktu Datang Aktual</label>
                 <div className="relative mt-1">
                   <Clock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
-                    type="date"
+                    type="datetime-local"
                     value={waktuDatang}
                     onChange={e => setWaktuDatang(e.target.value)}
                     className="w-full border rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400"
                   />
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">Tanggal diproses dalam WIB.</p>
+                <p className="text-[11px] text-slate-400 mt-1">Tanggal dan jam diproses dalam WIB.</p>
               </div>
               <button
                 onClick={handleConfirm}
@@ -387,7 +390,7 @@ export default function SantriKembaliPageContent() {
             <div className="relative w-full md:w-40">
               <Clock className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
-                type="date"
+                type="datetime-local"
                 value={waktuDatangBulk}
                 onChange={e => setWaktuDatangBulk(e.target.value)}
                 className="w-full bg-slate-850 border border-slate-700 rounded-xl pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"

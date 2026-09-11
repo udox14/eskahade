@@ -3,7 +3,7 @@
 import { execute, query, queryOne } from '@/lib/db'
 import { getSession, hasAnyRole, hasRole, isAdmin } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
-import { parseWibDate } from '@/lib/date/wib'
+import { parseWibDate, parseWibDateTime } from '@/lib/date/wib'
 import { revalidatePath } from 'next/cache'
 
 const FEATURE_PATH = '/dashboard/asrama/santri-kembali'
@@ -16,6 +16,7 @@ export type SessionInfo = {
 
 export type SantriKembaliRow = {
   id: string
+  jenis: 'PULANG' | 'KELUAR_KOMPLEK'
   santri_id: string
   nama: string
   nis: string | null
@@ -82,7 +83,7 @@ export async function getSantriBelumKembali(params: { asrama?: string; search?: 
   if (!session) return { rows: [], total: 0, overdueTotal: 0, hasMore: false }
 
   const restrictedAsrama = await getRestrictedAsrama()
-  const clauses = ["p.jenis = 'PULANG'", "p.status = 'AKTIF'", "p.tgl_kembali_aktual IS NULL"]
+  const clauses = ["p.jenis IN ('PULANG', 'KELUAR_KOMPLEK')", "p.status = 'AKTIF'", "p.tgl_kembali_aktual IS NULL"]
   const bind: unknown[] = []
   const limit = Math.min(Math.max(params.limit ?? 30, 1), 9999)
   const offset = Math.max(params.offset ?? 0, 0)
@@ -112,6 +113,7 @@ export async function getSantriBelumKembali(params: { asrama?: string; search?: 
     query<SantriKembaliRow>(`
     SELECT
       p.id,
+      p.jenis,
       p.santri_id,
       p.alasan,
       p.pemberi_izin,
@@ -148,25 +150,27 @@ export async function tandaiSantriKembali(id: string, waktuDatang: string) {
     jenis: string
     status: string
     tgl_selesai_rencana: string
+    tgl_kembali_aktual: string | null
     asrama: string | null
     nama_lengkap: string | null
   }>(`
-    SELECT p.id, p.jenis, p.status, p.tgl_selesai_rencana, s.asrama, s.nama_lengkap
+    SELECT p.id, p.jenis, p.status, p.tgl_selesai_rencana, p.tgl_kembali_aktual, s.asrama, s.nama_lengkap
     FROM perizinan p
     JOIN santri s ON s.id = p.santri_id
     WHERE p.id = ?
   `, [id])
 
   if (!izin) return { error: 'Data izin tidak ditemukan.' }
-  if (izin.jenis !== 'PULANG') return { error: 'Hanya izin pulang yang bisa ditandai dari fitur ini.' }
+  if (!['PULANG', 'KELUAR_KOMPLEK'].includes(izin.jenis)) return { error: 'Jenis izin ini tidak bisa ditandai dari fitur ini.' }
   if (izin.status !== 'AKTIF') return { error: 'Izin ini sudah selesai.' }
+  if (izin.tgl_kembali_aktual) return { error: 'Kedatangan santri sudah pernah tercatat.' }
 
   const restrictedAsrama = await getRestrictedAsrama()
   if (restrictedAsrama && izin.asrama !== restrictedAsrama) {
     return { error: 'Pengurus asrama hanya bisa menandai santri asramanya.' }
   }
 
-  const actual = parseWibDate(waktuDatang, 'start')
+  const actual = waktuDatang.includes('T') ? parseWibDateTime(waktuDatang) : parseWibDate(waktuDatang, 'start')
   if (Number.isNaN(actual.getTime())) return { error: 'Waktu datang tidak valid.' }
 
   const rencana = new Date(izin.tgl_selesai_rencana)
@@ -176,7 +180,7 @@ export async function tandaiSantriKembali(id: string, waktuDatang: string) {
   await execute(`
     UPDATE perizinan
     SET status = ?, tgl_kembali_aktual = ?
-    WHERE id = ?
+    WHERE id = ? AND tgl_kembali_aktual IS NULL
   `, [statusFinal, actual.toISOString(), id])
 
   await logActivity({
@@ -214,7 +218,7 @@ export async function tandaiSantriKembaliBulk(ids: string[], waktuDatang: string
 
   const restrictedAsrama = await getRestrictedAsrama()
 
-  const actual = parseWibDate(waktuDatang, 'start')
+  const actual = waktuDatang.includes('T') ? parseWibDateTime(waktuDatang) : parseWibDate(waktuDatang, 'start')
   if (Number.isNaN(actual.getTime())) return { error: 'Waktu datang tidak valid.' }
 
   const placeholders = ids.map(() => '?').join(',')
@@ -223,10 +227,11 @@ export async function tandaiSantriKembaliBulk(ids: string[], waktuDatang: string
     jenis: string
     status: string
     tgl_selesai_rencana: string
+    tgl_kembali_aktual: string | null
     asrama: string | null
     nama_lengkap: string | null
   }>(`
-    SELECT p.id, p.jenis, p.status, p.tgl_selesai_rencana, s.asrama, s.nama_lengkap
+    SELECT p.id, p.jenis, p.status, p.tgl_selesai_rencana, p.tgl_kembali_aktual, s.asrama, s.nama_lengkap
     FROM perizinan p
     JOIN santri s ON s.id = p.santri_id
     WHERE p.id IN (${placeholders})
@@ -235,8 +240,9 @@ export async function tandaiSantriKembaliBulk(ids: string[], waktuDatang: string
   if (listIzin.length === 0) return { error: 'Data izin tidak ditemukan.' }
 
   const validIzin = listIzin.filter(izin => {
-    if (izin.jenis !== 'PULANG') return false
+    if (!['PULANG', 'KELUAR_KOMPLEK'].includes(izin.jenis)) return false
     if (izin.status !== 'AKTIF') return false
+    if (izin.tgl_kembali_aktual) return false
     if (restrictedAsrama && izin.asrama !== restrictedAsrama) return false
     return true
   })
@@ -254,7 +260,7 @@ export async function tandaiSantriKembaliBulk(ids: string[], waktuDatang: string
     await execute(`
       UPDATE perizinan
       SET status = ?, tgl_kembali_aktual = ?
-      WHERE id = ?
+      WHERE id = ? AND tgl_kembali_aktual IS NULL
     `, [statusFinal, actual.toISOString(), izin.id])
 
     await logActivity({

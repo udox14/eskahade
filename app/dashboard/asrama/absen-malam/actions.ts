@@ -15,10 +15,18 @@ export async function getSessionInfo() {
 
 async function ensureAbsenMalamSchema() {
   const db = await getDB()
-  try {
-    await db.prepare(`ALTER TABLE absen_malam_v2 ADD COLUMN keterangan TEXT`).run()
-  } catch {
-    // Kolom sudah ada pada database yang sudah termigrasi.
+  for (const column of [
+    'keterangan TEXT',
+    'sumber_status TEXT',
+    'override_dari_status TEXT',
+    'override_by TEXT',
+    'override_at TEXT',
+  ]) {
+    try {
+      await db.prepare(`ALTER TABLE absen_malam_v2 ADD COLUMN ${column}`).run()
+    } catch {
+      // Kolom sudah ada pada database yang sudah termigrasi.
+    }
   }
 }
 
@@ -27,6 +35,14 @@ function getTanggalWindowIso(tanggal: string) {
     start: parseWibDate(tanggal, 'start').toISOString(),
     end: parseWibDate(tanggal, 'end').toISOString(),
   }
+}
+
+function getAbsenReferenceIso(tanggal: string) {
+  const now = new Date()
+  const wibToday = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now)
+  return tanggal === wibToday ? now.toISOString() : getTanggalWindowIso(tanggal).end
 }
 
 // Hanya ambil daftar kamar — ringan, dipanggil saat halaman pertama dibuka
@@ -68,7 +84,8 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
 
   try {
     absenList = await query<any>(
-      `SELECT santri_id, status, keterangan FROM absen_malam_v2 WHERE tanggal = ? AND santri_id IN (${ph})`,
+      `SELECT santri_id, status, keterangan, sumber_status, override_dari_status
+       FROM absen_malam_v2 WHERE tanggal = ? AND santri_id IN (${ph})`,
       [tanggal, ...ids]
     )
   } catch {}
@@ -76,26 +93,31 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
   try {
     izinList = await query<any>(
       `SELECT p.id, p.santri_id, p.jenis, p.alasan, p.tgl_selesai_rencana FROM perizinan p
-       WHERE p.jenis = 'PULANG'
+       WHERE p.jenis IN ('PULANG', 'KELUAR_KOMPLEK')
+         AND p.status = 'AKTIF'
          AND p.tgl_mulai <= ?
+         AND p.tgl_selesai_rencana >= ?
          AND (p.tgl_kembali_aktual IS NULL OR p.tgl_kembali_aktual > ?)
          AND p.santri_id IN (${ph})`,
-      [tanggalWindow.end, tanggalWindow.end, ...ids]
+      [getAbsenReferenceIso(tanggal), getAbsenReferenceIso(tanggal), getAbsenReferenceIso(tanggal), ...ids]
     )
   } catch {}
 
   const absenMap: Record<string, string> = {}
   const keteranganMap: Record<string, string> = {}
+  const sumberMap: Record<string, string> = {}
   absenList.forEach((a: any) => {
     absenMap[a.santri_id] = a.status
     keteranganMap[a.santri_id] = a.keterangan || ''
+    sumberMap[a.santri_id] = a.sumber_status || ''
   })
   const izinMap = new Map(izinList.map((i: any) => [i.santri_id, i]))
 
   return santriList.map((s: any) => ({
     ...s,
-    status: izinMap.has(s.id) ? 'IZIN' : (absenMap[s.id] || 'HADIR'),
-    keterangan: izinMap.has(s.id) ? '' : (keteranganMap[s.id] || ''),
+    status: izinMap.has(s.id) && sumberMap[s.id] !== 'MANUAL_OVERRIDE' ? 'IZIN' : (absenMap[s.id] || 'HADIR'),
+    keterangan: keteranganMap[s.id] || '',
+    sumber_status: izinMap.has(s.id) && sumberMap[s.id] !== 'MANUAL_OVERRIDE' ? 'IZIN_OTOMATIS' : (sumberMap[s.id] || 'MANUAL'),
     is_izin: izinMap.has(s.id),
     izin_id: izinMap.get(s.id)?.id ?? null,
     izin_jenis: izinMap.get(s.id)?.jenis ?? null,
@@ -110,7 +132,7 @@ export async function tandaiSantriKembaliDariAbsenMalam(santriId: string, tangga
   const session = await getSession()
   if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
 
-  const actual = parseWibDate(tanggal, 'start')
+  const actual = new Date(getAbsenReferenceIso(tanggal))
   if (Number.isNaN(actual.getTime())) return { error: 'Tanggal kembali tidak valid.' }
   const tanggalWindow = getTanggalWindowIso(tanggal)
 
@@ -135,7 +157,7 @@ export async function tandaiSantriKembaliDariAbsenMalam(santriId: string, tangga
 
   const row = izin[0]
   if (!row) return { error: 'Izin aktif santri ini tidak ditemukan atau sudah ditandai kembali.' }
-  if (row.jenis !== 'PULANG') return { error: 'Yang bisa ditandai kembali dari absen malam hanya izin pulang.' }
+  if (!['PULANG', 'KELUAR_KOMPLEK'].includes(row.jenis)) return { error: 'Jenis izin tidak dapat ditandai kembali dari absen malam.' }
 
   if (hasRole(session, 'pengurus_asrama') && session.asrama_binaan && row.asrama !== session.asrama_binaan) {
     return { error: 'Pengurus asrama hanya bisa menandai santri asramanya.' }
@@ -211,21 +233,25 @@ export async function batchSaveAbsenMalam(
     keterangan: (record.keterangan || '').trim(),
   }))
 
-  const tanggalWindow = getTanggalWindowIso(tanggal)
+  const referenceIso = getAbsenReferenceIso(tanggal)
   const activeIzinIds = santriIds.length
     ? new Set((await query<{ santri_id: string }>(
         `SELECT DISTINCT santri_id
          FROM perizinan
-         WHERE jenis = 'PULANG'
+         WHERE jenis IN ('PULANG', 'KELUAR_KOMPLEK')
+           AND status = 'AKTIF'
            AND tgl_mulai <= ?
+           AND tgl_selesai_rencana >= ?
            AND (tgl_kembali_aktual IS NULL OR tgl_kembali_aktual > ?)
            AND santri_id IN (${santriIds.map(() => '?').join(',')})`,
-        [tanggalWindow.end, tanggalWindow.end, ...santriIds]
+        [referenceIso, referenceIso, referenceIso, ...santriIds]
       )).map(row => row.santri_id))
     : new Set<string>()
-  const writableRecords = normalized.filter(r => !activeIzinIds.has(r.santri_id))
-  const toSave = writableRecords.filter(r => r.status === 'ALFA' || r.keterangan)
-  const toDelete = writableRecords.filter(r => r.status !== 'ALFA' && !r.keterangan).map(r => r.santri_id)
+  const invalidOverride = normalized.find(r => activeIzinIds.has(r.santri_id) && r.status === 'ALFA' && !r.keterangan)
+  if (invalidOverride) return { error: 'Alasan wajib diisi saat status izin otomatis diubah menjadi ALFA.' }
+
+  const toSave = normalized.filter(r => r.status === 'ALFA' || (!activeIzinIds.has(r.santri_id) && r.keterangan))
+  const toDelete = normalized.filter(r => r.status !== 'ALFA' && (!r.keterangan || activeIzinIds.has(r.santri_id))).map(r => r.santri_id)
 
   const db = await getDB()
   const stmts: any[] = []
@@ -239,13 +265,26 @@ export async function batchSaveAbsenMalam(
 
   for (const r of toSave) {
     stmts.push(db.prepare(`
-      INSERT INTO absen_malam_v2 (santri_id, tanggal, status, keterangan, created_by)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO absen_malam_v2 (
+        santri_id, tanggal, status, keterangan, created_by,
+        sumber_status, override_dari_status, override_by, override_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(santri_id, tanggal) DO UPDATE SET
         status = excluded.status,
         keterangan = excluded.keterangan,
-        created_by = excluded.created_by
-    `).bind(r.santri_id, tanggal, r.status, r.keterangan || null, session.id))
+        created_by = excluded.created_by,
+        sumber_status = excluded.sumber_status,
+        override_dari_status = excluded.override_dari_status,
+        override_by = excluded.override_by,
+        override_at = excluded.override_at
+    `).bind(
+      r.santri_id, tanggal, r.status, r.keterangan || null, session.id,
+      activeIzinIds.has(r.santri_id) ? 'MANUAL_OVERRIDE' : 'MANUAL',
+      activeIzinIds.has(r.santri_id) ? 'IZIN' : null,
+      activeIzinIds.has(r.santri_id) ? session.id : null,
+      activeIzinIds.has(r.santri_id) ? new Date().toISOString() : null
+    ))
   }
 
   for (let i = 0; i < stmts.length; i += 100) {

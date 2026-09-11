@@ -4,7 +4,7 @@ import { query, queryOne, execute, generateId } from '@/lib/db'
 import { assertFeature } from '@/lib/auth/feature'
 import { getSession, hasAnyRole } from '@/lib/auth/session'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
-import { parseWibDate } from '@/lib/date/wib'
+import { parseWibDate, parseWibDateTime } from '@/lib/date/wib'
 import { revalidatePath } from 'next/cache'
 
 const DEFAULT_PAGE_SIZE = 10
@@ -37,19 +37,29 @@ function buildIzinPayload(formData: FormData): {
   const pemberi_izin = String(formData.get('pemberi_izin') ?? '').trim()
 
   if (!jenis) return { error: 'Jenis izin wajib dipilih.' }
-  if (jenis !== 'PULANG') return { error: 'Jenis izin tidak dikenali.' }
+  if (!['PULANG', 'KELUAR_KOMPLEK'].includes(jenis)) return { error: 'Jenis izin tidak dikenali.' }
   if (!alasan_dropdown) return { error: 'Keperluan dasar wajib dipilih.' }
   if (!pemberi_izin) return { error: 'Pemberi izin wajib dipilih.' }
 
   const alasan_final = deskripsi ? `${alasan_dropdown} - ${deskripsi}` : alasan_dropdown
 
-  const dStart = String(formData.get('date_start') ?? '').trim()
-  const dEnd = String(formData.get('date_end') ?? '').trim()
+  let mulai: Date
+  let selesai: Date
 
-  if (!dStart || !dEnd) return { error: 'Tanggal pulang dan batas kembali wajib diisi.' }
-
-  const mulai = parseWibDate(dStart, 'start')
-  const selesai = parseWibDate(dEnd, 'end')
+  if (jenis === 'PULANG') {
+    const dStart = String(formData.get('date_start') ?? '').trim()
+    const dEnd = String(formData.get('date_end') ?? '').trim()
+    if (!dStart || !dEnd) return { error: 'Tanggal pulang dan batas kembali wajib diisi.' }
+    mulai = parseWibDate(dStart, 'start')
+    selesai = parseWibDate(dEnd, 'end')
+  } else {
+    const date = String(formData.get('date_single') ?? '').trim()
+    const tStart = String(formData.get('time_start') ?? '').trim()
+    const tEnd = String(formData.get('time_end') ?? '').trim()
+    if (!date || !tStart || !tEnd) return { error: 'Tanggal dan jam izin wajib diisi lengkap.' }
+    mulai = new Date(`${date}T${tStart}:00+07:00`)
+    selesai = new Date(`${date}T${tEnd}:00+07:00`)
+  }
 
   if (!isValidDateValue(mulai) || !isValidDateValue(selesai)) {
     return { error: 'Format tanggal atau jam izin tidak valid.' }
@@ -84,6 +94,16 @@ function normalizeAlasanList(items: unknown[]) {
       .map(item => String(item ?? '').trim().toUpperCase())
       .filter(Boolean)
   )]
+}
+
+async function findOverlappingIzin(santriId: string, mulai: string, selesai: string, excludeId?: string) {
+  const excludeClause = excludeId ? 'AND id != ?' : ''
+  return queryOne<{ id: string }>(`
+    SELECT id FROM perizinan
+    WHERE santri_id = ? AND status = 'AKTIF' AND tgl_kembali_aktual IS NULL
+      AND tgl_mulai <= ? AND tgl_selesai_rencana >= ? ${excludeClause}
+    LIMIT 1
+  `, excludeId ? [santriId, selesai, mulai, excludeId] : [santriId, selesai, mulai])
 }
 
 function normalizePemberiIzinName(value: unknown) {
@@ -275,6 +295,7 @@ function buildWhereClauses(params: {
   tglAwal?: string
   tglAkhir?: string
   statusFilter?: string
+  jenisFilter?: string
 }) {
   const clauses: string[] = []
   const baseParams: any[] = []
@@ -282,6 +303,11 @@ function buildWhereClauses(params: {
   if (params.asrama && params.asrama !== 'SEMUA') {
     clauses.push('s.asrama = ?')
     baseParams.push(params.asrama)
+  }
+
+  if (params.jenisFilter && params.jenisFilter !== 'SEMUA') {
+    clauses.push('p.jenis = ?')
+    baseParams.push(params.jenisFilter)
   }
 
   if (params.search) {
@@ -327,6 +353,7 @@ export async function getPerizinanList(params: {
   tglAwal?: string
   tglAkhir?: string
   statusFilter?: 'SEMUA' | 'BELUM_KEMBALI' | 'SUDAH_KEMBALI' | 'TERLAMBAT' | 'TEPAT_WAKTU'
+  jenisFilter?: 'SEMUA' | 'PULANG' | 'KELUAR_KOMPLEK'
 }) {
   const { page = 1, pageSize = DEFAULT_PAGE_SIZE, ...filters } = params
   const offset = (page - 1) * pageSize
@@ -367,6 +394,7 @@ export async function exportDataIzin(params: {
   tglAwal?: string
   tglAkhir?: string
   statusFilter?: string
+  jenisFilter?: string
 }) {
   const { clauses, baseParams } = buildWhereClauses(params)
   const where = clauses.length > 0 ? clauses.join(' AND ') : '1=1'
@@ -390,6 +418,7 @@ export async function getAnalitikIzin(params: {
   asrama?: string
   tglAwal?: string
   tglAkhir?: string 
+  jenisFilter?: string
 }) {
   const { clauses, baseParams } = buildWhereClauses({ ...params })
   const where = clauses.length > 0 ? clauses.join(' AND ') : '1=1'
@@ -398,6 +427,7 @@ export async function getAnalitikIzin(params: {
     SELECT 
       COUNT(p.id) as total_izin,
       SUM(CASE WHEN p.jenis = 'PULANG' THEN 1 ELSE 0 END) as izin_pulang,
+      SUM(CASE WHEN p.jenis = 'KELUAR_KOMPLEK' THEN 1 ELSE 0 END) as izin_keluar_komplek,
       SUM(CASE WHEN p.status = 'AKTIF' THEN 1 ELSE 0 END) as belum_kembali,
       SUM(CASE WHEN p.status = 'KEMBALI' AND p.tgl_kembali_aktual <= p.tgl_selesai_rencana THEN 1 ELSE 0 END) as tepat_waktu,
       SUM(CASE WHEN p.status = 'KEMBALI' AND p.tgl_kembali_aktual > p.tgl_selesai_rencana THEN 1 ELSE 0 END) as terlambat_kembali
@@ -409,6 +439,7 @@ export async function getAnalitikIzin(params: {
   return {
     total: statsRow?.total_izin || 0,
     pulang: statsRow?.izin_pulang || 0,
+    keluarKomplek: statsRow?.izin_keluar_komplek || 0,
     aktif: statsRow?.belum_kembali || 0,
     tepat: statsRow?.tepat_waktu || 0,
     telat: statsRow?.terlambat_kembali || 0,
@@ -416,7 +447,7 @@ export async function getAnalitikIzin(params: {
 }
 
 // ─── Get Top Santri Izin ───────────────────────────────────────────────────────
-export async function getTopSantriIzin(params: { asrama?: string, tglAwal?: string, tglAkhir?: string }) {
+export async function getTopSantriIzin(params: { asrama?: string, tglAwal?: string, tglAkhir?: string, jenisFilter?: string }) {
   const { clauses, baseParams } = buildWhereClauses({ ...params })
   const where = clauses.length > 0 ? clauses.join(' AND ') : '1=1'
 
@@ -439,7 +470,7 @@ export async function updateIzin(id: string, formData: FormData): Promise<{ succ
   if ('error' in access) return access
   const session = await getSession()
   const beforeIzin = await queryOne<Record<string, unknown>>(
-    `SELECT p.id, p.jenis, p.tgl_mulai, p.tgl_selesai_rencana, p.alasan, p.pemberi_izin, s.nama_lengkap
+    `SELECT p.id, p.santri_id, p.jenis, p.tgl_mulai, p.tgl_selesai_rencana, p.alasan, p.pemberi_izin, s.nama_lengkap
      FROM perizinan p
      LEFT JOIN santri s ON s.id = p.santri_id
      WHERE p.id = ?`,
@@ -453,6 +484,8 @@ export async function updateIzin(id: string, formData: FormData): Promise<{ succ
   const { jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
   const pemberiIzinError = await validatePemberiIzin(pemberi_izin)
   if (pemberiIzinError) return pemberiIzinError
+  const overlap = await findOverlappingIzin(String(beforeIzin.santri_id), tgl_mulai, tgl_selesai_rencana, id)
+  if (overlap) return { error: 'Santri sudah memiliki izin aktif pada rentang waktu tersebut.' }
 
   await execute(`
     UPDATE perizinan 
@@ -499,6 +532,8 @@ export async function simpanIzin(formData: FormData): Promise<{ success: boolean
   const { jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
   const pemberiIzinError = await validatePemberiIzin(pemberi_izin)
   if (pemberiIzinError) return pemberiIzinError
+  const overlap = await findOverlappingIzin(santri_id, tgl_mulai, tgl_selesai_rencana)
+  if (overlap) return { error: 'Santri sudah memiliki izin aktif pada rentang waktu tersebut.' }
   const izinId = generateId()
   const actorSession = await getSession()
   const santri = await queryOne<{ nama_lengkap: string | null; nis: string | null }>(
@@ -540,16 +575,17 @@ export async function setSudahDatang(id: string, waktuDatang: string): Promise<{
   if ('error' in access) return access
   const session = await getSession()
 
-  const izin = await queryOne<{ jenis: string; tgl_selesai_rencana: string; santri_nama: string | null }>(
-    `SELECT p.jenis, p.tgl_selesai_rencana, s.nama_lengkap AS santri_nama
+  const izin = await queryOne<{ jenis: string; tgl_selesai_rencana: string; tgl_kembali_aktual: string | null; santri_nama: string | null }>(
+    `SELECT p.jenis, p.tgl_selesai_rencana, p.tgl_kembali_aktual, s.nama_lengkap AS santri_nama
      FROM perizinan p
      LEFT JOIN santri s ON s.id = p.santri_id
      WHERE p.id = ?`,
     [id]
   )
   if (!izin) return { error: 'Data izin tidak ditemukan.' }
+  if (izin.tgl_kembali_aktual) return { error: 'Kedatangan santri sudah pernah tercatat.' }
 
-  const aktual = parseWibDate(waktuDatang, 'start')
+  const aktual = waktuDatang.includes('T') ? parseWibDateTime(waktuDatang) : parseWibDate(waktuDatang, 'start')
   if (!isValidDateValue(aktual)) return { error: 'Waktu datang tidak valid.' }
 
   const rencana = new Date(izin.tgl_selesai_rencana)
@@ -557,7 +593,7 @@ export async function setSudahDatang(id: string, waktuDatang: string): Promise<{
   const statusFinal = isTelat ? 'AKTIF' : 'KEMBALI'
 
   await execute(
-    'UPDATE perizinan SET status = ?, tgl_kembali_aktual = ? WHERE id = ?',
+    'UPDATE perizinan SET status = ?, tgl_kembali_aktual = ? WHERE id = ? AND tgl_kembali_aktual IS NULL',
     [statusFinal, aktual.toISOString(), id]
   )
 
@@ -642,15 +678,12 @@ export async function ajukanIzinAsrama(formData: FormData): Promise<{ success: b
   const santri_id = String(formData.get('santri_id') ?? '').trim()
   if (!santri_id) return { error: 'Santri wajib dipilih.' }
 
-  // Force jenis PULANG
-  formData.set('jenis', 'PULANG')
   const payload = buildIzinPayload(formData)
   if ('error' in payload) return payload
 
   const { jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
   const pemberiIzinError = await validatePemberiIzin(pemberi_izin)
   if (pemberiIzinError) return pemberiIzinError
-  if (jenis !== 'PULANG') return { error: 'Pengajuan dari asrama hanya untuk izin pulang.' }
 
   const santri = await queryOne<{ nama_lengkap: string | null; nis: string | null; asrama: string | null }>(
     'SELECT nama_lengkap, nis, asrama FROM santri WHERE id = ?',
@@ -678,7 +711,7 @@ export async function ajukanIzinAsrama(formData: FormData): Promise<{ success: b
     entityType: 'perizinan_pengajuan',
     entityId: pengajuanId,
     entityLabel: santri?.nama_lengkap || santri?.nis || santri_id,
-    summary: `Mengajukan izin pulang untuk ${santri?.nama_lengkap || santri?.nis || santri_id}`,
+    summary: `Mengajukan ${jenis === 'PULANG' ? 'izin pulang' : 'izin keluar kompleks'} untuk ${santri?.nama_lengkap || santri?.nis || santri_id}`,
     details: { jenis, alasan: alasan_final, pemberi_izin, tgl_mulai, tgl_selesai_rencana },
   })
 
@@ -741,19 +774,18 @@ export async function updatePengajuanAsrama(id: string, formData: FormData): Pro
 
   if (!pengajuan) return { error: 'Pengajuan tidak ditemukan, sudah diproses, atau bukan milik asrama Anda.' }
 
-  formData.set('jenis', 'PULANG')
   const payload = buildIzinPayload(formData)
   if ('error' in payload) return payload
 
-  const { tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
+  const { jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin } = payload
   const pemberiIzinError = await validatePemberiIzin(pemberi_izin)
   if (pemberiIzinError) return pemberiIzinError
 
   await execute(`
     UPDATE perizinan_pengajuan
-    SET tgl_mulai = ?, tgl_selesai_rencana = ?, alasan = ?, pemberi_izin = ?
+    SET jenis = ?, tgl_mulai = ?, tgl_selesai_rencana = ?, alasan = ?, pemberi_izin = ?
     WHERE id = ?
-  `, [tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin, id])
+  `, [jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin, id])
 
   revalidatePath('/dashboard/keamanan/perizinan')
   return { success: true }
@@ -823,6 +855,9 @@ export async function approveIzinAsrama(id: string): Promise<{ success: boolean 
 
   if (!pengajuan) return { error: 'Pengajuan tidak ditemukan atau sudah diproses.' }
 
+  const overlap = await findOverlappingIzin(pengajuan.santri_id, pengajuan.tgl_mulai, pengajuan.tgl_selesai_rencana)
+  if (overlap) return { error: 'Santri sudah memiliki izin aktif pada rentang waktu tersebut.' }
+
   const izinId = generateId()
 
   await execute(`
@@ -847,7 +882,7 @@ export async function approveIzinAsrama(id: string): Promise<{ success: boolean 
     entityType: 'perizinan',
     entityId: izinId,
     entityLabel: pengajuan.nama_lengkap || pengajuan.nis || pengajuan.santri_id,
-    summary: `Menyetujui pengajuan izin pulang ${pengajuan.nama_lengkap || pengajuan.santri_id}`,
+    summary: `Menyetujui ${pengajuan.jenis === 'PULANG' ? 'izin pulang' : 'izin keluar kompleks'} ${pengajuan.nama_lengkap || pengajuan.santri_id}`,
     details: { dari_pengajuan: id },
   })
 
