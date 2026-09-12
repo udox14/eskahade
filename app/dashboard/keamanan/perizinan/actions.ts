@@ -2,7 +2,7 @@
 
 import { query, queryOne, execute, generateId } from '@/lib/db'
 import { assertFeature } from '@/lib/auth/feature'
-import { getSession, hasAnyRole } from '@/lib/auth/session'
+import { getSession, getEffectiveRoles, hasAnyRole, isSuperAccess, type SessionUser } from '@/lib/auth/session'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
 import { parseWibDate, parseWibDateTime } from '@/lib/date/wib'
 import { revalidatePath } from 'next/cache'
@@ -15,10 +15,84 @@ const DEFAULT_ALASAN_IZIN = [
   "MEMBUAT PERSYARATAN", "ORANGTUA MENINGGAL", "KELUARGA MENINGGAL"
 ]
 const PEMBERI_IZIN_KEY = 'keamanan_perizinan_pemberi_izin'
+const PERIZINAN_HREF = '/dashboard/keamanan/perizinan'
 const DEFAULT_PEMBERI_IZIN = [
   "Muhammad Fakhri", "Gungun T. Aminullah", "Yusup Fallo",
   "Ryan M. Ridwan", "M. Jihad Robbani", "Wahid Hasyim", "Abdul Halim"
 ]
+
+type PerizinanScope = {
+  session: SessionUser
+  asrama: string | null
+  isAsrama: boolean
+  isDewan: boolean
+  isUnrestricted: boolean
+}
+
+/** Resolve the data boundary used by every read in this module. */
+async function resolvePerizinanScope(
+  requestedAsrama?: string,
+  options: { allowUnselectedDewan?: boolean } = {}
+): Promise<PerizinanScope | { error: string }> {
+  const access = await assertFeature(PERIZINAN_HREF, 'read')
+  if ('error' in access) return access
+
+  const session = access
+  const roles = getEffectiveRoles(session)
+  const isUnrestricted = isSuperAccess(session) || roles.includes('admin')
+  const isDewan = !isUnrestricted && roles.includes('dewan_santri')
+  const isAsrama = !isUnrestricted && !isDewan && roles.includes('pengurus_asrama')
+  const requested = String(requestedAsrama ?? '').trim()
+
+  if (isAsrama) {
+    if (!session.asrama_binaan) return { error: 'Akun Anda belum memiliki asrama binaan.' }
+    return { session, asrama: session.asrama_binaan, isAsrama, isDewan, isUnrestricted }
+  }
+
+  if (isDewan && (!requested || requested === 'SEMUA')) {
+    if (options.allowUnselectedDewan) {
+      return { session, asrama: null, isAsrama, isDewan, isUnrestricted }
+    }
+    return { error: 'Pilih asrama terlebih dahulu.' }
+  }
+
+  if (isDewan) {
+    const selected = await queryOne<{ asrama: string }>(
+      `SELECT asrama FROM santri
+       WHERE status_global = 'aktif' AND asrama = ?
+       LIMIT 1`,
+      [requested]
+    )
+    if (!selected) return { error: 'Asrama yang dipilih tidak valid.' }
+  }
+
+  return {
+    session,
+    asrama: requested && requested !== 'SEMUA' ? requested : null,
+    isAsrama,
+    isDewan,
+    isUnrestricted,
+  }
+}
+
+async function assertManagedMutation(
+  action: 'create' | 'update' | 'delete'
+): Promise<SessionUser | { error: string }> {
+  const access = await assertFeature(PERIZINAN_HREF, action)
+  if ('error' in access) return access
+
+  const roles = getEffectiveRoles(access)
+  const isReadOnlyAsrama = roles.includes('pengurus_asrama') &&
+    !roles.includes('dewan_santri') &&
+    !isSuperAccess(access) &&
+    !roles.includes('admin')
+
+  if (isReadOnlyAsrama) {
+    return { error: 'Pengurus asrama hanya dapat membaca, mengekspor, dan mengajukan izin.' }
+  }
+
+  return access
+}
 
 function isValidDateValue(value: Date) {
   return !Number.isNaN(value.getTime())
@@ -130,6 +204,8 @@ function normalizePemberiIzinList(items: unknown[]) {
 }
 
 export async function getAlasanIzinList() {
+  const access = await assertFeature(PERIZINAN_HREF, 'read')
+  if ('error' in access) return []
   await ensureAppSettingsTable()
   const row = await queryOne<{ value: string }>(
     'SELECT value FROM app_settings WHERE key = ?',
@@ -149,7 +225,7 @@ export async function getAlasanIzinList() {
 }
 
 export async function simpanAlasanIzinList(items: string[]) {
-  const access = await assertFeature('/dashboard/keamanan/perizinan', 'update')
+  const access = await assertManagedMutation('update')
   if ('error' in access) return access
   const session = await getSession()
 
@@ -184,6 +260,8 @@ export async function simpanAlasanIzinList(items: string[]) {
 }
 
 export async function getPemberiIzinList() {
+  const access = await assertFeature(PERIZINAN_HREF, 'read')
+  if ('error' in access) return []
   await ensureAppSettingsTable()
   const row = await queryOne<{ value: string }>(
     'SELECT value FROM app_settings WHERE key = ?',
@@ -211,7 +289,7 @@ async function validatePemberiIzin(value: string) {
 }
 
 export async function simpanPemberiIzinList(items: string[]) {
-  const access = await assertFeature('/dashboard/keamanan/perizinan', 'update')
+  const access = await assertManagedMutation('update')
   if ('error' in access) return access
   const session = await getSession()
 
@@ -281,6 +359,10 @@ export async function simpanPemberiIzinList(items: string[]) {
 
 // ─── Helper asrama list ───────────────────────────────────────────────────────
 export async function getAsramaList() {
+  const scope = await resolvePerizinanScope(undefined, { allowUnselectedDewan: true })
+  if ('error' in scope) return []
+  if (scope.asrama) return [scope.asrama]
+
   const rows = await query<{ asrama: string }>(
     `SELECT DISTINCT asrama FROM santri
      WHERE status_global = 'aktif' AND asrama IS NOT NULL ORDER BY asrama`
@@ -296,11 +378,14 @@ function buildWhereClauses(params: {
   tglAkhir?: string
   statusFilter?: string
   jenisFilter?: string
-}) {
+}, scopeAsrama?: string | null) {
   const clauses: string[] = []
   const baseParams: any[] = []
 
-  if (params.asrama && params.asrama !== 'SEMUA') {
+  if (scopeAsrama) {
+    clauses.push('s.asrama = ?')
+    baseParams.push(scopeAsrama)
+  } else if (params.asrama && params.asrama !== 'SEMUA') {
     clauses.push('s.asrama = ?')
     baseParams.push(params.asrama)
   }
@@ -358,7 +443,12 @@ export async function getPerizinanList(params: {
   const { page = 1, pageSize = DEFAULT_PAGE_SIZE, ...filters } = params
   const offset = (page - 1) * pageSize
 
-  const { clauses, baseParams } = buildWhereClauses(filters)
+  const scope = await resolvePerizinanScope(filters.asrama)
+  if ('error' in scope) {
+    return { rows: [], total: 0, page, totalPages: 0, error: scope.error }
+  }
+
+  const { clauses, baseParams } = buildWhereClauses(filters, scope.asrama)
   const where = clauses.length > 0 ? clauses.join(' AND ') : '1=1'
 
   const countRow = await queryOne<{ total: number }>(
@@ -396,7 +486,10 @@ export async function exportDataIzin(params: {
   statusFilter?: string
   jenisFilter?: string
 }) {
-  const { clauses, baseParams } = buildWhereClauses(params)
+  const scope = await resolvePerizinanScope(params.asrama)
+  if ('error' in scope) return []
+
+  const { clauses, baseParams } = buildWhereClauses(params, scope.asrama)
   const where = clauses.length > 0 ? clauses.join(' AND ') : '1=1'
 
   return query<any>(`
@@ -420,7 +513,12 @@ export async function getAnalitikIzin(params: {
   tglAkhir?: string 
   jenisFilter?: string
 }) {
-  const { clauses, baseParams } = buildWhereClauses({ ...params })
+  const scope = await resolvePerizinanScope(params.asrama)
+  if ('error' in scope) {
+    return { total: 0, pulang: 0, keluarKomplek: 0, aktif: 0, tepat: 0, telat: 0, error: scope.error }
+  }
+
+  const { clauses, baseParams } = buildWhereClauses({ ...params }, scope.asrama)
   const where = clauses.length > 0 ? clauses.join(' AND ') : '1=1'
 
   const statsRow = await queryOne<any>(`
@@ -448,7 +546,10 @@ export async function getAnalitikIzin(params: {
 
 // ─── Get Top Santri Izin ───────────────────────────────────────────────────────
 export async function getTopSantriIzin(params: { asrama?: string, tglAwal?: string, tglAkhir?: string, jenisFilter?: string }) {
-  const { clauses, baseParams } = buildWhereClauses({ ...params })
+  const scope = await resolvePerizinanScope(params.asrama)
+  if ('error' in scope) return []
+
+  const { clauses, baseParams } = buildWhereClauses({ ...params }, scope.asrama)
   const where = clauses.length > 0 ? clauses.join(' AND ') : '1=1'
 
   return query<any>(`
@@ -465,16 +566,20 @@ export async function getTopSantriIzin(params: { asrama?: string, tglAwal?: stri
 }
 
 // ─── Update Izin ─────────────────────────────────────────────────────────────
-export async function updateIzin(id: string, formData: FormData): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan', 'update')
+export async function updateIzin(id: string, formData: FormData, requestedAsrama?: string): Promise<{ success: boolean } | { error: string }> {
+  const access = await assertManagedMutation('update')
   if ('error' in access) return access
   const session = await getSession()
+  const scope = await resolvePerizinanScope(requestedAsrama)
+  if ('error' in scope) return scope
+  const scopeClause = scope.asrama ? ' AND s.asrama = ?' : ''
+  const scopeParams = scope.asrama ? [scope.asrama] : []
   const beforeIzin = await queryOne<Record<string, unknown>>(
     `SELECT p.id, p.santri_id, p.jenis, p.tgl_mulai, p.tgl_selesai_rencana, p.alasan, p.pemberi_izin, s.nama_lengkap
      FROM perizinan p
      LEFT JOIN santri s ON s.id = p.santri_id
-     WHERE p.id = ?`,
-    [id]
+     WHERE p.id = ?${scopeClause}`,
+    [id, ...scopeParams]
   )
   if (!beforeIzin) return { error: 'Data izin tidak ditemukan.' }
 
@@ -518,10 +623,12 @@ export async function updateIzin(id: string, formData: FormData): Promise<{ succ
 }
 
 // ─── Simpan Izin ─────────────────────────────────────────────────────────────
-export async function simpanIzin(formData: FormData): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan', 'create')
+export async function simpanIzin(formData: FormData, requestedAsrama?: string): Promise<{ success: boolean } | { error: string }> {
+  const access = await assertManagedMutation('create')
   if ('error' in access) return access
   const session = access
+  const scope = await resolvePerizinanScope(requestedAsrama)
+  if ('error' in scope) return scope
 
   const santri_id = String(formData.get('santri_id') ?? '').trim()
   if (!santri_id) return { error: 'Santri wajib dipilih terlebih dahulu.' }
@@ -536,10 +643,14 @@ export async function simpanIzin(formData: FormData): Promise<{ success: boolean
   if (overlap) return { error: 'Santri sudah memiliki izin aktif pada rentang waktu tersebut.' }
   const izinId = generateId()
   const actorSession = await getSession()
-  const santri = await queryOne<{ nama_lengkap: string | null; nis: string | null }>(
-    'SELECT nama_lengkap, nis FROM santri WHERE id = ?',
+  const santri = await queryOne<{ nama_lengkap: string | null; nis: string | null; asrama: string | null }>(
+    'SELECT nama_lengkap, nis, asrama FROM santri WHERE id = ?',
     [santri_id]
   )
+  if (!santri) return { error: 'Santri tidak ditemukan.' }
+  if (scope.asrama && santri.asrama !== scope.asrama) {
+    return { error: 'Santri ini berada di luar cakupan asrama yang dipilih.' }
+  }
 
   await execute(`
     INSERT INTO perizinan (id, santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan, pemberi_izin, status, created_by)
@@ -570,17 +681,21 @@ export async function simpanIzin(formData: FormData): Promise<{ success: boolean
   return { success: true }
 }
 
-export async function setSudahDatang(id: string, waktuDatang: string): Promise<{ success: boolean; message: string } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan', 'update')
+export async function setSudahDatang(id: string, waktuDatang: string, requestedAsrama?: string): Promise<{ success: boolean; message: string } | { error: string }> {
+  const access = await assertManagedMutation('update')
   if ('error' in access) return access
   const session = await getSession()
+  const scope = await resolvePerizinanScope(requestedAsrama)
+  if ('error' in scope) return scope
+  const scopeClause = scope.asrama ? ' AND s.asrama = ?' : ''
+  const scopeParams = scope.asrama ? [scope.asrama] : []
 
   const izin = await queryOne<{ jenis: string; tgl_selesai_rencana: string; tgl_kembali_aktual: string | null; santri_nama: string | null }>(
     `SELECT p.jenis, p.tgl_selesai_rencana, p.tgl_kembali_aktual, s.nama_lengkap AS santri_nama
      FROM perizinan p
      LEFT JOIN santri s ON s.id = p.santri_id
-     WHERE p.id = ?`,
-    [id]
+     WHERE p.id = ?${scopeClause}`,
+    [id, ...scopeParams]
   )
   if (!izin) return { error: 'Data izin tidak ditemukan.' }
   if (izin.tgl_kembali_aktual) return { error: 'Kedatangan santri sudah pernah tercatat.' }
@@ -621,16 +736,23 @@ export async function setSudahDatang(id: string, waktuDatang: string): Promise<{
   return { success: true, message: 'Tepat waktu. Izin selesai.' }
 }
 
-export async function cariSantri(keyword: string) {
+export async function cariSantri(keyword: string, requestedAsrama?: string) {
+  const scope = await resolvePerizinanScope(requestedAsrama)
+  if ('error' in scope) return []
+
+  const scopeClause = scope.asrama ? ' AND s.asrama = ?' : ''
+  const params = scope.asrama
+    ? [`%${keyword}%`, `%${keyword}%`, scope.asrama]
+    : [`%${keyword}%`, `%${keyword}%`]
   return query<any>(`
     SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
            k.nama_kelas AS kelas
     FROM santri s
     LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
     LEFT JOIN kelas k ON k.id = rp.kelas_id
-    WHERE s.nama_lengkap LIKE ?
+    WHERE (s.nama_lengkap LIKE ? OR s.nis LIKE ?)${scopeClause}
     LIMIT 5
-  `, [`%${keyword}%`])
+  `, params)
 }
 
 // ─── Ensure perizinan_pengajuan table ────────────────────────────────────────
@@ -655,7 +777,8 @@ async function ensurePengajuanTable() {
 
 // ─── Cari Santri terbatas ke asrama binaan ───────────────────────────────────
 export async function cariSantriAsrama(keyword: string, asramaBinaan: string) {
-  if (!asramaBinaan) return []
+  const scope = await resolvePerizinanScope(asramaBinaan)
+  if ('error' in scope || !scope.asrama) return []
   return query<any>(`
     SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar,
            k.nama_kelas AS kelas
@@ -664,7 +787,7 @@ export async function cariSantriAsrama(keyword: string, asramaBinaan: string) {
     LEFT JOIN kelas k ON k.id = rp.kelas_id
     WHERE s.nama_lengkap LIKE ? AND s.asrama = ? AND s.status_global = 'aktif'
     LIMIT 5
-  `, [`%${keyword}%`, asramaBinaan])
+  `, [`%${keyword}%`, scope.asrama])
 }
 
 // ─── Ajukan Izin Pulang (oleh pengurus asrama) ────────────────────────────────
@@ -715,53 +838,116 @@ export async function ajukanIzinAsrama(formData: FormData): Promise<{ success: b
     details: { jenis, alasan: alasan_final, pemberi_izin, tgl_mulai, tgl_selesai_rencana },
   })
 
-  // Trim oldest jika per-user sudah > 30
-  if (session?.id) {
-    await execute(`
-      DELETE FROM perizinan_pengajuan
-      WHERE submitted_by = ? AND id NOT IN (
-        SELECT id FROM perizinan_pengajuan
-        WHERE submitted_by = ?
-        ORDER BY created_at DESC
-        LIMIT 30
-      )
-    `, [session.id, session.id])
-  }
-
   revalidatePath('/dashboard/keamanan/perizinan')
   return { success: true }
 }
 
-// ─── Get Riwayat Pengajuan per asrama binaan (maks 30) ───────────────────────
-export async function getRiwayatPengajuanAsrama(): Promise<any[]> {
-  const session = await getSession()
-  if (!session?.asrama_binaan) return []
-  try {
-    await ensurePengajuanTable()
-    return await query<any>(`
-      SELECT pq.id, pq.created_at, pq.jenis, pq.alasan, pq.pemberi_izin,
-             pq.tgl_mulai, pq.tgl_selesai_rencana, pq.status,
-             pq.santri_id,
-             s.nama_lengkap AS nama, s.nis, s.asrama, s.kamar,
-             k.nama_kelas AS kelas,
-             u.full_name AS submitted_by_name
-      FROM perizinan_pengajuan pq
-      JOIN santri s ON s.id = pq.santri_id
-      LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
-      LEFT JOIN kelas k ON k.id = rp.kelas_id
-      LEFT JOIN users u ON u.id = pq.submitted_by
-      WHERE s.asrama = ?
-      ORDER BY pq.created_at DESC
-      LIMIT 30
-    `, [session.asrama_binaan])
-  } catch {
-    return []
+// ─── Riwayat Pengajuan (ter-scope, terfilter, dan berpaginasi) ───────────────
+export async function getRiwayatPengajuan(params: {
+  page?: number
+  pageSize?: number
+  search?: string
+  asrama?: string
+  tglAwal?: string
+  tglAkhir?: string
+  statusFilter?: 'SEMUA' | 'PENDING' | 'APPROVED' | 'REJECTED'
+  jenisFilter?: 'SEMUA' | 'PULANG' | 'KELUAR_KOMPLEK'
+  exportAll?: boolean
+} = {}) {
+  const page = Math.max(1, Number(params.page) || 1)
+  // The on-screen table remains small, while export can request the complete
+  // filtered result set without bypassing the same scope and WHERE clauses.
+  const pageSize = Math.min(10000, Math.max(1, Number(params.pageSize) || 10))
+  const scope = await resolvePerizinanScope(params.asrama)
+  if ('error' in scope) return { rows: [], total: 0, page, totalPages: 0, error: scope.error }
+  await ensurePengajuanTable()
+
+  const clauses: string[] = []
+  const values: any[] = []
+  if (scope.asrama) {
+    clauses.push('s.asrama = ?')
+    values.push(scope.asrama)
+  } else if (params.asrama && params.asrama !== 'SEMUA') {
+    clauses.push('s.asrama = ?')
+    values.push(params.asrama)
   }
+  if (params.search?.trim()) {
+    const search = `%${params.search.trim()}%`
+    clauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ? OR pq.alasan LIKE ?)')
+    values.push(search, search, search)
+  }
+
+  if (params.jenisFilter && params.jenisFilter !== 'SEMUA') {
+    clauses.push('pq.jenis = ?')
+    values.push(params.jenisFilter)
+  }
+  if (params.statusFilter && params.statusFilter !== 'SEMUA') {
+    clauses.push('pq.status = ?')
+    values.push(params.statusFilter)
+  }
+  if (params.tglAwal) {
+    clauses.push('pq.tgl_mulai >= ?')
+    values.push(new Date(`${params.tglAwal}T00:00:00+07:00`).toISOString())
+  }
+  if (params.tglAkhir) {
+    clauses.push('pq.tgl_mulai <= ?')
+    values.push(new Date(`${params.tglAkhir}T23:59:59+07:00`).toISOString())
+  }
+
+  const where = clauses.length ? clauses.join(' AND ') : '1=1'
+  const countRow = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) AS total
+     FROM perizinan_pengajuan pq
+     JOIN santri s ON s.id = pq.santri_id
+     WHERE ${where}`,
+    values
+  )
+  const total = Number(countRow?.total || 0)
+  const offset = (page - 1) * pageSize
+  const rows = await query<any>(
+    `SELECT pq.id, pq.created_at, pq.jenis, pq.alasan, pq.pemberi_izin,
+            pq.tgl_mulai, pq.tgl_selesai_rencana, pq.status, pq.reviewed_at,
+            pq.santri_id,
+            s.nama_lengkap AS nama, s.nis, s.asrama, s.kamar,
+            k.nama_kelas AS kelas,
+            u.full_name AS submitted_by_name,
+            reviewer.full_name AS reviewed_by_name
+     FROM perizinan_pengajuan pq
+     JOIN santri s ON s.id = pq.santri_id
+     LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+     LEFT JOIN kelas k ON k.id = rp.kelas_id
+     LEFT JOIN users u ON u.id = pq.submitted_by
+     LEFT JOIN users reviewer ON reviewer.id = pq.reviewed_by
+     WHERE ${where}
+     ORDER BY pq.created_at DESC
+     ${params.exportAll ? '' : 'LIMIT ? OFFSET ?'}`,
+    params.exportAll ? values : [...values, pageSize, offset]
+  )
+
+  return { rows, total, page, totalPages: Math.ceil(total / pageSize) }
+}
+
+export async function getRiwayatPengajuanAsrama(): Promise<any[]> {
+  const result = await getRiwayatPengajuan({ page: 1, pageSize: 100 })
+  return result.rows
+}
+
+/** Export the complete, filtered submission history using the same resolver as the tab. */
+export async function exportRiwayatPengajuan(params: {
+  search?: string
+  asrama?: string
+  tglAwal?: string
+  tglAkhir?: string
+  statusFilter?: 'SEMUA' | 'PENDING' | 'APPROVED' | 'REJECTED'
+  jenisFilter?: 'SEMUA' | 'PULANG' | 'KELUAR_KOMPLEK'
+} = {}) {
+  const result = await getRiwayatPengajuan({ ...params, page: 1, pageSize: 100, exportAll: true })
+  return result.rows
 }
 
 // ─── Update Pengajuan PENDING milik asrama ────────────────────────────────────
 export async function updatePengajuanAsrama(id: string, formData: FormData): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan', 'update')
+  const access = await assertManagedMutation('update')
   if ('error' in access) return access
   const session = await getSession()
   if (!session?.asrama_binaan) return { error: 'Akun Anda belum memiliki asrama binaan.' }
@@ -793,7 +979,7 @@ export async function updatePengajuanAsrama(id: string, formData: FormData): Pro
 
 // ─── Hapus Pengajuan PENDING milik asrama ─────────────────────────────────────
 export async function hapusPengajuanAsrama(id: string): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan', 'delete')
+  const access = await assertManagedMutation('delete')
   if ('error' in access) return access
   const session = await getSession()
   if (!session?.asrama_binaan) return { error: 'Akun Anda belum memiliki asrama binaan.' }
@@ -813,7 +999,9 @@ export async function hapusPengajuanAsrama(id: string): Promise<{ success: boole
 }
 
 // ─── Get Pengajuan Pending dari Asrama ────────────────────────────────────────
-export async function getPengajuanPendingAsrama(): Promise<any[]> {
+export async function getPengajuanPendingAsrama(requestedAsrama?: string): Promise<any[]> {
+  const scope = await resolvePerizinanScope(requestedAsrama)
+  if ('error' in scope) return []
   try {
     await ensurePengajuanTable()
     return await query<any>(`
@@ -828,17 +1016,17 @@ export async function getPengajuanPendingAsrama(): Promise<any[]> {
       LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
       LEFT JOIN kelas k ON k.id = rp.kelas_id
       LEFT JOIN users u ON u.id = pq.submitted_by
-      WHERE pq.status = 'PENDING'
+      WHERE pq.status = 'PENDING'${scope.asrama ? ' AND s.asrama = ?' : ''}
       ORDER BY pq.created_at ASC
-    `)
+    `, scope.asrama ? [scope.asrama] : [])
   } catch {
     return []
   }
 }
 
 // ─── Approve Pengajuan Asrama ─────────────────────────────────────────────────
-export async function approveIzinAsrama(id: string): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan', 'create')
+export async function approveIzinAsrama(id: string, requestedAsrama?: string): Promise<{ success: boolean } | { error: string }> {
+  const access = await assertManagedMutation('create')
   if ('error' in access) return access
   const session = await getSession()
 
@@ -846,12 +1034,17 @@ export async function approveIzinAsrama(id: string): Promise<{ success: boolean 
     return { error: 'Hanya dewan santri yang dapat menyetujui pengajuan.' }
   }
 
+  const scope = await resolvePerizinanScope(requestedAsrama)
+  if ('error' in scope) return scope
+  const scopeClause = scope.asrama ? ' AND s.asrama = ?' : ''
+  const scopeParams = scope.asrama ? [scope.asrama] : []
+
   const pengajuan = await queryOne<any>(`
     SELECT pq.*, s.nama_lengkap, s.nis
     FROM perizinan_pengajuan pq
     JOIN santri s ON s.id = pq.santri_id
-    WHERE pq.id = ? AND pq.status = 'PENDING'
-  `, [id])
+    WHERE pq.id = ? AND pq.status = 'PENDING'${scopeClause}
+  `, [id, ...scopeParams])
 
   if (!pengajuan) return { error: 'Pengajuan tidak ditemukan atau sudah diproses.' }
 
@@ -892,8 +1085,8 @@ export async function approveIzinAsrama(id: string): Promise<{ success: boolean 
 }
 
 // ─── Reject Pengajuan Asrama ──────────────────────────────────────────────────
-export async function rejectIzinAsrama(id: string): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan', 'update')
+export async function rejectIzinAsrama(id: string, requestedAsrama?: string): Promise<{ success: boolean } | { error: string }> {
+  const access = await assertManagedMutation('update')
   if ('error' in access) return access
   const session = await getSession()
 
@@ -901,9 +1094,17 @@ export async function rejectIzinAsrama(id: string): Promise<{ success: boolean }
     return { error: 'Hanya dewan santri yang dapat menolak pengajuan.' }
   }
 
+  const scope = await resolvePerizinanScope(requestedAsrama)
+  if ('error' in scope) return scope
+  const scopeClause = scope.asrama ? ' AND s.asrama = ?' : ''
+  const scopeParams = scope.asrama ? [scope.asrama] : []
+
   const pengajuan = await queryOne<any>(
-    'SELECT id, santri_id FROM perizinan_pengajuan WHERE id = ? AND status = ?',
-    [id, 'PENDING']
+    `SELECT pq.id, pq.santri_id
+     FROM perizinan_pengajuan pq
+     JOIN santri s ON s.id = pq.santri_id
+     WHERE pq.id = ? AND pq.status = ?${scopeClause}`,
+    [id, 'PENDING', ...scopeParams]
   )
   if (!pengajuan) return { error: 'Pengajuan tidak ditemukan atau sudah diproses.' }
 
@@ -930,10 +1131,14 @@ export async function rejectIzinAsrama(id: string): Promise<{ success: boolean }
   return { success: true }
 }
 
-export async function hapusIzin(id: string): Promise<{ success: boolean } | { error: string }> {
-  const access = await assertFeature('/dashboard/keamanan/perizinan', 'delete')
+export async function hapusIzin(id: string, requestedAsrama?: string): Promise<{ success: boolean } | { error: string }> {
+  const access = await assertManagedMutation('delete')
   if ('error' in access) return access
   const session = await getSession()
+  const scope = await resolvePerizinanScope(requestedAsrama)
+  if ('error' in scope) return scope
+  const scopeClause = scope.asrama ? ' AND s.asrama = ?' : ''
+  const scopeParams = scope.asrama ? [scope.asrama] : []
   const izin = await queryOne<{
     id: string
     jenis: string | null
@@ -943,8 +1148,8 @@ export async function hapusIzin(id: string): Promise<{ success: boolean } | { er
     `SELECT p.id, p.jenis, p.alasan, s.nama_lengkap
      FROM perizinan p
      LEFT JOIN santri s ON s.id = p.santri_id
-     WHERE p.id = ?`,
-    [id]
+     WHERE p.id = ?${scopeClause}`,
+    [id, ...scopeParams]
   )
   if (!izin) return { error: 'Data izin tidak ditemukan.' }
   await execute('DELETE FROM perizinan WHERE id = ?', [id])

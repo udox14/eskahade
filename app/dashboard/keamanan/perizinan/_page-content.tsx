@@ -6,7 +6,7 @@ import {
   getAsramaList, exportDataIzin, getAnalitikIzin, getTopSantriIzin, updateIzin,
   getAlasanIzinList, simpanAlasanIzinList, getPemberiIzinList, simpanPemberiIzinList,
   ajukanIzinAsrama, getPengajuanPendingAsrama, approveIzinAsrama, rejectIzinAsrama,
-  getRiwayatPengajuanAsrama, cariSantriAsrama, updatePengajuanAsrama, hapusPengajuanAsrama
+  getRiwayatPengajuan, exportRiwayatPengajuan, cariSantriAsrama, updatePengajuanAsrama, hapusPengajuanAsrama
 } from './actions'
 import { 
   Search, Plus, MapPin, Home, Clock, CheckCircle, X, User, ArrowLeft, 
@@ -56,10 +56,13 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const isAsrama = userRoles.includes('pengurus_asrama') &&
     !userRoles.includes('dewan_santri') &&
     !userRoles.includes('admin')
-  const isDewanOrAdmin = userRoles.includes('dewan_santri') || userRoles.includes('admin')
+  const isAdmin = userRoles.includes('admin')
+  const isDewan = userRoles.includes('dewan_santri') && !isAdmin
+  const isDewanOrAdmin = userRoles.includes('dewan_santri') || isAdmin
+  const requiresAsramaSelection = isDewan
   
   // Tabs
-  const [activeTab, setActiveTab] = useState<'DAFTAR' | 'ANALITIK'>('DAFTAR')
+  const [activeTab, setActiveTab] = useState<'DAFTAR' | 'RIWAYAT' | 'ANALITIK'>('DAFTAR')
 
   // Data State
   const [list, setList] = useState<any[]>([])
@@ -75,7 +78,8 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const [pageSize, setPageSize] = useState(10)
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
-  const [asrama, setAsrama] = useState('SEMUA')
+  const [asrama, setAsrama] = useState(() => isAsrama ? (asramaBinaan || '') : (isDewan ? '' : 'SEMUA'))
+  const hasSelectedAsrama = !requiresAsramaSelection || Boolean(asrama && asrama !== 'SEMUA')
   const [tglAwal, setTglAwal] = useState('')
   const [tglAkhir, setTglAkhir] = useState('')
   const [statusFilter, setStatusFilter] = useState<'SEMUA' | 'BELUM_KEMBALI' | 'SUDAH_KEMBALI' | 'TERLAMBAT' | 'TEPAT_WAKTU'>('SEMUA')
@@ -121,6 +125,13 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   // Asrama-only riwayat state
   const [riwayatPengajuan, setRiwayatPengajuan] = useState<any[]>([])
   const [loadingRiwayat, setLoadingRiwayat] = useState(false)
+  const [riwayatPage, setRiwayatPage] = useState(1)
+  const [riwayatTotal, setRiwayatTotal] = useState(0)
+  const [riwayatTotalPages, setRiwayatTotalPages] = useState(0)
+  const [riwayatSearch, setRiwayatSearch] = useState('')
+  const [riwayatSearchInput, setRiwayatSearchInput] = useState('')
+  const [riwayatStatusFilter, setRiwayatStatusFilter] = useState<'SEMUA' | 'PENDING' | 'APPROVED' | 'REJECTED'>('SEMUA')
+  const [riwayatJenisFilter, setRiwayatJenisFilter] = useState<'SEMUA' | 'PULANG' | 'KELUAR_KOMPLEK'>('SEMUA')
   const [editingPengajuan, setEditingPengajuan] = useState<any | null>(null)
   const [deletingPengajuanId, setDeletingPengajuanId] = useState<string | null>(null)
 
@@ -144,16 +155,28 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const [exportSemuaData, setExportSemuaData] = useState(false)
   const [exporting, setExporting] = useState(false)
 
-  const loadRiwayat = useCallback(async () => {
-    if (!isAsrama) return
+  const loadRiwayat = useCallback(async (pg = riwayatPage) => {
+    if (!hasSelectedAsrama) {
+      setRiwayatPengajuan([])
+      setRiwayatTotal(0)
+      setRiwayatTotalPages(0)
+      return
+    }
     setLoadingRiwayat(true)
     try {
-      const rows = await getRiwayatPengajuanAsrama()
-      setRiwayatPengajuan(rows)
+      const result = await getRiwayatPengajuan({
+        page: pg, pageSize, search: riwayatSearch, asrama,
+        tglAwal, tglAkhir, statusFilter: riwayatStatusFilter,
+        jenisFilter: riwayatJenisFilter,
+      })
+      setRiwayatPengajuan(result.rows)
+      setRiwayatTotal(result.total)
+      setRiwayatTotalPages(result.totalPages)
+      setRiwayatPage(result.page)
     } finally {
       setLoadingRiwayat(false)
     }
-  }, [isAsrama])
+  }, [asrama, hasSelectedAsrama, pageSize, riwayatJenisFilter, riwayatPage, riwayatSearch, riwayatStatusFilter, tglAkhir, tglAwal])
 
   useEffect(() => {
     getAsramaList().then(setAsramaOptions)
@@ -163,13 +186,10 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
       if (rows.length > 0) setAlasanDropdown(rows[0])
     })
     getPemberiIzinList().then(setPemberiIzinOptions)
-    if (isDewanOrAdmin) {
-      getPengajuanPendingAsrama().then(rows => setPengajuanCount(rows.length))
+    if (isDewanOrAdmin && (!isDewan || asrama)) {
+      getPengajuanPendingAsrama(asrama).then(rows => setPengajuanCount(rows.length))
     }
-    if (isAsrama) {
-      loadRiwayat()
-    }
-  }, [isDewanOrAdmin, isAsrama, loadRiwayat])
+  }, [asrama, isDewan, isDewanOrAdmin])
 
   const loadData = useCallback(async (pg = page, ps = pageSize, s = search, a = asrama, ta = tglAwal, tk = tglAkhir, st = statusFilter) => {
     setLoading(true)
@@ -194,17 +214,50 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   }, [asrama, tglAwal, tglAkhir, jenisFilter])
 
   useEffect(() => {
+    if (!hasSelectedAsrama) {
+      setLoading(false)
+      setList([])
+      setTotal(0)
+      setTotalPages(0)
+      setAnalitikData(null)
+      setTopSantri([])
+      return
+    }
     if (activeTab === 'DAFTAR') loadData(page, pageSize, search, asrama, tglAwal, tglAkhir, statusFilter)
-    else loadAnalitik(asrama, tglAwal, tglAkhir)
-  }, [activeTab, page, pageSize, search, asrama, tglAwal, tglAkhir, statusFilter, jenisFilter, loadData, loadAnalitik])
+    else if (activeTab === 'ANALITIK') loadAnalitik(asrama, tglAwal, tglAkhir)
+    else loadRiwayat(riwayatPage)
+  }, [activeTab, asrama, hasSelectedAsrama, jenisFilter, loadData, loadAnalitik, loadRiwayat, page, pageSize, riwayatPage, search, statusFilter, tglAkhir, tglAwal])
 
   // --- HANDLERS ---
+  const handleAsramaChange = (nextAsrama: string) => {
+    setAsrama(nextAsrama)
+    setPage(1)
+    setRiwayatPage(1)
+    if (isDewan) {
+      setSearch('')
+      setSearchInput('')
+      setTglAwal('')
+      setTglAkhir('')
+      setStatusFilter('SEMUA')
+      setJenisFilter('SEMUA')
+      setRiwayatSearch('')
+      setRiwayatSearchInput('')
+      setRiwayatStatusFilter('SEMUA')
+      setRiwayatJenisFilter('SEMUA')
+      setList([])
+      setRiwayatPengajuan([])
+      setAnalitikData(null)
+      setTopSantri([])
+    }
+  }
+
   const handleCariSantri = async (e: React.FormEvent) => {
     e.preventDefault()
     if (searchSantri.length < 3) { toast.warning("Ketik minimal 3 huruf untuk mencari."); return }
+    if (!hasSelectedAsrama) { toast.warning('Pilih asrama terlebih dahulu.'); return }
     const res = isAsrama && asramaBinaan
       ? await cariSantriAsrama(searchSantri, asramaBinaan)
-      : await cariSantri(searchSantri)
+      : await cariSantri(searchSantri, asrama)
     setHasilCari(res)
     if (res.length === 0) toast.info(isAsrama ? "Santri tidak ditemukan di asrama binaan Anda." : "Santri tidak ditemukan.")
   }
@@ -280,12 +333,12 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
       formData.append('alasan_dropdown', alasanDropdown)
 
       const res = isOpenEdit
-        ? await updateIzin(editData.id, formData)
+        ? await updateIzin(editData.id, formData, asrama)
         : isAsrama && editingPengajuan
           ? await updatePengajuanAsrama(editingPengajuan.id, formData)
           : isAsrama
             ? await ajukanIzinAsrama(formData)
-            : await simpanIzin(formData)
+            : await simpanIzin(formData, asrama)
 
       if ('error' in res) {
         toast.error("Gagal menyimpan: " + (res as any).error)
@@ -319,7 +372,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const handleHapus = async (item: any) => {
     if (!await confirm(`Hapus data izin ${item.nama}?`)) return
     setDeletingId(item.id)
-    const res = await hapusIzin(item.id)
+    const res = await hapusIzin(item.id, asrama)
     setDeletingId(null)
     if ('error' in res) { toast.error('Gagal hapus', { description: (res as any).error }); return }
     toast.success('Data izin dihapus')
@@ -335,7 +388,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
 
   const handleSimpanKembali = async () => {
     const loadingToast = toast.loading("Memproses kepulangan...")
-    const res = await setSudahDatang(selectedReturnId, waktuKembali)
+    const res = await setSudahDatang(selectedReturnId, waktuKembali, asrama)
     toast.dismiss(loadingToast)
 
     if ('error' in res) { toast.error((res as any).error) } 
@@ -350,6 +403,11 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
     setExporting(true)
     const loadingToast = toast.loading("Menyiapkan data export...")
     try {
+      if (!hasSelectedAsrama) {
+        toast.dismiss(loadingToast)
+        toast.warning('Pilih asrama terlebih dahulu sebelum export.')
+        return
+      }
       if (!semuaData && (!dari || !sampai)) {
         toast.dismiss(loadingToast)
         toast.warning("Pilih rentang tanggal sebelum export, atau centang opsi semua data.")
@@ -362,6 +420,53 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
       }
       const tglAwal = semuaData ? undefined : dari
       const tglAkhir = semuaData ? undefined : sampai
+
+      if (activeTab === 'RIWAYAT') {
+        const data = await exportRiwayatPengajuan({
+          search: riwayatSearch,
+          asrama,
+          tglAwal,
+          tglAkhir,
+          statusFilter: riwayatStatusFilter,
+          jenisFilter: riwayatJenisFilter,
+        })
+        if (!data || data.length === 0) {
+          toast.dismiss(loadingToast)
+          toast.info("Tidak ada riwayat pengajuan untuk diexport")
+          return
+        }
+        const remappedHistory = data.map((d: any) => ({
+          "Nama Lengkap": d.nama,
+          "NIS": d.nis,
+          "Kelas": d.kelas || '-',
+          "Asrama": d.asrama,
+          "Kamar": d.kamar,
+          "Jenis Pengajuan": d.jenis === 'PULANG' ? 'Izin Pulang' : 'Keluar Komplek',
+          "Alasan / Keperluan": d.alasan,
+          "Pemberi Izin": d.pemberi_izin,
+          "Status Pengajuan": d.status === 'PENDING' ? 'Menunggu' : d.status === 'APPROVED' ? 'Disetujui' : 'Ditolak',
+          "Keberangkatan": formatIzinWaktu(d.jenis, d.tgl_mulai),
+          "Batas Rencana Kembali": formatIzinWaktu(d.jenis, d.tgl_selesai_rencana),
+          "Diajukan": formatWibDateTime(d.created_at),
+          "Diajukan Oleh": d.submitted_by_name || '-',
+          "Ditinjau Oleh": d.reviewed_by_name || '-',
+          "Waktu Ditinjau": d.reviewed_at ? formatWibDateTime(d.reviewed_at) : '-',
+        }))
+        const ws = XLSX.utils.json_to_sheet(remappedHistory)
+        ws['!cols'] = [
+          { wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 10 },
+          { wch: 20 }, { wch: 35 }, { wch: 22 }, { wch: 18 }, { wch: 22 },
+          { wch: 22 }, { wch: 22 }, { wch: 24 }, { wch: 24 }, { wch: 22 },
+        ]
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, "Riwayat Pengajuan")
+        const dateStamp = semuaData ? toWibDateInputValue() : `${dari}_${sampai}`
+        XLSX.writeFile(wb, `Laporan_Riwayat_Pengajuan_${dateStamp}.xlsx`)
+        setIsOpenExport(false)
+        toast.success("Berhasil export riwayat pengajuan!")
+        return
+      }
+
       const data = await exportDataIzin({ search, asrama, tglAwal, tglAkhir, statusFilter, jenisFilter })
       if (!data || data.length === 0) { toast.dismiss(loadingToast); toast.info("Tidak ada data untuk diexport"); return }
 
@@ -436,7 +541,11 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   }
 
   const openPengajuanModal = async () => {
-    const list = await getPengajuanPendingAsrama()
+    if (!hasSelectedAsrama) {
+      toast.warning('Pilih asrama terlebih dahulu.')
+      return
+    }
+    const list = await getPengajuanPendingAsrama(asrama)
     setPengajuanList(list)
     setPengajuanCount(list.length)
     setIsOpenPengajuan(true)
@@ -444,11 +553,11 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
 
   const handleApprovePengajuan = async (id: string) => {
     setProcessingId(id)
-    const res = await approveIzinAsrama(id)
+    const res = await approveIzinAsrama(id, asrama)
     setProcessingId(null)
     if ('error' in res) { toast.error((res as any).error); return }
     toast.success('Pengajuan izin disetujui!')
-    const updated = await getPengajuanPendingAsrama()
+    const updated = await getPengajuanPendingAsrama(asrama)
     setPengajuanList(updated)
     setPengajuanCount(updated.length)
     loadData()
@@ -457,11 +566,11 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const handleRejectPengajuan = async (id: string) => {
     if (!await confirm('Tolak pengajuan izin ini?')) return
     setProcessingId(id)
-    const res = await rejectIzinAsrama(id)
+    const res = await rejectIzinAsrama(id, asrama)
     setProcessingId(null)
     if ('error' in res) { toast.error((res as any).error); return }
     toast.info('Pengajuan izin ditolak.')
-    const updated = await getPengajuanPendingAsrama()
+    const updated = await getPengajuanPendingAsrama(asrama)
     setPengajuanList(updated)
     setPengajuanCount(updated.length)
   }
@@ -640,7 +749,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   )
 
   // ── ASRAMA VIEW (simplified) ──────────────────────────────────────────────
-  if (isAsrama) {
+  if (false && isAsrama) {
     const statusBadge = (status: string) => {
       if (status === 'PENDING') return <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200">Menunggu</span>
       if (status === 'APPROVED') return <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1"><CheckCircle className="w-3 h-3"/>Disetujui</span>
@@ -818,7 +927,8 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
       {/* HEADER */}
-      <div className="flex items-start gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 flex-1 items-start gap-4">
         <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
           <ArrowLeft className="w-6 h-6 text-slate-600" />
         </button>
@@ -827,10 +937,10 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
           description="Monitoring izin pulang dan keluar kompleks santri."
           className="flex-1"
         />
-      </div>
+        </div>
 
-      <div className="flex justify-end">
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:rounded-2xl sm:border sm:border-slate-200 sm:bg-white sm:p-2 sm:shadow-sm">
+      <div className="w-full lg:max-w-[55%] xl:w-auto xl:max-w-none">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:rounded-2xl sm:border sm:border-slate-200 sm:bg-white sm:p-2 sm:shadow-sm lg:w-full lg:max-w-full xl:flex-nowrap">
           {isDewanOrAdmin && (canUpdate || canCreate) && (
             <>
               {canUpdate && (
@@ -857,11 +967,15 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
           )}
         </div>
       </div>
+      </div>
 
       {/* TABS */}
       <div className="flex gap-2 border-b border-slate-200">
         <button onClick={() => setActiveTab('DAFTAR')} className={`px-4 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'DAFTAR' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
           <List className="w-4 h-4" /> Daftar Izin
+        </button>
+        <button onClick={() => setActiveTab('RIWAYAT')} className={`px-4 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'RIWAYAT' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+          <Clock className='w-4 h-4' /> Riwayat Pengajuan
         </button>
         <button onClick={() => setActiveTab('ANALITIK')} className={`px-4 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ANALITIK' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
           <BarChart2 className="w-4 h-4" /> Analitik & Tren
@@ -871,14 +985,22 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
       {/* DAFTAR TAB CONTENT */}
       {activeTab === 'DAFTAR' && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+          {!hasSelectedAsrama && (
+            <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/60 p-6 text-center">
+              <Home className="mx-auto mb-2 h-8 w-8 text-blue-300" />
+              <p className="font-bold text-slate-700">Pilih asrama untuk melihat daftar izin</p>
+              <p className="mt-1 text-sm text-slate-500">Pencarian, filter, dan ekspor aktif setelah cakupan asrama dipilih.</p>
+            </div>
+          )}
           
           {/* COMPREHENSIVE FILTER BAR */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm">
             <div className="flex flex-wrap gap-3 items-end">
               <div className="min-w-[140px] flex-1 sm:flex-none">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
-                <select value={asrama} onChange={e => {setAsrama(e.target.value); setPage(1)}} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
-                  <option value="SEMUA">Semua Asrama</option>
+                <select value={asrama} disabled={isAsrama} onChange={e => handleAsramaChange(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700 disabled:bg-slate-50 disabled:text-slate-500">
+                  {!isDewan && !isAsrama && <option value="SEMUA">Semua Asrama</option>}
+                  {isDewan && <option value="">Pilih Asrama...</option>}
                   {asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
               </div>
@@ -912,15 +1034,15 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cari Santri</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input type="text" placeholder="Ketik Nama / NIS..." value={searchInput} onChange={e => setSearchInput(e.target.value)} className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700" />
+                  <input type="text" placeholder="Ketik Nama / NIS..." value={searchInput} onChange={e => setSearchInput(e.target.value)} disabled={!hasSelectedAsrama} className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700 disabled:bg-slate-50 disabled:text-slate-400" />
                 </div>
               </form>
               
               <div className="flex gap-2 self-end w-full sm:w-auto mt-2 sm:mt-0">
-                <button type="button" onClick={() => loadData(1, pageSize, searchInput, asrama, tglAwal, tglAkhir, statusFilter)} className="flex-1 sm:flex-none bg-slate-900 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-black transition-colors">
+                <button type="button" disabled={!hasSelectedAsrama} onClick={() => loadData(1, pageSize, searchInput, asrama, tglAwal, tglAkhir, statusFilter)} className="flex-1 sm:flex-none bg-slate-900 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-black transition-colors disabled:cursor-not-allowed disabled:opacity-50">
                   <Filter className="w-4 h-4" /> Terapkan
                 </button>
-                <button type="button" onClick={() => setIsOpenExport(true)} className="flex-1 sm:flex-none bg-emerald-600 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-emerald-700 transition-colors">
+                <button type="button" disabled={!hasSelectedAsrama} onClick={() => setIsOpenExport(true)} className="flex-1 sm:flex-none bg-emerald-600 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-emerald-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
                   <Download className="w-4 h-4" /> Export
                 </button>
               </div>
@@ -928,7 +1050,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
             {(search || tglAwal || tglAkhir || asrama !== 'SEMUA' || statusFilter !== 'SEMUA' || jenisFilter !== 'SEMUA') && (
               <div className="mt-3 flex items-center gap-2">
                 <span className="text-xs text-slate-500">Filter Aktif:</span>
-                <button onClick={() => {setSearchInput(''); setSearch(''); setTglAwal(''); setTglAkhir(''); setAsrama('SEMUA'); setStatusFilter('SEMUA'); setJenisFilter('SEMUA'); setPage(1)}} className="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-lg transition-colors">
+                <button onClick={() => {setSearchInput(''); setSearch(''); setTglAwal(''); setTglAkhir(''); setAsrama(isDewan ? asrama : isAsrama ? (asramaBinaan || '') : 'SEMUA'); setStatusFilter('SEMUA'); setJenisFilter('SEMUA'); setPage(1)}} className="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-lg transition-colors">
                   Kosongkan Filter
                 </button>
               </div>
@@ -1012,7 +1134,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                               item.tgl_kembali_aktual ? (
                                 <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2.5 py-1 rounded-lg border border-orange-200 flex items-center justify-center gap-1 shadow-sm"><AlertTriangle className="w-3 h-3"/> Sidang</span>
                               ) : (
-                                canUpdate ? (
+                                (!isAsrama && canUpdate) ? (
                                   <button onClick={() => openReturnModal(item)} className="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 px-2.5 py-1.5 rounded-lg text-[11px] font-bold w-full transition-colors shadow-sm">Tandai Tiba</button>
                                 ) : (
                                   <span className="text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200 px-2 py-1 rounded-lg flex items-center justify-center gap-1">Aktif</span>
@@ -1106,7 +1228,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                             item.tgl_kembali_aktual ? (
                               <span className="w-full text-center py-2 text-xs font-bold text-orange-700 bg-orange-50 rounded-xl border border-orange-200 flex items-center justify-center gap-1.5"><AlertTriangle className="w-4 h-4"/> Menunggu Sidang (Telat)</span>
                             ) : (
-                              canUpdate ? (
+                              (!isAsrama && canUpdate) ? (
                                 <button onClick={() => openReturnModal(item)} className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold border border-rose-200 shadow-sm rounded-xl text-xs transition-colors">Tandai Santri Tiba</button>
                               ) : (
                                 <span className="w-full text-center py-2 text-xs font-bold text-slate-600 bg-slate-50 rounded-xl border border-slate-200 flex justify-center items-center">Izin Aktif</span>
@@ -1130,7 +1252,47 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
         </div>
       )}
 
-      {/* ANALITIK TAB CONTENT - BENTO GRID DESIGN */}
+      {activeTab === 'RIWAYAT' && (
+        <div className='space-y-4 animate-in fade-in'>
+          <div className='bg-white rounded-2xl border border-slate-200 p-4 shadow-sm'>
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Clock className='w-5 h-5 text-blue-600' /> Riwayat Pengajuan</h2>
+            <p className='text-xs text-slate-500 mt-1'>Seluruh pengajuan pada cakupan asrama yang dipilih.</p>
+            <div className='mt-3 flex flex-wrap items-end gap-2'>
+              {!isAsrama && <select value={asrama} onChange={e => handleAsramaChange(e.target.value)} className='border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium'>{isAdmin && <option value='SEMUA'>Semua Asrama</option>}{isDewan && <option value=''>Pilih Asrama...</option>}{asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}</select>}
+              {isAsrama && <span className='px-3 py-2 rounded-xl bg-purple-50 border border-purple-100 text-purple-700 text-sm font-bold'>{asramaBinaan}</span>}
+              <select value={riwayatStatusFilter} onChange={e => { setRiwayatStatusFilter(e.target.value as any); setRiwayatPage(1) }} className='border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium'><option value='SEMUA'>Semua Status</option><option value='PENDING'>Menunggu</option><option value='APPROVED'>Disetujui</option><option value='REJECTED'>Ditolak</option></select>
+              <select value={riwayatJenisFilter} onChange={e => { setRiwayatJenisFilter(e.target.value as any); setRiwayatPage(1) }} className='border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium'><option value='SEMUA'>Semua Jenis</option><option value='PULANG'>Izin Pulang</option><option value='KELUAR_KOMPLEK'>Keluar Komplek</option></select>
+              <input type='date' value={tglAwal} onChange={e => { setTglAwal(e.target.value); setRiwayatPage(1) }} className='border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium' aria-label='Tanggal mulai riwayat' />
+              <input type='date' value={tglAkhir} onChange={e => { setTglAkhir(e.target.value); setRiwayatPage(1) }} className='border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium' aria-label='Tanggal akhir riwayat' />
+              <button type='button' disabled={!hasSelectedAsrama} onClick={() => setIsOpenExport(true)} className='inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50'><Download className='h-4 w-4' /> Export</button>
+            </div>
+            <form onSubmit={e => { e.preventDefault(); setRiwayatSearch(riwayatSearchInput); setRiwayatPage(1) }} className='mt-3 flex gap-2'><input value={riwayatSearchInput} onChange={e => setRiwayatSearchInput(e.target.value)} disabled={!hasSelectedAsrama} placeholder='Cari nama, NIS, atau alasan...' className='min-w-0 flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400' /><button type='submit' disabled={!hasSelectedAsrama} className='bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50'>Terapkan</button></form>
+            {!hasSelectedAsrama ? (
+              <div className='text-center py-20 bg-white rounded-2xl border border-dashed border-blue-200 mt-4'><Home className='w-10 h-10 text-blue-200 mx-auto mb-3' /><p className='text-slate-700 font-bold'>Pilih asrama untuk melihat riwayat</p><p className='text-sm text-slate-500 mt-1'>Data akan aktif setelah cakupan dipilih.</p></div>
+            ) : loadingRiwayat ? (
+              <div className='flex justify-center py-16 text-slate-400 mt-4'><Clock className='w-6 h-6 animate-spin' /><span className='ml-2'>Memuat Riwayat...</span></div>
+            ) : riwayatPengajuan.length === 0 ? (
+              <div className='text-center py-16 text-slate-500 mt-4'>Belum ada pengajuan sesuai filter.</div>
+            ) : (<>
+              <div className='mt-4 space-y-3'>
+                {riwayatPengajuan.map(item => (
+                  <div key={item.id} className='bg-white rounded-2xl border border-slate-200 shadow-sm p-4'>
+                    <div className='flex items-start justify-between gap-3'>
+                      <div><p className='font-bold text-slate-900'>{item.nama}</p><p className='text-xs text-slate-500'>{item.nis || '-'} · {item.asrama} / {item.kamar}</p></div>
+                      <span className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg border ${item.status === 'PENDING' ? 'bg-amber-50 text-amber-700 border-amber-200' : item.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>{item.status === 'PENDING' ? 'Menunggu' : item.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'}</span>
+                    </div>
+                    <div className='mt-3 bg-slate-50 rounded-xl p-3 text-xs text-slate-600 space-y-1.5 border border-slate-100'><p className='italic'>{item.alasan}</p><p><span className='font-bold text-slate-400'>Jenis:</span> {item.jenis === 'PULANG' ? 'Izin Pulang' : 'Keluar Komplek'} · <span className='font-bold text-slate-400'>Pemberi:</span> {item.pemberi_izin}</p><p><span className='font-bold text-slate-400'>Berangkat:</span> {formatIzinWaktu(item.jenis, item.tgl_mulai)} · <span className='font-bold text-slate-400'>Batas kembali:</span> {formatIzinWaktu(item.jenis, item.tgl_selesai_rencana)}</p></div>
+                    <p className='text-[10px] text-slate-400 mt-2'>{formatWibDateTime(item.created_at)}{item.submitted_by_name && <> · oleh {item.submitted_by_name}</>}</p>
+                  </div>
+                ))}
+            </div>
+              <Pagination currentPage={riwayatPage} totalPages={riwayatTotalPages} pageSize={pageSize} total={riwayatTotal} onPageChange={setRiwayatPage} onPageSizeChange={s => { setPageSize(s); setRiwayatPage(1) }} />
+            </>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'ANALITIK' && (
         <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4">
           
@@ -1143,14 +1305,21 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
             <div className="w-full md:w-auto flex flex-wrap gap-2">
                <input type="date" value={tglAwal} onChange={e => {setTglAwal(e.target.value);}} className="flex-1 min-w-[120px] border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-xs text-slate-700" title="Awal Periode"/>
                <input type="date" value={tglAkhir} onChange={e => {setTglAkhir(e.target.value);}} className="flex-1 min-w-[120px] border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-xs text-slate-700" title="Akhir Periode"/>
-               <select value={asrama} onChange={e => setAsrama(e.target.value)} className="w-full md:w-auto border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs text-slate-800">
-                <option value="SEMUA">Semua Asrama</option>
+               <select value={asrama} disabled={isAsrama} onChange={e => handleAsramaChange(e.target.value)} className="w-full md:w-auto border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs text-slate-800 disabled:bg-slate-100">
+                {!isDewan && !isAsrama && <option value="SEMUA">Semua Asrama</option>}
+                {isDewan && <option value="">Pilih Asrama...</option>}
                 {asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
           </div>
 
-          {!analitikData ? (
+          {!hasSelectedAsrama ? (
+            <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/60 p-8 text-center">
+              <Home className="mx-auto mb-2 h-8 w-8 text-blue-300" />
+              <p className="font-bold text-slate-700">Pilih asrama untuk melihat analitik</p>
+              <p className="mt-1 text-sm text-slate-500">Pilih cakupan asrama pada filter di atas untuk memuat data.</p>
+            </div>
+          ) : !analitikData ? (
             <div className="flex justify-center py-20"><Clock className="w-6 h-6 animate-spin text-slate-300"/></div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
