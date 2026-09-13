@@ -55,16 +55,18 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
 
   const isAsrama = userRoles.includes('pengurus_asrama') &&
     !userRoles.includes('dewan_santri') &&
-    !userRoles.includes('admin')
+    !userRoles.includes('admin') &&
+    !userRoles.includes('keamanan') &&
+    !userRoles.includes('sekpen')
   const isAdmin = userRoles.includes('admin')
-  const isDewan = userRoles.includes('dewan_santri') && !isAdmin
-  const isDewanOrAdmin = userRoles.includes('dewan_santri') || isAdmin
-  const requiresAsramaSelection = isDewan
+  const isKeamananOrSekpen = (userRoles.includes('keamanan') || userRoles.includes('sekpen')) && !isAdmin
+  const isSuperViewRole = isAdmin || isKeamananOrSekpen  // roles that see all asrama without selection
+  const isDewan = userRoles.includes('dewan_santri') && !isSuperViewRole
+  const isDewanOrAdmin = userRoles.includes('dewan_santri') || isSuperViewRole
+  const requiresAsramaSelection = isDewan  // only dewan_santri (non-super) must select asrama first
   
   // Tabs
   const [activeTab, setActiveTab] = useState<'DAFTAR' | 'RIWAYAT' | 'ANALITIK'>('DAFTAR')
-
-  // Data State
   const [list, setList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [asramaOptions, setAsramaOptions] = useState<string[]>([])
@@ -154,6 +156,9 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const [exportSampai, setExportSampai] = useState(() => toWibDateInputValue())
   const [exportSemuaData, setExportSemuaData] = useState(false)
   const [exporting, setExporting] = useState(false)
+
+  // Filter modal state
+  const [isOpenFilter, setIsOpenFilter] = useState(false)
 
   const loadRiwayat = useCallback(async (pg = riwayatPage) => {
     if (!hasSelectedAsrama) {
@@ -993,69 +998,139 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
             </div>
           )}
           
-          {/* COMPREHENSIVE FILTER BAR */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm">
-            <div className="flex flex-wrap gap-3 items-end">
-              <div className="min-w-[140px] flex-1 sm:flex-none">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
-                <select value={asrama} disabled={isAsrama} onChange={e => handleAsramaChange(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700 disabled:bg-slate-50 disabled:text-slate-500">
-                  {!isDewan && !isAsrama && <option value="SEMUA">Semua Asrama</option>}
-                  {isDewan && <option value="">Pilih Asrama...</option>}
-                  {asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-              </div>
-              <div className="min-w-[130px] flex-1 sm:flex-none">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Dari Tanggal</label>
-                <input type="date" value={tglAwal} onChange={e => {setTglAwal(e.target.value); setPage(1)}} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700" />
-              </div>
-              <div className="min-w-[130px] flex-1 sm:flex-none">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">S/D Tanggal</label>
-                <input type="date" value={tglAkhir} onChange={e => {setTglAkhir(e.target.value); setPage(1)}} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700" />
-              </div>
-              <div className="min-w-[150px] flex-1 xl:flex-none">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Jenis Izin</label>
-                <select value={jenisFilter} onChange={e => {setJenisFilter(e.target.value as any); setPage(1)}} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
-                  <option value="SEMUA">Semua Jenis</option>
-                  <option value="PULANG">Izin Pulang</option>
-                  <option value="KELUAR_KOMPLEK">Keluar Komplek</option>
-                </select>
-              </div>
-              <div className="min-w-[150px] flex-1 xl:flex-none">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Filter Status</label>
-                <select value={statusFilter} onChange={e => {setStatusFilter(e.target.value as any); setPage(1)}} className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
-                  <option value="SEMUA">- Semua Status -</option>
-                  <option value="BELUM_KEMBALI">Sedang di Luar (Belum Tiba)</option>
-                  <option value="SUDAH_KEMBALI">Selesai (Sudah Tiba)</option>
-                  <option value="TERLAMBAT">Melewati Batas Waktu (Telat)</option>
-                  <option value="TEPAT_WAKTU">Kembali Tepat Waktu</option>
-                </select>
-              </div>
-              <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); setPage(1) }} className="flex-1 min-w-[200px]">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cari Santri</label>
-                <div className="relative">
+          {/* COMPACT SEARCH + FILTER BUTTON BAR */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 text-sm">
+            <div className="flex gap-2 items-center">
+              <form onSubmit={e => { e.preventDefault(); setSearch(searchInput); setPage(1) }} className="flex-1 flex gap-2 min-w-0">
+                <div className="relative flex-1 min-w-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input type="text" placeholder="Ketik Nama / NIS..." value={searchInput} onChange={e => setSearchInput(e.target.value)} disabled={!hasSelectedAsrama} className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700 disabled:bg-slate-50 disabled:text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Cari Nama / NIS..."
+                    value={searchInput}
+                    onChange={e => setSearchInput(e.target.value)}
+                    disabled={!hasSelectedAsrama}
+                    className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700 disabled:bg-slate-50 disabled:text-slate-400 text-sm"
+                  />
                 </div>
+                <button type="submit" disabled={!hasSelectedAsrama} className="bg-slate-900 text-white px-3 py-2 rounded-xl text-sm font-bold hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0">
+                  Cari
+                </button>
               </form>
-              
-              <div className="flex gap-2 self-end w-full sm:w-auto mt-2 sm:mt-0">
-                <button type="button" disabled={!hasSelectedAsrama} onClick={() => loadData(1, pageSize, searchInput, asrama, tglAwal, tglAkhir, statusFilter)} className="flex-1 sm:flex-none bg-slate-900 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-black transition-colors disabled:cursor-not-allowed disabled:opacity-50">
-                  <Filter className="w-4 h-4" /> Terapkan
-                </button>
-                <button type="button" disabled={!hasSelectedAsrama} onClick={() => setIsOpenExport(true)} className="flex-1 sm:flex-none bg-emerald-600 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-emerald-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
-                  <Download className="w-4 h-4" /> Export
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsOpenFilter(true)}
+                className={`shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-colors border ${
+                  (tglAwal || tglAkhir || (!isAsrama && asrama !== 'SEMUA') || statusFilter !== 'SEMUA' || jenisFilter !== 'SEMUA')
+                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <Filter className="w-4 h-4" />
+                Filter
+                {(tglAwal || tglAkhir || (!isAsrama && asrama !== 'SEMUA') || statusFilter !== 'SEMUA' || jenisFilter !== 'SEMUA') && (
+                  <span className="text-[10px] font-black leading-none">●</span>
+                )}
+              </button>
             </div>
-            {(search || tglAwal || tglAkhir || asrama !== 'SEMUA' || statusFilter !== 'SEMUA' || jenisFilter !== 'SEMUA') && (
-              <div className="mt-3 flex items-center gap-2">
-                <span className="text-xs text-slate-500">Filter Aktif:</span>
-                <button onClick={() => {setSearchInput(''); setSearch(''); setTglAwal(''); setTglAkhir(''); setAsrama(isDewan ? asrama : isAsrama ? (asramaBinaan || '') : 'SEMUA'); setStatusFilter('SEMUA'); setJenisFilter('SEMUA'); setPage(1)}} className="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-lg transition-colors">
-                  Kosongkan Filter
+
+            {(search || tglAwal || tglAkhir || (!isAsrama && asrama !== 'SEMUA') || statusFilter !== 'SEMUA' || jenisFilter !== 'SEMUA') && (
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 pt-2.5 border-t border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filter Aktif:</span>
+                {search && <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-lg">"{search}"</span>}
+                {!isAsrama && asrama !== 'SEMUA' && <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-lg">{asrama}</span>}
+                {tglAwal && <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-lg">Dari: {tglAwal}</span>}
+                {tglAkhir && <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-lg">S/D: {tglAkhir}</span>}
+                {statusFilter !== 'SEMUA' && <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-lg">{statusFilter}</span>}
+                {jenisFilter !== 'SEMUA' && <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-lg">{jenisFilter === 'PULANG' ? 'Izin Pulang' : 'Keluar Komplek'}</span>}
+                <button
+                  onClick={() => { setSearchInput(''); setSearch(''); setTglAwal(''); setTglAkhir(''); setAsrama(isDewan ? asrama : isAsrama ? (asramaBinaan || '') : 'SEMUA'); setStatusFilter('SEMUA'); setJenisFilter('SEMUA'); setPage(1) }}
+                  className="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded-lg transition-colors border border-rose-100"
+                >
+                  × Hapus Semua
                 </button>
               </div>
             )}
           </div>
+
+          {/* FILTER MODAL */}
+          {isOpenFilter && (
+            <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-end md:items-center justify-center p-0 md:p-4 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-5">
+                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                      <Filter className="w-5 h-5 text-blue-600" /> Filter Daftar Izin
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Tentukan filter lalu tekan Terapkan.</p>
+                  </div>
+                  <button type="button" onClick={() => setIsOpenFilter(false)} className="p-2 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-full transition-colors border border-slate-200">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                  {!isAsrama && (
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
+                      <select value={asrama} onChange={e => handleAsramaChange(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
+                        {!isDewan && <option value="SEMUA">Semua Asrama</option>}
+                        {isDewan && <option value="">Pilih Asrama...</option>}
+                        {asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Dari Tanggal</label>
+                      <input type="date" value={tglAwal} onChange={e => { setTglAwal(e.target.value); setPage(1) }} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">S/D Tanggal</label>
+                      <input type="date" value={tglAkhir} onChange={e => { setTglAkhir(e.target.value); setPage(1) }} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Jenis Izin</label>
+                    <select value={jenisFilter} onChange={e => { setJenisFilter(e.target.value as any); setPage(1) }} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
+                      <option value="SEMUA">Semua Jenis</option>
+                      <option value="PULANG">Izin Pulang</option>
+                      <option value="KELUAR_KOMPLEK">Keluar Komplek</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Status Izin</label>
+                    <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value as any); setPage(1) }} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
+                      <option value="SEMUA">- Semua Status -</option>
+                      <option value="BELUM_KEMBALI">Sedang di Luar (Belum Tiba)</option>
+                      <option value="SUDAH_KEMBALI">Selesai (Sudah Tiba)</option>
+                      <option value="TERLAMBAT">Melewati Batas Waktu (Telat)</option>
+                      <option value="TEPAT_WAKTU">Kembali Tepat Waktu</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="px-5 py-4 border-t bg-slate-50 flex gap-3">
+                  <button
+                    type="button"
+                    disabled={!hasSelectedAsrama}
+                    onClick={() => { setIsOpenExport(true); setIsOpenFilter(false) }}
+                    className="flex-1 py-3 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    <Download className="w-4 h-4" /> Export Excel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!hasSelectedAsrama}
+                    onClick={() => { setSearch(searchInput); setPage(1); loadData(1, pageSize, searchInput, asrama, tglAwal, tglAkhir, statusFilter); setIsOpenFilter(false) }}
+                    className="flex-1 py-3 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    <Filter className="w-4 h-4" /> Terapkan Filter
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* LIST DATA */}
           {loading ? (
@@ -1258,7 +1333,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Clock className='w-5 h-5 text-blue-600' /> Riwayat Pengajuan</h2>
             <p className='text-xs text-slate-500 mt-1'>Seluruh pengajuan pada cakupan asrama yang dipilih.</p>
             <div className='mt-3 flex flex-wrap items-end gap-2'>
-              {!isAsrama && <select value={asrama} onChange={e => handleAsramaChange(e.target.value)} className='border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium'>{isAdmin && <option value='SEMUA'>Semua Asrama</option>}{isDewan && <option value=''>Pilih Asrama...</option>}{asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}</select>}
+              {!isAsrama && <select value={asrama} onChange={e => handleAsramaChange(e.target.value)} className='border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium'>{isSuperViewRole && <option value='SEMUA'>Semua Asrama</option>}{isDewan && <option value=''>Pilih Asrama...</option>}{asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}</select>}
               {isAsrama && <span className='px-3 py-2 rounded-xl bg-purple-50 border border-purple-100 text-purple-700 text-sm font-bold'>{asramaBinaan}</span>}
               <select value={riwayatStatusFilter} onChange={e => { setRiwayatStatusFilter(e.target.value as any); setRiwayatPage(1) }} className='border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium'><option value='SEMUA'>Semua Status</option><option value='PENDING'>Menunggu</option><option value='APPROVED'>Disetujui</option><option value='REJECTED'>Ditolak</option></select>
               <select value={riwayatJenisFilter} onChange={e => { setRiwayatJenisFilter(e.target.value as any); setRiwayatPage(1) }} className='border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium'><option value='SEMUA'>Semua Jenis</option><option value='PULANG'>Izin Pulang</option><option value='KELUAR_KOMPLEK'>Keluar Komplek</option></select>
