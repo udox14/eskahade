@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne, execute, generateId } from '@/lib/db'
+import { query, queryOne, execute, generateId, getDB } from '@/lib/db'
 import { assertFeature } from '@/lib/auth/feature'
 import { getSession, getEffectiveRoles, hasAnyRole, isSuperAccess, type SessionUser } from '@/lib/auth/session'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
@@ -395,6 +395,7 @@ function buildWhereClauses(params: {
     baseParams.push(params.jenisFilter)
   }
 
+
   if (params.search) {
     clauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)')
     baseParams.push(`%${params.search}%`, `%${params.search}%`)
@@ -403,11 +404,11 @@ function buildWhereClauses(params: {
   if (params.tglAwal && params.tglAkhir) {
     const startWindow = new Date(`${params.tglAwal}T00:00:00+07:00`).toISOString()
     const endWindow = new Date(`${params.tglAkhir}T23:59:59+07:00`).toISOString()
-    clauses.push(`p.tgl_mulai <= ? AND (p.status = 'AKTIF' OR p.tgl_kembali_aktual >= ?)`)
+    clauses.push(`p.tgl_mulai <= ? AND ((p.status = 'AKTIF' AND p.tgl_kembali_aktual IS NULL) OR p.tgl_kembali_aktual >= ?)`)
     baseParams.push(endWindow, startWindow)
   } else if (params.tglAwal) {
     const startWindow = new Date(`${params.tglAwal}T00:00:00+07:00`).toISOString()
-    clauses.push(`(p.status = 'AKTIF' OR p.tgl_kembali_aktual >= ?)`)
+    clauses.push(`((p.status = 'AKTIF' AND p.tgl_kembali_aktual IS NULL) OR p.tgl_kembali_aktual >= ?)`)
     baseParams.push(startWindow)
   } else if (params.tglAkhir) {
     const endWindow = new Date(`${params.tglAkhir}T23:59:59+07:00`).toISOString()
@@ -416,14 +417,14 @@ function buildWhereClauses(params: {
   }
 
   if (params.statusFilter === 'BELUM_KEMBALI') {
-    clauses.push("p.status = 'AKTIF'")
+    clauses.push("p.status = 'AKTIF' AND p.tgl_kembali_aktual IS NULL")
   } else if (params.statusFilter === 'SUDAH_KEMBALI') {
-    clauses.push("p.status = 'KEMBALI'")
+    clauses.push("(p.status = 'KEMBALI' OR p.tgl_kembali_aktual IS NOT NULL)")
   } else if (params.statusFilter === 'TERLAMBAT') {
-    clauses.push(`((p.status = 'KEMBALI' AND p.tgl_kembali_aktual > p.tgl_selesai_rencana) OR (p.status = 'AKTIF' AND p.tgl_selesai_rencana < ?))`)
+    clauses.push(`((p.tgl_kembali_aktual IS NOT NULL AND p.tgl_kembali_aktual > p.tgl_selesai_rencana) OR (p.status = 'AKTIF' AND p.tgl_kembali_aktual IS NULL AND p.tgl_selesai_rencana < ?))`)
     baseParams.push(new Date().toISOString())
   } else if (params.statusFilter === 'TEPAT_WAKTU') {
-    clauses.push("p.status = 'KEMBALI' AND p.tgl_kembali_aktual <= p.tgl_selesai_rencana")
+    clauses.push("p.tgl_kembali_aktual IS NOT NULL AND p.tgl_kembali_aktual <= p.tgl_selesai_rencana")
   }
 
   return { clauses, baseParams }
@@ -469,7 +470,13 @@ export async function getPerizinanList(params: {
      LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
      LEFT JOIN kelas k ON k.id = rp.kelas_id
      WHERE ${where}
-     ORDER BY p.status ASC, p.created_at DESC
+     ORDER BY 
+       CASE 
+         WHEN p.status = 'AKTIF' AND p.tgl_kembali_aktual IS NULL THEN 0
+         WHEN p.status = 'AKTIF' AND p.tgl_kembali_aktual IS NOT NULL THEN 1
+         ELSE 2 
+       END ASC,
+       p.created_at DESC
      LIMIT ? OFFSET ?`,
     [...baseParams, pageSize, offset]
   )
@@ -502,7 +509,13 @@ export async function exportDataIzin(params: {
     LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
     LEFT JOIN kelas k ON k.id = rp.kelas_id
     WHERE ${where}
-    ORDER BY p.status ASC, p.tgl_mulai DESC
+    ORDER BY 
+      CASE 
+        WHEN p.status = 'AKTIF' AND p.tgl_kembali_aktual IS NULL THEN 0
+        WHEN p.status = 'AKTIF' AND p.tgl_kembali_aktual IS NOT NULL THEN 1
+        ELSE 2 
+      END ASC,
+      p.tgl_mulai DESC
   `, baseParams)
 }
 
@@ -526,9 +539,9 @@ export async function getAnalitikIzin(params: {
       COUNT(p.id) as total_izin,
       SUM(CASE WHEN p.jenis = 'PULANG' THEN 1 ELSE 0 END) as izin_pulang,
       SUM(CASE WHEN p.jenis = 'KELUAR_KOMPLEK' THEN 1 ELSE 0 END) as izin_keluar_komplek,
-      SUM(CASE WHEN p.status = 'AKTIF' THEN 1 ELSE 0 END) as belum_kembali,
-      SUM(CASE WHEN p.status = 'KEMBALI' AND p.tgl_kembali_aktual <= p.tgl_selesai_rencana THEN 1 ELSE 0 END) as tepat_waktu,
-      SUM(CASE WHEN p.status = 'KEMBALI' AND p.tgl_kembali_aktual > p.tgl_selesai_rencana THEN 1 ELSE 0 END) as terlambat_kembali
+      SUM(CASE WHEN p.status = 'AKTIF' AND p.tgl_kembali_aktual IS NULL THEN 1 ELSE 0 END) as belum_kembali,
+      SUM(CASE WHEN p.tgl_kembali_aktual IS NOT NULL AND p.tgl_kembali_aktual <= p.tgl_selesai_rencana THEN 1 ELSE 0 END) as tepat_waktu,
+      SUM(CASE WHEN p.tgl_kembali_aktual IS NOT NULL AND p.tgl_kembali_aktual > p.tgl_selesai_rencana THEN 1 ELSE 0 END) as terlambat_kembali
     FROM perizinan p
     JOIN santri s ON s.id = p.santri_id
     WHERE ${where}
@@ -554,7 +567,7 @@ export async function getTopSantriIzin(params: { asrama?: string, tglAwal?: stri
 
   return query<any>(`
     SELECT s.id, s.nama_lengkap, s.asrama, s.kamar, COUNT(p.id) as total_izin,
-           SUM(CASE WHEN p.status = 'KEMBALI' AND p.tgl_kembali_aktual > p.tgl_selesai_rencana THEN 1 ELSE 0 END) as total_telat
+           SUM(CASE WHEN p.tgl_kembali_aktual IS NOT NULL AND p.tgl_kembali_aktual > p.tgl_selesai_rencana THEN 1 ELSE 0 END) as total_telat
     FROM perizinan p
     JOIN santri s ON s.id = p.santri_id
     WHERE ${where}
@@ -657,6 +670,17 @@ export async function simpanIzin(formData: FormData, requestedAsrama?: string): 
     VALUES (?, ?, ?, ?, ?, ?, ?, 'AKTIF', ?)
   `, [izinId, santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin, session?.id ?? null])
 
+  // Hapus record absen_malam_v2 (non-MANUAL_OVERRIDE) yang tercakup dalam periode izin
+  // agar absen malam langsung sinkron — tidak perlu menunggu query berikutnya.
+  try {
+    const mulaiDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(tgl_mulai))
+    const selesaiDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(tgl_selesai_rencana))
+    await execute(
+      `DELETE FROM absen_malam_v2 WHERE santri_id = ? AND tanggal >= ? AND tanggal <= ? AND (sumber_status IS NULL OR sumber_status != 'MANUAL_OVERRIDE')`,
+      [santri_id, mulaiDate, selesaiDate]
+    )
+  } catch { /* non-fatal */ }
+
   await logActivity({
     actor: actorFromSession(actorSession),
     module: 'keamanan_perizinan',
@@ -678,6 +702,7 @@ export async function simpanIzin(formData: FormData, requestedAsrama?: string): 
 
   revalidatePath('/dashboard/keamanan/perizinan')
   revalidatePath('/dashboard/asrama/absen-malam')
+  revalidatePath('/dashboard/keamanan/rekap-absen-malam')
   return { success: true }
 }
 
@@ -690,8 +715,8 @@ export async function setSudahDatang(id: string, waktuDatang: string, requestedA
   const scopeClause = scope.asrama ? ' AND s.asrama = ?' : ''
   const scopeParams = scope.asrama ? [scope.asrama] : []
 
-  const izin = await queryOne<{ jenis: string; tgl_selesai_rencana: string; tgl_kembali_aktual: string | null; santri_nama: string | null }>(
-    `SELECT p.jenis, p.tgl_selesai_rencana, p.tgl_kembali_aktual, s.nama_lengkap AS santri_nama
+  const izin = await queryOne<{ santri_id: string; jenis: string; tgl_selesai_rencana: string; tgl_kembali_aktual: string | null; santri_nama: string | null }>(
+    `SELECT p.santri_id, p.jenis, p.tgl_selesai_rencana, p.tgl_kembali_aktual, s.nama_lengkap AS santri_nama
      FROM perizinan p
      LEFT JOIN santri s ON s.id = p.santri_id
      WHERE p.id = ?${scopeClause}`,
@@ -707,10 +732,22 @@ export async function setSudahDatang(id: string, waktuDatang: string, requestedA
   const isTelat = aktual > rencana
   const statusFinal = isTelat ? 'AKTIF' : 'KEMBALI'
 
-  await execute(
-    'UPDATE perizinan SET status = ?, tgl_kembali_aktual = ? WHERE id = ? AND tgl_kembali_aktual IS NULL',
-    [statusFinal, aktual.toISOString(), id]
-  )
+  // Hitung tanggal hari ini WIB (untuk sinkronisasi absen malam)
+  const tanggalHariIni = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(aktual)
+
+  const db = await getDB()
+  await db.batch([
+    // Update status perizinan
+    db.prepare('UPDATE perizinan SET status = ?, tgl_kembali_aktual = ? WHERE id = ? AND tgl_kembali_aktual IS NULL')
+      .bind(statusFinal, aktual.toISOString(), id),
+    // Hapus record absen malam hari ini untuk santri ini (non-MANUAL_OVERRIDE)
+    // agar absen malam otomatis kembali ke HADIR / default saat di-refresh
+    db.prepare(
+      `DELETE FROM absen_malam_v2 WHERE tanggal = ? AND santri_id = ? AND (sumber_status IS NULL OR sumber_status != 'MANUAL_OVERRIDE')`
+    ).bind(tanggalHariIni, izin.santri_id),
+  ])
 
   await logActivity({
     actor: actorFromSession(session),
@@ -731,6 +768,7 @@ export async function setSudahDatang(id: string, waktuDatang: string, requestedA
 
   revalidatePath('/dashboard/keamanan/perizinan')
   revalidatePath('/dashboard/asrama/absen-malam')
+  revalidatePath('/dashboard/keamanan/rekap-absen-malam')
 
   if (isTelat) return { success: true, message: 'Terlambat! Masuk antrian verifikasi.' }
   return { success: true, message: 'Tepat waktu. Izin selesai.' }
@@ -1060,6 +1098,16 @@ export async function approveIzinAsrama(id: string, requestedAsrama?: string): P
       pengajuan.tgl_selesai_rencana, pengajuan.alasan, pengajuan.pemberi_izin,
       session?.id ?? null])
 
+  // Hapus record absen_malam_v2 (non-MANUAL_OVERRIDE) yang tercakup dalam periode izin
+  try {
+    const mulaiDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(pengajuan.tgl_mulai))
+    const selesaiDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(pengajuan.tgl_selesai_rencana))
+    await execute(
+      `DELETE FROM absen_malam_v2 WHERE santri_id = ? AND tanggal >= ? AND tanggal <= ? AND (sumber_status IS NULL OR sumber_status != 'MANUAL_OVERRIDE')`,
+      [pengajuan.santri_id, mulaiDate, selesaiDate]
+    )
+  } catch { /* non-fatal */ }
+
   await execute(`
     UPDATE perizinan_pengajuan
     SET status = 'APPROVED', reviewed_by = ?, reviewed_at = datetime('now')
@@ -1081,6 +1129,7 @@ export async function approveIzinAsrama(id: string, requestedAsrama?: string): P
 
   revalidatePath('/dashboard/keamanan/perizinan')
   revalidatePath('/dashboard/asrama/absen-malam')
+  revalidatePath('/dashboard/keamanan/rekap-absen-malam')
   return { success: true }
 }
 

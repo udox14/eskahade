@@ -91,15 +91,17 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
   } catch {}
 
   try {
+    const refIso = getAbsenReferenceIso(tanggal)
     izinList = await query<any>(
       `SELECT p.id, p.santri_id, p.jenis, p.alasan, p.tgl_selesai_rencana FROM perizinan p
        WHERE p.jenis IN ('PULANG', 'KELUAR_KOMPLEK')
-         AND p.status = 'AKTIF'
          AND p.tgl_mulai <= ?
-         AND p.tgl_selesai_rencana >= ?
-         AND (p.tgl_kembali_aktual IS NULL OR p.tgl_kembali_aktual > ?)
+         AND (
+           (p.tgl_kembali_aktual IS NULL AND p.status = 'AKTIF')
+           OR (p.tgl_kembali_aktual IS NOT NULL AND p.tgl_kembali_aktual > ?)
+         )
          AND p.santri_id IN (${ph})`,
-      [getAbsenReferenceIso(tanggal), getAbsenReferenceIso(tanggal), getAbsenReferenceIso(tanggal), ...ids]
+      [refIso, refIso, ...ids]
     )
   } catch {}
 
@@ -113,24 +115,48 @@ export async function getDataAbsenMalamKamar(asrama: string, kamar: string, tang
   })
   const izinMap = new Map(izinList.map((i: any) => [i.santri_id, i]))
 
-  return santriList.map((s: any) => ({
-    ...s,
-    status: izinMap.has(s.id) && sumberMap[s.id] !== 'MANUAL_OVERRIDE' ? 'IZIN' : (absenMap[s.id] || 'HADIR'),
-    keterangan: keteranganMap[s.id] || '',
-    sumber_status: izinMap.has(s.id) && sumberMap[s.id] !== 'MANUAL_OVERRIDE' ? 'IZIN_OTOMATIS' : (sumberMap[s.id] || 'MANUAL'),
-    is_izin: izinMap.has(s.id),
-    izin_id: izinMap.get(s.id)?.id ?? null,
-    izin_jenis: izinMap.get(s.id)?.jenis ?? null,
-    izin_alasan: izinMap.get(s.id)?.alasan ?? null,
-    izin_batas: izinMap.get(s.id)?.tgl_selesai_rencana ?? null,
-  }))
+  // Hapus record HADIR/ALFA lama (non-MANUAL_OVERRIDE) milik santri yang sedang izin aktif,
+  // agar DB bersih dan tidak mengacaukan tampilan pada query berikutnya.
+  const staleSantriIds = [...izinMap.keys()].filter(id =>
+    absenMap[id] !== undefined && sumberMap[id] !== 'MANUAL_OVERRIDE'
+  )
+  if (staleSantriIds.length > 0) {
+    try {
+      const db = await getDB()
+      for (let i = 0; i < staleSantriIds.length; i += 50) {
+        const chunk = staleSantriIds.slice(i, i + 50)
+        await db.prepare(
+          `DELETE FROM absen_malam_v2 WHERE tanggal = ? AND santri_id IN (${chunk.map(() => '?').join(',')}) AND (sumber_status IS NULL OR sumber_status != 'MANUAL_OVERRIDE')`
+        ).bind(tanggal, ...chunk).run()
+      }
+      // Hapus dari map lokal supaya status render dari izinMap saja
+      staleSantriIds.forEach(id => { delete absenMap[id]; delete sumberMap[id]; delete keteranganMap[id] })
+    } catch { /* non-fatal */ }
+  }
+
+  return santriList.map((s: any) => {
+    const isIzinAktif = izinMap.has(s.id)
+    const isManualOverride = sumberMap[s.id] === 'MANUAL_OVERRIDE'
+    // Izin aktif selalu menang, kecuali pengurus sengaja override ke ALFA
+    return {
+      ...s,
+      status: isIzinAktif && !isManualOverride ? 'IZIN' : (absenMap[s.id] || 'HADIR'),
+      keterangan: keteranganMap[s.id] || '',
+      sumber_status: isIzinAktif && !isManualOverride ? 'IZIN_OTOMATIS' : (sumberMap[s.id] || 'MANUAL'),
+      is_izin: isIzinAktif,
+      izin_id: izinMap.get(s.id)?.id ?? null,
+      izin_jenis: izinMap.get(s.id)?.jenis ?? null,
+      izin_alasan: izinMap.get(s.id)?.alasan ?? null,
+      izin_batas: izinMap.get(s.id)?.tgl_selesai_rencana ?? null,
+    }
+  })
 }
 
 export async function tandaiSantriKembaliDariAbsenMalam(santriId: string, tanggal: string) {
   await ensureAbsenMalamSchema()
 
   const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama'])) return { error: 'Unauthorized' }
+  if (!session || !hasAnyRole(session, ['admin', 'pengurus_asrama', 'keamanan', 'sekpen', 'dewan_santri'])) return { error: 'Unauthorized' }
 
   const actual = new Date(getAbsenReferenceIso(tanggal))
   if (Number.isNaN(actual.getTime())) return { error: 'Tanggal kembali tidak valid.' }
@@ -159,7 +185,7 @@ export async function tandaiSantriKembaliDariAbsenMalam(santriId: string, tangga
   if (!row) return { error: 'Izin aktif santri ini tidak ditemukan atau sudah ditandai kembali.' }
   if (!['PULANG', 'KELUAR_KOMPLEK'].includes(row.jenis)) return { error: 'Jenis izin tidak dapat ditandai kembali dari absen malam.' }
 
-  if (hasRole(session, 'pengurus_asrama') && session.asrama_binaan && row.asrama !== session.asrama_binaan) {
+  if (hasRole(session, 'pengurus_asrama') && session.asrama_binaan && row.asrama !== session.asrama_binaan && !hasAnyRole(session, ['admin', 'keamanan', 'sekpen', 'dewan_santri'])) {
     return { error: 'Pengurus asrama hanya bisa menandai santri asramanya.' }
   }
 
@@ -202,6 +228,7 @@ export async function tandaiSantriKembaliDariAbsenMalam(santriId: string, tangga
   revalidatePath('/dashboard/asrama/santri-kembali')
   revalidatePath('/dashboard/keamanan/perizinan')
   revalidatePath('/dashboard/keamanan/perizinan/verifikasi-telat')
+  revalidatePath('/dashboard/keamanan/rekap-absen-malam')
 
   if (isTelat) {
     return { success: true, telat: true, message: 'Santri ditandai datang terlambat dan masuk verifikasi telat.' }
@@ -239,12 +266,13 @@ export async function batchSaveAbsenMalam(
         `SELECT DISTINCT santri_id
          FROM perizinan
          WHERE jenis IN ('PULANG', 'KELUAR_KOMPLEK')
-           AND status = 'AKTIF'
            AND tgl_mulai <= ?
-           AND tgl_selesai_rencana >= ?
-           AND (tgl_kembali_aktual IS NULL OR tgl_kembali_aktual > ?)
+           AND (
+             (tgl_kembali_aktual IS NULL AND status = 'AKTIF')
+             OR (tgl_kembali_aktual IS NOT NULL AND tgl_kembali_aktual > ?)
+           )
            AND santri_id IN (${santriIds.map(() => '?').join(',')})`,
-        [referenceIso, referenceIso, referenceIso, ...santriIds]
+        [referenceIso, referenceIso, ...santriIds]
       )).map(row => row.santri_id))
     : new Set<string>()
   const invalidOverride = normalized.find(r => activeIzinIds.has(r.santri_id) && r.status === 'ALFA' && !r.keterangan)
