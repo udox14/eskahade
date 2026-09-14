@@ -53,17 +53,15 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const confirm = useConfirm()
   const router = useRouter()
 
-  const isAsrama = userRoles.includes('pengurus_asrama') &&
-    !userRoles.includes('dewan_santri') &&
-    !userRoles.includes('admin') &&
-    !userRoles.includes('keamanan') &&
-    !userRoles.includes('sekpen')
+  const isSuperViewRole = userRoles.includes('admin') ||
+    userRoles.includes('dewan_santri') ||
+    userRoles.includes('keamanan') ||
+    userRoles.includes('sekpen')
+  const isAsrama = userRoles.includes('pengurus_asrama') && !isSuperViewRole
   const isAdmin = userRoles.includes('admin')
-  const isKeamananOrSekpen = (userRoles.includes('keamanan') || userRoles.includes('sekpen')) && !isAdmin
-  const isSuperViewRole = isAdmin || isKeamananOrSekpen  // roles that see all asrama without selection
-  const isDewan = userRoles.includes('dewan_santri') && !isSuperViewRole
-  const isDewanOrAdmin = userRoles.includes('dewan_santri') || isSuperViewRole
-  const requiresAsramaSelection = isDewan  // only dewan_santri (non-super) must select asrama first
+  const isDewan = userRoles.includes('dewan_santri')
+  const isDewanOrAdmin = isSuperViewRole
+  const requiresAsramaSelection = false
   
   // Tabs
   const [activeTab, setActiveTab] = useState<'DAFTAR' | 'RIWAYAT' | 'ANALITIK'>('DAFTAR')
@@ -80,8 +78,8 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const [pageSize, setPageSize] = useState(10)
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
-  const [asrama, setAsrama] = useState(() => isAsrama ? (asramaBinaan || '') : (isDewan ? '' : 'SEMUA'))
-  const hasSelectedAsrama = !requiresAsramaSelection || Boolean(asrama && asrama !== 'SEMUA')
+  const [asrama, setAsrama] = useState(() => isAsrama ? (asramaBinaan || '') : 'SEMUA')
+  const hasSelectedAsrama = !isAsrama || Boolean(asramaBinaan)
   const [tglAwal, setTglAwal] = useState('')
   const [tglAkhir, setTglAkhir] = useState('')
   const [statusFilter, setStatusFilter] = useState<'SEMUA' | 'BELUM_KEMBALI' | 'SUDAH_KEMBALI' | 'TERLAMBAT' | 'TEPAT_WAKTU'>('SEMUA')
@@ -191,10 +189,10 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
       if (rows.length > 0) setAlasanDropdown(rows[0])
     })
     getPemberiIzinList().then(setPemberiIzinOptions)
-    if (isDewanOrAdmin && (!isDewan || asrama)) {
+    if (isDewanOrAdmin) {
       getPengajuanPendingAsrama(asrama).then(rows => setPengajuanCount(rows.length))
     }
-  }, [asrama, isDewan, isDewanOrAdmin])
+  }, [asrama, isDewanOrAdmin])
 
   const loadData = useCallback(async (pg = page, ps = pageSize, s = search, a = asrama, ta = tglAwal, tk = tglAkhir, st = statusFilter) => {
     setLoading(true)
@@ -238,31 +236,14 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
     setAsrama(nextAsrama)
     setPage(1)
     setRiwayatPage(1)
-    if (isDewan) {
-      setSearch('')
-      setSearchInput('')
-      setTglAwal('')
-      setTglAkhir('')
-      setStatusFilter('SEMUA')
-      setJenisFilter('SEMUA')
-      setRiwayatSearch('')
-      setRiwayatSearchInput('')
-      setRiwayatStatusFilter('SEMUA')
-      setRiwayatJenisFilter('SEMUA')
-      setList([])
-      setRiwayatPengajuan([])
-      setAnalitikData(null)
-      setTopSantri([])
-    }
   }
 
   const handleCariSantri = async (e: React.FormEvent) => {
     e.preventDefault()
     if (searchSantri.length < 3) { toast.warning("Ketik minimal 3 huruf untuk mencari."); return }
-    if (!hasSelectedAsrama) { toast.warning('Pilih asrama terlebih dahulu.'); return }
     const res = isAsrama && asramaBinaan
       ? await cariSantriAsrama(searchSantri, asramaBinaan)
-      : await cariSantri(searchSantri, asrama)
+      : await cariSantri(searchSantri, undefined)
     setHasilCari(res)
     if (res.length === 0) toast.info(isAsrama ? "Santri tidak ditemukan di asrama binaan Anda." : "Santri tidak ditemukan.")
   }
@@ -338,12 +319,12 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
       formData.append('alasan_dropdown', alasanDropdown)
 
       const res = isOpenEdit
-        ? await updateIzin(editData.id, formData, asrama)
+        ? await updateIzin(editData.id, formData, isAsrama ? asrama : undefined)
         : isAsrama && editingPengajuan
           ? await updatePengajuanAsrama(editingPengajuan.id, formData)
           : isAsrama
             ? await ajukanIzinAsrama(formData)
-            : await simpanIzin(formData, asrama)
+            : await simpanIzin(formData, isAsrama ? asrama : undefined)
 
       if ('error' in res) {
         toast.error("Gagal menyimpan: " + (res as any).error)
@@ -377,7 +358,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
   const handleHapus = async (item: any) => {
     if (!await confirm(`Hapus data izin ${item.nama}?`)) return
     setDeletingId(item.id)
-    const res = await hapusIzin(item.id, asrama)
+    const res = await hapusIzin(item.id, isAsrama ? asrama : undefined)
     setDeletingId(null)
     if ('error' in res) { toast.error('Gagal hapus', { description: (res as any).error }); return }
     toast.success('Data izin dihapus')
@@ -393,7 +374,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
 
   const handleSimpanKembali = async () => {
     const loadingToast = toast.loading("Memproses kepulangan...")
-    const res = await setSudahDatang(selectedReturnId, waktuKembali, asrama)
+    const res = await setSudahDatang(selectedReturnId, waktuKembali, isAsrama ? asrama : undefined)
     toast.dismiss(loadingToast)
 
     if ('error' in res) { toast.error((res as any).error) } 
@@ -1044,7 +1025,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                 {statusFilter !== 'SEMUA' && <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-lg">{statusFilter}</span>}
                 {jenisFilter !== 'SEMUA' && <span className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-lg">{jenisFilter === 'PULANG' ? 'Izin Pulang' : 'Keluar Komplek'}</span>}
                 <button
-                  onClick={() => { setSearchInput(''); setSearch(''); setTglAwal(''); setTglAkhir(''); setAsrama(isDewan ? asrama : isAsrama ? (asramaBinaan || '') : 'SEMUA'); setStatusFilter('SEMUA'); setJenisFilter('SEMUA'); setPage(1) }}
+                  onClick={() => { setSearchInput(''); setSearch(''); setTglAwal(''); setTglAkhir(''); setAsrama(isAsrama ? (asramaBinaan || '') : 'SEMUA'); setStatusFilter('SEMUA'); setJenisFilter('SEMUA'); setPage(1) }}
                   className="text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-2 py-0.5 rounded-lg transition-colors border border-rose-100"
                 >
                   × Hapus Semua
@@ -1074,8 +1055,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Asrama</label>
                       <select value={asrama} onChange={e => handleAsramaChange(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700">
-                        {!isDewan && <option value="SEMUA">Semua Asrama</option>}
-                        {isDewan && <option value="">Pilih Asrama...</option>}
+                        <option value="SEMUA">Semua Asrama</option>
                         {asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}
                       </select>
                     </div>
@@ -1333,7 +1313,12 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Clock className='w-5 h-5 text-blue-600' /> Riwayat Pengajuan</h2>
             <p className='text-xs text-slate-500 mt-1'>Seluruh pengajuan pada cakupan asrama yang dipilih.</p>
             <div className='mt-3 flex flex-wrap items-end gap-2'>
-              {!isAsrama && <select value={asrama} onChange={e => handleAsramaChange(e.target.value)} className='border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium'>{isSuperViewRole && <option value='SEMUA'>Semua Asrama</option>}{isDewan && <option value=''>Pilih Asrama...</option>}{asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}</select>}
+              {!isAsrama && (
+                <select value={asrama} onChange={e => handleAsramaChange(e.target.value)} className='border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium'>
+                  <option value='SEMUA'>Semua Asrama</option>
+                  {asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+              )}
               {isAsrama && <span className='px-3 py-2 rounded-xl bg-purple-50 border border-purple-100 text-purple-700 text-sm font-bold'>{asramaBinaan}</span>}
               <select value={riwayatStatusFilter} onChange={e => { setRiwayatStatusFilter(e.target.value as any); setRiwayatPage(1) }} className='border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium'><option value='SEMUA'>Semua Status</option><option value='PENDING'>Menunggu</option><option value='APPROVED'>Disetujui</option><option value='REJECTED'>Ditolak</option></select>
               <select value={riwayatJenisFilter} onChange={e => { setRiwayatJenisFilter(e.target.value as any); setRiwayatPage(1) }} className='border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium'><option value='SEMUA'>Semua Jenis</option><option value='PULANG'>Izin Pulang</option><option value='KELUAR_KOMPLEK'>Keluar Komplek</option></select>
@@ -1381,8 +1366,7 @@ export default function PerizinanPage({ userRoles = [], asramaBinaan, canCreate 
                <input type="date" value={tglAwal} onChange={e => {setTglAwal(e.target.value);}} className="flex-1 min-w-[120px] border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-xs text-slate-700" title="Awal Periode"/>
                <input type="date" value={tglAkhir} onChange={e => {setTglAkhir(e.target.value);}} className="flex-1 min-w-[120px] border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-xs text-slate-700" title="Akhir Periode"/>
                <select value={asrama} disabled={isAsrama} onChange={e => handleAsramaChange(e.target.value)} className="w-full md:w-auto border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-xs text-slate-800 disabled:bg-slate-100">
-                {!isDewan && !isAsrama && <option value="SEMUA">Semua Asrama</option>}
-                {isDewan && <option value="">Pilih Asrama...</option>}
+                {!isAsrama && <option value="SEMUA">Semua Asrama</option>}
                 {asramaOptions.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>

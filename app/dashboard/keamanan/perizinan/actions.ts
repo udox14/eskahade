@@ -39,31 +39,14 @@ async function resolvePerizinanScope(
 
   const session = access
   const roles = getEffectiveRoles(session)
-  const isUnrestricted = isSuperAccess(session) || roles.includes('admin')
-  const isDewan = !isUnrestricted && roles.includes('dewan_santri')
-  const isAsrama = !isUnrestricted && !isDewan && roles.includes('pengurus_asrama')
+  const isDewan = roles.includes('dewan_santri')
+  const isUnrestricted = isSuperAccess(session) || roles.includes('admin') || isDewan || roles.includes('keamanan') || roles.includes('sekpen')
+  const isAsrama = !isUnrestricted && roles.includes('pengurus_asrama')
   const requested = String(requestedAsrama ?? '').trim()
 
   if (isAsrama) {
     if (!session.asrama_binaan) return { error: 'Akun Anda belum memiliki asrama binaan.' }
-    return { session, asrama: session.asrama_binaan, isAsrama, isDewan, isUnrestricted }
-  }
-
-  if (isDewan && (!requested || requested === 'SEMUA')) {
-    if (options.allowUnselectedDewan) {
-      return { session, asrama: null, isAsrama, isDewan, isUnrestricted }
-    }
-    return { error: 'Pilih asrama terlebih dahulu.' }
-  }
-
-  if (isDewan) {
-    const selected = await queryOne<{ asrama: string }>(
-      `SELECT asrama FROM santri
-       WHERE status_global = 'aktif' AND asrama = ?
-       LIMIT 1`,
-      [requested]
-    )
-    if (!selected) return { error: 'Asrama yang dipilih tidak valid.' }
+    return { session, asrama: session.asrama_binaan, isAsrama, isDewan: false, isUnrestricted }
   }
 
   return {
@@ -85,7 +68,9 @@ async function assertManagedMutation(
   const isReadOnlyAsrama = roles.includes('pengurus_asrama') &&
     !roles.includes('dewan_santri') &&
     !isSuperAccess(access) &&
-    !roles.includes('admin')
+    !roles.includes('admin') &&
+    !roles.includes('keamanan') &&
+    !roles.includes('sekpen')
 
   if (isReadOnlyAsrama) {
     return { error: 'Pengurus asrama hanya dapat membaca, mengekspor, dan mengajukan izin.' }
