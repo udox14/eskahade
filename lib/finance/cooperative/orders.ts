@@ -79,7 +79,10 @@ export async function createOrder(input: {
       [selected.billId, student.id],
     );
     if (!b) throw new Error("Tagihan sudah berubah atau bukan milik santri.");
-    const policy = policyFor(config, b.kind);
+    const policy =
+      b.kind === "NON_SPP" && b.category_code === "BANGUNAN"
+        ? "INSTALLMENT"
+        : policyFor(config, b.kind);
     validatePayment(selected.amount, b.amount - b.paid, policy);
     items.push({
       id: crypto.randomUUID(),

@@ -1,5 +1,6 @@
 import { generateMonthlyBills } from "../lib/finance/cooperative/billing-core";
-export default {
+import { generateNonSppBills } from "../lib/finance/cooperative/non-spp-billing";
+const billingWorker = {
   async fetch() {
     return Response.json({
       ok: true,
@@ -22,10 +23,23 @@ export default {
       "-" +
       parts.find((p) => p.type === "month")!.value;
     ctx.waitUntil(
-      generateMonthlyBills(env.DB, env.FINANCE_DB, month, "SYSTEM_BILLING")
-        .then((result) => {
+      Promise.all([
+        generateMonthlyBills(env.DB, env.FINANCE_DB, month, "SYSTEM_BILLING"),
+        generateNonSppBills(
+          env.DB,
+          env.FINANCE_DB,
+          "SYSTEM_BILLING",
+          month.endsWith("-07"),
+        ),
+      ])
+        .then(([monthly, nonSpp]) => {
           console.log(
-            JSON.stringify({ event: "cooperative_billing", month, ...result }),
+            JSON.stringify({
+              event: "cooperative_billing",
+              month,
+              monthly,
+              nonSpp,
+            }),
           );
         })
         .catch((error) => {
@@ -41,3 +55,5 @@ export default {
     );
   },
 };
+
+export default billingWorker;

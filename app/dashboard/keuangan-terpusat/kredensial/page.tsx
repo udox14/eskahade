@@ -2,7 +2,6 @@ import { requireFinanceAccess } from '@/lib/finance/access'
 import { CredentialClient,type CredentialInventoryRow } from './_credential-client'
 import { getCredentialData } from './actions'
 import { FinanceGuide,FinancePageHeader } from '../_components/finance-ui'
-import { FinanceNav } from '../_components/finance-nav'
 
 export const dynamic='force-dynamic'
 
@@ -11,7 +10,6 @@ export default async function CredentialPage(){
   const data=await getCredentialData()
   return <main className="space-y-4 sm:space-y-5">
     <FinancePageHeader title="Kartu QR Santri" description="Pendaftaran kartu massal, integrasi reader, dan pencetakan kartu QR santri." eyebrow="Kredensial: QR Code" meta={data.scope?`Scope asrama ${data.scope} · saldo dan PIN tidak pernah menempel pada kartu`:'Saldo dan PIN tidak pernah menempel pada kartu'}/>
-    <FinanceNav/>
     <FinanceGuide
       purpose="Menerbitkan kartu QR santri secara massal, dalam batch yang dapat dilanjutkan bila terputus."
       prerequisites={['Uji scanner lebih dulu di tab Pengaturan; scanner harus mengirim Enter setelah tiap scan.', 'Izinkan akses kamera bila memindai QR lewat perangkat.']}

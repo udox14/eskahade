@@ -308,13 +308,25 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
               placeholder="Nama atau NIS" className="min-h-11 rounded-md border border-slate-300 px-3 outline-none focus-visible:ring-2 focus-visible:ring-emerald-800 focus-visible:ring-offset-2" />
           </label>
           <div className="flex gap-2">
-            <button type="button" onClick={() => setShowFilterModal(true)} className="inline-flex min-h-11 items-center gap-2 rounded-md border px-4 font-bold"><ListChecks className="h-4 w-4" />Filter Lanjutan</button>
+            <button type="button" aria-expanded={showFilterModal} aria-controls="credential-advanced-filters" onClick={() => setShowFilterModal(value => !value)} className="inline-flex min-h-11 items-center gap-2 rounded-md border px-4 font-bold"><ListChecks className="h-4 w-4" />{showFilterModal ? 'Tutup filter' : 'Filter lanjutan'}</button>
             <button type="button" onClick={() => void load(1)} className="min-h-11 rounded-md bg-emerald-700 px-4 font-bold text-white">Cari</button>
             {filters.asrama || filters.kamar || filters.kelas || filters.status !== 'ALL'
               ? <button type="button" onClick={resetFilters} className="min-h-11 px-3 text-sm font-semibold text-slate-600">Reset</button>
               : null}
           </div>
         </div>
+        {showFilterModal ? <section id="credential-advanced-filters" aria-label="Filter lanjutan" className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <label><span className="mb-1 block text-xs font-bold">Asrama</span><select value={filters.asrama} onChange={event => setFilters({ ...filters, asrama: event.target.value })} className="min-h-11 w-full rounded-md border px-3"><option value="">Semua asrama</option>{options.asramas.map(value => <option key={value}>{value}</option>)}</select></label>
+            <label><span className="mb-1 block text-xs font-bold">Kamar</span><select value={filters.kamar} onChange={event => setFilters({ ...filters, kamar: event.target.value })} className="min-h-11 w-full rounded-md border px-3"><option value="">Semua kamar</option>{options.kamars.map(value => <option key={value}>{value}</option>)}</select></label>
+            <label><span className="mb-1 block text-xs font-bold">Kelas</span><select value={filters.kelas} onChange={event => setFilters({ ...filters, kelas: event.target.value })} className="min-h-11 w-full rounded-md border px-3"><option value="">Semua kelas</option>{options.kelas.map(value => <option key={value}>{value}</option>)}</select></label>
+            <label><span className="mb-1 block text-xs font-bold">Status kepemilikan</span><select value={filters.status} onChange={event => setFilters({ ...filters, status: event.target.value })} className="min-h-11 w-full rounded-md border px-3"><option value="ALL">Semua status</option><option value="MISSING_QR">Belum punya QR</option><option value="HAS_QR">Sudah punya QR</option></select></label>
+          </div>
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            <button type="button" onClick={resetFilters} className="min-h-11 rounded-md px-4 text-sm font-bold text-slate-600">Reset filter</button>
+            <button type="button" onClick={() => void load(1)} className="min-h-11 rounded-md bg-emerald-700 px-6 font-bold text-white">Terapkan filter</button>
+          </div>
+        </section> : null}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-slate-50 px-4 py-2 text-xs">
@@ -476,44 +488,5 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
       </> : null}
     </FinanceModal>
 
-    <FinanceModal
-      open={showFilterModal}
-      title="Filter Lanjutan"
-      onClose={() => setShowFilterModal(false)}
-      footer={<div className="flex justify-end gap-3">
-        <button type="button" onClick={() => { resetFilters(); setShowFilterModal(false) }} className="min-h-11 rounded-md px-4 text-sm font-bold text-slate-600">Reset Filter</button>
-        <button type="button" onClick={async () => {
-          if (await load(1)) setShowFilterModal(false)
-        }} className="min-h-11 rounded-md bg-emerald-700 px-6 font-bold text-white">Terapkan Filter</button>
-      </div>}>
-        <div className="grid gap-4">
-          <label>
-            <span className="mb-1 block text-sm font-bold">Asrama</span>
-            <select value={filters.asrama} onChange={event => setFilters({ ...filters, asrama: event.target.value })} className="min-h-11 w-full rounded-md border px-3">
-              <option value="">Semua asrama</option>{options.asramas.map(value => <option key={value}>{value}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="mb-1 block text-sm font-bold">Kamar</span>
-            <select value={filters.kamar} onChange={event => setFilters({ ...filters, kamar: event.target.value })} className="min-h-11 w-full rounded-md border px-3">
-              <option value="">Semua kamar</option>{options.kamars.map(value => <option key={value}>{value}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="mb-1 block text-sm font-bold">Kelas</span>
-            <select value={filters.kelas} onChange={event => setFilters({ ...filters, kelas: event.target.value })} className="min-h-11 w-full rounded-md border px-3">
-              <option value="">Semua kelas</option>{options.kelas.map(value => <option key={value}>{value}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="mb-1 block text-sm font-bold">Status Kepemilikan</span>
-            <select value={filters.status} onChange={event => setFilters({ ...filters, status: event.target.value })} className="min-h-11 w-full rounded-md border px-3">
-              <option value="ALL">Semua status</option>
-              <option value="MISSING_QR">Belum punya QR</option>
-              <option value="HAS_QR">Sudah punya QR</option>
-            </select>
-          </label>
-        </div>
-    </FinanceModal>
   </div>
 }

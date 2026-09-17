@@ -1,5 +1,9 @@
 export const BILL_KINDS = ["SPP", "NON_SPP", "MAKAN", "LAUNDRY"] as const;
 export type BillKind = (typeof BILL_KINDS)[number];
+export const NON_SPP_CATEGORIES = ["BANGUNAN", "KESEHATAN", "EHB", "EKSKUL"] as const;
+export type NonSppCategory = (typeof NON_SPP_CATEGORIES)[number];
+export const EXEMPTION_ITEM_CODES = ["SPP", "MAKAN", "LAUNDRY", ...NON_SPP_CATEGORIES] as const;
+export type ExemptionItemCode = (typeof EXEMPTION_ITEM_CODES)[number];
 export type RecipientKind = "PESANTREN" | "MAKAN" | "LAUNDRY";
 export type FeeBearer = "KOPERASI" | "PENERIMA";
 export type PaymentPolicy = "FULL" | "INSTALLMENT";
@@ -8,6 +12,10 @@ export type Bill = {
   id: string;
   santri_id: string;
   kind: BillKind;
+  category_code?: NonSppCategory | null;
+  academic_year_id?: string | null;
+  academic_year_label?: string | null;
+  cohort_year?: number | null;
   title: string;
   period_key: string | null;
   amount: number;
@@ -47,6 +55,7 @@ export type Recipient = {
   name: string;
   method: "CASH" | "TRANSFER";
   bank_name: string | null;
+  bank_code: string | null;
   account_mask: string | null;
   account_holder: string | null;
   balance: number;

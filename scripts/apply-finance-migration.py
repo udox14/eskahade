@@ -27,6 +27,7 @@ BERKAS = [
     '0001h_seed',
     '0003_payroll_per_sesi',
     '0004_cooperative_item_payments',
+    '0006_central_billing_workspaces',
 ]
 
 if len(sys.argv) < 2:
@@ -52,6 +53,11 @@ print('Jumlah berkas: %d\n' % len(BERKAS))
 
 for i, nama in enumerate(BERKAS, 1):
     print('[%d/%d] %-24s ... ' % (i, len(BERKAS), nama), end='', flush=True)
+    if nama == '0006_central_billing_workspaces':
+        cek_kolom = wrangler(['--command', "SELECT name FROM pragma_table_info('finance_coop_bills') WHERE name='category_code';"])
+        if cek_kolom.returncode == 0 and 'category_code' in (cek_kolom.stdout or ''):
+            print('SUDAH ADA')
+            continue
     hasil = wrangler(['--file', 'migrations-finance/%s.sql' % nama])
     if hasil.returncode == 0:
         print('OK')
@@ -74,5 +80,5 @@ cek = wrangler(['--command',
                 "(SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND sql IS NOT NULL) index_, "
                 "(SELECT COUNT(*) FROM finance_accounts) akun;"])
 print(cek.stdout or cek.stderr)
-print('Yang harus terlihat: 51 tabel, 41 trigger, 28 index, 18 akun.')
+print('Yang harus terlihat: 52 tabel, 41 trigger, 32 index, 18 akun.')
 print('Kalau angkanya meleset, JANGAN lanjut ke deploy - pulihkan dari export.')

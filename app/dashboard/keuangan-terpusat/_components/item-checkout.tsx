@@ -2,6 +2,7 @@
 import { useState, useTransition } from "react";
 import { QrCamera } from './qr-camera';
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { StudentField, inputClass, buttonClass, money } from "./cooperative-ui";
 import {
   studentCheckout,
@@ -115,9 +116,11 @@ export function Checkout({
               </button>
               {name && <p className="font-medium">{name}</p>}
               {photo && (
-                <img
+                <Image
                   src={photo}
                   alt="Foto identitas santri"
+                  width={80}
+                  height={96}
                   className="h-24 w-20 rounded-md object-cover"
                 />
               )}

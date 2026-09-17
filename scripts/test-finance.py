@@ -13,6 +13,7 @@ UJI = [
     ('gateway', 'T10-11 idempotensi & replay callback Duitku'),
     ('demo-seed', '       demo-seed cocok dengan skema'),
     ('queries', '       setiap SQL keuangan di SELURUH repo sah terhadap skema'),
+    ('central-migration', ' migrasi kosong, legacy, dan eksekusi ulang'),
 ]
 
 os.makedirs('tmp', exist_ok=True)

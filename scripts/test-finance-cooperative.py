@@ -8,6 +8,7 @@ class Cooperative(unittest.TestCase):
    self.db.executescript((ROOT/f'migrations-finance/0001{suffix}.sql').read_text(encoding='utf-8'))
   self.db.executescript((ROOT/'migrations-finance/0003_payroll_per_sesi.sql').read_text(encoding='utf-8'))
   self.db.executescript((ROOT/'migrations-finance/0004_cooperative_item_payments.sql').read_text(encoding='utf-8'))
+  self.db.executescript((ROOT/'migrations-finance/0006_central_billing_workspaces.sql').read_text(encoding='utf-8'))
   self.db.execute("INSERT INTO finance_coop_bills(id,santri_id,kind,title,recipient_id,amount,created_by) VALUES('b1','s1','SPP','SPP','pesantren',100000,'staff')")
   self.db.execute("INSERT INTO finance_cash_units(id,name) VALUES('u','Loket')")
   self.db.execute("INSERT INTO finance_cash_shifts(id,cash_unit_id,operator_id,terminal_id,opening_cash_rupiah) VALUES('sh','u','staff','t',0)")

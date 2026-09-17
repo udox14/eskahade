@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ArrowsDownUp, CaretDown, CaretUp, Warning, X } from "@phosphor-icons/react";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import type {
@@ -11,6 +11,14 @@ import type {
 } from "@/lib/finance/cooperative/screen";
 import { coopAction, searchCoopStudents } from "../cooperative-actions";
 import { Checkout } from "./item-checkout";
+import { BillingOperations } from "./billing-operations";
+import { RecipientAccountManager } from "./recipient-account-manager";
+import {
+  FinanceGuide,
+  FinanceTour,
+  useFinanceTour,
+  type TourStep,
+} from "./finance-ui";
 export const money = (n: unknown) =>
   new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -74,96 +82,6 @@ const ACTION_PRESENTATION: Record<string, ActionPresentation> = {
   pin: { tone: "neutral", submitLabel: "Simpan PIN baru" },
   openShift: { tone: "primary", submitLabel: "Buka shift" },
 };
-type NavItem = readonly [path: string, label: string];
-const links: ReadonlyArray<readonly [group: string, items: ReadonlyArray<NavItem>]> = [
-  [
-    "Operasional",
-    [
-      ["", "Ringkasan"],
-      ["tagihan", "Tagihan & Pembayaran"],
-      ["payout", "Dana & Pencairan"],
-      ["loket", "Loket & Jajan"],
-    ],
-  ],
-  ["Administrasi", [["kredensial", "Kartu QR Santri"]]],
-  [
-    "Laporan & Pengaturan",
-    [
-      ["transaksi", "Transaksi & Laporan"],
-      ["pengaturan", "Pengaturan"],
-    ],
-  ],
-];
-export function CoopNav({
-  write = true,
-  configure = true,
-}: {
-  write?: boolean;
-  configure?: boolean;
-}) {
-  const pathname = usePathname();
-  const allowed = ([path]: NavItem) =>
-    (write || !["loket", "kredensial"].includes(path)) &&
-    (configure || path !== "pengaturan");
-  const current = links
-    .flatMap(([, items]) => items)
-    .filter(allowed)
-    .find(([path]) => pathname === "/dashboard/keuangan-terpusat" + (path ? "/" + path : ""));
-  const renderLink = ([path, label]: NavItem) => {
-    const href = "/dashboard/keuangan-terpusat" + (path ? "/" + path : "");
-    const active = pathname === href;
-    return (
-      <Link
-        key={path}
-        href={href}
-        aria-current={active ? "page" : undefined}
-        className={
-          "flex min-h-11 shrink-0 items-center rounded-md px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800 " +
-          (active
-            ? "bg-emerald-100 text-emerald-950"
-            : "text-slate-700 hover:bg-slate-100 hover:text-slate-950")
-        }
-      >
-        {label}
-      </Link>
-    );
-  };
-  return (
-    <nav
-      aria-label="Keuangan Terpusat"
-      className="rounded-lg border border-slate-200 bg-white p-2"
-    >
-      <div className="lg:hidden">
-        <p className="px-2 pt-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-          Saat ini: <span className="text-slate-800">{current?.[1] || "Keuangan Terpusat"}</span>
-        </p>
-        <div className="mt-1 flex gap-1 overflow-x-auto pb-1">
-          {links[0][1].filter(allowed).map(renderLink)}
-          <details className="shrink-0">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
-              Lainnya
-            </summary>
-            <div className="absolute left-4 right-4 z-20 mt-1 grid gap-1 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
-              {links.slice(1).flatMap(([, items]) => items.filter(allowed)).map(renderLink)}
-            </div>
-          </details>
-        </div>
-      </div>
-      <div className="hidden gap-3 lg:grid lg:grid-cols-[2fr_1fr_1.3fr]">
-        {links.map(([group, items]) => (
-          <section key={group} className="min-w-0">
-            <p className="flex min-h-8 items-center px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {group}
-            </p>
-            <div className="flex flex-wrap gap-1">
-              {items.filter(allowed).map(renderLink)}
-            </div>
-          </section>
-        ))}
-      </div>
-    </nav>
-  );
-}
 export function StudentField({
   name = "santriId",
   onSelect,
@@ -171,23 +89,34 @@ export function StudentField({
   name?: string;
   onSelect?: (id: string, label: string) => void;
 }) {
-  const [search, setSearch] = useState(""),
-    [rows, setRows] = useState<
-      { id: string; nama_lengkap: string; nis: string }[]
-    >([]),
-    [selected, setSelected] = useState(""),
-    [error, setError] = useState(""),
-    [state, setState] = useState<
-      "idle" | "loading" | "ready" | "empty" | "error"
-    >("idle");
+  type StudentRow = {
+    id: string;
+    nama_lengkap: string;
+    nis: string;
+    asrama: string | null;
+    kamar: string | null;
+  };
+  const box = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const [search, setSearch] = useState("");
+  const [rows, setRows] = useState<StudentRow[]>([]);
+  const [selected, setSelected] = useState<StudentRow | null>(null);
+  const [error, setError] = useState("");
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [retry, setRetry] = useState(0);
+  const [state, setState] = useState<"idle" | "loading" | "ready" | "empty" | "error">("idle");
   useEffect(() => {
-    if (search.length < 2) return;
+    if (selected || search.trim().length < 2) return;
     let stale = false;
     const timer = setTimeout(() => {
+      setState("loading");
       searchCoopStudents(search)
         .then((r) => {
           if (!stale) {
             setRows(r);
+            setOpen(true);
+            setActiveIndex(r.length ? 0 : -1);
             setState(r.length ? "ready" : "empty");
           }
         })
@@ -203,58 +132,72 @@ export function StudentField({
       stale = true;
       clearTimeout(timer);
     };
-  }, [search]);
+  }, [search, selected, retry]);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!box.current?.contains(event.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [open]);
+  const choose = (row: StudentRow) => {
+    setSelected(row);
+    setSearch(row.nama_lengkap);
+    setOpen(false);
+    onSelect?.(row.id, row.nama_lengkap);
+  };
   return (
-    <div className="space-y-2">
+    <div ref={box} className="relative space-y-2">
+      {selected ? <div className="flex min-h-11 items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm">
+        <div className="min-w-0"><p className="truncate font-semibold text-slate-900">{selected.nama_lengkap}</p><p className="truncate text-xs text-slate-600">{selected.nis} · {selected.asrama || "Tanpa asrama"}{selected.kamar ? ` / ${selected.kamar}` : ""}</p></div>
+        <button type="button" className="min-h-11 shrink-0 px-2 text-xs font-bold text-emerald-900" onClick={() => { setSelected(null); setSearch(""); setRows([]); setState("idle"); requestAnimationFrame(() => input.current?.focus()); }}>Ganti</button>
+        <input type="hidden" name={name} value={selected.id} />
+      </div> : <>
       <input
+        ref={input}
         className={inputClass}
-        placeholder="Ketik nama atau NIS"
+        placeholder="Cari nama atau NIS santri"
         aria-label="Cari santri"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={`${name}-student-options`}
+        aria-activedescendant={activeIndex >= 0 ? `${name}-student-${activeIndex}` : undefined}
         value={search}
         onChange={(e) => {
           const value = e.target.value;
           setSearch(value);
-          setSelected("");
+          setSelected(null);
           setError("");
           setRows([]);
           setState(value.length < 2 ? "idle" : "loading");
         }}
-      />
-      <select
-        name={name}
-        aria-label="Pilih santri"
-        required
-        disabled={
-          state === "loading" ||
-          state === "idle" ||
-          state === "empty" ||
-          state === "error"
-        }
-        value={selected}
-        onChange={(e) => {
-          setSelected(e.target.value);
-          const row = rows.find((r) => r.id === e.target.value);
-          if (row) onSelect?.(row.id, row.nama_lengkap);
+        onFocus={() => rows.length && setOpen(true)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") { setOpen(false); return; }
+          if (event.key === "ArrowDown") { event.preventDefault(); setOpen(true); setActiveIndex(index => Math.min(rows.length - 1, index + 1)); }
+          if (event.key === "ArrowUp") { event.preventDefault(); setOpen(true); setActiveIndex(index => Math.max(0, index - 1)); }
+          if (event.key === "Home" && open) { event.preventDefault(); setActiveIndex(0); }
+          if (event.key === "End" && open) { event.preventDefault(); setActiveIndex(rows.length - 1); }
+          if (event.key === "Enter" && open && rows[activeIndex]) { event.preventDefault(); choose(rows[activeIndex]); }
         }}
-        className={inputClass}
-      >
-        <option value="">
-          {state === "idle"
-            ? "Ketik minimal 2 karakter"
-            : state === "loading"
-              ? "Mencari santri..."
-              : state === "empty"
-                ? "Tidak ada santri yang cocok"
-                : state === "error"
-                  ? "Pencarian gagal"
-                  : "Pilih hasil pencarian"}
-        </option>
-        {rows.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.nama_lengkap} | {r.nis}
-          </option>
-        ))}
-      </select>
+      />
+      {open ? <div id={`${name}-student-options`} role="listbox" className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
+        {state === "loading" ? <p role="status" className="px-3 py-3 text-sm text-slate-600">Mencari santri...</p> : null}
+        {state === "empty" ? <p role="status" className="px-3 py-3 text-sm text-slate-600">Tidak ada santri aktif yang cocok.</p> : null}
+        {state === "error" ? <div role="alert" className="px-3 py-3 text-sm text-red-800"><p>{error}</p><button type="button" className="mt-2 min-h-11 rounded-md border border-red-300 bg-white px-3 font-semibold" onClick={() => setRetry(value => value + 1)}>Coba lagi</button></div> : null}
+        {state === "ready" ? rows.map((row, index) => <button
+          id={`${name}-student-${index}`}
+          key={row.id}
+          type="button"
+          role="option"
+          aria-selected={index === activeIndex}
+          onMouseEnter={() => setActiveIndex(index)}
+          onClick={() => choose(row)}
+          className={`block min-h-11 w-full rounded-md px-3 py-2 text-left ${index === activeIndex ? "bg-emerald-50" : "hover:bg-slate-50"}`}
+        ><span className="block font-semibold text-slate-900">{row.nama_lengkap}</span><span className="block text-xs text-slate-600">{row.nis} · {row.asrama || "Tanpa asrama"}{row.kamar ? ` / ${row.kamar}` : ""}</span></button>) : null}
+      </div> : null}
+      </>}
       {state === "loading" && (
         <p role="status" className="text-sm text-slate-600">
           Mencari santri...
@@ -266,7 +209,7 @@ export function StudentField({
         </p>
       )}
       {error && (
-        <p role="alert" className="text-sm text-red-800">
+        <p className="sr-only" aria-live="assertive">
           {error}
         </p>
       )}
@@ -329,6 +272,7 @@ export function ActionDialog({
     tone: "neutral",
     submitLabel: spec.title,
   };
+  const confirmation = Boolean(presentation.impact);
   const triggerClass = {
     primary: buttonClass,
     neutral:
@@ -368,7 +312,9 @@ export function ActionDialog({
       <dialog
         ref={dialog}
         onClose={() => trigger.current?.focus()}
-        className="m-0 h-dvh max-h-dvh w-screen max-w-none overflow-y-auto bg-white p-0 backdrop:bg-slate-950/40 sm:m-auto sm:h-auto sm:max-h-[90dvh] sm:max-w-lg sm:rounded-xl"
+        className={confirmation
+          ? "m-auto max-h-[90dvh] w-[min(32rem,calc(100vw-1.5rem))] overflow-y-auto rounded-xl bg-white p-0 backdrop:bg-slate-950/40"
+          : "ml-auto mr-0 mt-0 h-dvh max-h-dvh w-full max-w-xl overflow-y-auto bg-white p-0 shadow-2xl backdrop:bg-slate-950/40"}
       >
         <form
           onSubmit={(e) => {
@@ -480,6 +426,110 @@ export function ActionDialog({
     </>
   );
 }
+
+const INLINE_ACTIONS = new Set(["inquiry", "unit", "pin", "openShift"]);
+
+function InlineAction({ spec, shiftId }: { spec: FormSpec; shiftId?: string }) {
+  const [pending, startTransition] = useTransition();
+  const [message, setMessage] = useState("");
+  const [success, setSuccess] = useState(false);
+  const router = useRouter();
+  return <form
+    className="w-full rounded-lg border border-slate-200 bg-white p-4 sm:max-w-xl"
+    onSubmit={event => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      form.set("action", spec.action);
+      form.set("key", crypto.randomUUID());
+      form.set("shiftId", shiftId || "");
+      startTransition(async () => {
+        const response = await coopAction(form);
+        setMessage(response.message);
+        setSuccess(response.success);
+        if (response.success) router.refresh();
+      });
+    }}
+  >
+    <h2 className="text-sm font-bold text-slate-900">{spec.title}</h2>
+    <div className="mt-3 grid gap-3 sm:grid-cols-2">{spec.fields.map(field => <FormField key={field.name} field={field} />)}</div>
+    {message ? <p role={success ? "status" : "alert"} className={`mt-3 rounded-md p-3 text-sm ${success ? "bg-emerald-50 text-emerald-900" : "bg-red-50 text-red-800"}`}>{message}</p> : null}
+    <button disabled={pending} className={`${buttonClass} mt-3`}>{pending ? "Memproses..." : ACTION_PRESENTATION[spec.action]?.submitLabel || spec.title}</button>
+  </form>;
+}
+
+type GuideContent = {
+  purpose: string;
+  prerequisites: string[];
+  steps: string[];
+  notes: string[];
+  commonMistakes: string[];
+  glossary: Array<{ term: string; meaning: string }>;
+};
+
+const GUIDE_CONTENT: Record<ScreenData["view"], GuideContent> = {
+  home: {
+    purpose: "Membaca kondisi kas, tunggakan, hak penerima, dan aktivitas terbaru sebelum mengambil tindakan.",
+    prerequisites: ["Pastikan periode laporan dan hak akses Anda sesuai.", "Gunakan halaman pekerjaan khusus untuk mengubah data."],
+    steps: ["Periksa kartu kondisi utama.", "Telusuri tagihan atau aktivitas yang memerlukan perhatian.", "Buka workspace terkait dari sidebar dashboard untuk menindaklanjuti."],
+    notes: ["Ringkasan tidak dipakai untuk membuat tagihan atau mengubah kebijakan.", "Angka hak penerima berasal dari pembayaran yang sudah dibukukan."],
+    commonMistakes: ["Menganggap tagihan OPEN sebagai uang yang sudah diterima.", "Membandingkan angka dari periode berbeda."],
+    glossary: [{ term: "Hak penerima", meaning: "Dana yang telah diterima koperasi dan menjadi hak unit tujuan, tetapi belum dicairkan." }],
+  },
+  bills: {
+    purpose: "Mengelola tarif, menerbitkan tagihan massal, memberi pembebasan, dan menangani pengecualian per santri.",
+    prerequisites: ["Tahun ajaran aktif dan tarif per angkatan harus tersedia.", "Pastikan daftar santri aktif sudah benar sebelum menjalankan batch."],
+    steps: ["Pratinjau batch dan baca alasan setiap baris dilewati.", "Konfirmasi penerbitan untuk seluruh santri yang memenuhi aturan.", "Kelola pembebasan permanen atau per periode.", "Gunakan pembuatan individual hanya untuk pengecualian."],
+    notes: ["Bangunan dibuat sekali seumur hidup dan dapat dicicil.", "Kesehatan, EHB, dan Ekskul dibuat sekali per tahun ajaran mulai Juli.", "Tagihan lama tanpa kategori tetap ditampilkan sebagai Non-SPP lama."],
+    commonMistakes: ["Menjalankan batch sebelum tarif angkatan lengkap.", "Membebaskan tagihan yang sudah dibayar tanpa koreksi atau refund."],
+    glossary: [{ term: "Batch idempoten", meaning: "Eksekusi ulang tidak membuat tagihan ganda." }, { term: "Pembebasan periode", meaning: "Pengecualian yang hanya berlaku untuk bulan atau tahun ajaran tertentu." }],
+  },
+  distributions: {
+    purpose: "Memeriksa hak setiap penerima, membuat draft pencairan, dan mencatat penyerahan dana.",
+    prerequisites: ["Rekening penerima harus lengkap untuk transfer.", "Saldo hak penerima harus mencukupi."],
+    steps: ["Cari penerima dan periksa hak yang belum dicairkan.", "Buat draft pencairan melalui drawer.", "Periksa metode, biaya, dan rekening bertopeng.", "Konfirmasi penyerahan setelah dana benar-benar diterima."],
+    notes: ["Nomor rekening disimpan terenkripsi dan hanya empat digit terakhir yang terlihat.", "Penyerahan dana merupakan tindakan finansial dan selalu meminta konfirmasi."],
+    commonMistakes: ["Menandai penyerahan sebelum transfer berhasil.", "Mengabaikan siapa yang menanggung biaya transfer."],
+    glossary: [{ term: "Draft pencairan", meaning: "Rencana penyerahan yang mencadangkan hak, tetapi belum dianggap selesai." }],
+  },
+  cashier: {
+    purpose: "Menjalankan transaksi loket dan uang jajan dalam satu shift yang dapat direkonsiliasi.",
+    prerequisites: ["Buka shift pada unit kas yang benar.", "Pastikan QR reader dan PIN santri dapat digunakan."],
+    steps: ["Hitung dan catat kas awal.", "Cari atau pindai santri lalu proses transaksi secara inline.", "Gunakan drawer untuk pengaturan PIN atau form panjang.", "Hitung kas fisik dan konfirmasi tutup shift."],
+    notes: ["QR tidak menyimpan saldo dan penarikan tetap memerlukan PIN.", "Selisih kas dicatat saat shift ditutup."],
+    commonMistakes: ["Bertransaksi pada shift atau loket yang salah.", "Membagikan PIN melalui catatan transaksi."],
+    glossary: [{ term: "Kas seharusnya", meaning: "Kas awal ditambah dan dikurangi seluruh mutasi yang tercatat pada shift." }],
+  },
+  reports: {
+    purpose: "Menelusuri jurnal, settlement, rekonsiliasi, koreksi, dan pembatalan dengan jejak audit yang jelas.",
+    prerequisites: ["Tentukan rentang tanggal yang akan diperiksa.", "Siapkan referensi bank atau bukti refund untuk tindakan finansial."],
+    steps: ["Saring transaksi berdasarkan tanggal atau kata kunci.", "Bandingkan settlement gateway dengan rekening.", "Catat rekonsiliasi dan tindak lanjuti selisih.", "Gunakan koreksi atau pembatalan hanya setelah bukti diperiksa."],
+    notes: ["Refund dan pembatalan mengubah pembukuan serta memerlukan konfirmasi.", "Jangan menghapus bukti setelah referensinya dicatat."],
+    commonMistakes: ["Merekonsiliasi rentang tanggal yang berbeda.", "Memakai pembatalan untuk transaksi yang seharusnya direfund."],
+    glossary: [{ term: "Settlement", meaning: "Dana bersih dari penyedia pembayaran yang masuk ke rekening." }, { term: "Rekonsiliasi", meaning: "Pencocokan saldo pembukuan dengan saldo aktual rekening." }],
+  },
+  settings: {
+    purpose: "Mengatur kebijakan pembayaran, rekening penerima, VA, loket, akses, dan limit secara terkontrol.",
+    prerequisites: ["Perubahan hanya dapat dilakukan admin keuangan.", "Siapkan data bank resmi dan daftar penerima sebelum import."],
+    steps: ["Periksa kebijakan per jenis tagihan.", "Edit rekening secara massal atau import template Excel.", "Kelola VA, loket, akses, dan limit pada section masing-masing.", "Simpan lalu periksa status kelengkapan."],
+    notes: ["Nomor rekening mentah tidak pernah diekspor.", "Kolom rekening kosong saat import mempertahankan data terenkripsi yang sudah ada."],
+    commonMistakes: ["Mengganti kebijakan global tanpa memeriksa override per jenis.", "Mengunggah file campuran valid dan tidak valid lalu mengabaikan hasil pratinjau."],
+    glossary: [{ term: "Masked account", meaning: "Nomor rekening yang hanya menampilkan empat digit terakhir." }, { term: "Rollback import", meaning: "Tidak ada baris disimpan bila satu baris saja gagal validasi." }],
+  },
+};
+
+function WorkspaceGuide({ view }: { view: ScreenData["view"] }) {
+  const tour = useFinanceTour(`workspace-${view}`);
+  const content = GUIDE_CONTENT[view];
+  const steps: TourStep[] = [
+    { target: '[data-tour="summary"]', title: "Kondisi utama", body: "Mulai dari angka dan status yang merangkum pekerjaan pada halaman ini." },
+    { target: '[data-tour="actions"]', title: "Area tindakan", body: "Form singkat tampil di halaman, sedangkan pekerjaan panjang dibuka dalam drawer." },
+    { target: '[data-tour="records"]', title: "Daftar kerja", body: "Gunakan pencarian, filter, pengurutan, dan rincian baris untuk menelusuri data." },
+  ];
+  return <>
+    <FinanceGuide {...content} onStartTour={tour.start} />
+    <FinanceTour steps={steps} running={tour.running} onFinish={tour.finish} />
+  </>;
+}
 export function CooperativeScreen({ data }: { data: ScreenData }) {
   const path =
     "/dashboard/keuangan-terpusat" +
@@ -503,7 +553,16 @@ export function CooperativeScreen({ data }: { data: ScreenData }) {
     return path + "?" + params.toString();
   };
   const mobileSummary = (row: Record<string, string | number | null>) => {
-    if (data.view === "home" || data.view === "bills") {
+    if (data.view === "home") {
+      return {
+        title: String(row.santri || "-"),
+        context: [row.waktu, row.kanal].filter(Boolean).join(" | "),
+        value: money(row.nominal),
+        valueLabel: "Nominal",
+        status: String(row.status || ""),
+      };
+    }
+    if (data.view === "bills") {
       return {
         title: String(row.santri || "-"),
         context: [row.title, row.penerima].filter(Boolean).join(" | "),
@@ -550,9 +609,9 @@ export function CooperativeScreen({ data }: { data: ScreenData }) {
   return (
     <main className="min-w-0 space-y-5">
       <DashboardPageHeader title={data.title} description={data.description} />
-      <CoopNav write={data.canWrite} configure={data.canConfigure} />
+      <WorkspaceGuide view={data.view} />
       {data.metrics.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div data-tour="summary" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {data.metrics.map((m) => (
             <section key={m.label} className="rounded-lg border bg-white p-4">
               <p className="text-sm text-slate-500">{m.label}</p>
@@ -569,15 +628,42 @@ export function CooperativeScreen({ data }: { data: ScreenData }) {
           <strong>Kas loket: {money(data.shift.expected)}</strong>
         </div>
       )}
-      <div className="flex flex-wrap gap-2">
-        {data.forms.map((f) => (
-          <ActionDialog
-            key={f.action}
-            spec={f}
-            shiftId={String(data.shift?.id || "")}
-          />
-        ))}
+      <div data-tour="actions" className={["settings", "distributions", "reports", "cashier"].includes(data.view) ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-3" : "flex flex-wrap gap-2"}>
+        {data.forms.map((f) => {
+          const action = INLINE_ACTIONS.has(f.action)
+            ? <InlineAction spec={f} shiftId={String(data.shift?.id || "")} />
+            : <ActionDialog spec={f} shiftId={String(data.shift?.id || "")} />;
+          if (data.view !== "settings") {
+            const groups: Record<string, string> = {
+              distribution: "Pembuatan pencairan",
+              finish: "Penyerahan dana",
+              settlement: "Settlement & rekonsiliasi",
+              reconciliation: "Settlement & rekonsiliasi",
+              refund: "Koreksi transaksi",
+              cancelDistribution: "Koreksi transaksi",
+              cancelOrder: "Koreksi transaksi",
+              expense: "Mutasi kas",
+              funding: "Mutasi kas",
+              inquiry: "Pemeriksaan VA",
+              openShift: "Operasional shift",
+              closeShift: "Operasional shift",
+              pin: "Akses santri",
+            };
+            if (!groups[f.action]) return <div key={f.action}>{action}</div>;
+            return <section key={f.action} className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800">{groups[f.action]}</p>{!INLINE_ACTIONS.has(f.action) ? <><h2 className="mt-1 text-sm font-bold text-slate-900">{f.title}</h2><div className="mt-3">{action}</div></> : <div className="mt-2 [&>form]:border-0 [&>form]:p-0">{action}</div>}</section>;
+          }
+          const descriptions: Record<string, string> = {
+            settings: "Atur kebijakan pembayaran, biaya, dan kanal VA.",
+            va: "Terbitkan nomor VA tetap untuk santri.",
+            unit: "Kelola unit kas yang digunakan saat membuka shift.",
+            access: "Batasi pengelola pada penerima dana yang menjadi tanggung jawabnya.",
+            limits: "Tetapkan batas penarikan uang jajan per santri.",
+          };
+          return <section key={f.action} className="rounded-lg border border-slate-200 bg-white p-4"><h2 className="text-sm font-bold text-slate-900">{f.title}</h2><p className="mt-1 min-h-10 text-xs leading-5 text-slate-500">{descriptions[f.action]}</p><div className="mt-3">{action}</div></section>;
+        })}
       </div>
+      {data.view === "bills" && data.canConfigure ? <BillingOperations /> : null}
+      {data.view === "settings" && data.canConfigure ? <RecipientAccountManager /> : null}
       {data.view === "cashier" && data.shift && (
         <Checkout shiftId={String(data.shift.id)} />
       )}
@@ -588,7 +674,7 @@ export function CooperativeScreen({ data }: { data: ScreenData }) {
           aplikasi.
         </p>
       )}
-      <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <section data-tour="records" className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
         <form className="flex flex-wrap gap-2 border-b p-4" action={path}>
           <input
             name="q"

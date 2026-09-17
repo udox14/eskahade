@@ -17,6 +17,7 @@ export const queryOne=async(sql,params=[])=>globalThis.financeTestMain.prepare(s
 await build({stdin:{contents:`
 export * from './lib/finance/cooperative/orders';
 export * from './lib/finance/cooperative/billing';
+export * from './lib/finance/cooperative/non-spp-billing';
 export * from './lib/finance/cooperative/distributions';
 export * from './lib/finance/cooperative/corrections';
 export * from './lib/finance/cooperative/cash';
@@ -27,11 +28,13 @@ export * from './lib/finance/withdrawal';
 export * from './lib/finance/credential-batches';
 export * from './lib/finance/demo-seed';
 export * from './lib/finance/access';
+export * from './app/dashboard/keuangan-terpusat/billing-actions';
 `,resolveDir:root,loader:'ts'},bundle:true,platform:'node',format:'esm',outfile:'tmp/finance-cooperative/domain.mjs',plugins:[{name:'isolated-db',setup(b){
  b.onResolve({filter:/^@\/lib\/db$/},()=>({path:'db',namespace:'mock'}))
  b.onResolve({filter:/^@\/lib\/auth\/demo-context$/},()=>({path:'demo',namespace:'mock'}))
  b.onResolve({filter:/^@\/lib\/auth\/session$/},()=>({path:'session',namespace:'mock'}))
- b.onLoad({filter:/.*/,namespace:'mock'},({path:p})=>({contents:p==='db'?dbMock:p==='demo'?'export const isDemoRequest=async()=>true;':'export const getEffectiveRoles=s=>s.roles; export const getSession=async()=>globalThis.financeTestSession;',loader:'js'}))
+ b.onResolve({filter:/^next\/cache$/},()=>({path:'cache',namespace:'mock'}))
+ b.onLoad({filter:/.*/,namespace:'mock'},({path:p})=>({contents:p==='db'?dbMock:p==='demo'?'export const isDemoRequest=async()=>true;':p==='cache'?'export const revalidatePath=()=>{}; export const revalidateTag=()=>{};':'export const getEffectiveRoles=s=>s.roles; export const getSession=async()=>globalThis.financeTestSession;',loader:'js'}))
 }}]})
 const api=await import(pathToFileURL(path.resolve('tmp/finance-cooperative/domain.mjs')))
 function wrap(sqlite){
@@ -41,10 +44,16 @@ function wrap(sqlite){
 const finance=new DatabaseSync(':memory:'),main=new DatabaseSync(':memory:')
 for(const suffix of ['b_tables_core','c_tables_billing','d_tables_loket','e_tables_payout','f_tables_support','g_triggers','h_seed'])finance.exec(readFileSync('migrations-finance/0001'+suffix+'.sql','utf8'))
 for(const file of ['0003_payroll_per_sesi.sql','0004_cooperative_item_payments.sql'])finance.exec(readFileSync('migrations-finance/'+file,'utf8'))
-main.exec(`CREATE TABLE santri(id TEXT PRIMARY KEY,nis TEXT,nama_lengkap TEXT,asrama TEXT,kamar TEXT,foto_url TEXT,status_global TEXT,tempat_makan_id TEXT,tempat_mencuci_id TEXT);
+finance.exec(readFileSync('migrations-finance/0006_central_billing_workspaces.sql','utf8'))
+main.exec(`CREATE TABLE santri(id TEXT PRIMARY KEY,nis TEXT,nama_lengkap TEXT,asrama TEXT,kamar TEXT,foto_url TEXT,status_global TEXT,tempat_makan_id TEXT,tempat_mencuci_id TEXT,tahun_masuk INTEGER,tanggal_masuk TEXT,created_at TEXT);
 CREATE TABLE master_jasa(id TEXT PRIMARY KEY,nama_jasa TEXT,jenis TEXT);
+CREATE TABLE tahun_ajaran(id INTEGER PRIMARY KEY,nama TEXT,is_active INTEGER);
+CREATE TABLE biaya_settings(id INTEGER PRIMARY KEY AUTOINCREMENT,tahun_ajaran_id INTEGER,tahun_angkatan INTEGER,jenis_biaya TEXT,nominal INTEGER);
+CREATE TABLE pembayaran_tahunan(id TEXT PRIMARY KEY,santri_id TEXT,jenis_biaya TEXT,tahun_ajaran_id INTEGER,tahun_tagihan INTEGER,nominal_bayar INTEGER,status TEXT);
+CREATE TABLE santri_pembebasan_biaya(id TEXT PRIMARY KEY,santri_id TEXT,service_kind TEXT,is_active INTEGER);
 INSERT INTO master_jasa VALUES('m','Ibu Makan','Makan'),('l','Ibu Laundry','Cuci');
-INSERT INTO santri VALUES('s1','1001','Santri Satu','A','1',NULL,'aktif','m','l'),('s2','1002','Santri Dua','A','2',NULL,'aktif','m','l');`)
+INSERT INTO tahun_ajaran VALUES(1,'2026/2027',1);
+INSERT INTO santri VALUES('s1','1001','Santri Satu','A','1',NULL,'aktif','m','l',2025,'2025-07-01','2025-07-01'),('s2','1002','Santri Dua','A','2',NULL,'aktif','m','l',2025,'2025-07-01','2025-07-01'),('s3','1003','Warga Lokal','AL-BAGHORY','-',NULL,'aktif','m','l',2025,'2025-07-01','2025-07-01');`)
 globalThis.financeTestDb=wrap(finance);globalThis.financeTestMain=wrap(main);globalThis.financeTestSession={id:'staff',roles:['admin_koperasi']}
 process.env.FINANCE_ENCRYPTION_KEY='isolated-test-key';process.env.CREDENTIAL_HMAC_SECRET='isolated-hmac-key'
 const row=sql=>finance.prepare(sql).get()
@@ -114,6 +123,50 @@ await test('monthly generator is independent and idempotent',async()=>{
  finance.exec("INSERT INTO finance_coop_tariffs(id,kind,title,amount,effective_month,created_by) VALUES('t','MAKAN','Makan',30000,'2026-01','staff')")
  const a=await api.generateMonthlyBills(globalThis.financeTestMain,globalThis.financeTestDb,'2026-09','staff'),b=await api.generateMonthlyBills(globalThis.financeTestMain,globalThis.financeTestDb,'2026-09','staff')
  assert.equal(a.created,2);assert.equal(b.created,0)
+})
+await test('monthly generator honors centralized exemptions',async()=>{
+ finance.exec("INSERT INTO finance_bill_exemptions(id,santri_id,item_code,scope,reason,created_by) VALUES('ex-month','s2','MAKAN','PERMANENT','Kebijakan pengurus','staff')")
+ const result=await api.generateMonthlyBills(globalThis.financeTestMain,globalThis.financeTestDb,'2026-10','staff')
+ assert.equal(result.created,1);assert.equal(result.exempted,1)
+})
+await test('Non-SPP batch applies lifetime, annual, legacy and idempotency rules',async()=>{
+ main.exec("INSERT INTO biaya_settings(tahun_ajaran_id,tahun_angkatan,jenis_biaya,nominal) VALUES(1,2025,'BANGUNAN',1000000),(1,2025,'KESEHATAN',200000),(1,2025,'EHB',100000),(1,2025,'EKSKUL',50000)")
+ finance.exec("INSERT INTO finance_bill_exemptions(id,santri_id,item_code,scope,period_key,reason,created_by) VALUES('ex-ehb','s2','EHB','PERIOD','TA:1','Beasiswa tahunan','staff')")
+ main.exec("INSERT INTO pembayaran_tahunan VALUES('legacy-free','s1','EKSKUL',1,2026,0,'AKTIF')")
+ const preview=await api.previewNonSppBills(globalThis.financeTestMain,globalThis.financeTestDb,true)
+ assert.equal(preview.eligibleStudents,2);assert.equal(preview.created,6);assert.equal(preview.skipped,2)
+ const first=await api.generateNonSppBills(globalThis.financeTestMain,globalThis.financeTestDb,'staff',true)
+ const second=await api.generateNonSppBills(globalThis.financeTestMain,globalThis.financeTestDb,'staff',true)
+ assert.equal(first.created,6);assert.equal(second.created,0)
+ assert.equal(row("SELECT COUNT(*) n FROM finance_coop_bills WHERE category_code='BANGUNAN'").n,2)
+ assert.equal(row("SELECT COUNT(*) n FROM finance_coop_bills WHERE category_code IN ('KESEHATAN','EHB','EKSKUL')").n,4)
+ assert.throws(()=>finance.exec("INSERT INTO finance_coop_bills(id,santri_id,kind,category_code,title,period_key,recipient_id,amount,created_by) VALUES('dup','s1','NON_SPP','BANGUNAN','Bangunan lagi','x','pesantren',1,'staff')"))
+})
+await test('recipient bulk save validates all rows, encrypts, masks, and preserves blank account',async()=>{
+ const invalid=await api.saveRecipientAccounts([
+  {id:'pesantren',method:'TRANSFER',bankCode:'014',bankName:'BCA',accountNumber:'1234567890',accountHolder:'Bendahara'},
+  {id:'jasa-m',method:'TRANSFER',bankCode:'002',bankName:'BRI',accountNumber:'abc',accountHolder:'Ibu Makan'},
+ ])
+ assert.equal(invalid.success,false)
+ assert.equal(row("SELECT method FROM finance_coop_recipients WHERE id='pesantren'").method,'CASH')
+ const valid=await api.saveRecipientAccounts([
+  {id:'pesantren',method:'TRANSFER',bankCode:'014',bankName:'BCA',accountNumber:'1234567890',accountHolder:'Bendahara'},
+  {id:'jasa-m',method:'CASH',bankCode:'',bankName:'',accountNumber:'',accountHolder:''},
+ ])
+ assert.equal(valid.success,true)
+ const saved=row("SELECT account_encrypted,account_mask FROM finance_coop_recipients WHERE id='pesantren'")
+ assert.notEqual(saved.account_encrypted,'1234567890');assert.equal(saved.account_mask,'****7890')
+ await api.saveRecipientAccounts([{id:'pesantren',method:'TRANSFER',bankCode:'014',bankName:'BCA',accountNumber:'',accountHolder:'Bendahara Baru'}])
+ assert.equal(row("SELECT account_encrypted FROM finance_coop_recipients WHERE id='pesantren'").account_encrypted,saved.account_encrypted)
+})
+await test('exemption voids OPEN bill, revokes safely, and rejects PARTIAL bill',async()=>{
+ const saved=await api.saveBillingExemption({santriId:'s1',itemCode:'KESEHATAN',scope:'PERIOD',periodKey:'TA:1',reason:'Beasiswa kesehatan'})
+ assert.equal(saved.affectedBills,1)
+ assert.equal(row("SELECT status FROM finance_coop_bills WHERE santri_id='s1' AND category_code='KESEHATAN'").status,'VOID')
+ await api.revokeBillingExemptions([saved.ruleId],'Keputusan dibatalkan')
+ assert.equal(row("SELECT status FROM finance_coop_bills WHERE santri_id='s1' AND category_code='KESEHATAN'").status,'OPEN')
+ finance.exec("UPDATE finance_coop_bills SET paid=1,status='PARTIAL' WHERE santri_id='s1' AND category_code='BANGUNAN'")
+ await assert.rejects(api.saveBillingExemption({santriId:'s1',itemCode:'BANGUNAN',scope:'PERMANENT',reason:'Pembebasan bangunan'}),/koreksi atau refund/)
 })
 await test('closed shift preserves expected cash including receipts',async()=>{
  await api.closeShift('staff',shift,40000,'Sesuai hitungan')

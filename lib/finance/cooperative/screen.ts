@@ -131,18 +131,41 @@ export async function loadScreen(
   let sql = "",
     values: unknown[] = [],
     searchColumns: string[] = [];
-  if (view === "home" || view === "bills") {
-    data.title =
-      view === "home" ? "Ringkasan Keuangan" : "Tagihan & Pembayaran";
-    data.description =
-      "Pilih tagihan, terima pembayaran, dan telusuri hak penerima.";
+  if (view === "home") {
+    data.title = "Ringkasan Keuangan";
+    data.description = "Kondisi utama dan aktivitas penerimaan dana terbaru.";
+    const oscope = scopeSql(scope, "i.recipient_id");
+    sql = `SELECT o.id,o.created_at waktu,s.full_name santri,o.channel kanal,o.total nominal,o.status
+      FROM finance_orders o LEFT JOIN finance_student_snapshots s ON s.santri_id=o.santri_id
+      ${scope === null ? "" : `WHERE EXISTS(SELECT 1 FROM finance_order_items i WHERE i.order_id=o.id${oscope.sql})`}`;
+    values = scope === null ? [] : oscope.params;
+    searchColumns = ["waktu", "santri", "kanal", "status"];
+    data.columns = [
+      { key: "waktu", label: "Waktu" },
+      { key: "santri", label: "Santri" },
+      { key: "kanal", label: "Kanal" },
+      { key: "nominal", label: "Nominal", money: true },
+      { key: "status", label: "Status" },
+    ];
+  } else if (view === "bills") {
+    data.title = "Tagihan & Pembayaran";
+    data.description = "Kelola tarif, batch, pembebasan, dan pengecualian tagihan per santri.";
     const bscope = scopeSql(scope, "b.recipient_id");
-    sql = `SELECT b.id,s.full_name santri,s.asrama,b.title,b.kind,r.name penerima,b.amount,b.paid,b.amount-b.paid remaining,b.status FROM finance_coop_bills b LEFT JOIN finance_student_snapshots s ON s.santri_id=b.santri_id JOIN finance_coop_recipients r ON r.id=b.recipient_id WHERE 1=1${bscope.sql}`;
+    sql = `SELECT b.id,s.full_name santri,s.asrama,b.title,
+      CASE WHEN b.kind='NON_SPP' AND b.category_code IS NULL THEN 'Non-SPP lama'
+           WHEN b.category_code='EKSKUL' THEN 'Ekskul'
+           WHEN b.category_code IS NOT NULL THEN upper(substr(b.category_code,1,1))||lower(substr(b.category_code,2))
+           ELSE b.kind END category,
+      r.name penerima,b.amount,b.paid,b.amount-b.paid remaining,
+      CASE WHEN b.exemption_rule_id IS NOT NULL THEN 'DIBEBASKAN' ELSE b.status END status
+      FROM finance_coop_bills b LEFT JOIN finance_student_snapshots s ON s.santri_id=b.santri_id
+      JOIN finance_coop_recipients r ON r.id=b.recipient_id WHERE 1=1${bscope.sql}`;
     values = bscope.params;
-    searchColumns = ["santri", "asrama", "title", "kind", "status"];
+    searchColumns = ["santri", "asrama", "title", "category", "status"];
     data.columns = [
       { key: "santri", label: "Santri" },
       { key: "title", label: "Tagihan" },
+      { key: "category", label: "Kategori" },
       { key: "penerima", label: "Penerima" },
       { key: "amount", label: "Tagihan", money: true },
       { key: "remaining", label: "Sisa", money: true },
@@ -152,10 +175,21 @@ export async function loadScreen(
       data.forms = [
         {
           action: "bill",
-          title: "Buat tagihan",
+          title: "Pembuatan individual",
           fields: [
             student,
             kind,
+            {
+              name: "category",
+              label: "Kategori Non-SPP",
+              options: [
+                { value: "", label: "Tidak berlaku untuk jenis lain" },
+                { value: "BANGUNAN", label: "Bangunan" },
+                { value: "KESEHATAN", label: "Kesehatan" },
+                { value: "EHB", label: "EHB" },
+                { value: "EKSKUL", label: "Ekskul" },
+              ],
+            },
             { name: "title", label: "Nama tagihan", required: true },
             amount,
             period,
@@ -442,6 +476,7 @@ export async function loadScreen(
         ],
       },
     ];
+    data.forms = data.forms.filter((form) => form.action !== "recipient");
   } else {
     data.title = "Loket & Uang Jajan";
     data.description =

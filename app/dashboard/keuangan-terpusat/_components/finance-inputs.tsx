@@ -111,23 +111,29 @@ export function SantriPicker({ selected, onSelect, name, placeholder = 'Ketik na
   placeholder?: string
   id?: string
 }) {
+  const fallbackId = useId()
+  const comboId = id || `santri-${fallbackId}`
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SantriSearchRow[]>([])
   const [open, setOpen] = useState(false)
   const [searching, setSearching] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const [error, setError] = useState('')
+  const [retry, setRetry] = useState(0)
   const box = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (selected || query.trim().length < 2) return
     const timer = window.setTimeout(() => {
       setSearching(true)
+      setError('')
       searchSantriByName(query)
-        .then(rows => { setResults(rows); setOpen(true) })
-        .catch(() => toast.error('Pencarian santri gagal. Coba lagi.'))
+        .then(rows => { setResults(rows); setActiveIndex(rows.length ? 0 : -1); setOpen(true) })
+        .catch(() => { setResults([]); setError('Pencarian santri gagal. Periksa koneksi lalu coba lagi.'); setOpen(true) })
         .finally(() => setSearching(false))
     }, 300)
     return () => window.clearTimeout(timer)
-  }, [query, selected])
+  }, [query, selected, retry])
 
   // Klik di luar menutup daftar; versi sebelumnya membiarkannya menggantung.
   useEffect(() => {
@@ -143,31 +149,41 @@ export function SantriPicker({ selected, onSelect, name, placeholder = 'Ketik na
     return <div className="flex min-h-11 items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm">
       <span className="min-w-0 truncate font-semibold text-slate-800">{selected.nama_lengkap} <span className="font-normal text-slate-500">{selected.nis}{selected.asrama ? ` · ${selected.asrama}` : ''}</span></span>
       {name ? <input type="hidden" name={name} value={selected.id} /> : null}
-      <button type="button" onClick={() => { onSelect(null); setQuery('') }} className="shrink-0 text-xs font-bold text-slate-600 hover:text-slate-900">Ganti</button>
+      <button type="button" onClick={() => { onSelect(null); setQuery(''); setResults([]) }} className="min-h-11 shrink-0 px-2 text-xs font-bold text-slate-600 hover:text-slate-900">Ganti</button>
     </div>
   }
 
   return <div ref={box} className="relative">
     <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
     <input
-      id={id}
+      id={comboId}
       value={query}
       role="combobox"
       aria-expanded={open}
-      aria-controls={`${id || 'santri'}-hasil`}
+      aria-controls={`${comboId}-hasil`}
+      aria-activedescendant={open && activeIndex >= 0 ? `${comboId}-option-${activeIndex}` : undefined}
       autoComplete="off"
       onChange={event => { setQuery(event.target.value); if (event.target.value.trim().length < 2) setOpen(false) }}
       onFocus={() => results.length > 0 && setOpen(true)}
-      onKeyDown={event => { if (event.key === 'Escape') setOpen(false) }}
+      onKeyDown={event => {
+        if (event.key === 'Escape') { setOpen(false); return }
+        if (event.key === 'ArrowDown') { event.preventDefault(); setOpen(true); setActiveIndex(index => Math.min(results.length - 1, index + 1)) }
+        if (event.key === 'ArrowUp') { event.preventDefault(); setOpen(true); setActiveIndex(index => Math.max(0, index - 1)) }
+        if (event.key === 'Home' && open) { event.preventDefault(); setActiveIndex(0) }
+        if (event.key === 'End' && open) { event.preventDefault(); setActiveIndex(results.length - 1) }
+        if (event.key === 'Enter' && open && results[activeIndex]) { event.preventDefault(); onSelect(results[activeIndex]); setOpen(false) }
+      }}
       placeholder={placeholder}
       className={cn(FINANCE_FIELD_CLASS, 'pl-9')}
     />
-    {open ? <div id={`${id || 'santri'}-hasil`} role="listbox" className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+    {open ? <div id={`${comboId}-hasil`} role="listbox" className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
       {searching ? <p className="px-3 py-2 text-xs text-slate-500">Mencari...</p>
+        : error ? <div role="alert" className="p-3 text-xs text-red-800"><p>{error}</p><button type="button" onClick={() => setRetry(value => value + 1)} className="mt-2 min-h-11 rounded-md border border-red-300 bg-white px-3 font-bold">Coba lagi</button></div>
         : results.length === 0 ? <p className="px-3 py-2 text-xs text-slate-500">Tidak ada santri aktif yang cocok.</p>
-          : results.map(row => <button key={row.id} type="button" role="option" aria-selected={false}
+          : results.map((row, index) => <button id={`${comboId}-option-${index}`} key={row.id} type="button" role="option" aria-selected={activeIndex === index}
+            onMouseEnter={() => setActiveIndex(index)}
             onClick={() => { onSelect(row); setOpen(false) }}
-            className="block w-full px-3 py-2.5 text-left text-xs hover:bg-emerald-50">
+            className={cn('block min-h-11 w-full px-3 py-2.5 text-left text-xs hover:bg-emerald-50', activeIndex === index ? 'bg-emerald-50' : null)}>
             <span className="font-bold text-slate-800">{row.nama_lengkap}</span>
             <span className="ml-1.5 text-slate-500">{row.nis}{row.asrama ? ` · ${row.asrama}` : ''}{row.kamar ? ` / ${row.kamar}` : ''}</span>
           </button>)}

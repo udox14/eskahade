@@ -10,7 +10,7 @@ import {
   query,
   queryOne,
 } from "@/lib/db";
-import { requireFinanceAccess, financeRoles } from "@/lib/finance/access";
+import { requireFinanceAccess } from "@/lib/finance/access";
 import {
   createOrder,
   cancelOrder,
@@ -33,8 +33,10 @@ import {
 } from "@/lib/finance/cooperative/data";
 import {
   BILL_KINDS,
+  NON_SPP_CATEGORIES,
   rupiah,
   type BillKind,
+  type NonSppCategory,
   type Settings,
 } from "@/lib/finance/cooperative/types";
 import { encryptFinanceValue } from "@/lib/finance/encryption";
@@ -42,12 +44,24 @@ import { setStudentPin, resolveCredential } from "@/lib/finance/credentials";
 import { withdrawPocketMoney } from "@/lib/finance/withdrawal";
 import { inquireVa } from "@/lib/finance/cooperative/snap";
 import { isDemoRequest } from "@/lib/auth/demo-context";
+import { andExcludeAsramaSql } from "@/lib/finance/asrama";
 const text = (f: FormData, k: string) => String(f.get(k) || "").trim();
 const number = (f: FormData, k: string) => Number(text(f, k));
 export async function searchCoopStudents(search: string) {
   await requireFinanceAccess("CREATE");
-  return query<{ id: string; nama_lengkap: string; nis: string }>(
-    "SELECT id,nama_lengkap,nis FROM santri WHERE status_global='aktif' AND (nama_lengkap LIKE ? OR nis LIKE ?) ORDER BY nama_lengkap LIMIT 30",
+  const term = search.trim().slice(0, 80);
+  if (term.length < 2) return [];
+  return query<{
+    id: string;
+    nama_lengkap: string;
+    nis: string;
+    asrama: string | null;
+    kamar: string | null;
+  }>(
+    `SELECT id,nama_lengkap,nis,asrama,kamar FROM santri
+     WHERE status_global='aktif' AND (nama_lengkap LIKE ? OR nis LIKE ?)
+     ${andExcludeAsramaSql("asrama")}
+     ORDER BY nama_lengkap LIMIT 30`,
     ["%" + search.slice(0, 80) + "%", "%" + search.slice(0, 80) + "%"],
   );
 }
@@ -131,6 +145,9 @@ export async function coopAction(
       const kind = text(form, "kind") as BillKind;
       if (!BILL_KINDS.includes(kind))
         throw new Error("Jenis tagihan tidak valid.");
+      const category = text(form, "category") as NonSppCategory;
+      if (kind === "NON_SPP" && !NON_SPP_CATEGORIES.includes(category))
+        throw new Error("Pilih kategori Non-SPP.");
       id = await createBill({
         santriId: text(form, "santriId"),
         kind,
@@ -138,6 +155,7 @@ export async function coopAction(
         amount: number(form, "amount"),
         period: text(form, "period"),
         actor,
+        category: kind === "NON_SPP" ? category : null,
       });
     } else if (action === "generate") {
       const r = await generateMonthlyBills(
