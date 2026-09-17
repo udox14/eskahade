@@ -29,12 +29,16 @@ import { cn } from '@/lib/utils'
  * disalin sebagai `const field` di delapan halaman, sehingga satu penyesuaian
  * tinggi sentuh atau warna fokus harus ditulis delapan kali.
  */
-export const FINANCE_FIELD_CLASS = 'min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500'
+export const FINANCE_FIELD_CLASS = 'min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-800 focus-visible:ring-offset-2'
 
 export function FinancePageHeader({ title, description, eyebrow, meta, action }: {
   title: string; description: string; eyebrow?: string; meta?: string; action?: React.ReactNode
 }) {
-  return <DashboardPageHeader title={title} description={description} action={action} className="[&_h1]:text-xl [&_p]:text-xs sm:[&_h1]:text-[1.75rem] sm:[&_p]:text-sm" />
+  return <div className="space-y-2">
+    {eyebrow ? <p className="mb-1 text-xs font-bold uppercase tracking-wide text-emerald-800">{eyebrow}</p> : null}
+    <DashboardPageHeader title={title} description={description} action={action} className="[&_h1]:text-xl [&_p]:text-xs sm:[&_h1]:text-[1.75rem] sm:[&_p]:text-sm" />
+    {meta ? <p className="text-xs leading-5 text-slate-600"><span className="font-bold text-slate-800">Cakupan dan keamanan: </span>{meta}</p> : null}
+  </div>
 }
 
 export function FinanceGuide({
@@ -60,14 +64,14 @@ export function FinanceGuide({
 }) {
   // Panel sebelumnya memakai `hidden sm:block`, sehingga justru hilang di layar
   // kecil — tempat pengguna paling butuh petunjuk. Semua panel kini tampil.
-  return <details className="group rounded-xl border border-blue-200 bg-blue-50/60 open:bg-white">
+  return <details className="group rounded-lg border border-blue-200 bg-blue-50/60 open:bg-white">
     <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
       <span className="flex items-center gap-2 text-xs font-bold text-slate-800 sm:text-sm"><CircleHelp className="h-4 w-4 text-blue-600" />{title}</span>
       <span className="flex shrink-0 items-center gap-1 text-[10px] font-semibold text-blue-700 sm:text-xs">Buka <span className="hidden sm:inline">petunjuk</span> <ChevronDown className="h-4 w-4 transition group-open:rotate-180" /></span>
     </summary>
     <div className="border-t border-blue-100 px-4 py-4">
       <button type="button" onClick={() => onStartTour ? onStartTour() : window.dispatchEvent(new CustomEvent(FINANCE_TOUR_EVENT))}
-        className="mb-4 inline-flex min-h-10 items-center gap-2 rounded-lg bg-blue-700 px-3 text-xs font-bold text-white">
+        className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-md bg-blue-700 px-3 text-xs font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-800">
         <Compass className="h-4 w-4" />Pandu saya di layar
       </button>
       <div className="grid gap-4 text-xs leading-relaxed text-slate-600 md:grid-cols-2 xl:grid-cols-4">
@@ -124,10 +128,11 @@ export function ResultBanner({ result, onDismiss }: { result: FinanceResult | nu
     duplicate: { box: 'border-blue-200 bg-blue-50 text-blue-900', Icon: Info },
     error: { box: 'border-red-200 bg-red-50 text-red-900', Icon: XCircle },
   }[result.tone]
-  return <div ref={box} role="status" aria-live="polite" className={cn('flex items-start gap-3 rounded-xl border px-4 py-3 text-xs sm:text-sm', style.box)}>
+  const isError = result.tone === 'error'
+  return <div ref={box} role={isError ? 'alert' : 'status'} aria-live={isError ? 'assertive' : 'polite'} className={cn('flex items-start gap-3 rounded-lg border px-4 py-3 text-xs sm:text-sm', style.box)}>
     <style.Icon className="mt-0.5 h-5 w-5 shrink-0" />
     <div className="min-w-0 flex-1"><p className="font-bold">{result.message}</p>{result.detail ? <p className="mt-0.5 leading-5 opacity-90">{result.detail}</p> : null}</div>
-    {onDismiss ? <button type="button" onClick={onDismiss} aria-label="Tutup pesan" className="shrink-0 opacity-60 hover:opacity-100"><X className="h-4 w-4" /></button> : null}
+    {onDismiss ? <button type="button" onClick={onDismiss} aria-label="Tutup pesan" className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-lg text-slate-600 hover:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"><X className="h-4 w-4" /></button> : null}
   </div>
 }
 
@@ -158,20 +163,42 @@ export function FormField({ label, hint, error, children, required }: {
  * data setup yang jarang diubah. Aturannya sekarang: tab pertama selalu
  * pekerjaan harian.
  */
-export function FinanceTabs({ tabs, active, onChange, label = 'Kelompok pekerjaan' }: {
+export function FinanceTabs({ tabs, active, onChange, label = 'Kelompok pekerjaan', idBase }: {
   tabs: ReadonlyArray<{ id: string; label: string; hint?: string; badge?: number; icon?: React.ComponentType<{ className?: string }> }>
   active: string
   onChange: (id: string) => void
   label?: string
+  idBase?: string
 }) {
   const current = tabs.find(item => item.id === active)
-  return <nav aria-label={label} className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-    <div className="flex min-w-max gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+  const generatedId = useId()
+  const base = idBase || generatedId.replaceAll(':', '')
+  const tabList = useRef<HTMLDivElement>(null)
+  const activate = (next: (typeof tabs)[number] | undefined) => {
+    if (!next) return
+    onChange(next.id)
+    requestAnimationFrame(() => {
+      tabList.current?.querySelector<HTMLElement>('[data-tab-id="' + next.id + '"]')?.focus()
+    })
+  }
+  const move = (currentIndex: number, delta: number) => {
+    activate(tabs[(currentIndex + delta + tabs.length) % tabs.length])
+  }
+  return <div aria-label={label} className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+    <div ref={tabList} role="tablist" aria-label={label} className="flex min-w-max gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
       {tabs.map(item => {
         const aktif = item.id === active
-        return <button key={item.id} type="button" onClick={() => onChange(item.id)}
-          aria-current={aktif ? 'page' : undefined}
-          className={cn('flex min-h-11 items-center gap-2 rounded-lg px-3 text-xs font-bold transition',
+        const index = tabs.findIndex(tab => tab.id === item.id)
+        return <button key={item.id} type="button" role="tab" id={base + '-tab-' + item.id}
+          data-tab-id={item.id} aria-controls={base + '-panel-' + item.id} aria-selected={aktif}
+          tabIndex={aktif ? 0 : -1} onClick={() => onChange(item.id)}
+          onKeyDown={event => {
+            if (event.key === 'ArrowRight') { event.preventDefault(); move(index, 1) }
+            if (event.key === 'ArrowLeft') { event.preventDefault(); move(index, -1) }
+            if (event.key === 'Home') { event.preventDefault(); activate(tabs[0]) }
+            if (event.key === 'End') { event.preventDefault(); activate(tabs[tabs.length - 1]) }
+          }}
+          className={cn('flex min-h-11 items-center gap-2 rounded-md px-3 text-xs font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800',
             aktif ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800')}>
           {item.icon ? <item.icon className="h-4 w-4" /> : null}
           {item.label}
@@ -180,7 +207,7 @@ export function FinanceTabs({ tabs, active, onChange, label = 'Kelompok pekerjaa
       })}
     </div>
     {current?.hint ? <p className="mt-2 px-1 text-[11px] text-slate-500">{current.hint}</p> : null}
-  </nav>
+  </div>
 }
 
 const UKURAN_MODAL = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl', xl: 'max-w-5xl' } as const
@@ -256,7 +283,7 @@ function ModalShell({ title, description, size, onClose, children, footer }: {
           {description ? <p className="mt-1 text-sm leading-5 text-slate-600">{description}</p> : null}
         </div>
         <button type="button" onClick={onClose} aria-label="Tutup"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700">✕</button>
+          className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-800"><X aria-hidden className="h-5 w-5" /></button>
       </header>
       <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
       {footer ? <footer className="border-t border-slate-100 px-5 py-3">{footer}</footer> : null}
@@ -327,7 +354,7 @@ function ConfirmDialog({ title, description, impact = [], confirmLabel = 'Lanjut
   }, [onCancel])
 
   const ready = !confirmPhrase || typed.trim().toUpperCase() === confirmPhrase.toUpperCase()
-  const accent = tone === 'red' ? 'bg-red-700' : 'bg-amber-600'
+  const accent = tone === 'red' ? 'bg-red-700' : 'bg-amber-700'
   return <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/60 p-4" onClick={onCancel}>
     <section ref={panel} role="alertdialog" aria-modal="true" aria-label={title} className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
       <div className="flex items-start gap-3">
@@ -339,8 +366,8 @@ function ConfirmDialog({ title, description, impact = [], confirmLabel = 'Lanjut
         <input autoFocus value={typed} onChange={event => setTyped(event.target.value)} className="mt-1.5 min-h-11 w-full rounded-lg border border-slate-200 px-3 text-sm" />
       </label> : null}
       <div className="mt-5 grid grid-cols-2 gap-2">
-        <button type="button" onClick={onCancel} className="min-h-11 rounded-lg border border-slate-200 text-sm font-bold text-slate-700">Batal</button>
-        <button type="button" disabled={!ready || pending} onClick={onConfirm} className={cn('min-h-11 rounded-lg px-3 text-sm font-bold text-white disabled:opacity-50', accent)}>{confirmLabel}</button>
+        <button type="button" onClick={onCancel} className="min-h-11 rounded-lg border border-slate-300 text-sm font-bold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-800">Batal</button>
+        <button type="button" disabled={!ready || pending} onClick={onConfirm} className={cn('min-h-11 rounded-lg px-3 text-sm font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current disabled:opacity-50', accent)}>{confirmLabel}</button>
       </div>
     </section>
   </div>
@@ -460,16 +487,16 @@ export function FinanceTour({ steps, running, onFinish }: { steps: TourStep[]; r
     <div ref={dialog} tabIndex={-1} className="absolute w-[min(20rem,calc(100vw-1.5rem))] rounded-xl bg-white p-4 shadow-2xl outline-none" style={tooltipStyle}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Langkah {index + 1} dari {steps.length}</p>
-        <button type="button" onClick={onFinish} aria-label="Tutup panduan" className="text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></button>
+        <button type="button" onClick={onFinish} aria-label="Tutup panduan" className="grid min-h-11 min-w-11 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-800"><X className="h-4 w-4" /></button>
       </div>
       <h3 className="mt-1 text-sm font-bold text-slate-900">{step.title}</h3>
       <p className="mt-1.5 text-xs leading-5 text-slate-600">{step.body}</p>
       {!rect ? <p className="mt-2 rounded bg-amber-50 p-2 text-[11px] text-amber-800">Bagian ini belum tampil di layar — biasanya karena datanya belum ada.</p> : null}
       <div className="mt-4 flex items-center justify-between gap-2">
-        <button type="button" onClick={onFinish} className="text-[11px] font-semibold text-slate-500 hover:text-slate-800">Lewati</button>
+        <button type="button" onClick={onFinish} className="min-h-11 rounded-lg px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-800">Lewati</button>
         <div className="flex gap-2">
-          <button type="button" disabled={index === 0} onClick={() => setIndex(current => current - 1)} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 disabled:opacity-40"><ArrowLeft className="h-3.5 w-3.5" />Kembali</button>
-          <button type="button" onClick={() => index + 1 < steps.length ? setIndex(current => current + 1) : onFinish()} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white">{index + 1 < steps.length ? <>Lanjut<ArrowRight className="h-3.5 w-3.5" /></> : 'Selesai'}</button>
+          <button type="button" disabled={index === 0} onClick={() => setIndex(current => current - 1)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-300 px-3 text-xs font-bold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-800 disabled:opacity-40"><ArrowLeft className="h-3.5 w-3.5" />Kembali</button>
+          <button type="button" onClick={() => index + 1 < steps.length ? setIndex(current => current + 1) : onFinish()} className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800">{index + 1 < steps.length ? <>Lanjut<ArrowRight className="h-3.5 w-3.5" /></> : 'Selesai'}</button>
         </div>
       </div>
     </div>
@@ -494,7 +521,7 @@ export function MetricCard({ label, value, detail, icon, tone = 'emerald' }: {
 }) {
   const Icon = metricIcons[icon]
   const toneClass = { emerald: 'bg-emerald-50 text-emerald-700', blue: 'bg-blue-50 text-blue-700', amber: 'bg-amber-50 text-amber-700', slate: 'bg-slate-100 text-slate-700' }[tone]
-  return <div className="flex min-h-[108px] min-w-0 flex-col rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:block sm:min-h-0 sm:p-4">
+  return <div className="flex min-h-[108px] min-w-0 flex-col rounded-lg border border-slate-200 bg-white p-3 sm:block sm:min-h-0 sm:p-4">
     <div className="flex items-start justify-between gap-3"><p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p><span className={cn('grid h-8 w-8 place-items-center rounded-lg', toneClass)}><Icon className="h-4 w-4" /></span></div>
     <p className="mt-2 break-words text-sm font-extrabold tabular-nums text-slate-900 sm:truncate sm:text-xl">{value}</p>
     <p className="mt-1 text-[11px] leading-4 text-slate-500 sm:text-xs">{detail}</p>
@@ -506,7 +533,7 @@ export function SectionPanel({ id, title, description, action, children, classNa
   id?: string
   title: string; description?: string; action?: React.ReactNode; children: React.ReactNode; className?: string
 }) {
-  return <section id={id} className={cn('overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm', id ? 'scroll-mt-24' : null, className)}>
+  return <section id={id} className={cn('overflow-hidden rounded-lg border border-slate-200 bg-white', id ? 'scroll-mt-24' : null, className)}>
     <div className="flex flex-col items-stretch justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-start sm:gap-4">
       <div><h2 className="text-xs font-bold text-slate-900 sm:text-sm">{title}</h2>{description ? <p className="mt-0.5 text-[11px] leading-4 text-slate-500 sm:text-xs">{description}</p> : null}</div>{action}
     </div>

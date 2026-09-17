@@ -201,6 +201,10 @@ export const ROLE_LABEL: Record<string, string> = {
   guru: 'Guru',
   bendahara: 'Bendahara',
   operator_loket: 'Operator Loket',
+  admin_koperasi: 'Admin Koperasi',
+  petugas_koperasi: 'Petugas Koperasi',
+  pengelola_makan: 'Pengelola Makan',
+  pengelola_laundry: 'Pengelola Laundry',
   poskestren: 'POSKESTREN',
   pimpinan: 'Pimpinan',
 };

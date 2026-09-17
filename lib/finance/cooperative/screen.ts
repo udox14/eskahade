@@ -477,7 +477,7 @@ export async function loadScreen(
               student,
               {
                 name: "pin",
-                label: "PIN baru (4â€“8 digit)",
+                label: "PIN baru (4-8 digit)",
                 type: "password",
                 required: true,
               },

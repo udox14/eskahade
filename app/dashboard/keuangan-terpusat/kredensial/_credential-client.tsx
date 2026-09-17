@@ -1,21 +1,21 @@
 'use client'
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import {
-  ArrowClockwise, CheckCircle, DownloadSimple, GearSix, IdentificationCard, ListChecks,
+  ArrowClockwise, DownloadSimple, GearSix, IdentificationCard, ListChecks,
   Play, Printer, Scan, UsersThree, Warning,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import {
   createQrBatchAction, getCredentialBatchAction, getCredentialFilters, getLatestCredentialBatchAction,
-  issueCredentialAction, processQrBatchAction, searchCredentialStudents,
+  processQrBatchAction, searchCredentialStudents,
   type CredentialStudentRow,
 } from './actions'
 import { useKeyboardWedgeScanner } from '@/lib/finance/scanner-client'
 import { CredentialActions } from './_credential-actions'
 import {
-  ConfirmAction, FinanceTour, ResultBanner, StatusBadge,
+  FinanceTour, ResultBanner, StatusBadge,
   useFinanceTour, type FinanceResult, type TourStep,
   FinanceModal, FinanceTabs,
 } from '../_components/finance-ui'
@@ -53,12 +53,12 @@ const badge = (value: string | null) => value
 function EmptyTab({ icon: Icon, title, description, action }: {
   icon: typeof IdentificationCard; title: string; description: string; action: () => void
 }) {
-  return <section className="grid min-h-72 place-items-center rounded-xl border border-dashed bg-white p-6 text-center">
+  return <section className="grid min-h-72 place-items-center rounded-lg border border-dashed bg-white p-6 text-center">
     <div>
-      <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-700"><Icon className="h-7 w-7" /></span>
+      <span className="mx-auto grid h-14 w-14 place-items-center rounded-lg bg-emerald-50 text-emerald-700"><Icon className="h-7 w-7" /></span>
       <h2 className="mt-4 font-bold">{title}</h2>
       <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{description}</p>
-      <button type="button" onClick={action} className="mt-4 min-h-11 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white">Buka Pilih Santri</button>
+      <button type="button" onClick={action} className="mt-4 min-h-11 rounded-md bg-emerald-700 px-4 py-2 text-sm font-bold text-white">Buka Pilih Santri</button>
     </div>
   </section>
 }
@@ -75,6 +75,7 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
   const [total, setTotal] = useState(0)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [batch, setBatch] = useState<Batch>(null)
   const [readerTest, setReaderTest] = useState('')
   const [pageSize, setPageSize] = useState(50)
@@ -86,6 +87,7 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
 
   const load = useCallback(async (nextPage = page, nextFilters = filters, nextPageSize = pageSize) => {
     setLoading(true)
+    setLoadError('')
     try {
       const found = await searchCredentialStudents({ ...nextFilters, page: nextPage, pageSize: nextPageSize })
       setRows(found.rows)
@@ -93,14 +95,32 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
       setTotal(found.total)
       setTotalPages(found.totalPages)
       setPage(found.page)
+      return true
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Terjadi kesalahan yang tidak diketahui.'
+      setLoadError(detail)
+      setResult({ tone: 'error', message: 'Daftar santri gagal dimuat.', detail })
+      return false
     } finally {
       setLoading(false)
     }
   }, [filters, page, pageSize])
 
   useEffect(() => {
-    getCredentialFilters().then(setOptions)
-    getLatestCredentialBatchAction().then(value => setBatch(value as Batch))
+    getCredentialFilters()
+      .then(setOptions)
+      .catch(error => setResult({
+        tone: 'error',
+        message: 'Pilihan filter gagal dimuat.',
+        detail: error instanceof Error ? error.message : undefined,
+      }))
+    getLatestCredentialBatchAction()
+      .then(value => setBatch(value as Batch))
+      .catch(error => setResult({
+        tone: 'error',
+        message: 'Status batch QR terakhir gagal dimuat.',
+        detail: error instanceof Error ? error.message : undefined,
+      }))
     void load(1, filters, 50)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -123,27 +143,58 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
   const selectAllFiltered = () => setSelected(allFilteredSelected ? new Set() : new Set(allSelectable.map(row => row.id)))
 
   const runBatch = async (batchId: string) => {
-    let active = await getCredentialBatchAction(batchId) as Batch
-    setBatch(active)
-    while (active && ['PENDING', 'PROCESSING', 'COMPLETED_WITH_ERRORS'].includes(active.status)) {
-      const outcome = await processQrBatchAction(batchId)
-      if ('error' in outcome) { toast.error(outcome.error); break }
-      active = outcome.batch as Batch
+    try {
+      let active = await getCredentialBatchAction(batchId) as Batch
       setBatch(active)
-      if (active && ['COMPLETED', 'COMPLETED_WITH_ERRORS'].includes(active.status)) break
+      while (active && ['PENDING', 'PROCESSING', 'COMPLETED_WITH_ERRORS'].includes(active.status)) {
+        const outcome = await processQrBatchAction(batchId)
+        if ('error' in outcome) {
+          setResult({ tone: 'error', message: 'Batch QR tidak dapat dilanjutkan.', detail: outcome.error })
+          toast.error(outcome.error)
+          return
+        }
+        active = outcome.batch as Batch
+        setBatch(active)
+        if (active && ['COMPLETED', 'COMPLETED_WITH_ERRORS'].includes(active.status)) break
+      }
+      await load(page)
+      const failed = active?.failed_count || 0
+      setResult({
+        tone: failed ? 'error' : 'success',
+        message: failed ? 'Batch QR selesai dengan sebagian kegagalan.' : 'Penerbitan QR selesai.',
+        detail: failed ? String(failed) + ' santri gagal diproses. Periksa rincian batch sebelum mencetak kartu.' : undefined,
+      })
+      toast.success(failed ? 'Batch selesai dengan ' + failed + ' kegagalan.' : 'Penerbitan QR selesai.')
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Terjadi kesalahan yang tidak diketahui.'
+      setResult({ tone: 'error', message: 'Penerbitan QR gagal diproses.', detail })
+      toast.error(detail)
     }
-    await load(page)
-    toast.success(active?.failed_count ? `Batch selesai dengan ${active.failed_count} kegagalan.` : 'Penerbitan QR selesai.')
   }
 
   const createQrBatch = () => {
     setActiveTab('qr')
     startTransition(async () => {
       const ids = [...selected]
-      if (!ids.length) { toast.error('Pilih santri terlebih dahulu.'); setActiveTab('enrollment'); return }
-      const created = await createQrBatchAction({ santriIds: ids, filter: filters })
-      if ('error' in created) { toast.error(created.error); return }
-      await runBatch(created.id)
+      if (!ids.length) {
+        setResult({ tone: 'error', message: 'Belum ada santri yang dipilih.', detail: 'Pilih setidaknya satu santri sebelum menerbitkan QR.' })
+        setActiveTab('enrollment')
+        return
+      }
+      try {
+        const created = await createQrBatchAction({ santriIds: ids, filter: filters })
+        if ('error' in created) {
+          setResult({ tone: 'error', message: 'Batch QR gagal dibuat.', detail: created.error })
+          return
+        }
+        await runBatch(created.id)
+      } catch (error) {
+        setResult({
+          tone: 'error',
+          message: 'Batch QR gagal dibuat.',
+          detail: error instanceof Error ? error.message : 'Terjadi kesalahan yang tidak diketahui.',
+        })
+      }
     })
   }
 
@@ -164,9 +215,13 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
       link.download = `kartu-qr-santri-volume-${index + 1}.pdf`
       link.click()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
-      toast.success(`PDF volume ${index + 1} diunduh.`)
+      const message = 'PDF volume ' + (index + 1) + ' berhasil diunduh.'
+      setResult({ tone: 'success', message })
+      toast.success(message)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Gagal membuat PDF.')
+      const detail = error instanceof Error ? error.message : 'Gagal membuat PDF.'
+      setResult({ tone: 'error', message: 'PDF kartu gagal dibuat.', detail })
+      toast.error(detail)
     } finally {
       setExporting(null)
     }
@@ -174,10 +229,21 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
 
   const loadPreview = async () => {
     if (!qrIds[0]) return
-    const response = await fetch(`/api/finance/credentials/cards?id=${encodeURIComponent(qrIds[0])}`, { cache: 'no-store' })
-    const payload = await response.json() as CardPreview & { error?: string }
-    if (!response.ok) { toast.error(payload.error || 'Preview tidak tersedia.'); return }
-    setPreview(payload)
+    try {
+      const response = await fetch('/api/finance/credentials/cards?id=' + encodeURIComponent(qrIds[0]), { cache: 'no-store' })
+      const payload = await response.json() as CardPreview & { error?: string }
+      if (!response.ok) {
+        setResult({ tone: 'error', message: 'Preview kartu tidak tersedia.', detail: payload.error })
+        return
+      }
+      setPreview(payload)
+    } catch (error) {
+      setResult({
+        tone: 'error',
+        message: 'Preview kartu tidak tersedia.',
+        detail: error instanceof Error ? error.message : undefined,
+      })
+    }
   }
 
   const tabs: Array<{ id: CredentialTab; label: string; description: string; icon: typeof UsersThree; badge?: number | string }> = [
@@ -198,6 +264,7 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
     <ResultBanner result={result} onDismiss={() => setResult(null)} />
 
     <div data-tour="tabs"><FinanceTabs
+      idBase="credential"
       label="Bagian modul Kredensial"
       active={activeTab}
       onChange={id => setActiveTab(id as CredentialTab)}
@@ -210,17 +277,17 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
       }))}
     /></div>
 
-    {activeTab === 'settings' ? <section className="grid gap-4" role="tabpanel">
-      <div className="rounded-xl border bg-white p-4">
+    {activeTab === 'settings' ? <section id="credential-panel-settings" aria-labelledby="credential-tab-settings" className="grid gap-4" role="tabpanel">
+      <div className="rounded-lg border bg-white p-4">
         <div className="flex items-center gap-2"><Scan className="h-5 w-5 text-emerald-700" /><h2 className="font-bold">Uji USB reader / scanner</h2></div>
         <p className="mt-1 text-xs text-slate-500">Klik area kosong, lalu tempel kartu atau scan QR. Reader harus mengirim Enter.</p>
-        <div className="mt-3 rounded-xl border border-dashed p-4 font-mono text-sm">
-          {readerTest ? <span className="text-emerald-700">Terbaca: {readerTest}</span> : <span className="text-slate-400">Siap menerima scan...</span>}
+        <div className="mt-3 rounded-lg border border-dashed p-4 font-mono text-sm">
+          {readerTest ? <span className="text-emerald-700">Terbaca: {readerTest}</span> : <span className="text-slate-500">Siap menerima scan...</span>}
         </div>
       </div>
     </section> : null}
 
-    {activeTab === 'enrollment' ? <section className="rounded-xl border bg-white" role="tabpanel">
+    {activeTab === 'enrollment' ? <section id="credential-panel-enrollment" aria-labelledby="credential-tab-enrollment" className="rounded-lg border bg-white" role="tabpanel">
       <div className="border-b p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div>
@@ -228,20 +295,23 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
             <p className="text-xs text-slate-500">Saring hasil, pilih sebagian atau semua, lalu jalankan penerbitan. Kolom QR menunjukkan siapa yang belum punya kartu.</p>
           </div>
           <div data-tour="run" className="flex flex-wrap gap-2">
-            <button onClick={createQrBatch} disabled={pending || !selected.size} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"><Play className="h-4 w-4" />Terbitkan QR ({selected.size})</button>
-            <button onClick={() => setActiveTab('cards')} disabled={!selected.size} className="inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold disabled:opacity-50"><Printer className="h-4 w-4" />Cetak kartu</button>
+            <button type="button" onClick={createQrBatch} disabled={pending || !selected.size} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"><Play className="h-4 w-4" />Terbitkan QR ({selected.size})</button>
+            <button type="button" onClick={() => setActiveTab('cards')} disabled={!qrIds.length} className="inline-flex min-h-11 items-center gap-2 rounded-md border px-4 py-2 text-sm font-bold disabled:opacity-50"><Printer className="h-4 w-4" />Cetak kartu ({qrIds.length})</button>
           </div>
         </div>
 
         <div data-tour="select" className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <input value={filters.q} onChange={event => setFilters({ ...filters, q: event.target.value })}
-            onKeyDown={event => { if (event.key === 'Enter') void load(1) }}
-            placeholder="Cari nama atau NIS lalu tekan Enter..." className="min-h-11 flex-1 rounded-xl border px-3" />
+          <label htmlFor="credential-search" className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="text-xs font-bold text-slate-700">Cari santri</span>
+            <input id="credential-search" value={filters.q} onChange={event => setFilters({ ...filters, q: event.target.value })}
+              onKeyDown={event => { if (event.key === 'Enter') void load(1) }}
+              placeholder="Nama atau NIS" className="min-h-11 rounded-md border border-slate-300 px-3 outline-none focus-visible:ring-2 focus-visible:ring-emerald-800 focus-visible:ring-offset-2" />
+          </label>
           <div className="flex gap-2">
-            <button onClick={() => setShowFilterModal(true)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 font-bold"><ListChecks className="h-4 w-4" />Filter Lanjutan</button>
-            <button onClick={() => void load(1)} className="min-h-11 rounded-xl bg-emerald-700 px-4 font-bold text-white">Cari</button>
+            <button type="button" onClick={() => setShowFilterModal(true)} className="inline-flex min-h-11 items-center gap-2 rounded-md border px-4 font-bold"><ListChecks className="h-4 w-4" />Filter Lanjutan</button>
+            <button type="button" onClick={() => void load(1)} className="min-h-11 rounded-md bg-emerald-700 px-4 font-bold text-white">Cari</button>
             {filters.asrama || filters.kamar || filters.kelas || filters.status !== 'ALL'
-              ? <button onClick={resetFilters} className="min-h-11 px-3 text-sm text-slate-500">Reset</button>
+              ? <button type="button" onClick={resetFilters} className="min-h-11 px-3 text-sm font-semibold text-slate-600">Reset</button>
               : null}
           </div>
         </div>
@@ -249,16 +319,21 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-slate-50 px-4 py-2 text-xs">
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2"><input type="checkbox" checked={pageSelected} onChange={togglePage} /> Pilih halaman</label>
-          <button onClick={selectAllFiltered} className="font-bold text-emerald-700">{allFilteredSelected ? 'Batalkan semua' : `Pilih semua ${total} hasil`}</button>
+          <label className="flex min-h-11 items-center gap-2"><input className="h-5 w-5" type="checkbox" checked={pageSelected} onChange={togglePage} /> Pilih halaman</label>
+          <button type="button" onClick={selectAllFiltered} className="min-h-11 px-2 font-bold text-emerald-800">{allFilteredSelected ? 'Batalkan semua' : `Pilih semua ${total} hasil`}</button>
         </div>
         <span>{selected.size} dipilih</span>
       </div>
 
       <div className="divide-y">
-        {loading ? <p className="p-10 text-center text-sm text-slate-500">Memuat santri...</p>
+        {loading ? <p role="status" className="p-10 text-center text-sm text-slate-600">Memuat santri...</p>
+          : loadError ? <div role="alert" className="m-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+            <p className="font-bold">Daftar santri tidak dapat ditampilkan.</p>
+            <p className="mt-1">{loadError}</p>
+            <button type="button" onClick={() => void load(page)} className="mt-3 min-h-11 rounded-md border border-red-300 bg-white px-4 font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-800 focus-visible:ring-offset-2">Coba lagi</button>
+          </div>
           : rows.length ? rows.map(row => <label key={row.id} className="grid cursor-pointer gap-3 p-3 hover:bg-slate-50 sm:grid-cols-[auto_1fr_auto_auto] sm:items-center">
-            <input type="checkbox" checked={selected.has(row.id)} onChange={() => setSelected(current => {
+            <input className="h-5 w-5" type="checkbox" checked={selected.has(row.id)} onChange={() => setSelected(current => {
               const next = new Set(current)
               if (next.has(row.id)) next.delete(row.id); else next.add(row.id)
               return next
@@ -278,25 +353,26 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
       </div>
 
       <div className="flex items-center justify-between p-3 text-sm">
-        <button disabled={page <= 1} onClick={() => void load(page - 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Sebelumnya</button>
+        <button type="button" disabled={page <= 1} onClick={() => void load(page - 1)} className="min-h-11 rounded-lg border px-3 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-40">Sebelumnya</button>
         <div className="flex items-center gap-3">
           <span>Halaman {page} / {totalPages}</span>
-          <select value={pageSize} onChange={event => {
+          <label htmlFor="credential-page-size" className="sr-only">Jumlah baris per halaman</label>
+          <select id="credential-page-size" value={pageSize} onChange={event => {
             const next = Number(event.target.value)
             setPageSize(next)
             void load(1, filters, next)
-          }} className="rounded-lg border px-2 py-1">
+          }} className="min-h-11 rounded-lg border border-slate-300 px-2 py-1">
             <option value={50}>50 baris</option>
             <option value={100}>100 baris</option>
             <option value={5000}>Semua baris</option>
           </select>
         </div>
-        <button disabled={page >= totalPages} onClick={() => void load(page + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Berikutnya</button>
+        <button type="button" disabled={page >= totalPages} onClick={() => void load(page + 1)} className="min-h-11 rounded-lg border px-3 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-40">Berikutnya</button>
       </div>
     </section> : null}
 
-    {activeTab === 'qr' ? <div role="tabpanel">
-      {batch ? <section className="rounded-xl border bg-white p-4">
+    {activeTab === 'qr' ? <div id="credential-panel-qr" aria-labelledby="credential-tab-qr" role="tabpanel">
+      {batch ? <section className="rounded-lg border bg-white p-4">
         <div className="flex items-center justify-between">
           <div><h2 className="font-bold">Batch QR terakhir</h2><p className="text-xs text-slate-500">{batch.id}</p></div>
           <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">{batch.status}</span>
@@ -311,17 +387,17 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
           <span className="text-red-700">{batch.failed_count} gagal</span>
         </div>
         {['PROCESSING', 'PENDING', 'COMPLETED_WITH_ERRORS'].includes(batch.status)
-          ? <button disabled={pending} onClick={() => startTransition(() => runBatch(batch.id))} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold"><ArrowClockwise className="h-4 w-4" />Lanjutkan / retry</button>
+          ? <button type="button" disabled={pending} onClick={() => startTransition(() => runBatch(batch.id))} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-md border px-4 text-sm font-bold"><ArrowClockwise className="h-4 w-4" />Lanjutkan / retry</button>
           : null}
-        {batch.errors?.length ? <div className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-800">
+        {batch.errors?.length ? <div className="mt-3 rounded-lg bg-red-50 p-3 text-xs text-red-800">
           {batch.errors.map(error => <p key={error.santri_id}>{error.santri_id}: {error.error_message}</p>)}
         </div> : null}
       </section>
         : <EmptyTab icon={ListChecks} title="Belum ada batch QR" description="Pilih santri lalu mulai penerbitan QR dari tab Pilih Santri." action={() => setActiveTab('enrollment')} />}
     </div> : null}
 
-    {activeTab === 'cards' ? <div className="space-y-5" role="tabpanel">
-      <section className="rounded-xl border bg-white p-4">
+    {activeTab === 'cards' ? <div id="credential-panel-cards" aria-labelledby="credential-tab-cards" className="space-y-5" role="tabpanel">
+      <section className="rounded-lg border bg-white p-4">
         <div className="flex items-center gap-2">
           <Printer className="h-5 w-5 text-emerald-700" />
           <div>
@@ -330,17 +406,17 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
           </div>
         </div>
         {!qrIds.length
-          ? <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900"><Warning className="mr-1 inline h-4 w-4" />Pilih santri yang sudah memiliki QR aktif pada tab Pilih Santri.</p>
+          ? <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900"><Warning className="mr-1 inline h-4 w-4" />Pilih santri yang sudah memiliki QR aktif pada tab Pilih Santri.</p>
           : <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            <button onClick={() => void loadPreview()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold"><IdentificationCard className="h-4 w-4" />Preview kartu pertama</button>
-            {volumes.map((ids, index) => <button key={index} disabled={exporting !== null} onClick={() => void downloadVolume(ids, index)}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold disabled:opacity-50">
+            <button type="button" onClick={() => void loadPreview()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-4 py-3 text-sm font-bold"><IdentificationCard className="h-4 w-4" />Preview kartu pertama</button>
+            {volumes.map((ids, index) => <button type="button" key={index} disabled={exporting !== null} onClick={() => void downloadVolume(ids, index)}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-4 py-3 text-sm font-bold disabled:opacity-50">
               <DownloadSimple className="h-4 w-4" />{exporting === index ? 'Membuat PDF...' : `Unduh volume ${index + 1} (${ids.length} kartu)`}
             </button>)}
           </div>}
       </section>
 
-      <section className="overflow-hidden rounded-xl border bg-white">
+      <section className="overflow-hidden rounded-lg border bg-white">
         <div className="border-b px-4 py-3">
           <h2 className="font-bold">100 credential terbaru</h2>
           <p className="text-xs text-slate-500">Terbitkan ulang, blokir, tandai hilang, atau cabut credential.</p>
@@ -405,31 +481,33 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
       title="Filter Lanjutan"
       onClose={() => setShowFilterModal(false)}
       footer={<div className="flex justify-end gap-3">
-        <button type="button" onClick={() => { resetFilters(); setShowFilterModal(false) }} className="min-h-11 rounded-xl px-4 text-sm font-bold text-slate-500">Reset Filter</button>
-        <button type="button" onClick={() => { void load(1); setShowFilterModal(false) }} className="min-h-11 rounded-xl bg-emerald-700 px-6 font-bold text-white shadow-sm">Terapkan Filter</button>
+        <button type="button" onClick={() => { resetFilters(); setShowFilterModal(false) }} className="min-h-11 rounded-md px-4 text-sm font-bold text-slate-600">Reset Filter</button>
+        <button type="button" onClick={async () => {
+          if (await load(1)) setShowFilterModal(false)
+        }} className="min-h-11 rounded-md bg-emerald-700 px-6 font-bold text-white">Terapkan Filter</button>
       </div>}>
         <div className="grid gap-4">
           <label>
             <span className="mb-1 block text-sm font-bold">Asrama</span>
-            <select value={filters.asrama} onChange={event => setFilters({ ...filters, asrama: event.target.value })} className="min-h-11 w-full rounded-xl border px-3">
+            <select value={filters.asrama} onChange={event => setFilters({ ...filters, asrama: event.target.value })} className="min-h-11 w-full rounded-md border px-3">
               <option value="">Semua asrama</option>{options.asramas.map(value => <option key={value}>{value}</option>)}
             </select>
           </label>
           <label>
             <span className="mb-1 block text-sm font-bold">Kamar</span>
-            <select value={filters.kamar} onChange={event => setFilters({ ...filters, kamar: event.target.value })} className="min-h-11 w-full rounded-xl border px-3">
+            <select value={filters.kamar} onChange={event => setFilters({ ...filters, kamar: event.target.value })} className="min-h-11 w-full rounded-md border px-3">
               <option value="">Semua kamar</option>{options.kamars.map(value => <option key={value}>{value}</option>)}
             </select>
           </label>
           <label>
             <span className="mb-1 block text-sm font-bold">Kelas</span>
-            <select value={filters.kelas} onChange={event => setFilters({ ...filters, kelas: event.target.value })} className="min-h-11 w-full rounded-xl border px-3">
+            <select value={filters.kelas} onChange={event => setFilters({ ...filters, kelas: event.target.value })} className="min-h-11 w-full rounded-md border px-3">
               <option value="">Semua kelas</option>{options.kelas.map(value => <option key={value}>{value}</option>)}
             </select>
           </label>
           <label>
             <span className="mb-1 block text-sm font-bold">Status Kepemilikan</span>
-            <select value={filters.status} onChange={event => setFilters({ ...filters, status: event.target.value })} className="min-h-11 w-full rounded-xl border px-3">
+            <select value={filters.status} onChange={event => setFilters({ ...filters, status: event.target.value })} className="min-h-11 w-full rounded-md border px-3">
               <option value="ALL">Semua status</option>
               <option value="MISSING_QR">Belum punya QR</option>
               <option value="HAS_QR">Sudah punya QR</option>

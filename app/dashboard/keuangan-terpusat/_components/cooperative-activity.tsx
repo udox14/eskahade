@@ -47,13 +47,13 @@ export async function CooperativeActivity({ view }: { view: string }) {
   return (
     <div className="mt-5 space-y-4">
       {distributions.length > 0 && (
-        <section className="rounded-2xl border bg-white p-5">
+        <section className="rounded-lg border bg-white p-5">
           <h2 className="mb-3 font-bold">Daftar pencairan</h2>
           {distributions.map((d) => (
             <details key={d.id} className="border-t py-2">
               <summary className="flex min-h-11 cursor-pointer flex-wrap items-center justify-between gap-2 text-sm">
                 <span>
-                  {d.name} Â· {d.status}
+                  {d.name} | {d.status}
                 </span>
                 <strong>{rupiah(d.net)}</strong>
               </summary>
@@ -71,14 +71,22 @@ export async function CooperativeActivity({ view }: { view: string }) {
           ))}
         </section>
       )}
+      {["distributions", "reports"].includes(view) && distributions.length === 0 && (
+        <section className="rounded-lg border bg-white p-5">
+          <h2 className="font-bold">Daftar pencairan</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Belum ada pencairan. Pencairan yang dibuat akan tampil di sini.
+          </p>
+        </section>
+      )}
       {orders.length > 0 && (
-        <section className="rounded-2xl border bg-white p-5">
+        <section className="rounded-lg border bg-white p-5">
           <h2 className="mb-3 font-bold">Pesanan terbaru</h2>
           {orders.map((o) => (
             <details key={o.id} className="border-t py-2">
               <summary className="flex min-h-11 cursor-pointer flex-wrap justify-between gap-2 text-sm">
                 <span>
-                  {o.full_name} Â· {o.status}
+                  {o.full_name} | {o.status}
                 </span>
                 <strong>{rupiah(o.total)}</strong>
               </summary>
@@ -95,14 +103,32 @@ export async function CooperativeActivity({ view }: { view: string }) {
           ))}
         </section>
       )}
+      {scope === null &&
+        ["home", "bills", "reports"].includes(view) &&
+        orders.length === 0 && (
+          <section className="rounded-lg border bg-white p-5">
+            <h2 className="font-bold">Pesanan terbaru</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Belum ada pesanan pembayaran. Pesanan baru akan tampil di sini.
+            </p>
+          </section>
+        )}
       {exceptions.length > 0 && (
-        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+        <section className="rounded-lg border border-amber-200 bg-amber-50 p-5">
           <h2 className="font-bold">Pembayaran perlu diperiksa</h2>
           {exceptions.map((e) => (
             <p key={e.id} className="mt-3 break-all text-sm">
               {e.order_id}: {e.reason}
             </p>
           ))}
+        </section>
+      )}
+      {write && ["home", "reports"].includes(view) && exceptions.length === 0 && (
+        <section className="rounded-lg border bg-white p-5">
+          <h2 className="font-bold">Pemeriksaan pembayaran</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Tidak ada pembayaran yang perlu diperiksa.
+          </p>
         </section>
       )}
     </div>

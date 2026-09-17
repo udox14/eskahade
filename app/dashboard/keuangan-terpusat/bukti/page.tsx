@@ -38,10 +38,10 @@ export default async function Page({
       maximumFractionDigits: 0,
     }).format(Number(v) || 0);
   return (
-    <main className="mx-auto max-w-3xl space-y-5 rounded-2xl bg-white p-5 sm:p-10">
+    <main className="mx-auto max-w-3xl space-y-5 rounded-lg bg-white p-5 sm:p-10">
       <header className="border-b pb-5">
         <p className="text-sm uppercase tracking-wide text-emerald-800">
-          Koperasi Â· Keuangan Terpusat
+          Koperasi | Keuangan Terpusat
         </p>
         <h1 className="text-2xl font-bold">
           {isDistribution ? "Bukti Pencairan" : "Bukti Pembayaran"}
@@ -69,10 +69,10 @@ export default async function Page({
       </div>
       {isDistribution && (
         <>
-          <p>Referensi penyerahan: {row.reference || "â€”"}</p>
-          <p>Diterima oleh: {row.received_by || "â€”"}</p>
+          <p>Referensi penyerahan: {row.reference || "-"}</p>
+          <p>Diterima oleh: {row.received_by || "-"}</p>
           <p>
-            Hak bruto: {money(row.gross)} Â· Biaya ditanggung {row.fee_bearer}
+            Hak bruto: {money(row.gross)} | Biaya ditanggung {row.fee_bearer}
           </p>
           {row.proof_url && (
             <a href={String(row.proof_url)} className="underline">

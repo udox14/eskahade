@@ -169,7 +169,13 @@ function sortGroupItems(group: string, items: FiturAkses[]) {
 // ── Deskripsi tiap fitur ──────────────────────────────────────────────────────
 const FITUR_DESC: Record<string, string> = {
   '/dashboard/santri':                               'Lihat dan kelola seluruh data induk santri yang aktif.',
-  '/dashboard/keuangan-terpusat/unit-kas':          'Atur Unit Kas, saldo tetap, penugasan operator, dan review selisih shift.',
+  '/dashboard/keuangan-terpusat':                   'Ringkasan penerimaan, tunggakan, hak penerima, saldo jajan, dan kas loket.',
+  '/dashboard/keuangan-terpusat/tagihan':           'Kelola tarif, tagihan, pesanan, dan pembayaran item santri.',
+  '/dashboard/keuangan-terpusat/payout':            'Pantau hak penerima dan catat pencairan tunai atau transfer manual.',
+  '/dashboard/keuangan-terpusat/loket':             'Terima pembayaran, setor atau tarik uang jajan, dan kelola shift kas.',
+  '/dashboard/keuangan-terpusat/kredensial':        'Terbitkan, cetak, blokir, dan ganti kartu QR santri.',
+  '/dashboard/keuangan-terpusat/transaksi':         'Telusuri transaksi, laporan, rekonsiliasi, koreksi, dan audit.',
+  '/dashboard/keuangan-terpusat/pengaturan':        'Atur kebijakan pembayaran, rekening, VA, limit, akses unit, dan kas.',
   '/dashboard/dewan-santri/sensus':                  'Input dan kelola data sensus penduduk santri per asrama.',
   '/dashboard/dewan-santri/sensus/laporan':          'Cetak laporan hasil sensus penduduk dalam format yang rapi.',
   '/dashboard/santri/input':                         'Input data santri baru beserta identitas awalnya.',

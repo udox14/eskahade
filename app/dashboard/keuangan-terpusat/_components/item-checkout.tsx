@@ -37,6 +37,7 @@ export function Checkout({
     [selected, setSelected] = useState<Record<string, number>>({}),
     [jajan, setJajan] = useState(0),
     [message, setMessage] = useState(""),
+    [messageTone, setMessageTone] = useState<"info" | "success" | "error">("info"),
     [pending, start] = useTransition(),
     [order, setOrder] = useState<Order | null>(null),
     [token, setToken] = useState(""),
@@ -56,8 +57,10 @@ export function Checkout({
         const data = await studentCheckout(id);
         setBills(data.bills);
         setSettings(data.settings);
+        setMessageTone("info");
         setMessage("Saldo jajan: " + money(data.balance));
       } catch (e) {
+        setMessageTone("error");
         setMessage(e instanceof Error ? e.message : "Gagal memuat");
       }
     });
@@ -65,14 +68,14 @@ export function Checkout({
   const sum = Object.values(selected).reduce((s, v) => s + v, 0) + jajan,
     fee = pay ? settings?.gatewayFee || 0 : 0;
   return (
-    <section className="space-y-4 rounded-2xl border bg-white p-4 sm:p-6">
+    <section className="space-y-4 rounded-lg border bg-white p-4 sm:p-5">
       <h2 className="text-lg font-bold">
         {pay ? "Pilih pembayaran" : "Pembayaran & layanan santri"}
       </h2>
       {!pay && (
         <>
           <StudentField onSelect={choose} />
-          <details className="rounded-xl border p-3">
+          <details className="rounded-lg border p-3">
             <summary className="min-h-11 cursor-pointer py-2 font-medium">
               Pindai kartu untuk penarikan
             </summary>
@@ -81,7 +84,7 @@ export function Checkout({
               <input
                 aria-label="Token QR"
                 className={inputClass}
-                placeholder="Pindai dengan scanner QRâ€¦"
+                placeholder="Pindai dengan scanner QR"
                 value={token}
                 onChange={(e) => {
                   setToken(e.target.value);
@@ -89,6 +92,7 @@ export function Checkout({
                 }}
               />
               <button
+                type="button"
                 className={buttonClass}
                 disabled={pending}
                 onClick={() =>
@@ -99,6 +103,7 @@ export function Checkout({
                       setPhoto(s.foto_url);
                       choose(s.id, s.nama_lengkap);
                     } catch (e) {
+                      setMessageTone("error");
                       setMessage(
                         e instanceof Error ? e.message : "QR tidak valid",
                       );
@@ -113,7 +118,7 @@ export function Checkout({
                 <img
                   src={photo}
                   alt="Foto identitas santri"
-                  className="h-24 w-20 rounded-xl object-cover"
+                  className="h-24 w-20 rounded-md object-cover"
                 />
               )}
               <input
@@ -143,6 +148,7 @@ export function Checkout({
                 Identitas sesuai dengan pemilik kartu
               </label>
               <button
+                type="button"
                 className={buttonClass}
                 disabled={pending || !confirmed || !pin || !token || !withdraw}
                 onClick={() =>
@@ -158,6 +164,7 @@ export function Checkout({
                       confirmed: "yes",
                     }).forEach(([k, v]) => f.set(k, v));
                     const r = await coopAction(f);
+                    setMessageTone(r.success ? "success" : "error");
                     setMessage(r.message);
                     setPin("");
                     if (r.success) {
@@ -174,7 +181,7 @@ export function Checkout({
           </details>
         </>
       )}
-      <div className="divide-y rounded-xl border">
+      <div className="divide-y rounded-lg border">
         {bills.map((b) => (
           <label key={b.id} className="flex flex-wrap items-center gap-3 p-4">
             <input
@@ -245,14 +252,21 @@ export function Checkout({
       </label>
       {message && (
         <p
-          role="status"
-          className="rounded-xl bg-slate-100 p-3 text-sm break-words"
+          role={messageTone === "error" ? "alert" : "status"}
+          className={
+            "rounded-lg p-3 text-sm break-words " +
+            (messageTone === "error"
+              ? "bg-red-50 text-red-900"
+              : messageTone === "success"
+                ? "bg-emerald-50 text-emerald-900"
+                : "bg-slate-100 text-slate-800")
+          }
         >
           {message}
         </p>
       )}
       {order && (
-        <div className="rounded-xl bg-emerald-50 p-4">
+        <div className="rounded-lg bg-emerald-50 p-4">
           <p>VA tetap santri</p>
           <strong className="block break-all text-xl">
             {order.va_number || "Sedang disiapkan"}
@@ -261,7 +275,7 @@ export function Checkout({
           <p className="text-sm">Status: {order.status}</p>
         </div>
       )}
-      <footer className="sticky bottom-2 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-4 shadow-lg">
+      <footer className="sticky bottom-20 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-4 shadow-lg md:bottom-2">
         <div>
           <p className="text-xs text-slate-500">
             Total {fee > 0 ? "(biaya " + money(fee) + ")" : ""}
@@ -269,6 +283,7 @@ export function Checkout({
           <strong className="text-lg">{money(sum + fee)}</strong>
         </div>
         <button
+          type="button"
           className={buttonClass}
           disabled={pending || sum <= 0 || (!pay && !student) || !!order}
           onClick={() =>
@@ -279,6 +294,7 @@ export function Checkout({
                 );
                 if (pay) {
                   const r = await pay({ key, items, jajan });
+                  setMessageTone(r.success ? "success" : "error");
                   setMessage(r.message);
                   if (r.order) setOrder(r.order);
                 } else {
@@ -292,6 +308,7 @@ export function Checkout({
                     shiftId: shiftId || "",
                   }).forEach(([k, v]) => f.set(k, v));
                   const r = await coopAction(f);
+                  setMessageTone(r.success ? "success" : "error");
                   setMessage(r.message);
                   if (r.success) {
                     setSelected({});
@@ -302,16 +319,17 @@ export function Checkout({
                   }
                 }
               } catch (e) {
+                setMessageTone("error");
                 setMessage(e instanceof Error ? e.message : "Pembayaran gagal");
               }
             })
           }
         >
           {pending
-            ? "Memprosesâ€¦"
+            ? "Memproses..."
             : pay
               ? "Buat pembayaran"
-              : "Uang diterima Â· Catat"}
+              : "Uang diterima | Catat"}
         </button>
       </footer>
     </section>
