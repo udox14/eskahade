@@ -19,7 +19,7 @@ import type { JournalEntryInput, WalletKind } from './types'
 /** Bagan akun. Didefinisikan di sini supaya tidak ada berkas lain yang menulis kode akun. */
 export type FinanceAccountCode =
   | '1101' | '1102' | '1103' | '1104' | '1201'
-  | '2101' | '2102' | '2103' | '2104' | '2105'
+  | '2106' | '2101' | '2102' | '2103' | '2104' | '2105'
   | '4101' | '4102' | '4103' | '4104'
   | '5101' | '5102' | '9999'
 
@@ -28,7 +28,7 @@ export const ACCOUNT_IDS: Record<FinanceAccountCode, string> = {
   '1101': 'fa-main-bank', '1102': 'fa-gateway-clearing', '1103': 'fa-central-cash',
   '1104': 'fa-unit-cash', '1201': 'fa-parent-receivable', '2101': 'fa-guardian-float',
   '2102': 'fa-meal-payable', '2103': 'fa-laundry-payable', '2104': 'fa-payroll-payable',
-  '2105': 'fa-jajan-liability', '4101': 'fa-spp-revenue', '4102': 'fa-uspp-revenue',
+  '2106': 'fa-pesantren-payable', '2105': 'fa-jajan-liability', '4101': 'fa-spp-revenue', '4102': 'fa-uspp-revenue',
   '4103': 'fa-nonspp-revenue', '4104': 'fa-gateway-fee-revenue',
   '5101': 'fa-gateway-fee-expense', '5102': 'fa-payroll-expense', '9999': 'fa-suspense',
 }
@@ -48,6 +48,7 @@ export const AKUN: Record<FinanceAccountCode, { label: string; jenis: string }> 
   '2102': { label: 'Utang Pengelola Makan', jenis: 'LIABILITY' },
   '2103': { label: 'Utang Pengelola Laundry', jenis: 'LIABILITY' },
   '2104': { label: 'Utang Payroll', jenis: 'LIABILITY' },
+  '2106': { label: 'Hak Bendahara Pesantren', jenis: 'LIABILITY' },
   '2105': { label: 'Titipan Uang Jajan', jenis: 'LIABILITY' },
   '4101': { label: 'Pendapatan SPP', jenis: 'REVENUE' },
   '4102': { label: 'Pendapatan USPP/Uang Bangunan', jenis: 'REVENUE' },

@@ -41,6 +41,8 @@ export async function withdrawPocketMoney(input: {
           withdrawalId, input.idempotencyKey, credential.santri_id, credential.id, credential.credential_kind,
           input.cashUnitId, input.shiftId, input.operatorId, input.terminalId, input.amountRupiah, journal.journalId,
         ),
+      db.prepare('INSERT INTO finance_cash_entries(id,shift_id,journal_id,amount) VALUES(?,?,?,?)').bind(generateId(),input.shiftId,journal.journalId,-input.amountRupiah),
+      db.prepare("INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,after_json) VALUES(?,'STAFF',?,'WITHDRAW','WITHDRAWAL',?,?)").bind(generateId(),input.operatorId,withdrawalId,JSON.stringify({santriId:credential.santri_id,amount:input.amountRupiah})),
       db.prepare(`UPDATE student_credentials SET last_used_at=datetime('now') WHERE id=?`).bind(credential.id),
       db.prepare(`UPDATE finance_journals SET status='POSTED',posted_at=datetime('now') WHERE id=? AND status='DRAFT'`).bind(journal.journalId),
     ])

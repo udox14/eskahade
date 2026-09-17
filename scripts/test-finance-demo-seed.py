@@ -9,7 +9,8 @@ if os.path.exists('tmp/seed.db'):
     os.remove('tmp/seed.db')
 c = sqlite3.connect('tmp/seed.db')
 for f in ['0001a_drop_legacy', '0001b_tables_core', '0001c_tables_billing', '0001d_tables_loket',
-          '0001e_tables_payout', '0001f_tables_support', '0001g_triggers', '0001h_seed', '0003_payroll_per_sesi']:
+          '0001e_tables_payout', '0001f_tables_support', '0001g_triggers', '0001h_seed', '0003_payroll_per_sesi',
+          '0004_cooperative_item_payments']:
     c.executescript(io.open('migrations-finance/%s.sql' % f, encoding='utf-8').read())
 c.commit()
 
@@ -44,9 +45,10 @@ for tabel, daftar in re.findall(r"INSERT INTO\s+([a-z_]+)\s*\n?\s*\(([^)]+)\)", 
         ok.append('%s: %d kolom cocok' % (tabel, len(diminta)))
 
 # nilai enum yang dipakai seed harus lolos CHECK
-for nilai, tabel, label in [
-    ("'QR'", 'finance_credential_policy', 'mode kredensial QR'),
-    ("'QR_STATIC'", 'student_credentials', 'jenis kredensial QR_STATIC'),
+for nilai, label in [
+    ('student_credentials', 'inventaris kartu QR'),
+    ('token_hmac', 'token QR berbasis HMAC'),
+    ('token_encrypted', 'token QR terenkripsi'),
 ]:
     (ok if nilai in src else fail).append(
         '%s dipakai seed' % label if nilai in src else '%s TIDAK dipakai seed' % label)

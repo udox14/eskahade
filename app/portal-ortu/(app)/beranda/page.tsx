@@ -3,7 +3,7 @@ import {
   CalendarCheck, CaretRight, Clock, Receipt, ShieldWarning, Sparkle, XCircle,
 } from '@phosphor-icons/react/dist/ssr'
 import { requirePortalSessionStrict } from '@/lib/portal/session'
-import { syncPortalSppBills, syncPortalNonSppBills, getPortalOpenBills } from '@/lib/finance/portal-bills-sync'
+import { getPortalOpenBills } from '@/lib/finance/cooperative/portal-summary'
 import {
   getLatestRejectedSubmission, getPelanggaranAnak, getPendingSubmission, getRekapAbsensiAnak,
 } from '@/lib/portal/data'
@@ -27,11 +27,6 @@ export default async function BerandaPage() {
   const session = await requirePortalSessionStrict()
   const tampilkanSpp = !session.bebas_spp && !isAsramaTanpaKamar(session.asrama)
   const { start, end } = monthRange()
-
-  await Promise.all([
-    syncPortalSppBills(session.santri_id, tampilkanSpp),
-    syncPortalNonSppBills(session.santri_id),
-  ])
 
   const [sppBills, nonSppBills, absen, pelanggaran, pendingSpp, pendingNonSpp, rejectedSpp, rejectedNonSpp] =
     await Promise.all([

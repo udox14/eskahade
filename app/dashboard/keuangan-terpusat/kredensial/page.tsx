@@ -1,16 +1,16 @@
-import { guardPage } from '@/lib/auth/guard'
+import { requireFinanceAccess } from '@/lib/finance/access'
 import { CredentialClient,type CredentialInventoryRow } from './_credential-client'
 import { getCredentialData } from './actions'
-import { FINANCE_GLOSSARY,FinanceGuide,FinancePageHeader } from '../_components/finance-ui'
+import { FinanceGuide,FinancePageHeader } from '../_components/finance-ui'
 import { FinanceNav } from '../_components/finance-nav'
 
 export const dynamic='force-dynamic'
 
 export default async function CredentialPage(){
-  await guardPage('/dashboard/keuangan-terpusat/kredensial')
+  await requireFinanceAccess('CARDS')
   const data=await getCredentialData()
   return <main className="space-y-4 sm:space-y-5">
-    <FinancePageHeader title="Kredensial" description="Pendaftaran kartu massal, integrasi reader, dan pencetakan kartu QR santri." eyebrow="Kredensial: QR Code" meta={data.scope?`Scope asrama ${data.scope} · saldo dan PIN tidak pernah menempel pada kartu`:'Saldo dan PIN tidak pernah menempel pada kartu'}/>
+    <FinancePageHeader title="Kartu QR Santri" description="Pendaftaran kartu massal, integrasi reader, dan pencetakan kartu QR santri." eyebrow="Kredensial: QR Code" meta={data.scope?`Scope asrama ${data.scope} · saldo dan PIN tidak pernah menempel pada kartu`:'Saldo dan PIN tidak pernah menempel pada kartu'}/>
     <FinanceNav/>
     <FinanceGuide
       purpose="Menerbitkan kartu QR santri secara massal, dalam batch yang dapat dilanjutkan bila terputus."
@@ -36,7 +36,7 @@ export default async function CredentialPage(){
         { term: 'QR statis', meaning: 'Kode QR tercetak di kartu. Isinya token acak yang disimpan terenkripsi, bukan data santri.' },
         { term: 'PIN santri', meaning: 'Enam digit milik santri. QR saja tidak cukup — tanpa PIN, kartu yang jatuh tidak bisa dipakai orang lain.' },
         { term: 'Batch penerbitan', meaning: 'Antrean penerbitan QR massal yang mencatat progresnya, sehingga dapat dilanjutkan bila terputus.' },
-        FINANCE_GLOSSARY.makerChecker,
+
       ]}
     />
     <CredentialClient credentials={data.credentials as CredentialInventoryRow[]}/>

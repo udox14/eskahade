@@ -70,3 +70,6 @@ next-env.d.ts
 
 # POSKESTREN browser test screenshots
 /tmp/poskestren-ui/
+
+# Keuangan Terpusat browser QA screenshots
+/tmp/finance-cooperative/

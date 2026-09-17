@@ -20,7 +20,7 @@ export type CredentialStudentRow={
 export async function getCredentialFilters(){
   // Bendahara asrama lolos VIEW, jadi daftar filter pun harus dibatasi scope-nya.
   // Menyembunyikan menu di navigasi bukan otorisasi; server action tetap bisa dipanggil.
-  const scope=financeAsramaScope(await requireFinanceAccess('VIEW'))
+  const scope=financeAsramaScope(await requireFinanceAccess('CARDS'))
   const scoped=`${andExcludeAsramaSql('s.asrama')} ${scope?'AND s.asrama=?':''}`
   const args=scope?[scope]:[]
   const [asramas,kamars,kelas]=await Promise.all([
@@ -32,7 +32,7 @@ export async function getCredentialFilters(){
 }
 
 export async function searchCredentialStudents(input:{q?:string;asrama?:string;kamar?:string;kelas?:string;status?:string;page?:number;pageSize?:number}){
-  const scope=financeAsramaScope(await requireFinanceAccess('VIEW'))
+  const scope=financeAsramaScope(await requireFinanceAccess('CARDS'))
   const params:unknown[]=[],where=[`s.status_global='aktif'`,excludeAsramaSql('s.asrama')]
   if(scope){where.push(`s.asrama=?`);params.push(scope)}
   const q=String(input.q||'').trim()
@@ -62,7 +62,7 @@ export async function searchCredentialStudents(input:{q?:string;asrama?:string;k
 }
 
 export async function issueCredentialAction(input:{nis?:string;santriId?:string;kind:CredentialKind;rawToken?:string;reissue?:boolean}){
-  const session=await requireFinanceAccess('CONFIGURE')
+  const session=await requireFinanceAccess('CARDS')
   const student=input.santriId
     ? await queryOne<{id:string}>(`SELECT id FROM santri WHERE id=? AND status_global='aktif' ${andExcludeAsramaSql('asrama')}`,[input.santriId])
     : await queryOne<{id:string}>(`SELECT id FROM santri WHERE nis=? AND status_global='aktif' ${andExcludeAsramaSql('asrama')}`,[String(input.nis||'').trim()])
@@ -74,7 +74,7 @@ export async function issueCredentialAction(input:{nis?:string;santriId?:string;
 }
 
 export async function createQrBatchAction(input:{santriIds:string[];filter?:Record<string,unknown>}){
-  const session=await requireFinanceAccess('CONFIGURE')
+  const session=await requireFinanceAccess('CARDS')
   const unique=[...new Set(input.santriIds.filter(Boolean))]
   const valid:string[]=[]
   for(let offset=0;offset<unique.length;offset+=80){
@@ -89,21 +89,22 @@ export async function createQrBatchAction(input:{santriIds:string[];filter?:Reco
   return result
 }
 
-export async function processQrBatchAction(batchId:string){const session=await requireFinanceAccess('CONFIGURE');const result=await processQrCredentialBatch(batchId,session.id,50);if(result.success)revalidatePath(PATH);return result}
-export async function getCredentialBatchAction(batchId:string){const session=await requireFinanceAccess('CONFIGURE');const batch=await getCredentialBatch(batchId);if(!batch||batch.created_by!==session.id)return null;return batch}
-export async function getLatestCredentialBatchAction(){const session=await requireFinanceAccess('CONFIGURE');return getLatestCredentialBatch(session.id)}
+export async function processQrBatchAction(batchId:string){const session=await requireFinanceAccess('CARDS');const result=await processQrCredentialBatch(batchId,session.id,50);if(result.success)revalidatePath(PATH);return result}
+export async function getCredentialBatchAction(batchId:string){const session=await requireFinanceAccess('CARDS');const batch=await getCredentialBatch(batchId);if(!batch||batch.created_by!==session.id)return null;return batch}
+export async function getLatestCredentialBatchAction(){const session=await requireFinanceAccess('CARDS');return getLatestCredentialBatch(session.id)}
 
 
-export async function markCredentialAction(id:string,status:'LOST'|'REVOKED'|'BLOCKED'){
-  const session=await requireFinanceAccess('CONFIGURE'),db=await getFinanceDB()
-  const result=await db.prepare(`UPDATE student_credentials SET status=?,blocked_reason=? WHERE id=? AND status IN ('ACTIVE','BLOCKED')`).bind(status,status,id).run()
-  if(!result.meta?.changes)return{error:'Credential tidak dapat diubah.'}
-  await db.prepare(`INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,after_json) VALUES(?,'STAFF',?,'MARK_CREDENTIAL','STUDENT_CREDENTIAL',?,?)`).bind(generateId(),session.id,id,JSON.stringify({status})).run()
-  revalidatePath(PATH);return{success:true as const}
+export async function markCredentialAction(id:string,status:'ACTIVE'|'LOST'|'REVOKED'|'BLOCKED',reason:string){
+ const session=await requireFinanceAccess('CARDS'),db=await getFinanceDB()
+ if(!['ACTIVE','LOST','REVOKED','BLOCKED'].includes(status)||reason.trim().length<5)return {error:'Alasan minimal 5 karakter.'}
+ const current=await financeQueryOne<{status:string}>('SELECT status FROM student_credentials WHERE id=?',[id])
+ if(!current||!['ACTIVE','BLOCKED'].includes(current.status)||(status==='ACTIVE'&&current.status!=='BLOCKED'))return {error:'Status kartu tidak dapat diubah.'}
+ await db.batch([db.prepare("UPDATE student_credentials SET status=?,blocked_reason=? WHERE id=? AND status=?").bind(status,reason,id,current.status),db.prepare("INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,before_json,after_json) VALUES(?,'STAFF',?,'CARD_STATUS','STUDENT_CREDENTIAL',?,?,?)").bind(generateId(),session.id,id,JSON.stringify(current),JSON.stringify({status,reason}))])
+ revalidatePath(PATH);return {success:true as const}
 }
 
 export async function getCredentialData(){
-  const scope=financeAsramaScope(await requireFinanceAccess('VIEW'))
+  const scope=financeAsramaScope(await requireFinanceAccess('CARDS'))
   return{
     scope,
     policy:await financeQueryOne<any>(`SELECT * FROM finance_credential_policy WHERE singleton_id=1`),

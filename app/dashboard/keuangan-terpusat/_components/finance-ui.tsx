@@ -1,29 +1,18 @@
 'use client'
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState } from 'react'
 import {
   Bank as Landmark,
-  BookOpenText,
-  ArrowsLeftRight,
   CaretDown as ChevronDown,
   CheckCircle as CheckCircle2,
-  CreditCard,
-  CurrencyDollar as BadgeDollarSign,
   FileXls as FileSpreadsheet,
-  Gear as Settings2,
   ListChecks,
   LockKey as LockKeyhole,
-  PaperPlaneTilt as SendHorizontal,
   Question as CircleHelp,
   Receipt as ReceiptText,
-  Scan as ScanLine,
   Stack as Layers3,
-  Tag,
   Wallet as WalletCards,
   Warning as AlertTriangle,
-  ShieldCheck,
   ArrowLeft,
   ArrowRight,
   BookBookmark,
@@ -36,46 +25,6 @@ import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { cn } from '@/lib/utils'
 
 /**
- * Navigasi dikelompokkan menurut kapan halamannya dipakai, bukan menurut
- * kemiripan nama. Sebelumnya tiga belas tab berderet rata sehingga pekerjaan
- * harian seperti Operasi justru terlempar ke ujung kanan di luar layar.
- *
- * `badge` menunjuk angka pekerjaan menunggu dari `getFinanceWorkCounts`.
- */
-export const FINANCE_NAV_GROUPS = [
-  {
-    id: 'harian', label: 'Pekerjaan harian', items: [
-      { href: '/dashboard/keuangan-terpusat', label: 'Ringkasan', icon: Landmark, badge: null },
-      { href: '/dashboard/keuangan-terpusat/loket', label: 'Loket', icon: ScanLine, badge: null },
-      { href: '/dashboard/keuangan-terpusat/operasi', label: 'Operasi', icon: Settings2, badge: 'operasi' },
-    ],
-  },
-  {
-    id: 'keluar', label: 'Dana keluar', items: [
-      { href: '/dashboard/keuangan-terpusat/payout', label: 'Payout', icon: SendHorizontal, badge: 'payout' },
-      { href: '/dashboard/keuangan-terpusat/payroll', label: 'Payroll', icon: BadgeDollarSign, badge: 'payroll' },
-      { href: '/dashboard/keuangan-terpusat/alokasi', label: 'Alokasi', icon: ArrowsLeftRight, badge: null },
-    ],
-  },
-  {
-    id: 'atur', label: 'Pengaturan', items: [
-      { href: '/dashboard/keuangan-terpusat/tarif-layanan', label: 'Tarif Layanan', icon: Tag, badge: null },
-      { href: '/dashboard/keuangan-terpusat/unit-kas', label: 'Unit Kas', icon: WalletCards, badge: 'unitKas' },
-      { href: '/dashboard/keuangan-terpusat/kredensial', label: 'Kredensial', icon: CreditCard, badge: null },
-    ],
-  },
-  {
-    id: 'kontrol', label: 'Kontrol & penelusuran', items: [
-      { href: '/dashboard/keuangan-terpusat/tagihan', label: 'Tagihan', icon: ReceiptText, badge: null },
-      { href: '/dashboard/keuangan-terpusat/transaksi', label: 'Transaksi', icon: BookOpenText, badge: null },
-      { href: '/dashboard/keuangan-terpusat/kontrol', label: 'Kontrol', icon: ShieldCheck, badge: null },
-    ],
-  },
-] as const
-
-export type FinanceNavBadges = Partial<Record<string, number>>
-
-/**
  * Kelas dasar seluruh input keuangan. Sebelumnya string yang sama persis
  * disalin sebagai `const field` di delapan halaman, sehingga satu penyesuaian
  * tinggi sentuh atau warna fokus harus ditulis delapan kali.
@@ -86,61 +35,6 @@ export function FinancePageHeader({ title, description, eyebrow, meta, action }:
   title: string; description: string; eyebrow?: string; meta?: string; action?: React.ReactNode
 }) {
   return <DashboardPageHeader title={title} description={description} action={action} className="[&_h1]:text-xl [&_p]:text-xs sm:[&_h1]:text-[1.75rem] sm:[&_p]:text-sm" />
-}
-
-export function FinanceNavClient({ allowedHrefs, sandbox = false, badges = {}, commandPalette }: {
-  allowedHrefs: string[]
-  sandbox?: boolean
-  /** Jumlah pekerjaan menunggu per kunci `badge` di `FINANCE_NAV_GROUPS`. */
-  badges?: FinanceNavBadges
-  commandPalette?: React.ReactNode
-}) {
-  const pathname = usePathname()
-  const groups = FINANCE_NAV_GROUPS
-    .map(group => ({ ...group, items: group.items.filter(item => allowedHrefs.includes(item.href)) }))
-    .filter(group => group.items.length)
-
-  const renderItem = (item: (typeof FINANCE_NAV_GROUPS)[number]['items'][number]) => {
-    const active = item.href === '/dashboard/keuangan-terpusat' ? pathname === item.href : pathname.startsWith(item.href)
-    const count = item.badge ? badges[item.badge] || 0 : 0
-    return <Link key={item.href} href={item.href} aria-current={active ? 'page' : undefined} className={cn(
-      'flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2.5 text-xs font-bold transition-colors',
-      active ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
-    )}>
-      <item.icon className="h-4 w-4 shrink-0" weight={active ? 'fill' : 'regular'} />
-      {item.label}
-      {count ? <span aria-label={`${count} menunggu tindakan`} className={cn(
-        'ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-black tabular-nums',
-        active ? 'bg-emerald-700 text-white' : 'bg-amber-100 text-amber-900',
-      )}>{count}</span> : null}
-    </Link>
-  }
-
-  return <div className="space-y-3">
-    {sandbox ? <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 shadow-sm">
-      <span className="font-extrabold tracking-wide">MODE SANDBOX · DATA KEUANGAN DUMMY</span>
-      <span>QR: <code>SKH1.DEMO.SANTRI.0001.TEST.CREDENTIAL</code> · PIN: <code>123456</code></span>
-    </div> : null}
-
-    <nav aria-label="Navigasi keuangan terpusat" className="border-b border-slate-200 pb-2">
-      {/* Satu baris di semua ukuran layar untuk menunya sendiri: label
-          kelompok dulu memakan satu baris sendiri di layar lebar sehingga
-          header terasa sesak. Urutan kerjanya tetap terbaca lewat garis
-          pemisah antar kelompok, dan barisnya bisa digeser bila menu tidak
-          muat. Kotak cari selalu di barisnya sendiri di bawah — kalau
-          dipaksa sebaris dengan menu yang lebarnya dinamis, keduanya
-          gampang berdesakan di lebar layar tertentu. */}
-      <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-w-max items-center gap-1">
-          {groups.map((group, index) => <div key={group.id} role="group" aria-label={group.label} className="flex items-center gap-1">
-            {index ? <span aria-hidden className="mx-1 h-6 w-px bg-slate-200" /> : null}
-            {group.items.map(renderItem)}
-          </div>)}
-        </div>
-      </div>
-    </nav>
-    {commandPalette ? <div>{commandPalette}</div> : null}
-  </div>
 }
 
 export function FinanceGuide({
@@ -194,17 +88,6 @@ export function FinanceGuide({
       </div> : null}
     </div>
   </details>
-}
-
-/** Istilah yang berulang di banyak halaman; pakai ulang agar penjelasannya konsisten. */
-export const FINANCE_GLOSSARY: Record<string, { term: string; meaning: string }> = {
-  titipan: { term: 'Titipan', meaning: 'Dana wali yang sudah masuk tapi belum dialokasikan ke kebutuhan tertentu.' },
-  uspp: { term: 'USPP', meaning: 'Tagihan di luar SPP yang boleh dicicil. SPP dan Non-SPP wajib lunas sekaligus.' },
-  makerChecker: { term: 'Maker–checker', meaning: 'Pembuat, pemeriksa, dan pelaksana harus tiga orang berbeda. Ditolak database jika sama.' },
-  suspense: { term: 'Suspense', meaning: 'Akun penampung sementara. Saldonya harus nol sebelum tutup buku.' },
-  settlement: { term: 'Settlement', meaning: 'Pencairan dana gateway ke rekening bank; bruto = neto + biaya provider.' },
-  reversal: { term: 'Reversal', meaning: 'Jurnal lawan untuk mengoreksi. Jurnal terposting tidak pernah dihapus atau diubah.' },
-  cutoff: { term: 'Cutoff', meaning: 'Batas waktu terakhir alokasi Makan/Laundry dapat dikembalikan ke Titipan.' },
 }
 
 export function EmptyState({ title, description, action, icon: Icon = ListChecks }: {

@@ -51,7 +51,7 @@ export async function issueCredential(input: {
     const encrypted = await encryptFinanceValue(rawToken)
     const cardNumber = credentialCardNumber(id)
     const statements = []
-    if (current) statements.push(db.prepare(`UPDATE student_credentials SET status='REVOKED',blocked_reason='REISSUED',replacement_credential_id=? WHERE id=?`).bind(id,current.id))
+    if (current) statements.push(db.prepare(`UPDATE student_credentials SET status='REVOKED',blocked_reason='REISSUED' WHERE id=?`).bind(current.id))
     statements.push(
       db.prepare(`INSERT INTO student_credentials
         (id,santri_id,credential_kind,token_hmac,token_encrypted,token_version,card_number,status,expires_at,created_by,physically_verified_at,physically_verified_by)
@@ -63,8 +63,9 @@ export async function issueCredential(input: {
           generateId(),input.actorId||null,current?'REISSUE_CREDENTIAL':'ISSUE_CREDENTIAL',id,current?JSON.stringify({replacedCredentialId:current.id}):null,JSON.stringify({santriId:input.santriId,kind:'QR_STATIC',cardNumber}),
       ),
     )
+    if (current) statements.push(db.prepare('UPDATE student_credentials SET replacement_credential_id=? WHERE id=?').bind(id,current.id))
     await db.batch(statements)
-    return { success: true as const, credentialId: id, rawToken, version, cardNumber }
+    return { success: true as const, credentialId: id, version, cardNumber }
   } catch (error) {
     return { success: false as const, ...financeError(error) }
   }

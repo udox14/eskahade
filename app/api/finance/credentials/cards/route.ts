@@ -45,9 +45,9 @@ function buildHtml(cards:Array<{row:CardRow;kelas:string|null;svg:string}>,origi
 }
 
 export async function GET(request:Request){
-  try{await requireFinanceAccess('CONFIGURE')}catch{return NextResponse.json({error:'Tidak berwenang melihat kartu.'},{status:403})}
+  try{await requireFinanceAccess('CARDS')}catch{return NextResponse.json({error:'Tidak berwenang melihat kartu.'},{status:403})}
   const id=new URL(request.url).searchParams.get('id')||''
-  const rows=await financeQuery<CardRow>(`SELECT c.id,c.santri_id,c.card_number,c.token_encrypted,s.nis,s.full_name,s.asrama,s.kamar,s.photo_url FROM student_credentials c JOIN finance_student_snapshots s ON s.santri_id=c.santri_id WHERE c.id=? AND c.credential_kind='QR_STATIC' AND c.status IN ('ACTIVE','SUSPENDED_BY_POLICY') AND c.token_encrypted IS NOT NULL`,[id])
+  const rows=await financeQuery<CardRow>(`SELECT c.id,c.santri_id,c.card_number,c.token_encrypted,s.nis,s.full_name,s.asrama,s.kamar,s.photo_url FROM student_credentials c JOIN finance_student_snapshots s ON s.santri_id=c.santri_id WHERE c.id=? AND c.credential_kind='QR_STATIC' AND c.status = 'ACTIVE' AND c.token_encrypted IS NOT NULL`,[id])
   const row=rows[0]
   if(!row)return NextResponse.json({error:'Kartu QR tidak ditemukan.'},{status:404})
   const masters=await query<MasterRow>(`SELECT s.id,k.nama_kelas kelas_pesantren FROM santri s LEFT JOIN riwayat_pendidikan rp ON rp.santri_id=s.id AND rp.status_riwayat='aktif' LEFT JOIN kelas k ON k.id=rp.kelas_id WHERE s.id=?`,[row.santri_id])
@@ -57,12 +57,12 @@ export async function GET(request:Request){
 
 export async function POST(request:Request){
   let session
-  try{session=await requireFinanceAccess('CONFIGURE')}catch{return NextResponse.json({error:'Tidak berwenang mencetak credential.'},{status:403})}
+  try{session=await requireFinanceAccess('CARDS')}catch{return NextResponse.json({error:'Tidak berwenang mencetak credential.'},{status:403})}
   const body=await request.json().catch(()=>null) as {credentialIds?:unknown}|null
   const ids=Array.isArray(body?.credentialIds)?[...new Set(body!.credentialIds.filter((id):id is string=>typeof id==='string'&&id.length>0))]:[]
   if(!ids.length||ids.length>MAX_CARDS)return NextResponse.json({error:`Pilih 1-${MAX_CARDS} kartu per volume.`},{status:400})
   const rows:CardRow[]=[]
-  for(let offset=0;offset<ids.length;offset+=80){const chunk=ids.slice(offset,offset+80);rows.push(...await financeQuery<CardRow>(`SELECT c.id,c.santri_id,c.card_number,c.token_encrypted,s.nis,s.full_name,s.asrama,s.kamar,s.photo_url FROM student_credentials c JOIN finance_student_snapshots s ON s.santri_id=c.santri_id WHERE c.id IN (${chunk.map(()=>'?').join(',')}) AND c.credential_kind='QR_STATIC' AND c.status IN ('ACTIVE','SUSPENDED_BY_POLICY') AND c.token_encrypted IS NOT NULL`,chunk))}
+  for(let offset=0;offset<ids.length;offset+=80){const chunk=ids.slice(offset,offset+80);rows.push(...await financeQuery<CardRow>(`SELECT c.id,c.santri_id,c.card_number,c.token_encrypted,s.nis,s.full_name,s.asrama,s.kamar,s.photo_url FROM student_credentials c JOIN finance_student_snapshots s ON s.santri_id=c.santri_id WHERE c.id IN (${chunk.map(()=>'?').join(',')}) AND c.credential_kind='QR_STATIC' AND c.status = 'ACTIVE' AND c.token_encrypted IS NOT NULL`,chunk))}
   const byId=new Map(rows.map(row=>[row.id,row])),ordered=ids.map(id=>byId.get(id)).filter((row):row is CardRow=>Boolean(row))
   if(ordered.length!==ids.length)return NextResponse.json({error:'Sebagian kartu QR tidak tersedia atau sudah dicabut.'},{status:409})
   const masters:MasterRow[]=[]

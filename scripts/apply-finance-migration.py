@@ -26,6 +26,7 @@ BERKAS = [
     '0001g_triggers',
     '0001h_seed',
     '0003_payroll_per_sesi',
+    '0004_cooperative_item_payments',
 ]
 
 if len(sys.argv) < 2:
@@ -73,5 +74,5 @@ cek = wrangler(['--command',
                 "(SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND sql IS NOT NULL) index_, "
                 "(SELECT COUNT(*) FROM finance_accounts) akun;"])
 print(cek.stdout or cek.stderr)
-print('Yang harus terlihat: 37 tabel, 21 trigger, 24 index, 17 akun.')
+print('Yang harus terlihat: 51 tabel, 41 trigger, 28 index, 18 akun.')
 print('Kalau angkanya meleset, JANGAN lanjut ke deploy - pulihkan dari export.')

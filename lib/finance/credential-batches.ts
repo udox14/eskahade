@@ -50,7 +50,7 @@ export async function processQrCredentialBatch(batchId:string,actorId:string,lim
   if(!batch||batch.credential_kind!=='QR_STATIC') return {error:'Batch QR tidak ditemukan.'}
   if(batch.created_by!==actorId) return {error:'Batch ini dibuat oleh petugas lain.'}
   const items=await financeQuery<{santri_id:string}>(`SELECT santri_id FROM finance_credential_batch_items
-    WHERE batch_id=? AND status IN ('PENDING','FAILED') ORDER BY position LIMIT ?`,[batchId,Math.max(1,Math.min(50,limit))])
+    WHERE batch_id=? AND status IN ('PENDING','FAILED','PROCESSING') ORDER BY position LIMIT ?`,[batchId,Math.max(1,Math.min(50,limit))])
   const db=await getFinanceDB()
   for(const item of items){
     await db.prepare(`UPDATE finance_credential_batch_items SET status='PROCESSING',error_message=NULL WHERE batch_id=? AND santri_id=?`).bind(batchId,item.santri_id).run()

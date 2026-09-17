@@ -1,9 +1,2 @@
-import { guardPage } from '@/lib/auth/guard'
-import PageContent from './_page-content'
-
-export const dynamic = 'force-dynamic'
-
-export default async function GuardedPage() {
-  await guardPage('/dashboard/keuangan-terpusat/konfirmasi-non-spp')
-  return <PageContent />
-}
+import { redirect } from 'next/navigation'
+export default function Page(){redirect('/dashboard/keuangan-terpusat/tagihan')}

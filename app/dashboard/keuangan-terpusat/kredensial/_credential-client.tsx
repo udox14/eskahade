@@ -24,7 +24,6 @@ const TOUR: TourStep[] = [
   { target: '[data-tour="tabs"]', title: 'Lima tahap penerbitan', body: 'Mulai dari Pilih Santri, lalu jalankan batch QR, lanjut ke cetak kartu.' },
   { target: '[data-tour="select"]', title: 'Saring lalu pilih', body: 'Filter lanjutan bisa menyaring santri yang belum punya QR, sehingga tidak ada yang terlewat maupun tercetak dua kali.' },
   { target: '[data-tour="run"]', title: 'Jalankan enrollment', body: 'Batch QR berjalan otomatis dan bisa dilanjutkan bila terputus tanpa membuat kartu ganda.' },
-  { target: '[data-tour="mode"]', title: 'Mode menentukan yang diterima loket', body: 'Mengubah mode akan menangguhkan kredensial jenis lain di seluruh pesantren. Pakai mode transisi bila ingin berpindah bertahap.' },
 ]
 
 type Filters = { q: string; asrama: string; kamar: string; kelas: string; status: string }

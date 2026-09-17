@@ -1,5 +1,10 @@
 # Rencana Penyederhanaan Modul Keuangan Terpusat
 
+> ARSIP DESAIN LAMA. Dokumen ini menjelaskan implementasi sebelum rewrite
+> koperasi dan pembayaran item. Prosedur aktif berada di
+> docs/finance-centralized-rollout.md; jangan memakai alur payroll, payout API,
+> titipan, alokasi, atau maker-checker dari dokumen ini.
+
 Status dokumen: **SELESAI DIIMPLEMENTASIKAN** di branch `feat/finance-simplification`.
 Tanggal rencana: 18 Agustus 2026, revisi 2. Implementasi selesai hari yang sama.
 
