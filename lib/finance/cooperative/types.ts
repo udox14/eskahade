@@ -23,6 +23,7 @@ export type Bill = {
   recipient_id: string;
   status: string;
   full_name?: string;
+  module_code?: string | null;
 };
 export type OrderItem = {
   id: string;
@@ -33,6 +34,7 @@ export type OrderItem = {
   recipient_id: string | null;
   amount: number;
   policy: PaymentPolicy;
+  module_code?: string | null;
 };
 export type Order = {
   id: string;

@@ -180,11 +180,12 @@ export async function coopAction(
       await db.batch([
         db
           .prepare(
-            "INSERT INTO finance_coop_tariffs(id,kind,title,amount,effective_month,recurring,created_by) VALUES(?,?,?,?,?,1,?)",
+            "INSERT INTO finance_coop_tariffs(id,kind,module_code,title,amount,effective_month,recurring,created_by) VALUES(?,?,?,?,?,?,1,?)",
           )
           .bind(
             id,
             kind,
+            kind === "NON_SPP" ? null : kind,
             text(form, "title"),
             rupiah(number(form, "amount")),
             text(form, "period"),

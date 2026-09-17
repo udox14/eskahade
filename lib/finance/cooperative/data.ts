@@ -65,10 +65,11 @@ export function auditStatement(
   entity: string,
   id: string,
   details: unknown,
+  moduleCode?: string | null,
 ) {
   return db
     .prepare(
-      `INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,after_json) VALUES(?,'STAFF',?,?,?,?,?)`,
+      `INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,after_json,module_code) VALUES(?,'STAFF',?,?,?,?,?,?)`,
     )
     .bind(
       crypto.randomUUID(),
@@ -77,5 +78,6 @@ export function auditStatement(
       entity,
       id,
       JSON.stringify(details),
+      moduleCode || null,
     );
 }

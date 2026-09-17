@@ -92,17 +92,21 @@ export async function createBill(input: {
     input.period = periodKey;
   }
   const cohort = Number(s.tahun_masuk || String(s.tanggal_masuk || s.created_at || "").slice(0, 4)) || null;
+  const moduleCode = input.kind === "NON_SPP"
+    ? category === "BANGUNAN" ? "BANGUNAN" : "BIAYA_TAHUNAN"
+    : input.kind;
   await db.batch([
     db
       .prepare(
         `INSERT INTO finance_coop_bills
-         (id,santri_id,kind,category_code,title,period_key,recipient_id,amount,created_by,academic_year_id,academic_year_label,cohort_year)
-         VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
+         (id,santri_id,kind,module_code,category_code,title,period_key,recipient_id,amount,created_by,academic_year_id,academic_year_label,cohort_year,due_at)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       )
       .bind(
         id,
         s.id,
         input.kind,
+        moduleCode,
         category,
         input.title.trim(),
         input.period || null,
@@ -112,6 +116,7 @@ export async function createBill(input: {
         academicYear?.id || null,
         academicYear?.nama || null,
         cohort,
+        input.kind === "NON_SPP" ? null : `${input.period.slice(0, 7)}-28`,
       ),
     auditStatement(db, input.actor, "CREATE_BILL", "BILL", id, input),
   ]);

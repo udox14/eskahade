@@ -45,6 +45,7 @@ const finance=new DatabaseSync(':memory:'),main=new DatabaseSync(':memory:')
 for(const suffix of ['b_tables_core','c_tables_billing','d_tables_loket','e_tables_payout','f_tables_support','g_triggers','h_seed'])finance.exec(readFileSync('migrations-finance/0001'+suffix+'.sql','utf8'))
 for(const file of ['0003_payroll_per_sesi.sql','0004_cooperative_item_payments.sql'])finance.exec(readFileSync('migrations-finance/'+file,'utf8'))
 finance.exec(readFileSync('migrations-finance/0006_central_billing_workspaces.sql','utf8'))
+finance.exec(readFileSync('migrations-finance/0007_payment_work_units.sql','utf8'))
 main.exec(`CREATE TABLE santri(id TEXT PRIMARY KEY,nis TEXT,nama_lengkap TEXT,asrama TEXT,kamar TEXT,foto_url TEXT,status_global TEXT,tempat_makan_id TEXT,tempat_mencuci_id TEXT,tahun_masuk INTEGER,tanggal_masuk TEXT,created_at TEXT);
 CREATE TABLE master_jasa(id TEXT PRIMARY KEY,nama_jasa TEXT,jenis TEXT);
 CREATE TABLE tahun_ajaran(id INTEGER PRIMARY KEY,nama TEXT,is_active INTEGER);

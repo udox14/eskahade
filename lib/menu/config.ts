@@ -87,6 +87,8 @@ import {
   Bookmark,
   Books,
   CalendarDots,
+  WashingMachine,
+  Buildings,
 } from "@phosphor-icons/react";
 
 const CalendarRange = Calendar;
@@ -108,6 +110,7 @@ export const ICON_MAP: Record<string, React.ElementType> = {
   PresentationChart, Table, Sun, Bed, UsersThree, IdentificationCard,
   Columns, HandCoins, Cardholder, Wrench, CalendarBlank, ListDashes,
   Bank, PiggyBank, PlusCircle, MinusCircle, Bookmark, Books, CalendarDots,
+  WashingMachine, Buildings,
   // Alias nama icon Lucide yang dipakai oleh modul keuangan baru.
   Landmark: Bank,
   ScanLine: IdentificationCard,
@@ -135,6 +138,7 @@ export const GROUP_ICON: Record<string, React.ElementType> = {
   'Absensi': CalendarCheck,
   'Keuangan Pusat': Coins,
   'Keuangan Terpusat': Bank,
+  'Unit Pembayaran': Wallet,
   'Keuangan Santri': Wallet,
   'Keuangan': Coins,
   'Operasional': Wallet,
@@ -180,6 +184,7 @@ export const GROUP_ORDER = [
   'Absensi',
   'Keuangan Pusat',
   'Keuangan Terpusat',
+  'Unit Pembayaran',
   'Keuangan Santri',
   'Keuangan',
   'Operasional',

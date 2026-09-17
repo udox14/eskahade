@@ -9,13 +9,14 @@ class Cooperative(unittest.TestCase):
   self.db.executescript((ROOT/'migrations-finance/0003_payroll_per_sesi.sql').read_text(encoding='utf-8'))
   self.db.executescript((ROOT/'migrations-finance/0004_cooperative_item_payments.sql').read_text(encoding='utf-8'))
   self.db.executescript((ROOT/'migrations-finance/0006_central_billing_workspaces.sql').read_text(encoding='utf-8'))
-  self.db.execute("INSERT INTO finance_coop_bills(id,santri_id,kind,title,recipient_id,amount,created_by) VALUES('b1','s1','SPP','SPP','pesantren',100000,'staff')")
+  self.db.executescript((ROOT/'migrations-finance/0007_payment_work_units.sql').read_text(encoding='utf-8'))
+  self.db.execute("INSERT INTO finance_coop_bills(id,santri_id,kind,module_code,title,recipient_id,amount,created_by) VALUES('b1','s1','SPP','SPP','SPP','pesantren',100000,'staff')")
   self.db.execute("INSERT INTO finance_cash_units(id,name) VALUES('u','Loket')")
   self.db.execute("INSERT INTO finance_cash_shifts(id,cash_unit_id,operator_id,terminal_id,opening_cash_rupiah) VALUES('sh','u','staff','t',0)")
   self.db.commit()
  def order(self,id='o1',amount=100000,policy='FULL',student='s1'):
   self.db.execute("INSERT INTO finance_orders(id,request_key,santri_id,actor_id,channel,amount,fee,total,expires_at,shift_id) VALUES(?,?,?,'staff','CASH',?,0,?,'2099-01-01','sh')",(id,id,student,amount,amount))
-  self.db.execute("INSERT INTO finance_order_items(id,order_id,bill_id,kind,title,recipient_id,amount,policy) VALUES(?,?,'b1','SPP','SPP','pesantren',?,?)",('i'+id,id,amount,policy))
+  self.db.execute("INSERT INTO finance_order_items(id,order_id,bill_id,kind,module_code,title,recipient_id,amount,policy) VALUES(?,?,'b1','SPP','SPP','SPP','pesantren',?,?)",('i'+id,id,amount,policy))
  def pay(self,id='o1',amount=100000):
   j='j'+id
   self.db.execute("INSERT INTO finance_journals(id,idempotency_key,effective_date,description,source_type,actor_type) VALUES(?,?,'2026-09-17','Payment','COOP_RECEIPT','STAFF')",(j,j))
@@ -81,4 +82,10 @@ class Cooperative(unittest.TestCase):
   config=(ROOT/'wrangler.jsonc').read_text()
   self.assertIn('"database_name": "eskahade-finance"',config)
   self.assertIn('8388b81f-c5c7-4523-9a72-437f947331a1',config)
+ def test_module_access_and_scope_constraints(self):
+  self.db.execute("INSERT INTO finance_module_access(user_id,module_code,permissions_json,created_by) VALUES('operator','LAUNDRY','[\"VIEW\",\"REPORT\"]','admin')")
+  self.assertEqual(self.db.execute("SELECT module_code FROM finance_coop_bills WHERE id='b1'").fetchone()[0],'SPP')
+  self.assertEqual(self.db.execute("SELECT permissions_json FROM finance_module_access WHERE user_id='operator' AND module_code='LAUNDRY'").fetchone()[0],'[\"VIEW\",\"REPORT\"]')
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.db.execute("INSERT INTO finance_module_access(user_id,module_code,permissions_json,created_by) VALUES('x','UNIT_1','[]','admin')")
 if __name__=='__main__':unittest.main(verbosity=2)

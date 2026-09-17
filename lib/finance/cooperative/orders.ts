@@ -93,6 +93,7 @@ export async function createOrder(input: {
       recipient_id: b.recipient_id,
       amount: selected.amount,
       policy,
+      module_code: b.module_code,
     });
   }
   if (input.jajan)
@@ -105,6 +106,7 @@ export async function createOrder(input: {
       recipient_id: null,
       amount: input.jajan,
       policy: "FULL",
+      module_code: "UANG_JAJAN",
     });
   const amount = rupiah(items.reduce((s, i) => s + i.amount, 0)),
     fee = input.channel === "VA" ? rupiah(config.gatewayFee, true) : 0,
@@ -132,7 +134,7 @@ export async function createOrder(input: {
     ...items.map((i) =>
       db
         .prepare(
-          "INSERT INTO finance_order_items(id,order_id,bill_id,kind,title,recipient_id,amount,policy) VALUES(?,?,?,?,?,?,?,?)",
+          "INSERT INTO finance_order_items(id,order_id,bill_id,kind,title,recipient_id,amount,policy,module_code) VALUES(?,?,?,?,?,?,?,?,?)",
         )
         .bind(
           i.id,
@@ -143,6 +145,7 @@ export async function createOrder(input: {
           i.recipient_id,
           i.amount,
           i.policy,
+          i.module_code,
         ),
     ),
     auditStatement(db, input.actorId, "CREATE_ORDER", "ORDER", id, {

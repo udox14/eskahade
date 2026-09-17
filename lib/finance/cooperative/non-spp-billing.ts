@@ -108,6 +108,7 @@ async function buildPreview(
   main: D1Database,
   db: D1Database,
   annualEnabled: boolean,
+  onlyCategories?: readonly NonSppCategory[],
 ): Promise<{ preview: NonSppBillingPreview; candidates: Candidate[] }> {
   const academicYear = await loadAcademicYear(main);
   const annualYear = yearFromAcademicLabel(academicYear.nama);
@@ -172,7 +173,7 @@ async function buildPreview(
 
     for (const student of students) {
       const cohort = cohortYear(student);
-      const categories = annualEnabled
+      const categories = onlyCategories?.length ? onlyCategories : annualEnabled
         ? NON_SPP_CATEGORIES
         : (["BANGUNAN"] as const);
       for (const category of categories) {
@@ -265,8 +266,9 @@ export async function previewNonSppBills(
   main: D1Database,
   db: D1Database,
   annualEnabled = true,
+  onlyCategories?: readonly NonSppCategory[],
 ) {
-  return (await buildPreview(main, db, annualEnabled)).preview;
+  return (await buildPreview(main, db, annualEnabled, onlyCategories)).preview;
 }
 
 export async function generateNonSppBills(
@@ -274,8 +276,9 @@ export async function generateNonSppBills(
   db: D1Database,
   actor: string,
   annualEnabled = true,
+  onlyCategories?: readonly NonSppCategory[],
 ) {
-  const { preview, candidates } = await buildPreview(main, db, annualEnabled);
+  const { preview, candidates } = await buildPreview(main, db, annualEnabled, onlyCategories);
   let created = 0;
   for (let offset = 0; offset < candidates.length; offset += 40) {
     const chunk = candidates.slice(offset, offset + 40);
@@ -284,12 +287,13 @@ export async function generateNonSppBills(
         db
           .prepare(
             `INSERT OR IGNORE INTO finance_coop_bills
-             (id,santri_id,kind,category_code,title,period_key,recipient_id,amount,created_by,academic_year_id,academic_year_label,cohort_year)
-             VALUES(?,?,'NON_SPP',?,?,?,?,?,?,?,?,?)`,
+             (id,santri_id,kind,module_code,category_code,title,period_key,recipient_id,amount,created_by,academic_year_id,academic_year_label,cohort_year)
+             VALUES(?,?,'NON_SPP',?,?,?,?,?,?,?,?,?,?)`,
           )
           .bind(
             crypto.randomUUID(),
             item.santriId,
+            item.category === "BANGUNAN" ? "BANGUNAN" : "BIAYA_TAHUNAN",
             item.category,
             item.title,
             item.periodKey,

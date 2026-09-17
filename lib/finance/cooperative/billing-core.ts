@@ -5,6 +5,7 @@ export async function generateMonthlyBills(
   db: D1Database,
   month: string,
   actor: string,
+  onlyKind?: Extract<BillKind, "SPP" | "MAKAN" | "LAUNDRY">,
 ) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))
     throw new Error("Bulan tidak valid.");
@@ -32,9 +33,11 @@ export async function generateMonthlyBills(
     (
       await db
         .prepare(
-          `SELECT t.* FROM finance_coop_tariffs t WHERE recurring=1 AND kind<>'NON_SPP' AND effective_month<=? AND NOT EXISTS(SELECT 1 FROM finance_coop_tariffs n WHERE n.kind=t.kind AND n.title=t.title AND n.effective_month<=? AND (n.effective_month>t.effective_month OR (n.effective_month=t.effective_month AND n.id>t.id)))`,
+          `SELECT t.* FROM finance_coop_tariffs t WHERE recurring=1 AND kind<>'NON_SPP'
+           ${onlyKind ? "AND kind=?" : ""} AND effective_month<=?
+           AND NOT EXISTS(SELECT 1 FROM finance_coop_tariffs n WHERE n.kind=t.kind AND n.title=t.title AND n.effective_month<=? AND (n.effective_month>t.effective_month OR (n.effective_month=t.effective_month AND n.id>t.id)))`,
         )
-        .bind(month, month)
+        .bind(...(onlyKind ? [onlyKind, month, month] : [month, month]))
         .all<{ id: string; kind: BillKind; title: string; amount: number }>()
     ).results ?? [];
   let created = 0,
@@ -114,11 +117,14 @@ export async function generateMonthlyBills(
         const period = month + ":" + t.kind + ":" + t.title;
         const stmt = db
           .prepare(
-            `INSERT INTO finance_coop_bills(id,santri_id,kind,title,period_key,tariff_id,recipient_id,amount,created_by) SELECT ?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM finance_coop_bills WHERE santri_id=? AND period_key=?)`,
+            `INSERT INTO finance_coop_bills(id,santri_id,kind,module_code,title,period_key,tariff_id,recipient_id,amount,created_by,due_at)
+             SELECT ?,?,?,?,?,?,?,?,?,?,date(?||'-01','+1 month','-1 day')
+             WHERE NOT EXISTS(SELECT 1 FROM finance_coop_bills WHERE santri_id=? AND period_key=?)`,
           )
           .bind(
             crypto.randomUUID(),
             s.id,
+            t.kind,
             t.kind,
             t.title + " " + month,
             period,
@@ -126,6 +132,7 @@ export async function generateMonthlyBills(
             source ? "jasa-" + source : "pesantren",
             t.amount,
             actor,
+            month,
             s.id,
             period,
           );
@@ -140,12 +147,13 @@ export async function generateMonthlyBills(
   }
   await db
     .prepare(
-      "INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,after_json) VALUES(?,'SYSTEM',?,'GENERATE_BILLS','PERIOD',?,?)",
+      "INSERT INTO finance_audit_log(id,actor_type,actor_id,action,entity_type,entity_id,module_code,after_json) VALUES(?,'SYSTEM',?,'GENERATE_BILLS','PERIOD',?,?,?)",
     )
     .bind(
       crypto.randomUUID(),
       actor,
       month,
+      onlyKind || null,
       JSON.stringify({ created, missing, exempted }),
     )
     .run();

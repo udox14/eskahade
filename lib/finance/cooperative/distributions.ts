@@ -9,6 +9,7 @@ import { settings, auditStatement } from "./data";
 import { distributionEntries } from "./postings";
 import { activeShift } from "./orders";
 import { rupiah, type Recipient } from "./types";
+import type { PaymentModuleCode } from "../modules";
 export async function createDistribution(input: {
   key: string;
   recipientId: string;
@@ -16,6 +17,7 @@ export async function createDistribution(input: {
   fee: number;
   method: "CASH" | "TRANSFER";
   actor: string;
+  moduleCode?: PaymentModuleCode;
 }) {
   rupiah(input.amount);
   rupiah(input.fee, true);
@@ -46,8 +48,11 @@ export async function createDistribution(input: {
       input.amount - (config.transferFeeBearer === "PENERIMA" ? input.fee : 0),
     );
   const entitlements = await q<{ id: string; amount: number; paid: number }>(
-    "SELECT e.id,e.amount,e.paid+COALESCE((SELECT SUM(i.amount) FROM finance_distribution_items i JOIN finance_distributions d ON d.id=i.distribution_id WHERE i.entitlement_id=e.id AND d.status='DRAFT'),0) paid FROM finance_entitlements e WHERE recipient_id=? AND reversed=0 AND paid<amount ORDER BY created_at,id",
-    [recipient.id],
+    `SELECT e.id,e.amount,e.paid+COALESCE((SELECT SUM(i.amount) FROM finance_distribution_items i JOIN finance_distributions d ON d.id=i.distribution_id WHERE i.entitlement_id=e.id AND d.status='DRAFT'),0) paid
+     FROM finance_entitlements e JOIN finance_order_items oi ON oi.id=e.order_item_id
+     WHERE e.recipient_id=? AND e.reversed=0 AND e.paid<e.amount ${input.moduleCode ? "AND oi.module_code=?" : ""}
+     ORDER BY e.created_at,e.id`,
+    input.moduleCode ? [recipient.id, input.moduleCode] : [recipient.id],
   );
   let remaining = input.amount;
   const selected: { id: string; amount: number }[] = [];
@@ -69,7 +74,7 @@ export async function createDistribution(input: {
   await db.batch([
     db
       .prepare(
-        "INSERT INTO finance_distributions(id,request_key,request_hash,recipient_id,gross,fee,fee_bearer,net,method,recipient_snapshot,actor_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO finance_distributions(id,request_key,request_hash,recipient_id,gross,fee,fee_bearer,net,method,recipient_snapshot,actor_id,module_code) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
       )
       .bind(
         id,
@@ -83,6 +88,7 @@ export async function createDistribution(input: {
         input.method,
         JSON.stringify(snapshot),
         input.actor,
+        input.moduleCode || null,
       ),
     ...selected.map((e) =>
       db
@@ -95,7 +101,7 @@ export async function createDistribution(input: {
       gross: input.amount,
       net,
       fee: input.fee,
-    }),
+    }, input.moduleCode),
   ]);
   return id;
 }
