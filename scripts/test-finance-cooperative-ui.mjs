@@ -56,6 +56,7 @@ try{
  await page.keyboard.press('Escape')
  assert.equal(await trigger.evaluate(e=>e===document.activeElement),true)
  if(width===360){
+  await page.locator('summary').filter({hasText:'Aksi lainnya'}).click()
   const destructive=page.getByRole('button',{name:'Batalkan pesanan aktif'})
   await destructive.click()
   await page.getByLabel('Nomor pesanan').fill('order-001')

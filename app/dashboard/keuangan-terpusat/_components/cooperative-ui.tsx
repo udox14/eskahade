@@ -530,6 +530,62 @@ function WorkspaceGuide({ view }: { view: ScreenData["view"] }) {
     <FinanceTour steps={steps} running={tour.running} onFinish={tour.finish} />
   </>;
 }
+
+const WORK_TABS: Partial<Record<ScreenData["view"], ReadonlyArray<{ id: string; label: string }>>> = {
+  bills: [
+    { id: "overview", label: "Daftar Tagihan" }, { id: "individual", label: "Buat Individual" },
+    { id: "generate", label: "Generate Bulanan" }, { id: "bulk", label: "Non-SPP Massal" },
+    { id: "tariff", label: "Tarif" }, { id: "exemptions", label: "Pembebasan" },
+  ],
+  distributions: [
+    { id: "overview", label: "Saldo & Riwayat" }, { id: "create", label: "Buat Pencairan" }, { id: "handover", label: "Catat Penyerahan" },
+  ],
+  reports: [
+    { id: "overview", label: "Riwayat" }, { id: "settlement", label: "Settlement" },
+    { id: "corrections", label: "Koreksi" }, { id: "cash", label: "Mutasi Kas" }, { id: "va", label: "Periksa VA" },
+  ],
+  settings: [
+    { id: "policies", label: "Kebijakan" }, { id: "accounts", label: "Rekening" }, { id: "va", label: "VA Santri" },
+    { id: "counters", label: "Loket" }, { id: "access", label: "Akses" }, { id: "limits", label: "Limit" }, { id: "overview", label: "Data VA" },
+  ],
+  cashier: [
+    { id: "service", label: "Layanan Loket" }, { id: "shift", label: "Shift" },
+    { id: "pin", label: "PIN Santri" }, { id: "overview", label: "Riwayat Shift" },
+  ],
+};
+
+const ACTION_TO_TOOL: Record<string, string> = {
+  bill: "individual", generate: "generate", tariff: "tariff",
+  distribution: "create", finish: "handover",
+  settlement: "settlement", reconciliation: "settlement",
+  refund: "corrections", cancelDistribution: "corrections", cancelOrder: "corrections",
+  expense: "cash", funding: "cash", inquiry: "va",
+  settings: "policies", va: "va", unit: "counters", access: "access", limits: "limits",
+  openShift: "shift", closeShift: "shift", pin: "pin",
+};
+
+function WorkspaceAction({ spec, data }: { spec: FormSpec; data: ScreenData }) {
+  const action = INLINE_ACTIONS.has(spec.action)
+    ? <InlineAction spec={spec} shiftId={String(data.shift?.id || "")} />
+    : <ActionDialog spec={spec} shiftId={String(data.shift?.id || "")} />;
+  if (data.view === "settings") {
+    const descriptions: Record<string, string> = {
+      settings: "Atur kebijakan pembayaran, biaya, dan kanal VA.", va: "Terbitkan nomor VA tetap untuk santri.",
+      unit: "Kelola unit kas yang digunakan saat membuka shift.", access: "Batasi pengelola pada penerima dana yang menjadi tanggung jawabnya.",
+      limits: "Tetapkan batas penarikan uang jajan per santri.",
+    };
+    return <section className="rounded-lg border border-slate-200 bg-white p-4"><h2 className="text-sm font-bold text-slate-900">{spec.title}</h2><p className="mt-1 text-xs leading-5 text-slate-500">{descriptions[spec.action]}</p><div className="mt-3">{action}</div></section>;
+  }
+  const groups: Record<string, string> = {
+    distribution: "Pembuatan pencairan", finish: "Penyerahan dana", settlement: "Settlement & rekonsiliasi",
+    reconciliation: "Settlement & rekonsiliasi", refund: "Koreksi transaksi", cancelDistribution: "Koreksi transaksi",
+    cancelOrder: "Koreksi transaksi", expense: "Mutasi kas", funding: "Mutasi kas", inquiry: "Pemeriksaan VA",
+    openShift: "Operasional shift", closeShift: "Operasional shift", pin: "Akses santri",
+  };
+  if (!groups[spec.action]) return <div>{action}</div>;
+  return <section className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800">{groups[spec.action]}</p>{!INLINE_ACTIONS.has(spec.action) ? <><h2 className="mt-1 text-sm font-bold text-slate-900">{spec.title}</h2><div className="mt-3">{action}</div></> : <div className="mt-2 [&>form]:border-0 [&>form]:p-0">{action}</div>}</section>;
+}
+
 export function CooperativeScreen({ data }: { data: ScreenData }) {
   const path =
     "/dashboard/keuangan-terpusat" +
@@ -542,6 +598,9 @@ export function CooperativeScreen({ data }: { data: ScreenData }) {
       cashier: "/loket",
     }[data.view];
   const lastPage = Math.max(1, Math.ceil(data.total / 25));
+  const workTabs = WORK_TABS[data.view] || [];
+  const activeTool = data.tool || "overview";
+  const visibleForms = data.tool ? data.forms.filter(form => ACTION_TO_TOOL[form.action] === activeTool) : data.forms;
   const pageLink = (p: number) => {
     const params = new URLSearchParams();
     if (data.search) params.set("q", data.search);
@@ -550,6 +609,7 @@ export function CooperativeScreen({ data }: { data: ScreenData }) {
     if (data.dir) params.set("dir", data.dir);
     if (data.from) params.set("from", data.from);
     if (data.to) params.set("to", data.to);
+    if (activeTool) params.set("tool", activeTool);
     return path + "?" + params.toString();
   };
   const mobileSummary = (row: Record<string, string | number | null>) => {
@@ -609,8 +669,16 @@ export function CooperativeScreen({ data }: { data: ScreenData }) {
   return (
     <main className="min-w-0 space-y-5">
       <DashboardPageHeader title={data.title} description={data.description} />
+      {workTabs.length ? <nav aria-label="Pekerjaan pada halaman ini" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div className="flex min-w-max gap-1 rounded-lg border border-slate-200 bg-white p-1">
+          {workTabs.map(tab => <Link key={tab.id} href={`${path}?tool=${tab.id}`} aria-current={tab.id === activeTool ? "page" : undefined}
+            className={tab.id === activeTool ? "inline-flex min-h-11 items-center rounded-md bg-emerald-700 px-3 text-xs font-bold text-white" : "inline-flex min-h-11 items-center rounded-md px-3 text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900"}>
+            {tab.label}
+          </Link>)}
+        </div>
+      </nav> : null}
       <WorkspaceGuide view={data.view} />
-      {data.metrics.length > 0 && (
+      {activeTool === "overview" && data.metrics.length > 0 && (
         <div data-tour="summary" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {data.metrics.map((m) => (
             <section key={m.label} className="rounded-lg border bg-white p-4">
@@ -628,54 +696,29 @@ export function CooperativeScreen({ data }: { data: ScreenData }) {
           <strong>Kas loket: {money(data.shift.expected)}</strong>
         </div>
       )}
-      <div data-tour="actions" className={["settings", "distributions", "reports", "cashier"].includes(data.view) ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-3" : "flex flex-wrap gap-2"}>
-        {data.forms.map((f) => {
-          const action = INLINE_ACTIONS.has(f.action)
-            ? <InlineAction spec={f} shiftId={String(data.shift?.id || "")} />
-            : <ActionDialog spec={f} shiftId={String(data.shift?.id || "")} />;
-          if (data.view !== "settings") {
-            const groups: Record<string, string> = {
-              distribution: "Pembuatan pencairan",
-              finish: "Penyerahan dana",
-              settlement: "Settlement & rekonsiliasi",
-              reconciliation: "Settlement & rekonsiliasi",
-              refund: "Koreksi transaksi",
-              cancelDistribution: "Koreksi transaksi",
-              cancelOrder: "Koreksi transaksi",
-              expense: "Mutasi kas",
-              funding: "Mutasi kas",
-              inquiry: "Pemeriksaan VA",
-              openShift: "Operasional shift",
-              closeShift: "Operasional shift",
-              pin: "Akses santri",
-            };
-            if (!groups[f.action]) return <div key={f.action}>{action}</div>;
-            return <section key={f.action} className="rounded-lg border border-slate-200 bg-white p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-800">{groups[f.action]}</p>{!INLINE_ACTIONS.has(f.action) ? <><h2 className="mt-1 text-sm font-bold text-slate-900">{f.title}</h2><div className="mt-3">{action}</div></> : <div className="mt-2 [&>form]:border-0 [&>form]:p-0">{action}</div>}</section>;
-          }
-          const descriptions: Record<string, string> = {
-            settings: "Atur kebijakan pembayaran, biaya, dan kanal VA.",
-            va: "Terbitkan nomor VA tetap untuk santri.",
-            unit: "Kelola unit kas yang digunakan saat membuka shift.",
-            access: "Batasi pengelola pada penerima dana yang menjadi tanggung jawabnya.",
-            limits: "Tetapkan batas penarikan uang jajan per santri.",
-          };
-          return <section key={f.action} className="rounded-lg border border-slate-200 bg-white p-4"><h2 className="text-sm font-bold text-slate-900">{f.title}</h2><p className="mt-1 min-h-10 text-xs leading-5 text-slate-500">{descriptions[f.action]}</p><div className="mt-3">{action}</div></section>;
-        })}
-      </div>
-      {data.view === "bills" && data.canConfigure ? <BillingOperations /> : null}
-      {data.view === "settings" && data.canConfigure ? <RecipientAccountManager /> : null}
-      {data.view === "cashier" && data.shift && (
+      {visibleForms.length ? <div data-tour="actions" className="space-y-3">
+        <WorkspaceAction spec={visibleForms[0]} data={data} />
+        {visibleForms.length > 1 ? <details className="rounded-lg border border-slate-200 bg-white">
+          <summary className="flex min-h-11 cursor-pointer items-center justify-between px-4 py-3 text-sm font-bold text-slate-700">Aksi lainnya <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs">{visibleForms.length - 1}</span></summary>
+          <div className="grid gap-3 border-t border-slate-100 p-4 sm:grid-cols-2">{visibleForms.slice(1).map(form => <WorkspaceAction key={form.action} spec={form} data={data} />)}</div>
+        </details> : null}
+      </div> : null}
+      {data.view === "bills" && data.canConfigure && activeTool === "bulk" ? <BillingOperations view="generate" /> : null}
+      {data.view === "bills" && data.canConfigure && activeTool === "exemptions" ? <BillingOperations view="exemptions" /> : null}
+      {data.view === "settings" && data.canConfigure && activeTool === "accounts" ? <RecipientAccountManager /> : null}
+      {data.view === "cashier" && data.shift && activeTool === "service" && (
         <Checkout shiftId={String(data.shift.id)} />
       )}
-      {data.view === "settings" && (
+      {data.view === "settings" && activeTool === "policies" && (
         <p className="rounded-lg bg-slate-100 p-4 text-sm">
           Data produksi: <strong>eskahade-finance</strong>. Pengelola mengikuti
           Katering & Laundry. Role akun diatur melalui Pengaturan Pengguna
           aplikasi.
         </p>
       )}
-      <section data-tour="records" className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      {activeTool === "overview" ? <section data-tour="records" className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
         <form className="flex flex-wrap gap-2 border-b p-4" action={path}>
+          <input type="hidden" name="tool" value={activeTool} />
           <input
             name="q"
             defaultValue={data.search}
@@ -715,7 +758,7 @@ export function CooperativeScreen({ data }: { data: ScreenData }) {
                         encodeURIComponent(data.search) +
                         "&sort=" +
                         c.key +
-                        "&dir="+(data.sort===c.key&&data.dir==='asc'?'desc':'asc')+"&from="+data.from+"&to="+data.to
+                        "&dir="+(data.sort===c.key&&data.dir==='asc'?'desc':'asc')+"&from="+data.from+"&to="+data.to+"&tool="+activeTool
                       }
                     >
                       <span className="inline-flex items-center gap-1">
@@ -848,7 +891,7 @@ export function CooperativeScreen({ data }: { data: ScreenData }) {
             </Link>
           )}
         </footer>
-      </section>
+      </section> : null}
     </main>
   );
 }

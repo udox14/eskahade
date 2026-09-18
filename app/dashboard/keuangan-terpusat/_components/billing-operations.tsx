@@ -21,7 +21,7 @@ const money = (value: number) => new Intl.NumberFormat("id-ID", { style: "curren
 
 type ActiveRule = Awaited<ReturnType<typeof listBillingExemptions>>[number];
 
-export function BillingOperations() {
+export function BillingOperations({ view = "all" }: { view?: "all" | "generate" | "exemptions" }) {
   const [preview, setPreview] = useState<NonSppBillingPreview | null>(null);
   const [rules, setRules] = useState<ActiveRule[]>([]);
   const [selectedRules, setSelectedRules] = useState<Set<string>>(new Set());
@@ -52,7 +52,7 @@ export function BillingOperations() {
 
   return <div className="space-y-4">
     <ResultBanner result={result} onDismiss={() => setResult(null)} />
-    <SectionPanel
+    {view !== "exemptions" ? <SectionPanel
       title="Penerbitan Non-SPP massal"
       description="Sasaran selalu seluruh santri aktif yang memenuhi aturan. AL-BAGHORY tetap dikecualikan."
       action={<button type="button" disabled={pending} onClick={loadPreview} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 text-sm font-bold text-slate-800 disabled:opacity-50"><ArrowClockwise className="h-4 w-4" />{pending ? "Memeriksa..." : preview ? "Perbarui pratinjau" : "Buat pratinjau"}</button>}
@@ -70,9 +70,9 @@ export function BillingOperations() {
         </div>
         <div className="flex justify-end"><button type="button" disabled={pending || preview.created === 0} onClick={() => setConfirm(true)} className={buttonClass}>Terbitkan {preview.created} tagihan</button></div>
       </div>}
-    </SectionPanel>
+    </SectionPanel> : null}
 
-    <SectionPanel title="Pembebasan tagihan" description="Aturan baru mencegah generator menerbitkan tagihan. Tagihan OPEN yang sudah ada ditandai dibebaskan tanpa dihapus.">
+    {view !== "generate" ? <SectionPanel title="Pembebasan tagihan" description="Aturan baru mencegah generator menerbitkan tagihan. Tagihan OPEN yang sudah ada ditandai dibebaskan tanpa dihapus.">
       <form className="grid gap-3 p-4 lg:grid-cols-2" onSubmit={event => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
@@ -98,7 +98,7 @@ export function BillingOperations() {
         <div className="px-4 py-3"><h3 className="text-sm font-bold">Pembebasan aktif</h3><p className="text-xs text-slate-500">Pilih satu atau beberapa aturan. Pencabutan membuka kembali tagihan yang dibebaskan bila belum ada pembayaran.</p>{selectedRules.size ? <div className="mt-3 flex flex-col gap-2 sm:flex-row"><input value={revokeReason} onChange={event => setRevokeReason(event.target.value)} placeholder="Alasan pencabutan" className={inputClass} /><button type="button" disabled={pending || revokeReason.trim().length < 5} className="min-h-11 shrink-0 rounded-md border border-red-300 px-3 text-xs font-bold text-red-800 disabled:opacity-40" onClick={() => startTransition(async () => { try { const response = await revokeBillingExemptions([...selectedRules], revokeReason); setSelectedRules(new Set()); setRevokeReason(""); setResult({ tone: "success", message: `${response.revoked} pembebasan dicabut.` }); await loadRules(); } catch (error) { setResult({ tone: "error", message: "Pembebasan massal gagal dicabut.", detail: error instanceof Error ? error.message : "Kesalahan tidak dikenal." }); } })}>Cabut {selectedRules.size} pilihan</button></div> : null}</div>
         {rules.length ? <div className="divide-y">{rules.map(rule => <label key={rule.id} className="flex min-h-16 cursor-pointer items-start gap-3 px-4 py-3 text-sm hover:bg-slate-50"><input type="checkbox" aria-label={`Pilih pembebasan ${rule.student?.nama_lengkap || rule.santri_id}`} checked={selectedRules.has(rule.id)} onChange={() => setSelectedRules(current => { const next = new Set(current); if (next.has(rule.id)) next.delete(rule.id); else next.add(rule.id); return next; })} className="mt-1 h-5 w-5" /><div><p className="font-semibold">{rule.student?.nama_lengkap || rule.santri_id}</p><p className="text-xs text-slate-500">{rule.item_code} · {rule.scope === "PERMANENT" ? "Permanen" : rule.period_key} · {rule.reason}</p></div></label>)}</div> : <p className="p-6 text-center text-sm text-slate-500">Belum ada pembebasan aktif.</p>}
       </div>
-    </SectionPanel>
+    </SectionPanel> : null}
 
     <ConfirmAction
       open={confirm}

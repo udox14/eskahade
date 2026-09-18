@@ -34,6 +34,7 @@ export type ScreenData = {
   to: string;
   sort: string;
   dir: string;
+  tool: string;
   forms: FormSpec[];
   canWrite: boolean;
   canConfigure: boolean;
@@ -83,7 +84,7 @@ const policyOptions = [
 export async function loadScreen(
   view: ScreenView,
   session: SessionUser,
-  params: { q?: string; p?: string; sort?: string; dir?: string; from?: string; to?: string },
+  params: { q?: string; p?: string; sort?: string; dir?: string; from?: string; to?: string; tool?: string },
 ): Promise<ScreenData> {
   const roles = financeRoles(session),
     canWrite = roles.admin || roles.operator,
@@ -121,6 +122,7 @@ export async function loadScreen(
     from: /^\d{4}-\d{2}-\d{2}$/.test(params.from||'')?params.from!:new Date().getFullYear()+'-01-01',
     to: /^\d{4}-\d{2}-\d{2}$/.test(params.to||'')?params.to!:new Date().getFullYear()+'-12-31',
     sort: params.sort||'',dir:params.dir||'desc',
+    tool: params.tool || "",
     forms: [],
     canWrite,
     canConfigure: roles.admin,
@@ -535,6 +537,20 @@ export async function loadScreen(
           },
         ];
   }
+  const toolSets: Record<ScreenView, readonly string[]> = {
+    home: ["overview"],
+    bills: ["overview", "individual", "generate", "bulk", "tariff", "exemptions"],
+    distributions: ["overview", "create", "handover"],
+    reports: ["overview", "settlement", "corrections", "cash", "va"],
+    settings: ["policies", "accounts", "va", "counters", "access", "limits", "overview"],
+    cashier: ["service", "shift", "pin", "overview"],
+  };
+  const defaults: Record<ScreenView, string> = {
+    home: "overview", bills: "overview", distributions: "overview", reports: "overview",
+    settings: "policies", cashier: shift ? "service" : "shift",
+  };
+  data.tool = toolSets[view].includes(data.tool) ? data.tool : defaults[view];
+
   const search = data.search
     ? " WHERE " +
       searchColumns.map((c) => `CAST(${c} AS TEXT) LIKE ?`).join(" OR ")

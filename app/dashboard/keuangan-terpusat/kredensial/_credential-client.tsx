@@ -42,6 +42,7 @@ export type CredentialInventoryRow = {
   card_number: string | null; status: string; print_count: number; nis: string; nama_lengkap: string
 }
 type CredentialTab = 'enrollment' | 'qr' | 'cards' | 'settings'
+const CREDENTIAL_TABS: CredentialTab[] = ['enrollment', 'qr', 'cards', 'settings']
 type Selectable = { id: string; qr_id: string | null }
 
 const emptyFilters: Filters = { q: '', asrama: '', kamar: '', kelas: '', status: 'ALL' }
@@ -83,6 +84,23 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
   const [exporting, setExporting] = useState<number | null>(null)
   const [preview, setPreview] = useState<CardPreview | null>(null)
   const [result, setResult] = useState<FinanceResult | null>(null)
+
+  useEffect(() => {
+    const syncFromUrl = () => {
+      const value = new URL(window.location.href).searchParams.get('tab') as CredentialTab | null
+      setActiveTab(value && CREDENTIAL_TABS.includes(value) ? value : 'enrollment')
+    }
+    syncFromUrl()
+    window.addEventListener('popstate', syncFromUrl)
+    return () => window.removeEventListener('popstate', syncFromUrl)
+  }, [])
+
+  const changeTab = (tab: CredentialTab) => {
+    setActiveTab(tab)
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', tab)
+    window.history.pushState({}, '', url)
+  }
   const tour = useFinanceTour('kredensial')
 
   const load = useCallback(async (nextPage = page, nextFilters = filters, nextPageSize = pageSize) => {
@@ -267,7 +285,7 @@ export function CredentialClient({ credentials }: { credentials: CredentialInven
       idBase="credential"
       label="Bagian modul Kredensial"
       active={activeTab}
-      onChange={id => setActiveTab(id as CredentialTab)}
+      onChange={id => changeTab(id as CredentialTab)}
       tabs={tabs.map(item => ({
         id: item.id,
         label: item.label,

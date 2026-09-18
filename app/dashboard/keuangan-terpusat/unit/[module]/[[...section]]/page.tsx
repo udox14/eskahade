@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { DashboardPageHeader } from "@/components/dashboard/page-header";
 import { getEffectiveRoles } from "@/lib/auth/session";
 import { financeQuery } from "@/lib/db";
+import { MODULE_GUIDES, moduleSectionSteps } from "@/lib/finance/module-guides";
+import { FinanceWorkspaceNavigation } from "../../../_components/workspace-navigation";
 import { loadModuleWorkspace } from "@/lib/finance/module-workspace";
 import {
   ANNUAL_FEE_TYPES,
@@ -26,14 +28,14 @@ const SECTION_LABELS: Record<(typeof SECTIONS)[number], string> = {
   dashboard: "Dashboard", tagihan: "Daftar Tagihan", generate: "Generate Tagihan", pembayaran: "Pembayaran",
   penyaluran: "Penyaluran", laporan: "Laporan", pengaturan: "Pengaturan", petunjuk: "Petunjuk",
 };
-const CHECKLIST = [
-  ["tarif", "Tarif atau target periode sudah diperiksa"],
-  ["periode", "Periode aktif dan jatuh tempo sudah benar"],
-  ["peserta", "Daftar peserta dan pembebasan sudah diperiksa"],
-  ["generate", "Tagihan atau target setoran sudah diproses"],
-  ["hasil", "Hasil, selisih, dan data yang dilewati sudah diperiksa"],
+const SECTION_GROUPS = [
+  { label: "Ringkasan", sections: ["dashboard"] },
+  { label: "Penagihan", sections: ["tagihan", "generate", "pembayaran"] },
+  { label: "Penyaluran", sections: ["penyaluran"] },
+  { label: "Laporan", sections: ["laporan"] },
+  { label: "Administrasi", sections: ["pengaturan", "petunjuk"] },
 ] as const;
-
+const CHECKLIST_CODES = ["tarif", "periode", "peserta", "generate", "hasil"] as const;
 function rupiah(value: unknown) {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(Number(value) || 0);
 }
@@ -69,26 +71,67 @@ export default async function PaymentModulePage({
       ) : [];
   const keys = data.rows[0] ? Object.keys(data.rows[0]) : [];
   const periodType = definition.code === "BIAYA_TAHUNAN" ? "text" : "month";
+  const guide = MODULE_GUIDES[definition.code];
+  const pageSteps = moduleSectionSteps(definition.code, section, definition.label);
+  const activeGroup = SECTION_GROUPS.find((group) => (group.sections as readonly string[]).includes(section)) || SECTION_GROUPS[0];
 
   return <main className="min-w-0 space-y-5">
-    <Link href="/dashboard/keuangan-terpusat" className="inline-flex min-h-11 items-center text-sm font-bold text-emerald-800 underline underline-offset-4">Kembali ke Sistem Keuangan Baru</Link>
+    <FinanceWorkspaceNavigation />
     <DashboardPageHeader title={`Unit ${definition.label}`} description={definition.shortDescription} />
 
-    <nav aria-label={`Menu unit ${definition.label}`} className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-1">
-      <div className="flex min-w-max gap-1">
-        {SECTIONS.map((item) => <Link key={item} href={item === "dashboard" ? base : `${base}/${item}`}
-          aria-current={section === item ? "page" : undefined}
-          className={`inline-flex min-h-11 items-center rounded-md px-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800 ${section === item ? "bg-emerald-800 text-white" : "text-slate-700 hover:bg-slate-100"}`}>
-          {SECTION_LABELS[item]}
-        </Link>)}
-      </div>
-    </nav>
+    <div className="space-y-2">
+      <nav aria-label={`Kelompok kerja unit ${definition.label}`} className="overflow-x-auto rounded-lg border border-slate-200 bg-slate-100 p-1">
+        <div className="flex min-w-max gap-1">
+          {SECTION_GROUPS.map((group) => {
+            const target = group.sections[0];
+            const active = group.label === activeGroup.label;
+            return <Link key={group.label} href={target === "dashboard" ? base : `${base}/${target}`}
+              aria-current={active ? "page" : undefined}
+              className={`inline-flex min-h-11 items-center rounded-md px-3 text-sm font-semibold ${active ? "bg-white text-emerald-900 shadow-sm" : "text-slate-600 hover:bg-white/70"}`}>
+              {group.label}
+            </Link>;
+          })}
+        </div>
+      </nav>
+      {activeGroup.sections.length > 1 ? <nav aria-label={`Menu ${activeGroup.label}`} className="overflow-x-auto border-b border-slate-200">
+        <div className="flex min-w-max gap-5">
+          {activeGroup.sections.map((item) => <Link key={item} href={item === "dashboard" ? base : `${base}/${item}`}
+            aria-current={section === item ? "page" : undefined}
+            className={`inline-flex min-h-11 items-center border-b-2 px-0.5 text-sm font-semibold ${section === item ? "border-emerald-700 text-emerald-900" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
+            {SECTION_LABELS[item]}
+          </Link>)}
+        </div>
+      </nav> : null}
+    </div>
 
     <details className="rounded-lg border border-emerald-200 bg-emerald-50 p-4" open={section === "petunjuk"}>
-      <summary className="min-h-11 cursor-pointer py-2 font-bold text-emerald-950">Petunjuk halaman {SECTION_LABELS[section]}</summary>
-      <div className="grid gap-4 pt-3 text-sm leading-6 text-slate-700 md:grid-cols-2">
-        <div><h2 className="font-bold text-slate-900">Tujuan dan prasyarat</h2><p>Gunakan halaman ini hanya untuk data {definition.label}. Pastikan periode, tarif, daftar peserta, dan pembebasan sudah diperiksa sebelum memposting perubahan.</p></div>
-        <div><h2 className="font-bold text-slate-900">Koreksi yang aman</h2><p>Jangan menghapus transaksi yang sudah diposting. Gunakan pembatalan atau refund yang tersedia agar jurnal dan audit tetap dapat ditelusuri.</p></div>
+      <summary className="min-h-11 cursor-pointer py-2 font-bold text-emerald-950">
+        Petunjuk {definition.label}: halaman {SECTION_LABELS[section]}
+      </summary>
+      <div className="grid gap-5 pt-3 text-sm leading-6 text-slate-700 lg:grid-cols-2">
+        <section>
+          <h2 className="font-bold text-slate-950">Fungsi modul ini</h2>
+          <p className="mt-1">{guide.purpose}</p>
+        </section>
+        <section>
+          <h2 className="font-bold text-slate-950">Sebelum mulai</h2>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {guide.prerequisites.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </section>
+        <section>
+          <h2 className="font-bold text-slate-950">Yang dilakukan di halaman ini</h2>
+          <ol className="mt-1 list-decimal space-y-1 pl-5">
+            {pageSteps.map((item) => <li key={item}>{item}</li>)}
+          </ol>
+        </section>
+        <section>
+          <h2 className="font-bold text-slate-950">Hal penting</h2>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {guide.attention.map((item) => <li key={item}>{item}</li>)}
+            <li>Transaksi yang sudah diposting dikoreksi dengan pembatalan atau refund agar jurnal dan audit tetap dapat ditelusuri.</li>
+          </ul>
+        </section>
       </div>
     </details>
 
@@ -156,11 +199,25 @@ export default async function PaymentModulePage({
       {canManageAssignments ? <section className="rounded-lg border border-slate-200 bg-white p-5 xl:col-span-2"><h2 className="font-bold">Petugas yang ditugaskan</h2>{data.assignments.length ? <ul className="mt-3 divide-y">{data.assignments.map((item) => <li key={item.user_id} className="py-3 text-sm"><strong>{item.user_id}</strong><span className="ml-2 text-slate-600">{(JSON.parse(item.permissions_json) as string[]).join(", ")}</span></li>)}</ul> : <p className="mt-2 text-sm text-slate-600">Belum ada assignment khusus. Akses bawaan role tetap berlaku.</p>}</section> : null}
     </div> : null}
 
-    {section === "petunjuk" ? <form action={saveModuleChecklist.bind(null, definition.code)} className="rounded-lg border border-slate-200 bg-white p-5">
-      <h2 className="font-bold text-slate-950">Checklist awal petugas</h2><p className="mt-1 text-sm text-slate-600">Checklist ini hanya menyimpan progres panduan dan tidak mengubah transaksi.</p>
-      <div className="mt-4 space-y-2">{CHECKLIST.map(([code,label]) => <label key={code} className="flex min-h-11 items-center gap-3 rounded-md border border-slate-300 px-3 text-sm"><input type="checkbox" name={code} defaultChecked={data.checklist.includes(code)} /><span>{label}</span></label>)}</div>
-      <button className="mt-4 min-h-11 rounded-md bg-emerald-800 px-4 font-bold text-white">Simpan progres</button>
-    </form> : null}
+    {section === "petunjuk" ? <div className="grid gap-4 lg:grid-cols-2">
+      <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Urutan kerja lengkap</p>
+        <h2 className="mt-1 text-lg font-bold text-slate-950">Dari persiapan sampai rekonsiliasi</h2>
+        <ol className="mt-4 space-y-3">
+          {guide.workflow.map((item, index) => <li key={item} className="flex gap-3 text-sm leading-6 text-slate-700">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-900">{index + 1}</span>
+            <span>{item}</span>
+          </li>)}
+        </ol>
+      </section>
+      <form action={saveModuleChecklist.bind(null, definition.code)} className="rounded-lg border border-slate-200 bg-white p-5">
+        <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">Progres saya</p>
+        <h2 className="mt-1 text-lg font-bold text-slate-950">Checklist awal petugas</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-600">Centang setelah Anda memeriksa atau mencoba langkahnya. Checklist hanya menyimpan progres panduan dan tidak mengubah transaksi.</p>
+        <div className="mt-4 space-y-2">{CHECKLIST_CODES.map((code) => <label key={code} className="flex min-h-11 items-center gap-3 rounded-md border border-slate-300 px-3 py-2 text-sm"><input type="checkbox" name={code} defaultChecked={data.checklist.includes(code)} /><span>{guide.checklist[code]}</span></label>)}</div>
+        <button className="mt-4 min-h-11 rounded-md bg-emerald-800 px-4 font-bold text-white hover:bg-emerald-900">Simpan progres</button>
+      </form>
+    </div> : null}
 
     {!["pengaturan", "petunjuk"].includes(section) ? <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
       <header className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-start sm:justify-between"><div><h2 className="font-bold text-slate-950">{section === "dashboard" ? "Aktivitas tagihan terbaru" : SECTION_LABELS[section]}</h2><p className="mt-1 text-sm text-slate-600">Daftar ini hanya memuat data milik unit {definition.label}{query.status ? ` dengan filter ${query.status}` : ""}.</p></div>{actions.has("EXPORT") && ["tagihan","pembayaran","penyaluran","laporan"].includes(section) ? <a className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-400 px-3 text-sm font-bold text-slate-800" href={`/api/finance/modules/export?module=${definition.code}&section=${section}&period=${encodeURIComponent(data.period)}&annualFeeType=${query.annualFeeType || ""}&status=${query.status || ""}`}>Ekspor Excel</a> : null}</header>
