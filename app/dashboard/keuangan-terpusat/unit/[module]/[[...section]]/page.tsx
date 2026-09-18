@@ -71,6 +71,7 @@ export default async function PaymentModulePage({
   const periodType = definition.code === "BIAYA_TAHUNAN" ? "text" : "month";
 
   return <main className="min-w-0 space-y-5">
+    <Link href="/dashboard/keuangan-terpusat" className="inline-flex min-h-11 items-center text-sm font-bold text-emerald-800 underline underline-offset-4">Kembali ke Sistem Keuangan Baru</Link>
     <DashboardPageHeader title={`Unit ${definition.label}`} description={definition.shortDescription} />
 
     <nav aria-label={`Menu unit ${definition.label}`} className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-1">

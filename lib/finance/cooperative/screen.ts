@@ -111,7 +111,7 @@ export async function loadScreen(
     : null;
   const data: ScreenData = {
     view,
-    title: "Keuangan Terpusat",
+    title: "Sistem Keuangan Baru",
     description: "Penerimaan dan penyerahan dana melalui koperasi.",
     columns: [],
     rows: [],

@@ -7,7 +7,7 @@ export default function CentralFinanceError({ reset }: { error: Error & { digest
   return (
     <section role="alert" className="mx-auto max-w-2xl rounded-lg border border-red-200 bg-red-50 p-5 text-red-950">
       <WarningCircle className="h-7 w-7" aria-hidden="true" />
-      <h1 className="mt-3 text-lg font-bold">Data Keuangan Terpusat tidak dapat dimuat</h1>
+      <h1 className="mt-3 text-lg font-bold">Sistem Keuangan Baru tidak dapat dimuat</h1>
       <p className="mt-1 text-sm text-red-900">
         Coba muat ulang bagian ini. Jika masalah berulang, kembali ke ringkasan dan periksa koneksi atau hak akses.
       </p>

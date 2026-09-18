@@ -28,7 +28,7 @@ export async function CentralModuleOverview() {
   ]);
   const totals = new Map(rows.map((row) => [row.module_code, row]));
   return <section className="mt-5 rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-    <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="font-bold text-slate-950">Konsolidasi unit pembayaran</h2><p className="mt-1 text-sm text-slate-600">Perbandingan seluruh periode untuk admin keuangan pusat dan superadmin.</p></div><p className="text-xs text-slate-600">Sumber: tagihan dan alokasi pembayaran terposting</p></div>
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="font-bold text-slate-950">Unit pembayaran di Sistem Keuangan Baru</h2><p className="mt-1 text-sm leading-6 text-slate-600">Uang Jajan, Makan, Laundry, SPP, Bangunan, dan Biaya Tahunan adalah workspace operasional. Pembayaran gabungan, kas, jurnal, QR, audit, dan pengaturan sistem baru tetap menjadi layanan bersama.</p></div><p className="text-xs text-slate-600">Sumber: tagihan dan alokasi pembayaran terposting</p></div>
     <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
       {PAYMENT_MODULES.map((module) => {
         const value = totals.get(module.code) || { received: 0, outstanding: 0 };

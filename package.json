@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:finance": "python scripts/test-finance.py && python scripts/test-finance-cooperative.py && node scripts/test-finance-cooperative.mjs && node scripts/test-finance-cooperative-ui.mjs && node scripts/test-finance-module-export.mjs",
+    "test:finance": "python scripts/test-finance.py && python scripts/test-finance-cooperative.py && python scripts/test-payment-unit-menu.py && node scripts/test-finance-cooperative.mjs && node scripts/test-finance-cooperative-ui.mjs && node scripts/test-finance-module-export.mjs",
     "build:cf": "next build --webpack && opennextjs-cloudflare build --skipNextBuild",
     "preview:cf": "next build --webpack && opennextjs-cloudflare build --skipNextBuild && opennextjs-cloudflare preview",
     "deploy:cf": "next build --webpack && opennextjs-cloudflare build --skipNextBuild && opennextjs-cloudflare deploy",

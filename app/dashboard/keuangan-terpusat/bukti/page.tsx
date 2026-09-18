@@ -41,7 +41,7 @@ export default async function Page({
     <main className="mx-auto max-w-3xl space-y-5 rounded-lg bg-white p-5 sm:p-10">
       <header className="border-b pb-5">
         <p className="text-sm uppercase tracking-wide text-emerald-800">
-          Koperasi | Keuangan Terpusat
+          Koperasi | Sistem Keuangan Baru
         </p>
         <h1 className="text-2xl font-bold">
           {isDistribution ? "Bukti Pencairan" : "Bukti Pembayaran"}
