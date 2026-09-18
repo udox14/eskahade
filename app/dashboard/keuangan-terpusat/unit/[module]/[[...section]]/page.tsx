@@ -76,8 +76,8 @@ export default async function PaymentModulePage({
   const activeGroup = SECTION_GROUPS.find((group) => (group.sections as readonly string[]).includes(section)) || SECTION_GROUPS[0];
 
   return <main className="min-w-0 space-y-5">
-    <FinanceWorkspaceNavigation />
     <DashboardPageHeader title={`Unit ${definition.label}`} description={definition.shortDescription} />
+    <FinanceWorkspaceNavigation />
 
     <div className="space-y-2">
       <nav aria-label={`Kelompok kerja unit ${definition.label}`} className="overflow-x-auto rounded-lg border border-slate-200 bg-slate-100 p-1">

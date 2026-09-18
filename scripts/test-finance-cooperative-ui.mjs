@@ -34,6 +34,8 @@ try{
  page.on('pageerror',e=>errors.push(e.message))
  await page.goto('http://127.0.0.1:'+port)
  await page.getByRole('heading',{name:'Tagihan & Pembayaran'}).waitFor()
+ const headerBeforeTabs=await page.evaluate(()=>{const h=document.querySelector('h1'),n=document.querySelector('nav[aria-label="Kelompok Sistem Keuangan Baru"]');return !!h&&!!n&&!!(h.compareDocumentPosition(n)&Node.DOCUMENT_POSITION_FOLLOWING)})
+ assert.equal(headerBeforeTabs,true,'page title must appear before finance navigation')
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'horizontal overflow '+width)
  if(width===360){
   assert.equal(await page.locator('nav[aria-label="Keuangan Terpusat"]').count(),0)

@@ -10,8 +10,8 @@ export default async function CredentialPage(){
   await requireFinanceAccess('CARDS')
   const data=await getCredentialData()
   return <main className="space-y-4 sm:space-y-5">
-    <FinanceWorkspaceNavigation />
     <FinancePageHeader title="Kartu QR Santri" description="Pendaftaran kartu massal, integrasi reader, dan pencetakan kartu QR santri." eyebrow="Kredensial: QR Code" meta={data.scope?`Scope asrama ${data.scope} · saldo dan PIN tidak pernah menempel pada kartu`:'Saldo dan PIN tidak pernah menempel pada kartu'}/>
+    <FinanceWorkspaceNavigation />
     <FinanceGuide
       purpose="Menerbitkan kartu QR santri secara massal, dalam batch yang dapat dilanjutkan bila terputus."
       prerequisites={['Uji scanner lebih dulu di tab Pengaturan; scanner harus mengirim Enter setelah tiap scan.', 'Izinkan akses kamera bila memindai QR lewat perangkat.']}

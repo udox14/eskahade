@@ -13,6 +13,7 @@ import { coopAction, searchCoopStudents } from "../cooperative-actions";
 import { Checkout } from "./item-checkout";
 import { BillingOperations } from "./billing-operations";
 import { RecipientAccountManager } from "./recipient-account-manager";
+import { FinanceWorkspaceNavigation } from "./workspace-navigation";
 import {
   FinanceGuide,
   FinanceTour,
@@ -669,6 +670,7 @@ export function CooperativeScreen({ data }: { data: ScreenData }) {
   return (
     <main className="min-w-0 space-y-5">
       <DashboardPageHeader title={data.title} description={data.description} />
+      <FinanceWorkspaceNavigation />
       {workTabs.length ? <nav aria-label="Pekerjaan pada halaman ini" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex min-w-max gap-1 rounded-lg border border-slate-200 bg-white p-1">
           {workTabs.map(tab => <Link key={tab.id} href={`${path}?tool=${tab.id}`} aria-current={tab.id === activeTool ? "page" : undefined}
