@@ -114,14 +114,12 @@ export async function verifyDuitkuCallbackSignatureV2(
 
 /**
  * Memuat konfigurasi Duitku V2.
- * ATURAN KEAMANAN: Secret apiKey WAJIB dari process.env (Cloudflare Secret),
- * database HANYA boleh menyimpan konfigurasi non-secret.
+ * Terhubung langsung ke tabel app_settings (konfigurasi yang diatur di Modul Pengaturan Keuangan SPA)
+ * dengan fallback ke environment / Cloudflare Secrets jika belum disetel di database.
  */
 export async function getDuitkuV2Config(): Promise<DuitkuConfig> {
-  // Secret: mutlak dari environment
-  const apiKey = (process.env.DUITKU_API_KEY || '').trim()
-
-  // Non-secret: dapat diambil dari env atau fallback ke app_settings
+  // Nilai awal / fallback dari environment
+  let apiKey = (process.env.DUITKU_API_KEY || '').trim()
   let merchantCode = (process.env.DUITKU_MERCHANT_CODE || '').trim()
   let environment: 'sandbox' | 'production' =
     process.env.DUITKU_ENV === 'production' ? 'production' : 'sandbox'
@@ -129,28 +127,28 @@ export async function getDuitkuV2Config(): Promise<DuitkuConfig> {
   let returnUrl = (process.env.DUITKU_RETURN_URL || '').trim()
   let defaultExpiryMinutes = parseInt(process.env.DUITKU_EXPIRY_MINUTES || '1440', 10)
 
-  if (!merchantCode || !callbackUrl) {
-    try {
-      const dbSettings = await query<{ key: string; value: string }>(
-        `SELECT key, value FROM app_settings WHERE key IN (
-          'duitku_merchant_code', 'duitku_env',
-          'duitku_callback_url', 'duitku_return_url', 'duitku_expiry_minutes'
-        )`
-      )
-      for (const row of dbSettings) {
-        if (row.key === 'duitku_merchant_code' && !merchantCode) merchantCode = row.value.trim()
-        if (row.key === 'duitku_env' && !process.env.DUITKU_ENV) {
-          environment = row.value === 'production' ? 'production' : 'sandbox'
-        }
-        if (row.key === 'duitku_callback_url' && !callbackUrl) callbackUrl = row.value.trim()
-        if (row.key === 'duitku_return_url' && !returnUrl) returnUrl = row.value.trim()
-        if (row.key === 'duitku_expiry_minutes' && !process.env.DUITKU_EXPIRY_MINUTES) {
-          defaultExpiryMinutes = parseInt(row.value, 10) || 1440
-        }
+  try {
+    const dbSettings = await query<{ key: string; value: string }>(
+      `SELECT key, value FROM app_settings WHERE key IN (
+        'duitku_merchant_code', 'duitku_env', 'duitku_api_key',
+        'duitku_callback_url', 'duitku_return_url', 'duitku_expiry_minutes'
+      )`
+    )
+    for (const row of dbSettings) {
+      if (row.key === 'duitku_merchant_code' && row.value) merchantCode = row.value.trim()
+      if (row.key === 'duitku_api_key' && row.value) apiKey = row.value.trim()
+      if (row.key === 'duitku_env' && row.value) {
+        environment = row.value === 'production' ? 'production' : 'sandbox'
       }
-    } catch {
-      // Abaikan pada environment testing tanpa tabel
+      if (row.key === 'duitku_callback_url' && row.value) callbackUrl = row.value.trim()
+      if (row.key === 'duitku_return_url' && row.value) returnUrl = row.value.trim()
+      if (row.key === 'duitku_expiry_minutes' && row.value) {
+        const val = parseInt(row.value, 10)
+        if (!isNaN(val) && val > 0) defaultExpiryMinutes = val
+      }
     }
+  } catch {
+    // Abaikan pada environment testing tanpa tabel app_settings
   }
 
   return {
@@ -161,6 +159,69 @@ export async function getDuitkuV2Config(): Promise<DuitkuConfig> {
     returnUrl: returnUrl || undefined,
     defaultExpiryMinutes: isNaN(defaultExpiryMinutes) ? 1440 : defaultExpiryMinutes,
   }
+}
+
+export interface GatewayFeeSettings {
+  feePayer: 'CUSTOMER' | 'INSTITUTION'
+  defaultVaFee: number
+  defaultQrisFeePercent: number
+}
+
+/**
+ * Mengambil pengaturan penanggung fee gateway (CUSTOMER vs INSTITUTION)
+ * dan nominal/persentase fee default dari app_settings.
+ */
+export async function getGatewayFeeSettings(): Promise<GatewayFeeSettings> {
+  let feePayer: 'CUSTOMER' | 'INSTITUTION' = 'CUSTOMER'
+  let defaultVaFee = 4000
+  let defaultQrisFeePercent = 0.7
+
+  try {
+    const rows = await query<{ key: string; value: string }>(
+      `SELECT key, value FROM app_settings WHERE key IN (
+        'gateway_fee_payer', 'gateway_default_va_fee', 'gateway_default_qris_fee_percent'
+      )`
+    )
+    for (const r of rows) {
+      if (r.key === 'gateway_fee_payer' && (r.value === 'CUSTOMER' || r.value === 'INSTITUTION')) {
+        feePayer = r.value
+      } else if (r.key === 'gateway_default_va_fee') {
+        const val = parseInt(r.value, 10)
+        if (!isNaN(val) && val >= 0) defaultVaFee = val
+      } else if (r.key === 'gateway_default_qris_fee_percent') {
+        const val = parseFloat(r.value)
+        if (!isNaN(val) && val >= 0) defaultQrisFeePercent = val
+      }
+    }
+  } catch {
+    // Abaikan pada testing tanpa tabel
+  }
+
+  return { feePayer, defaultVaFee, defaultQrisFeePercent }
+}
+
+/**
+ * Mengambil daftar channel pembayaran yang aktif diizinkan dari app_settings.
+ * Default: ['DUITKU_VA', 'DUITKU_QRIS']
+ */
+export async function getEnabledPaymentChannels(): Promise<Array<'DUITKU_VA' | 'DUITKU_QRIS'>> {
+  try {
+    const row = await queryOne<{ value: string }>(
+      `SELECT value FROM app_settings WHERE key = 'gateway_channels_enabled'`
+    )
+    if (row?.value) {
+      const parsed = JSON.parse(row.value)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const valid = parsed.filter((c: unknown): c is 'DUITKU_VA' | 'DUITKU_QRIS' =>
+          c === 'DUITKU_VA' || c === 'DUITKU_QRIS'
+        )
+        if (valid.length > 0) return valid
+      }
+    }
+  } catch {
+    // Abaikan jika belum siap
+  }
+  return ['DUITKU_VA', 'DUITKU_QRIS']
 }
 
 // ============================================================

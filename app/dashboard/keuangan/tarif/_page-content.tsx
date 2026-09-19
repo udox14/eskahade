@@ -1,209 +1,172 @@
 'use client'
 
-import React from 'react'
-
-import { useState, useEffect } from 'react'
-import { getDaftarTarif, getTarifByTahun, simpanTarif } from './actions'
-import { Save, DollarSign, History, Loader2, Edit } from 'lucide-react'
+import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import {
+  getPengaturanKeuanganData,
+  type PengaturanKeuanganData,
+} from './actions'
+import TarifTab from './tarif-tab'
+import PembebasanTab from './pembebasan-tab'
+import LimitJajanTab from './limit-jajan-tab'
+import GatewayTab from './gateway-tab'
+import {
+  Tag,
+  ShieldCheck,
+  Wallet,
+  CreditCard,
+  GearSix,
+  ArrowClockwise,
+  Eye,
+} from '@phosphor-icons/react'
 
-export default function TarifPage() {
-  // State Form
-  const [tahunInput, setTahunInput] = useState(new Date().getFullYear())
-  const [nominal, setNominal] = useState({
-    BANGUNAN: 0,
-    KESEHATAN: 0,
-    EHB: 0,
-    EKSKUL: 0
-  })
-  
-  const [loading, setLoading] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  
-  // State List
-  const [listTarif, setListTarif] = useState<any[]>([])
+interface PengaturanKeuanganContentProps {
+  initialData: PengaturanKeuanganData
+}
 
-  // Init Load List
-  useEffect(() => {
-    refreshList()
-  }, [])
+type TabKey = 'tarif' | 'pembebasan' | 'limit' | 'gateway'
 
-  // Auto Load saat Tahun diubah (Cek apakah sudah ada tarif?)
-  useEffect(() => {
-    async function checkExisting() {
-        setLoading(true)
-        const res = await getTarifByTahun(tahunInput)
-        setNominal(res)
-        setLoading(false)
-    }
-    checkExisting()
-  }, [tahunInput])
+export default function PengaturanKeuanganContent({
+  initialData,
+}: PengaturanKeuanganContentProps) {
+  const [data, setData] = useState<PengaturanKeuanganData>(initialData)
+  const [activeTab, setActiveTab] = useState<TabKey>('tarif')
+  const [isPending, startTransition] = useTransition()
 
-  const refreshList = async () => {
-    const data = await getDaftarTarif()
-    setListTarif(data)
+  const refreshData = () => {
+    startTransition(async () => {
+      try {
+        const next = await getPengaturanKeuanganData()
+        setData(next)
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Gagal menyegarkan data pengaturan.')
+      }
+    })
   }
 
-  const handleSimpan = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSaving(true)
-    const toastId = toast.loading("Menyimpan tarif...")
+  const canMutate = data.userPermissions.canMutate
+  const userRole = data.userPermissions.role
 
-    const res = await simpanTarif(tahunInput, nominal)
-    
-    setIsSaving(false)
-    toast.dismiss(toastId)
-
-    if ('error' in res) {
-        toast.error("Gagal", { description: (res as any).error })
-    } else {
-        toast.success("Tarif Berhasil Disimpan", { description: `Angkatan ${tahunInput} telah diperbarui.` })
-        refreshList()
-    }
-  }
-
-  // Format Rupiah Helper
-  const rp = (val: number) => "Rp " + (val || 0).toLocaleString('id-ID')
+  const tabs: Array<{ key: TabKey; label: string; icon: typeof Tag; badge?: number }> = [
+    { key: 'tarif', label: 'Tarif & Cicilan', icon: Tag, badge: data.tariffs.length },
+    { key: 'pembebasan', label: 'Pembebasan Biaya', icon: ShieldCheck, badge: data.exemptions.filter(e => e.status === 'ACTIVE').length },
+    { key: 'limit', label: 'Limit Uang Jajan', icon: Wallet },
+    { key: 'gateway', label: 'Payment Gateway Duitku', icon: CreditCard },
+  ]
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto pb-20">
-      
-      {/* HEADER */}
-      <DashboardPageHeader
-        title="Pengaturan Tarif Angkatan"
-        description="Tentukan besaran biaya masuk dan tahunan berdasarkan tahun masuk santri."
-      />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-         
-         {/* KOLOM KIRI: FORM INPUT */}
-         <div className="lg:col-span-1">
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm sticky top-24">
-                <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2 border-b pb-4">
-                    <Edit className="w-5 h-5 text-emerald-600"/> Edit / Baru
-                </h3>
-                
-                <form onSubmit={handleSimpan} className="space-y-5">
-                    
-                    {/* Tahun Selector */}
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tahun Angkatan (Masuk)</label>
-                        <div className="grid grid-cols-[48px_minmax(0,1fr)_48px] gap-2 items-center">
-                            <button type="button" onClick={() => setTahunInput(t => t - 1)} className="h-12 w-12 bg-slate-100 rounded-lg hover:bg-slate-200 font-bold text-lg text-slate-700 flex items-center justify-center shrink-0">-</button>
-                            <input 
-                                type="number" 
-                                className="w-full min-w-0 h-12 text-center font-bold text-lg border rounded-lg bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500"
-                                value={tahunInput}
-                                onChange={(e) => setTahunInput(Number(e.target.value))}
-                            />
-                            <button type="button" onClick={() => setTahunInput(t => t + 1)} className="h-12 w-12 bg-slate-100 rounded-lg hover:bg-slate-200 font-bold text-lg text-slate-700 flex items-center justify-center shrink-0">+</button>
-                        </div>
-                    </div>
-
-                    <hr className="border-dashed"/>
-
-                    {/* Input Biaya */}
-                    {loading ? (
-                        <div className="py-10 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400"/></div>
-                    ) : (
-                        <>
-                            <InputDuit label="Uang Bangunan (Sekali)" value={nominal.BANGUNAN} onChange={v => setNominal({...nominal, BANGUNAN: v})} />
-                            <InputDuit label="Infaq Kesehatan (Tahunan)" value={nominal.KESEHATAN} onChange={v => setNominal({...nominal, KESEHATAN: v})} />
-                            <InputDuit label="Uang EHB (Tahunan)" value={nominal.EHB} onChange={v => setNominal({...nominal, EHB: v})} />
-                            <InputDuit label="Ekstrakurikuler (Tahunan)" value={nominal.EKSKUL} onChange={v => setNominal({...nominal, EKSKUL: v})} />
-                        </>
-                    )}
-
-                    <button 
-                        disabled={isSaving || loading}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-bold shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-transform active:scale-95"
-                    >
-                        {isSaving ? <Loader2 className="w-5 h-5 animate-spin"/> : <Save className="w-5 h-5"/>}
-                        SIMPAN TARIF
-                    </button>
-
-                </form>
+    <div className="space-y-6 pb-12">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-emerald-50 rounded-xl text-emerald-700 border border-emerald-100">
+              <GearSix className="w-5 h-5" weight="bold" />
             </div>
-         </div>
+            <div>
+              <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+                Pengaturan Keuangan
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Konfigurasi tarif terversi, pembebasan biaya santri, limit buku besar uang jajan, dan gateway pembayaran.
+              </p>
+            </div>
+          </div>
+        </div>
 
-         {/* KOLOM KANAN: TABEL RIWAYAT */}
-         <div className="lg:col-span-2">
-            <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-                <div className="p-5 bg-slate-50 border-b flex justify-between items-center">
-                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                        <History className="w-5 h-5"/> Daftar Tarif Tersimpan
-                    </h3>
-                </div>
-                
-                {listTarif.length === 0 ? (
-                    <div className="p-10 text-center text-slate-400 italic">Belum ada data tarif yang diatur.</div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-white text-slate-500 border-b uppercase text-xs">
-                                <tr>
-                                    <th className="px-6 py-4">Angkatan</th>
-                                    <th className="px-6 py-4 text-right">Bangunan</th>
-                                    <th className="px-6 py-4 text-right">Kesehatan</th>
-                                    <th className="px-6 py-4 text-right">EHB</th>
-                                    <th className="px-6 py-4 text-right">Ekskul</th>
-                                    <th className="px-4 py-4 text-center">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {listTarif.map((item: any) => (
-                                    <tr key={item.tahun} className={`hover:bg-emerald-50 transition-colors ${item.tahun === tahunInput ? 'bg-emerald-50/50' : ''}`}>
-                                        <td className="px-6 py-4 font-bold text-lg text-emerald-800">{item.tahun}</td>
-                                        <td className="px-6 py-4 text-right font-mono">{rp(item.BANGUNAN)}</td>
-                                        <td className="px-6 py-4 text-right font-mono">{rp(item.KESEHATAN)}</td>
-                                        <td className="px-6 py-4 text-right font-mono">{rp(item.EHB)}</td>
-                                        <td className="px-6 py-4 text-right font-mono">{rp(item.EKSKUL)}</td>
-                                        <td className="px-4 py-4 text-center">
-                                            <button 
-                                                onClick={() => setTahunInput(item.tahun)}
-                                                className="text-xs bg-white border border-emerald-200 text-emerald-600 px-3 py-1 rounded-full hover:bg-emerald-600 hover:text-white transition-colors"
-                                            >
-                                                Edit
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+        <div className="flex items-center gap-3 shrink-0">
+          {!canMutate && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
+              <Eye className="w-4 h-4 text-amber-600" />
+              <span>Akses Mode Lihat Saja ({userRole.toUpperCase()})</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={refreshData}
+            disabled={isPending}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 shadow-xs transition-colors disabled:opacity-50"
+          >
+            <ArrowClockwise className={`w-3.5 h-3.5 ${isPending ? 'animate-spin' : ''}`} weight="bold" />
+            <span>Segarkan</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Internal Sub-Navigation Tabs (UI_UX_GUIDELINES #24) */}
+      <div className="border-b border-slate-200/80">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          {tabs.map((tab) => {
+            const Icon = tab.icon
+            const isActive = activeTab === tab.key
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all shrink-0 ${
+                  isActive
+                    ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50 rounded-t-lg'
+                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} weight={isActive ? 'bold' : 'regular'} />
+                <span>{tab.label}</span>
+                {tab.badge !== undefined && tab.badge > 0 && (
+                  <span
+                    className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                      isActive
+                        ? 'bg-emerald-200/70 text-emerald-900'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {tab.badge}
+                  </span>
                 )}
-            </div>
-         </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
 
+      {/* Tab Panels */}
+      <div>
+        {activeTab === 'tarif' && (
+          <TarifTab
+            tariffs={data.tariffs}
+            academicYears={data.academicYears}
+            canMutate={canMutate}
+            onRefresh={refreshData}
+          />
+        )}
+
+        {activeTab === 'pembebasan' && (
+          <PembebasanTab
+            exemptions={data.exemptions}
+            academicYears={data.academicYears}
+            canMutate={canMutate}
+            onRefresh={refreshData}
+          />
+        )}
+
+        {activeTab === 'limit' && (
+          <LimitJajanTab
+            globalDailyLimit={data.globalDailyLimit}
+            studentLimits={data.studentLimits}
+            canMutate={canMutate}
+            onRefresh={refreshData}
+          />
+        )}
+
+        {activeTab === 'gateway' && (
+          <GatewayTab
+            gatewayConfig={data.gatewayConfig}
+            canMutate={canMutate}
+            onRefresh={refreshData}
+          />
+        )}
       </div>
     </div>
   )
-}
-
-// Sub Component: Input Duit
-function InputDuit({ label, value, onChange }: { label: string, value: number, onChange: (val: number) => void }) {
-    const displayValue = Number(value || 0).toLocaleString('id-ID')
-
-    return (
-        <div>
-            <label className="text-xs font-bold text-slate-500 uppercase block mb-1">{label}</label>
-            <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-slate-400 font-bold">Rp</span>
-                </div>
-                <input 
-                    type="text"
-                    inputMode="numeric"
-                    className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-right"
-                    value={displayValue}
-                    onChange={(e) => {
-                        const digits = e.target.value.replace(/\D/g, '')
-                        onChange(digits ? Number(digits) : 0)
-                    }}
-                    onFocus={(e) => e.target.select()}
-                />
-            </div>
-        </div>
-    )
 }

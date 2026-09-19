@@ -51,9 +51,20 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
   const [isTopUpSelected, setIsTopUpSelected] = useState<boolean>(false)
   const [topUpAmount, setTopUpAmount] = useState<number>(100000)
 
+  // Payment Channels Whitelist from Settings
+  const enabledChannels = useMemo(() => {
+    return billingData.gatewayInfo?.enabledChannels || ['DUITKU_VA', 'DUITKU_QRIS']
+  }, [billingData.gatewayInfo?.enabledChannels])
+  const isVaEnabled = enabledChannels.includes('DUITKU_VA')
+  const isQrisEnabled = enabledChannels.includes('DUITKU_QRIS')
+
   // Checkout state
   const [isCheckingOut, setIsCheckingOut] = useState<boolean>(false)
-  const [paymentMethod, setPaymentMethod] = useState<'DUITKU_VA' | 'DUITKU_QRIS'>('DUITKU_VA')
+  const [paymentMethod, setPaymentMethod] = useState<'DUITKU_VA' | 'DUITKU_QRIS'>(() => {
+    if (isVaEnabled) return 'DUITKU_VA'
+    if (isQrisEnabled) return 'DUITKU_QRIS'
+    return 'DUITKU_VA'
+  })
   const [vaBank, setVaBank] = useState<string>('BR') // default BRI
   const [checkoutResult, setCheckoutResult] = useState<PortalCheckoutResponse | null>(null)
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
@@ -795,29 +806,33 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
             <div className="flex items-center justify-between border-b border-slate-100 pb-2 text-[11px]">
               <div className="flex items-center gap-1.5">
                 <span className="text-slate-400 font-semibold mr-1">Metode:</span>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('DUITKU_VA')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition ${
-                    paymentMethod === 'DUITKU_VA'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Virtual Account
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('DUITKU_QRIS')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition ${
-                    paymentMethod === 'DUITKU_QRIS'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  QRIS
-                </button>
-                {paymentMethod === 'DUITKU_VA' && (
+                {isVaEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('DUITKU_VA')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                      paymentMethod === 'DUITKU_VA'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Virtual Account
+                  </button>
+                )}
+                {isQrisEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('DUITKU_QRIS')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                      paymentMethod === 'DUITKU_QRIS'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    QRIS
+                  </button>
+                )}
+                {isVaEnabled && paymentMethod === 'DUITKU_VA' && (
                   <select
                     value={vaBank}
                     onChange={e => setVaBank(e.target.value)}

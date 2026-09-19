@@ -330,3 +330,35 @@ export async function getSettlementDetail(
     items: items || [],
   }
 }
+
+/**
+ * Mengambil konfigurasi rekening tujuan settlement bank pesantren dari app_settings.
+ */
+export async function getSettlementAccountConfig(): Promise<{
+  destinationBank: string
+  destinationAccount: string
+  accountHolder: string
+}> {
+  let destinationBank = 'Bank Syariah Indonesia (BSI)'
+  let destinationAccount = ''
+  let accountHolder = 'Pesantren SKH'
+
+  try {
+    const rows = await query<{ key: string; value: string }>(
+      `SELECT key, value FROM app_settings WHERE key IN (
+        'settlement_destination_bank',
+        'settlement_destination_account',
+        'settlement_account_holder'
+      )`
+    )
+    for (const r of rows) {
+      if (r.key === 'settlement_destination_bank' && r.value) destinationBank = r.value.trim()
+      if (r.key === 'settlement_destination_account' && r.value) destinationAccount = r.value.trim()
+      if (r.key === 'settlement_account_holder' && r.value) accountHolder = r.value.trim()
+    }
+  } catch {
+    // Abaikan jika tabel belum siap
+  }
+
+  return { destinationBank, destinationAccount, accountHolder }
+}

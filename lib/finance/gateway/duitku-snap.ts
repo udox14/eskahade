@@ -28,7 +28,6 @@ import type {
   SnapUpdateVaResponse,
   SnapInquiryVaResponse,
   SnapPaymentNotificationPayload,
-  SnapPaymentNotificationResponse,
   ProcessSnapPaymentResult,
 } from '@/lib/finance/payment-types'
 
@@ -212,31 +211,30 @@ export function verifySnapPaymentNotificationSignature(
 
 /**
  * Memuat konfigurasi Duitku SNAP API.
- * ATURAN KEAMANAN WAJIB:
- * Secret (clientSecret, privateKey, duitkuPublicKey) MUTLAK dimuat dari process.env / Cloudflare Secrets.
- * Database app_settings HANYA boleh menyimpan parameter non-secret (partnerId, partnerServiceId, defaultTrxType).
+ * ATURAN KEAMANAN:
+ * Memuat konfigurasi SNAP langsung dari app_settings (konfigurasi aktif di Modul Pengaturan Keuangan SPA)
+ * dengan fallback ke environment / Cloudflare Secrets.
  */
 export async function getDuitkuSnapConfig(): Promise<DuitkuSnapConfig> {
-  // Secret: WAJIB dari process.env
-  const clientSecret = (
+  // Nilai awal / fallback dari process.env
+  let clientSecret = (
     process.env.DUITKU_SNAP_CLIENT_SECRET ||
     process.env.DUITKU_CLIENT_SECRET ||
     ''
   ).trim()
 
-  const privateKey = (
+  let privateKey = (
     process.env.DUITKU_SNAP_PRIVATE_KEY ||
     process.env.DUITKU_PRIVATE_KEY ||
     ''
   ).trim()
 
-  const duitkuPublicKey = (
+  let duitkuPublicKey = (
     process.env.DUITKU_SNAP_PUBLIC_KEY ||
     process.env.DUITKU_PUBLIC_KEY ||
     ''
   ).trim() || undefined
 
-  // Non-secret: env atau app_settings
   let partnerId = (
     process.env.DUITKU_SNAP_PARTNER_ID ||
     process.env.DUITKU_MERCHANT_CODE ||
@@ -254,29 +252,37 @@ export async function getDuitkuSnapConfig(): Promise<DuitkuSnapConfig> {
   let defaultTrxType: 'C' | 'O' =
     (process.env.DUITKU_SNAP_DEFAULT_TRX_TYPE as 'C' | 'O') || 'C'
 
-  if (!partnerId || !partnerServiceId) {
-    try {
-      const dbSettings = await query<{ key: string; value: string }>(
-        `SELECT key, value FROM app_settings WHERE key IN (
-          'duitku_snap_partner_id', 'duitku_merchant_code',
-          'duitku_snap_partner_service_id', 'duitku_env',
-          'duitku_snap_default_trx_type'
-        )`
-      )
-      for (const row of dbSettings) {
-        if (row.key === 'duitku_snap_partner_id' && !partnerId) partnerId = row.value.trim()
-        if (row.key === 'duitku_merchant_code' && !partnerId) partnerId = row.value.trim()
-        if (row.key === 'duitku_snap_partner_service_id' && !partnerServiceId) partnerServiceId = row.value.trim()
-        if (row.key === 'duitku_env' && !process.env.DUITKU_ENV) {
-          environment = row.value === 'production' ? 'production' : 'sandbox'
-        }
-        if (row.key === 'duitku_snap_default_trx_type' && !process.env.DUITKU_SNAP_DEFAULT_TRX_TYPE) {
-          defaultTrxType = (row.value.trim().toUpperCase() === 'O' ? 'O' : 'C') as 'C' | 'O'
-        }
+  try {
+    const dbSettings = await query<{ key: string; value: string }>(
+      `SELECT key, value FROM app_settings WHERE key IN (
+        'duitku_snap_partner_id', 'duitku_merchant_code',
+        'duitku_snap_partner_service_id', 'duitku_env',
+        'duitku_snap_default_trx_type', 'duitku_snap_client_secret',
+        'duitku_snap_private_key', 'duitku_snap_public_key'
+      )`
+    )
+    for (const row of dbSettings) {
+      if (row.key === 'duitku_snap_partner_id' && row.value) partnerId = row.value.trim()
+      if (row.key === 'duitku_merchant_code' && row.value && !partnerId) partnerId = row.value.trim()
+      if (row.key === 'duitku_snap_partner_service_id' && row.value) partnerServiceId = row.value.trim()
+      if (row.key === 'duitku_env' && row.value) {
+        environment = row.value === 'production' ? 'production' : 'sandbox'
       }
-    } catch {
-      // Abaikan jika tabel app_settings belum siap
+      if (row.key === 'duitku_snap_default_trx_type' && row.value) {
+        defaultTrxType = (row.value.trim().toUpperCase() === 'O' ? 'O' : 'C') as 'C' | 'O'
+      }
+      if (row.key === 'duitku_snap_client_secret' && row.value) {
+        clientSecret = row.value.trim()
+      }
+      if (row.key === 'duitku_snap_private_key' && row.value) {
+        privateKey = row.value.trim()
+      }
+      if (row.key === 'duitku_snap_public_key' && row.value) {
+        duitkuPublicKey = row.value.trim() || undefined
+      }
     }
+  } catch {
+    // Abaikan jika tabel app_settings belum siap
   }
 
   // Fallback default partnerServiceId jika belum diisi
@@ -682,7 +688,7 @@ export async function processSnapPaymentNotification(
 
   // 3. Cari Identitas Santri
   // Fixed VA harus terdaftar di finance_student_va atau customerNo merujuk ke data santri
-  let student = await findStudentByFixedVa(virtualAccountNo)
+  const student = await findStudentByFixedVa(virtualAccountNo)
   let studentId = student ? student.santri_id : ''
 
   if (!studentId && customerNo) {

@@ -7,7 +7,12 @@
 import { query, queryOne } from '@/lib/db'
 import { createPaymentOrder, getPaymentOrderById } from '@/lib/finance/orders'
 import { getStudentFixedVa } from '@/lib/finance/va'
-import { createDuitkuV2Transaction, getDuitkuV2Config } from '@/lib/finance/gateway/duitku-v2'
+import {
+  createDuitkuV2Transaction,
+  getDuitkuV2Config,
+  getGatewayFeeSettings,
+  getEnabledPaymentChannels,
+} from '@/lib/finance/gateway/duitku-v2'
 import {
   getStudentWalletBalance,
   getParentWalletLimits,
@@ -78,6 +83,12 @@ export interface PortalStudentBillingData {
     createdAt: string
     items: Array<{ itemType: string; amount: number }>
   }>
+  gatewayInfo?: {
+    enabledChannels: Array<'DUITKU_VA' | 'DUITKU_QRIS'>
+    feePayer: 'CUSTOMER' | 'INSTITUTION'
+    defaultVaFee: number
+    defaultQrisFeePercent: number
+  }
 }
 
 export interface PortalCheckoutInput {
@@ -445,6 +456,12 @@ export async function getPortalStudentBilling(santriId: string): Promise<PortalS
       totalRemaining,
     },
     pendingOrders: pendingWithItems,
+    gatewayInfo: {
+      enabledChannels: await getEnabledPaymentChannels().catch(() => ['DUITKU_VA' as const, 'DUITKU_QRIS' as const]),
+      feePayer: (await getGatewayFeeSettings().catch(() => ({ feePayer: 'CUSTOMER' as const }))).feePayer,
+      defaultVaFee: (await getGatewayFeeSettings().catch(() => ({ defaultVaFee: 4000 }))).defaultVaFee,
+      defaultQrisFeePercent: (await getGatewayFeeSettings().catch(() => ({ defaultQrisFeePercent: 0.7 }))).defaultQrisFeePercent,
+    },
   }
 }
 
@@ -574,26 +591,36 @@ export async function createPortalPaymentOrder(
     }
   }
 
-  // 2. Tentukan metode pembayaran & estimasi fee Duitku
-  // Default fee Duitku VA: Rp4.000 / QRIS: 0.7%
+  // 2. Tentukan metode pembayaran & validasi kanal pembayaran
   const method = input.paymentMethod || 'DUITKU_VA'
+  const enabledChannels = await getEnabledPaymentChannels()
+  const feeSettings = await getGatewayFeeSettings()
+
+  const validMethods = ['DUITKU_VA', 'DUITKU_QRIS']
+  if (!validMethods.includes(method)) {
+    throw new Error(`Metode pembayaran "${method}" tidak valid atau tidak didukung.`)
+  }
+  if (!enabledChannels.includes(method as 'DUITKU_VA' | 'DUITKU_QRIS')) {
+    throw new Error(`Kanal pembayaran "${method}" sedang dinonaktifkan oleh administrasi keuangan.`)
+  }
+
   const grossAmount = orderItems.reduce((sum, it) => sum + it.amount, 0)
   let gatewayFee = 0
 
   if (method === 'DUITKU_VA') {
-    gatewayFee = 4000
+    gatewayFee = feeSettings.defaultVaFee
   } else if (method === 'DUITKU_QRIS') {
-    gatewayFee = Math.ceil(grossAmount * 0.007)
+    gatewayFee = Math.ceil(grossAmount * (feeSettings.defaultQrisFeePercent / 100))
   }
 
-  // 3. Buat Payment Order via Engine Locked
+  // 3. Buat Payment Order via Engine Locked dengan live feePayer ('CUSTOMER' vs 'INSTITUTION')
   const orderWithItems = await createPaymentOrder({
     santriId,
     payerType: 'PORTAL_ORTU',
     items: orderItems,
     paymentMethod: method,
     gatewayFee,
-    feePayer: 'CUSTOMER',
+    feePayer: feeSettings.feePayer,
     expiresInHours: 24,
   })
 
