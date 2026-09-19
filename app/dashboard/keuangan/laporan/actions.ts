@@ -1,132 +1,108 @@
 'use server'
 
-import { query } from '@/lib/db'
-import { getSession, hasAnyRole } from '@/lib/auth/session'
-import { getCachedBiayaSettings } from '@/lib/cache/master'
+// app/dashboard/keuangan/laporan/actions.ts
+// Server Actions untuk Modul Laporan & Cetak Ekspor Keuangan (Fase 10: PRD Bab 34)
 
-export async function getLaporanKeuangan(tahun: number) {
-  // Fix #11: Auth guard — hanya admin/keuangan yang boleh akses laporan keuangan
+import { getSession, getEffectiveRoles } from '@/lib/auth/session'
+import { canAccessFeatureForSession } from '@/lib/auth/feature'
+import {
+  getReceiptsReport,
+  getDistributionsReport,
+  getArrearsReport,
+  getExemptionsReport,
+  getStudentDetailReport,
+  getWalletReport,
+  getCashSessionsReport,
+  getCashSessionDetailReport,
+  getSettlementsReport,
+  getReconciliationsReport,
+  getReportFilterOptions,
+  type ReceiptsReportFilter,
+  type DistributionsReportFilter,
+  type ArrearsReportFilter,
+  type ExemptionsReportFilter,
+  type StudentDetailReportFilter,
+  type WalletReportFilter,
+  type CashSessionsReportFilter,
+  type SettlementsReportFilter,
+  type ReconciliationsReportFilter,
+} from '@/lib/finance/reports'
+
+async function assertReportPermission(): Promise<void> {
   const session = await getSession()
-  if (!session || !hasAnyRole(session, ['admin', 'keuangan', 'bendahara_pusat'])) {
-    throw new Error('Akses ditolak: hanya admin atau keuangan yang dapat melihat laporan ini.')
+  if (!session) {
+    throw new Error('Sesi autentikasi telah berakhir. Silakan login kembali.')
   }
 
-  const startDate = `${tahun}-01-01`
-  const endDate = `${tahun}-12-31`
+  const roles = getEffectiveRoles(session)
+  const isPrivileged =
+    roles.includes('admin') ||
+    roles.includes('bendahara') ||
+    roles.includes('pimpinan') ||
+    roles.includes('demo') ||
+    roles.includes('tester')
 
-  // 1. Cash flow tahun ini (tidak berubah, sudah ada filter tanggal)
-  const listTransaksi = await query<any>(`
-    SELECT pt.id, pt.jenis_biaya, pt.nominal_bayar, pt.tahun_tagihan, pt.tanggal_bayar, pt.keterangan,
-           s.nama_lengkap, s.nis, s.asrama,
-           u.full_name AS penerima_nama
-    FROM pembayaran_tahunan pt
-    JOIN santri s ON s.id = pt.santri_id
-    LEFT JOIN users u ON u.id = pt.penerima_id
-    WHERE pt.tanggal_bayar >= ? AND pt.tanggal_bayar <= ?
-    ORDER BY pt.tanggal_bayar DESC
-  `, [startDate, endDate])
+  const hasFeatureAccess = await canAccessFeatureForSession(
+    session,
+    '/dashboard/keuangan/laporan'
+  ).catch(() => false)
 
-  // SPP Juli yang diarahkan ke Bendahara Pusat (santri baru PSB atau kategori BARU).
-  // Fix #5: Filter diubah dari `psb_receipt_id IS NOT NULL` ke `tujuan_setoran = 'BENDAHARA_PUSAT'`.
-  // Filter lama melewatkan pembayaran SPP Juli yang dilakukan via modul asrama
-  // (Quick Pay / pembayaran manual) karena tidak menyimpan psb_receipt_id.
-  const sppJuliPsb = await query<any>(`
-    SELECT sl.id, sl.nominal_bayar, sl.tanggal_bayar, sl.keterangan,
-           s.nama_lengkap, s.nis, s.asrama,
-           u.full_name AS penerima_nama
-    FROM spp_log sl
-    JOIN santri s ON s.id = sl.santri_id
-    LEFT JOIN users u ON u.id = sl.penerima_id
-    WHERE sl.tujuan_setoran = 'BENDAHARA_PUSAT'
-      AND sl.tanggal_bayar >= ? AND sl.tanggal_bayar <= ?
-    ORDER BY sl.tanggal_bayar DESC
-  `, [startDate, endDate])
-
-  const cashFlow = { BANGUNAN: 0, KESEHATAN: 0, EHB: 0, EKSKUL: 0, SPP_JULI: 0, TOTAL: 0 }
-  listTransaksi.forEach((item: any) => {
-    const jenis = item.jenis_biaya as keyof typeof cashFlow
-    if (cashFlow[jenis] !== undefined) cashFlow[jenis] += item.nominal_bayar
-    cashFlow.TOTAL += item.nominal_bayar
-  })
-  sppJuliPsb.forEach((item: any) => {
-    cashFlow.SPP_JULI += item.nominal_bayar
-    cashFlow.TOTAL += item.nominal_bayar
-    listTransaksi.push({
-      id: item.id,
-      jenis_biaya: 'SPP_JULI',
-      nominal_bayar: item.nominal_bayar,
-      tahun_tagihan: null,
-      tanggal_bayar: item.tanggal_bayar,
-      keterangan: item.keterangan,
-      nama_lengkap: item.nama_lengkap,
-      nis: item.nis,
-      asrama: item.asrama,
-      penerima_nama: item.penerima_nama,
-    })
-  })
-  listTransaksi.sort((a: any, b: any) => String(b.tanggal_bayar).localeCompare(String(a.tanggal_bayar)))
-
-  // 2. Target & kekurangan
-  const santriList = await query<any>(
-    "SELECT id, tahun_masuk, created_at FROM santri WHERE status_global = 'aktif'", []
-  )
-  const settings = await getCachedBiayaSettings()
-
-  // FIX #3: Pisah query BANGUNAN (lifetime) dan tahunan, keduanya dengan filter yang tepat
-  // BANGUNAN: lifetime, ambil semua bangunan tanpa filter tahun
-  const allBangunanPayments = await query<any>(
-    "SELECT santri_id, nominal_bayar FROM pembayaran_tahunan WHERE jenis_biaya = 'BANGUNAN'",
-    []
-  )
-  // KESEHATAN, EHB, EKSKUL: hanya untuk tahun yang sedang dilihat
-  const tahunanPayments = await query<any>(
-    "SELECT santri_id, jenis_biaya, nominal_bayar FROM pembayaran_tahunan WHERE jenis_biaya IN ('KESEHATAN', 'EHB', 'EKSKUL') AND tahun_tagihan = ?",
-    [tahun]
-  )
-
-  const mapTarif = new Map<string, number>()
-  settings.forEach((s: any) => { mapTarif.set(`${s.tahun_angkatan}-${s.jenis_biaya}`, s.nominal) })
-
-  // Buat map untuk lookup cepat, hindari .filter() berulang di dalam loop
-  const mapBangunan = new Map<string, number>()
-  allBangunanPayments.forEach((p: any) => {
-    mapBangunan.set(p.santri_id, (mapBangunan.get(p.santri_id) ?? 0) + p.nominal_bayar)
-  })
-
-  const mapTahunan = new Map<string, { KESEHATAN: number; EHB: number; EKSKUL: number }>()
-  tahunanPayments.forEach((p: any) => {
-    if (!mapTahunan.has(p.santri_id)) mapTahunan.set(p.santri_id, { KESEHATAN: 0, EHB: 0, EKSKUL: 0 })
-    const entry = mapTahunan.get(p.santri_id)!
-    entry[p.jenis_biaya as 'KESEHATAN' | 'EHB' | 'EKSKUL'] += p.nominal_bayar
-  })
-
-  const targets = {
-    BANGUNAN:  { target: 0, terima: 0, kurang: 0 },
-    KESEHATAN: { target: 0, terima: 0, kurang: 0 },
-    EHB:       { target: 0, terima: 0, kurang: 0 },
-    EKSKUL:    { target: 0, terima: 0, kurang: 0 },
+  if (!isPrivileged && !hasFeatureAccess) {
+    throw new Error('Anda tidak memiliki izin untuk mengakses Laporan Keuangan.')
   }
+}
 
-  santriList.forEach((s: any) => {
-    const angkatan = s.tahun_masuk || new Date(s.created_at).getFullYear()
+export async function fetchReceiptsReport(filters: ReceiptsReportFilter) {
+  await assertReportPermission()
+  return await getReceiptsReport(filters)
+}
 
-    // Bangunan (lifetime)
-    const tarifBangunan = mapTarif.get(`${angkatan}-BANGUNAN`) || 0
-    const sudahBayarBangunan = mapBangunan.get(s.id) ?? 0
-    targets.BANGUNAN.target += tarifBangunan
-    targets.BANGUNAN.terima += sudahBayarBangunan
-    targets.BANGUNAN.kurang += Math.max(0, tarifBangunan - sudahBayarBangunan)
+export async function fetchDistributionsReport(filters: DistributionsReportFilter) {
+  await assertReportPermission()
+  return await getDistributionsReport(filters)
+}
 
-    // Tahunan
-    const tahunanSantri = mapTahunan.get(s.id)
-    ;(['KESEHATAN', 'EHB', 'EKSKUL'] as const).forEach(jenis => {
-      const tarif = mapTarif.get(`${angkatan}-${jenis}`) || 0
-      const sudahBayar = tahunanSantri?.[jenis] ?? 0
-      targets[jenis].target += tarif
-      targets[jenis].terima += sudahBayar
-      targets[jenis].kurang += Math.max(0, tarif - sudahBayar)
-    })
-  })
+export async function fetchArrearsReport(filters: ArrearsReportFilter) {
+  await assertReportPermission()
+  return await getArrearsReport(filters)
+}
 
-  return { cashFlow, targets, list: listTransaksi }
+export async function fetchExemptionsReport(filters: ExemptionsReportFilter) {
+  await assertReportPermission()
+  return await getExemptionsReport(filters)
+}
+
+export async function fetchStudentDetailReport(filters: StudentDetailReportFilter) {
+  await assertReportPermission()
+  return await getStudentDetailReport(filters)
+}
+
+export async function fetchWalletReport(filters: WalletReportFilter) {
+  await assertReportPermission()
+  return await getWalletReport(filters)
+}
+
+export async function fetchCashSessionsReport(filters: CashSessionsReportFilter) {
+  await assertReportPermission()
+  return await getCashSessionsReport(filters)
+}
+
+export async function fetchSettlementsReport(filters: SettlementsReportFilter) {
+  await assertReportPermission()
+  return await getSettlementsReport(filters)
+}
+
+export async function fetchReconciliationsReport(filters: ReconciliationsReportFilter) {
+  await assertReportPermission()
+  return await getReconciliationsReport(filters)
+}
+
+export async function fetchCashSessionDetailReport(sessionId: string) {
+  await assertReportPermission()
+  return await getCashSessionDetailReport(sessionId)
+}
+
+export async function fetchReportFilterOptions() {
+  await assertReportPermission()
+  return await getReportFilterOptions()
 }
