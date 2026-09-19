@@ -30,7 +30,7 @@ export async function gantiPasswordPortal(passwordLama: string, passwordBaru: st
     )
 
     return { success: true }
-  } catch (err: any) {
-    return { error: err?.message || 'Gagal mengganti password.' }
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Gagal mengganti password.' }
   }
 }

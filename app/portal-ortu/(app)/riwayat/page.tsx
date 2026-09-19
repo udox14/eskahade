@@ -1,8 +1,9 @@
 import { requirePortalSessionStrict } from '@/lib/portal/session'
+import { getPortalFinancialHistory, getPortalStudentBilling } from '@/lib/portal/finance'
 import { getRiwayatSubmissions } from '@/lib/portal/data'
 import { namaBulanId } from '@/lib/portal/format'
 import { PortalPageHeader } from '../../_components/page-header'
-import { RiwayatClient, type RiwayatItem } from './_riwayat-client'
+import { RiwayatClient, type LegacyRiwayatItem } from './_riwayat-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,14 +14,20 @@ const NON_SPP_LABEL: Record<string, string> = {
   EKSKUL: 'Ekstrakurikuler',
 }
 
+interface LegacyDetailItem {
+  bulan?: number | string
+  tahun?: number | string
+  jenis_biaya?: string
+}
+
 function parseDetail(kategori: string, detailJson: string): string[] {
   try {
-    const parsed = JSON.parse(detailJson)
+    const parsed = JSON.parse(detailJson) as LegacyDetailItem[]
     if (!Array.isArray(parsed)) return []
     if (kategori === 'SPP') {
-      return parsed.map((item: any) => `${namaBulanId(Number(item.bulan))} ${item.tahun}`)
+      return parsed.map((item) => `${namaBulanId(Number(item.bulan))} ${item.tahun}`)
     }
-    return parsed.map((item: any) => NON_SPP_LABEL[item.jenis_biaya] || String(item.jenis_biaya))
+    return parsed.map((item) => (item.jenis_biaya && NON_SPP_LABEL[item.jenis_biaya]) || String(item.jenis_biaya ?? ''))
   } catch {
     return []
   }
@@ -28,9 +35,14 @@ function parseDetail(kategori: string, detailJson: string): string[] {
 
 export default async function RiwayatPage() {
   const session = await requirePortalSessionStrict()
-  const rows = await getRiwayatSubmissions(session.santri_id)
 
-  const items: RiwayatItem[] = rows.map(row => ({
+  const [history, billing, rows] = await Promise.all([
+    getPortalFinancialHistory(session.santri_id).catch(() => []),
+    getPortalStudentBilling(session.santri_id),
+    getRiwayatSubmissions(session.santri_id).catch(() => []),
+  ])
+
+  const legacyItems: LegacyRiwayatItem[] = rows.map(row => ({
     id: row.id,
     kategori: row.kategori,
     rincian: parseDetail(row.kategori, row.detail_json),
@@ -54,11 +66,15 @@ export default async function RiwayatPage() {
     <div>
       <PortalPageHeader
         kicker="Pembayaran"
-        title="Riwayat Pengajuan"
-        subtitle="Pantau status pembayaran transfer & QRIS Anda"
+        title="Riwayat Transaksi"
+        subtitle="Riwayat pembayaran resmi tagihan, Uang Jajan & kuitansi sah"
       />
       <div className="px-5 -mt-9">
-        <RiwayatClient items={items} />
+        <RiwayatClient
+          history={history}
+          santri={billing.santri}
+          legacyItems={legacyItems}
+        />
       </div>
     </div>
   )

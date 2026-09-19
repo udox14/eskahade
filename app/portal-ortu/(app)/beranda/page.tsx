@@ -1,11 +1,13 @@
 import Link from 'next/link'
 import {
-  CalendarCheck, ShieldWarning, Sparkle,
+  CalendarCheck, ShieldWarning, Sparkle, Receipt, Wallet,
 } from '@phosphor-icons/react/dist/ssr'
 import { requirePortalSessionStrict } from '@/lib/portal/session'
 import {
   getPelanggaranAnak, getRekapAbsensiAnak,
 } from '@/lib/portal/data'
+import { getPortalStudentBilling } from '@/lib/portal/finance'
+import { formatRupiah } from '@/lib/portal/format'
 import { toWibDateInputValue } from '@/lib/date/wib'
 
 export const dynamic = 'force-dynamic'
@@ -24,9 +26,10 @@ export default async function BerandaPage() {
   const session = await requirePortalSessionStrict()
   const { start, end } = monthRange()
 
-  const [absen, pelanggaran] = await Promise.all([
+  const [absen, pelanggaran, billing] = await Promise.all([
     getRekapAbsensiAnak(session.santri_id, start, end),
     getPelanggaranAnak(session.santri_id),
+    getPortalStudentBilling(session.santri_id).catch(() => null),
   ])
   const totalPoin = pelanggaran.reduce((sum, p) => sum + p.poin, 0)
   const persenHadir = absen.totalSesi > 0 ? Math.round((absen.hadir / absen.totalSesi) * 100) : null
@@ -104,6 +107,49 @@ export default async function BerandaPage() {
             </Link>
           </div>
         </div>
+
+        {/* Keuangan & Uang Jajan */}
+        {billing && (
+          <div>
+            <p className="portal-section-label mb-3">02 — Keuangan & Uang Jajan</p>
+            <div className="portal-rise portal-rise-4 grid grid-cols-2 border border-[var(--p-line)] divide-x divide-[var(--p-line)]">
+              <Link href="/portal-ortu/tagihan" className="p-4">
+                <div className="flex items-center justify-between">
+                  <Receipt className="w-4 h-4 text-[var(--p-ink)]" />
+                  <span className="portal-index text-[var(--p-muted)]">
+                    {billing.obligations.totalRemaining > 0 ? 'Tagihan' : 'Lunas'}
+                  </span>
+                </div>
+                <p className="portal-display mt-3 text-xl leading-none text-[var(--p-emerald-deep)] truncate">
+                  {billing.obligations.totalRemaining > 0
+                    ? formatRupiah(billing.obligations.totalRemaining)
+                    : 'Rp 0'}
+                </p>
+                <p className="mt-1.5 text-[11px] font-semibold text-[var(--p-muted)]">
+                  Total sisa tagihan
+                </p>
+                <p className="mt-1 text-[10px] text-[var(--p-muted)]">
+                  {billing.obligations.totalRemaining > 0 ? 'Ketuk untuk bayar' : 'Semua pos lunas'}
+                </p>
+              </Link>
+              <Link href="/portal-ortu/tagihan" className="p-4">
+                <div className="flex items-center justify-between">
+                  <Wallet className="w-4 h-4 text-[var(--p-ink)]" />
+                  <span className="portal-index text-[var(--p-muted)]">Saldo</span>
+                </div>
+                <p className="portal-display mt-3 text-xl leading-none text-[var(--p-ink)] truncate">
+                  {formatRupiah(billing.wallet.balance)}
+                </p>
+                <p className="mt-1.5 text-[11px] font-semibold text-[var(--p-muted)]">
+                  Dompet Uang Jajan
+                </p>
+                <p className="mt-1 text-[10px] text-[var(--p-muted)]">
+                  Limit harian {formatRupiah(billing.wallet.effectiveDailyLimit)}
+                </p>
+              </Link>
+            </div>
+          </div>
+        )}
 
         {pelanggaranBulanIni.length === 0 && absen.alfa === 0 && (
           <div className="flex items-center gap-2.5 border-l-4 border-[var(--p-success)] bg-[var(--p-success-soft)] px-4 py-3">

@@ -129,9 +129,10 @@ export async function createSubmission(input: {
         bankSnapshot,
         String(input.catatan || '').trim() || null,
       ])
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Backstop race: partial unique index uq_portal_submission_pending
-      if (String(err?.message || '').toLowerCase().includes('unique')) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      if (errMsg.toLowerCase().includes('unique')) {
         return { error: 'Masih ada pengajuan yang menunggu konfirmasi untuk kategori ini.' }
       }
       throw err
@@ -150,8 +151,8 @@ export async function createSubmission(input: {
 
     PORTAL_PATHS.forEach(p => revalidatePath(p))
     return { success: true, submissionId: id, jumlah }
-  } catch (err: any) {
-    return { error: err?.message || 'Gagal membuat pengajuan.' }
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Gagal membuat pengajuan.' }
   }
 }
 
@@ -202,8 +203,8 @@ export async function uploadBukti(formData: FormData): Promise<{ success: true }
 
     PORTAL_PATHS.forEach(p => revalidatePath(p))
     return { success: true }
-  } catch (err: any) {
-    return { error: err?.message || 'Gagal mengunggah bukti.' }
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Gagal mengunggah bukti.' }
   }
 }
 
@@ -239,7 +240,68 @@ export async function cancelSubmission(submissionId: string): Promise<{ success:
 
     PORTAL_PATHS.forEach(p => revalidatePath(p))
     return { success: true }
-  } catch (err: any) {
-    return { error: err?.message || 'Gagal membatalkan pengajuan.' }
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Gagal membatalkan pengajuan.' }
   }
 }
+
+// ============================================================
+// SISTEM KEUANGAN BARU — SERVER ACTIONS PORTAL ORANG TUA
+// ============================================================
+
+import {
+  createPortalPaymentOrder,
+  getPortalPaymentOrderDetail,
+  updatePortalWalletLimits,
+  type PortalCheckoutInput,
+  type PortalCheckoutResponse,
+} from '@/lib/portal/finance'
+
+export async function createPortalCheckoutAction(
+  input: PortalCheckoutInput
+): Promise<PortalCheckoutResponse | { error: string }> {
+  try {
+    const session = await requirePortalSessionAction()
+
+    // Otorisasi ketat server-side: hanya santri milik wali yang boleh dicheckout
+    if (input.santriId && input.santriId !== session.santri_id) {
+      return { error: 'Akses ditolak: Anda tidak memiliki akses terhadap tagihan santri ini.' }
+    }
+
+    const res = await createPortalPaymentOrder(session.santri_id, {
+      ...input,
+      santriId: session.santri_id,
+    })
+
+    PORTAL_PATHS.forEach(p => revalidatePath(p))
+    return res
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Gagal membuat pesanan pembayaran.' }
+  }
+}
+
+export async function getPortalOrderDetailAction(orderId: string) {
+  try {
+    const session = await requirePortalSessionAction()
+    const res = await getPortalPaymentOrderDetail(session.santri_id, orderId)
+    return { success: true as const, data: res }
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Gagal memuat detail pesanan.' }
+  }
+}
+
+export async function updateParentLimitsAction(limits: {
+  daily?: number | null
+  weekly?: number | null
+  monthly?: number | null
+}) {
+  try {
+    const session = await requirePortalSessionAction()
+    await updatePortalWalletLimits(session.santri_id, limits)
+    PORTAL_PATHS.forEach(p => revalidatePath(p))
+    return { success: true as const }
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Gagal menyimpan pengaturan limit.' }
+  }
+}
+
