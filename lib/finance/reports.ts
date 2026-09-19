@@ -581,7 +581,7 @@ export async function getReceiptsReport(
     params.push(filters.asrama)
   }
   if (filters.kelas && filters.kelas !== 'ALL') {
-    conditions.push('(k.nama = ? OR s.kelas_sekolah = ?)')
+    conditions.push('(k.nama_kelas = ? OR s.kelas_sekolah = ?)')
     params.push(filters.kelas, filters.kelas)
   }
   if (filters.santriId) {
@@ -664,7 +664,7 @@ export async function getReceiptsReport(
        s.nama_lengkap AS santri_name,
        s.nis AS santri_nis,
        s.asrama AS santri_asrama,
-       COALESCE(k.nama, s.kelas_sekolah) AS santri_kelas,
+       COALESCE(k.nama_kelas, s.kelas_sekolah) AS santri_kelas,
        fp.channel,
        fp.method,
        fp.gross_amount,
@@ -924,7 +924,7 @@ export async function getArrearsReport(
     params.push(filters.asrama)
   }
   if (filters.kelas && filters.kelas !== 'ALL') {
-    conditions.push('(k.nama = ? OR s.kelas_sekolah = ?)')
+    conditions.push('(k.nama_kelas = ? OR s.kelas_sekolah = ?)')
     params.push(filters.kelas, filters.kelas)
   }
   if (filters.santriId) {
@@ -994,7 +994,7 @@ export async function getArrearsReport(
        s.nama_lengkap AS santri_name,
        s.nis AS santri_nis,
        s.asrama AS santri_asrama,
-       COALESCE(k.nama, s.kelas_sekolah) AS santri_kelas,
+       COALESCE(k.nama_kelas, s.kelas_sekolah) AS santri_kelas,
        s.no_wa_ortu,
        ta.nama AS academic_year_name,
        fo.period,
@@ -1100,7 +1100,7 @@ export async function getExemptionsReport(
     params.push(filters.asrama)
   }
   if (filters.kelas && filters.kelas !== 'ALL') {
-    conditions.push('(k.nama = ? OR s.kelas_sekolah = ?)')
+    conditions.push('(k.nama_kelas = ? OR s.kelas_sekolah = ?)')
     params.push(filters.kelas, filters.kelas)
   }
   if (filters.santriId) {
@@ -1168,7 +1168,7 @@ export async function getExemptionsReport(
        s.nama_lengkap AS santri_name,
        s.nis AS santri_nis,
        s.asrama AS santri_asrama,
-       COALESCE(k.nama, s.kelas_sekolah) AS santri_kelas,
+       COALESCE(k.nama_kelas, s.kelas_sekolah) AS santri_kelas,
        fe.item_type,
        ta.nama AS academic_year_name,
        fe.period_start,
@@ -1299,7 +1299,7 @@ export async function getStudentDetailReport(
        s.nama_lengkap AS nama,
        s.asrama,
        s.kamar,
-       COALESCE(k.nama, s.kelas_sekolah) AS kelas,
+       COALESCE(k.nama_kelas, s.kelas_sekolah) AS kelas,
        s.no_wa_ortu,
        sva.va_number AS fixed_va,
        sva.bank_code,
@@ -1573,7 +1573,7 @@ export async function getWalletReport(
       params.push(filters.asrama)
     }
     if (filters.kelas && filters.kelas !== 'ALL') {
-      conditions.push('(k.nama = ? OR s.kelas_sekolah = ?)')
+      conditions.push('(k.nama_kelas = ? OR s.kelas_sekolah = ?)')
       params.push(filters.kelas, filters.kelas)
     }
     if (filters.santriId) {
@@ -1615,11 +1615,11 @@ export async function getWalletReport(
          s.nama_lengkap AS santri_name,
          s.nis AS santri_nis,
          s.asrama AS santri_asrama,
-         COALESCE(k.nama, s.kelas_sekolah) AS santri_kelas,
+         COALESCE(k.nama_kelas, s.kelas_sekolah) AS santri_kelas,
          COALESCE(wl.total_in, 0) AS total_in,
          COALESCE(wl.total_out, 0) AS total_out,
          flim.parent_daily_limit,
-         fc.card_code,
+         fc.card_token AS card_code,
          fc.status AS card_status
        FROM santri s
        LEFT JOIN (
@@ -1697,7 +1697,7 @@ export async function getWalletReport(
       params.push(filters.asrama)
     }
     if (filters.kelas && filters.kelas !== 'ALL') {
-      conditions.push('(k.nama = ? OR s.kelas_sekolah = ?)')
+      conditions.push('(k.nama_kelas = ? OR s.kelas_sekolah = ?)')
       params.push(filters.kelas, filters.kelas)
     }
     if (filters.santriId) {
@@ -1747,7 +1747,7 @@ export async function getWalletReport(
          s.nama_lengkap AS santri_name,
          s.nis AS santri_nis,
          s.asrama AS santri_asrama,
-         COALESCE(k.nama, s.kelas_sekolah) AS santri_kelas,
+         COALESCE(k.nama_kelas, s.kelas_sekolah) AS santri_kelas,
          fwl.movement_type,
          fwl.direction,
          fwl.amount,
@@ -2488,8 +2488,8 @@ export async function getReportFilterOptions(): Promise<ReportFilterOptions> {
       query<{ asrama: string }>(
         "SELECT DISTINCT asrama FROM santri WHERE asrama IS NOT NULL AND asrama != '' ORDER BY asrama ASC"
       ),
-      query<{ nama: string }>(
-        "SELECT DISTINCT nama FROM kelas WHERE nama IS NOT NULL AND nama != '' ORDER BY nama ASC"
+      query<{ nama_kelas: string }>(
+        "SELECT DISTINCT nama_kelas FROM kelas WHERE nama_kelas IS NOT NULL AND nama_kelas != '' ORDER BY nama_kelas ASC"
       ),
       query<{ id: number; nama: string; is_active: number }>(
         'SELECT id, nama, is_active FROM tahun_ajaran ORDER BY is_active DESC, nama DESC'
@@ -2497,8 +2497,8 @@ export async function getReportFilterOptions(): Promise<ReportFilterOptions> {
       query<{ id: string; full_name: string }>(
         "SELECT DISTINCT u.id, u.full_name FROM users u JOIN finance_cash_sessions fcs ON fcs.operator_id = u.id ORDER BY u.full_name ASC"
       ),
-      query<{ id: string; nama_perusahaan: string; jenis: string }>(
-        "SELECT id, nama_perusahaan, jenis FROM master_jasa WHERE status = 'aktif' ORDER BY nama_perusahaan ASC"
+      query<{ id: string; nama_jasa: string; jenis: string }>(
+        'SELECT id, nama_jasa, jenis FROM master_jasa ORDER BY nama_jasa ASC'
       ),
       query<{ id: string; nis: string; nama_lengkap: string; asrama: string | null; kelas_sekolah: string | null }>(
         "SELECT id, nis, nama_lengkap, asrama, kelas_sekolah FROM santri WHERE status_global = 'aktif' ORDER BY nama_lengkap ASC LIMIT 500"
@@ -2517,7 +2517,7 @@ export async function getReportFilterOptions(): Promise<ReportFilterOptions> {
 
   return {
     asramaList: asramaRows.map((r) => r.asrama),
-    kelasList: kelasRows.map((r) => r.nama),
+    kelasList: kelasRows.map((r) => r.nama_kelas),
     academicYears: taRows.map((r) => ({
       id: r.id,
       name: r.nama,
@@ -2530,7 +2530,7 @@ export async function getReportFilterOptions(): Promise<ReportFilterOptions> {
     })),
     providers: providerRows.map((r) => ({
       id: r.id,
-      name: r.nama_perusahaan,
+      name: r.nama_jasa,
       type: r.jenis,
     })),
     students: studentRows.map((r) => ({

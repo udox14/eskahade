@@ -311,27 +311,31 @@ async function fetchLegacySppArrears(santriIds: string[]): Promise<Map<string, {
   const map = new Map<string, { total: number; count: number }>()
   if (santriIds.length === 0) return map
 
-  const placeholders = santriIds.map(() => '?').join(',')
+  const CHUNK_SIZE = 60
+  for (let i = 0; i < santriIds.length; i += CHUNK_SIZE) {
+    const chunk = santriIds.slice(i, i + CHUNK_SIZE)
+    const placeholders = chunk.map(() => '?').join(',')
 
-  try {
-    const rows = await query<{ santri_id: string; nominal_tagihan: number }>(
-      `SELECT santri_id, nominal_tagihan
-       FROM spp_tunggakan_historis
-       WHERE santri_id IN (${placeholders})
-         AND status = 'BELUM_LUNAS'
-         AND (tahun * 100 + bulan) < 202607`,
-      santriIds
-    )
+    try {
+      const rows = await query<{ santri_id: string; nominal_tagihan: number }>(
+        `SELECT santri_id, nominal_tagihan
+         FROM spp_tunggakan_historis
+         WHERE santri_id IN (${placeholders})
+           AND status = 'BELUM_LUNAS'
+           AND (tahun * 100 + bulan) < 202607`,
+        chunk
+      )
 
-    for (const r of rows) {
-      const prev = map.get(r.santri_id) ?? { total: 0, count: 0 }
-      map.set(r.santri_id, {
-        total: prev.total + (r.nominal_tagihan ?? 0),
-        count: prev.count + 1,
-      })
+      for (const r of rows) {
+        const prev = map.get(r.santri_id) ?? { total: 0, count: 0 }
+        map.set(r.santri_id, {
+          total: prev.total + (r.nominal_tagihan ?? 0),
+          count: prev.count + 1,
+        })
+      }
+    } catch (err: unknown) {
+      console.error('[status-pembayaran] Gagal membaca spp_tunggakan_historis:', err instanceof Error ? err.message : err)
     }
-  } catch (err: unknown) {
-    console.error('[status-pembayaran] Gagal membaca spp_tunggakan_historis:', err instanceof Error ? err.message : err)
   }
 
   return map

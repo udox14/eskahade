@@ -79,7 +79,7 @@ export async function getStudentsObligationMatrix(
   filter?: StudentObligationMatrixFilter
 ): Promise<StudentObligationMatrixItem[]> {
   const santriConditions: string[] = ["s.status_global = 'aktif'"]
-  const params: unknown[] = [period]
+  const params: unknown[] = [period, period]
 
   if (filter?.asrama) {
     santriConditions.push('s.asrama = ?')
