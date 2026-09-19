@@ -28,7 +28,7 @@ import {
 } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { getDashboardData, type UserDashboardPermissions } from './actions'
-import { formatPeriodLabel, type FinanceDashboardData } from '@/lib/finance/dashboard'
+import type { FinanceDashboardData } from '@/lib/finance/dashboard'
 
 interface DashboardKeuanganContentProps {
   initialData: FinanceDashboardData
@@ -57,6 +57,23 @@ function formatDateIndo(dateStr: string): string {
   } catch {
     return dateStr
   }
+}
+
+const BULAN_NAMES = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+]
+
+function formatPeriodLabel(period: string): string {
+  const parts = period.split('-')
+  if (parts.length === 2) {
+    const year = parts[0]
+    const monthIdx = parseInt(parts[1], 10) - 1
+    if (monthIdx >= 0 && monthIdx < 12) {
+      return `${BULAN_NAMES[monthIdx]} ${year}`
+    }
+  }
+  return period
 }
 
 export default function DashboardKeuanganContent({
