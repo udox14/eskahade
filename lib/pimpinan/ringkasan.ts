@@ -1,4 +1,4 @@
-import { financeQuery, query } from '@/lib/db'
+import { query } from '@/lib/db'
 import { currentMonthWib, monthPeriod, pct, safeNumber } from './helpers'
 import { getKeuanganMonitoring } from './keuangan'
 import { getAbsensiSantriMonitoring, getAbsensiGuruMonitoring } from './absensi'
@@ -28,15 +28,16 @@ export type RingkasanPimpinan = {
 
 async function getCashTrend(): Promise<RingkasanPimpinan['cashTrend']> {
   try {
-    return await financeQuery<{ day: string; masuk: number; keluar: number }>(
-      `SELECT j.effective_date AS day,
-              COALESCE(SUM(CASE WHEN e.side = 'DEBIT' THEN e.amount_rupiah ELSE 0 END), 0) AS masuk,
-              COALESCE(SUM(CASE WHEN e.side = 'CREDIT' THEN e.amount_rupiah ELSE 0 END), 0) AS keluar
-       FROM finance_journal_entries e
-       JOIN finance_journals j ON j.id = e.journal_id AND j.status = 'POSTED'
-       WHERE date(j.effective_date) >= date('now', '-29 days')
-       GROUP BY j.effective_date
-       ORDER BY j.effective_date`
+    return await query<{ day: string; masuk: number; keluar: number }>(
+      `SELECT day, SUM(masuk) AS masuk, 0 AS keluar FROM (
+         SELECT date(tanggal_bayar) AS day, nominal_bayar AS masuk
+         FROM spp_log WHERE date(tanggal_bayar) >= date('now', '-29 days')
+         UNION ALL
+         SELECT date(tanggal_bayar) AS day, nominal_bayar AS masuk
+         FROM pembayaran_tahunan
+         WHERE date(tanggal_bayar) >= date('now', '-29 days')
+           AND COALESCE(status, 'AKTIF') != 'VOID'
+       ) GROUP BY day ORDER BY day`
     )
   } catch {
     return []

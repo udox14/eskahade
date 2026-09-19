@@ -27,15 +27,14 @@ SELECT group_name, CASE group_name
   WHEN 'Absensi Akademik'        THEN 9
   WHEN 'Absensi'                 THEN 10
   WHEN 'Keuangan Pusat'          THEN 11
-  WHEN 'Keuangan Terpusat'       THEN 12
-  WHEN 'Keuangan Santri'         THEN 13
-  WHEN 'Keuangan'                THEN 14
-  WHEN 'Operasional'             THEN 15
-  WHEN 'UPK'                     THEN 16
-  WHEN 'EHB'                     THEN 17
-  WHEN 'PSB'                     THEN 18
-  WHEN 'POSKESTREN'              THEN 19
-  WHEN 'Master Data'             THEN 20
+  WHEN 'Keuangan Santri'         THEN 12
+  WHEN 'Keuangan'                THEN 13
+  WHEN 'Operasional'             THEN 14
+  WHEN 'UPK'                     THEN 15
+  WHEN 'EHB'                     THEN 16
+  WHEN 'PSB'                     THEN 17
+  WHEN 'POSKESTREN'              THEN 18
+  WHEN 'Master Data'             THEN 19
   ELSE 100
 END
 FROM fitur_akses

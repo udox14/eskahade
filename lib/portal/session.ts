@@ -13,7 +13,7 @@
 
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { financeQueryOne, queryOne } from '@/lib/db'
+import { queryOne } from '@/lib/db'
 import { createJWTToken, verifyJWTToken } from '@/lib/auth/session'
 
 export const PORTAL_COOKIE = 'eskahade_portal_session'
@@ -23,11 +23,9 @@ const PORTAL_MAX_AGE = 60 * 60 * 24 * 365 * 10
 
 export type PortalTokenPayload = {
   kind: 'portal_ortu'
-  guardian_id?: string
   santri_id: string
   nis: string
   nama: string
-  // Dibandingkan dengan portal_ortu_credentials.token_version setiap request.
   // Dinaikkan saat password diganti/direset agar cookie lama otomatis invalid.
   token_version?: number
 }
@@ -65,15 +63,6 @@ export async function getPortalSession(): Promise<PortalSession | null> {
     const payload = await verifyJWTToken<Partial<PortalTokenPayload>>(token)
     if (!payload || payload.kind !== 'portal_ortu' || typeof payload.santri_id !== 'string') return null
 
-    // guardian_id di token yang relasinya sudah hilang (dihapus/ditautkan
-    // ulang oleh admin) TIDAK meng-invalidate seluruh sesi — cukup diabaikan
-    // dan ortu tetap masuk dalam mode single-santri seperti sebelum migrasi.
-    let guardianId = typeof payload.guardian_id === 'string' ? payload.guardian_id : undefined
-    if (guardianId) {
-      const link = await financeQueryOne<{ guardian_id: string }>(`SELECT guardian_id FROM finance_guardian_students WHERE guardian_id=? AND santri_id=?`, [guardianId, payload.santri_id])
-      if (!link) guardianId = undefined
-    }
-
     const santri = await queryOne<{
       id: string
       nis: string
@@ -99,12 +88,10 @@ export async function getPortalSession(): Promise<PortalSession | null> {
       [santri.id]
     )
     if (cred && Number(cred.is_active) === 0) return null
-    // Password diganti/direset setelah token ini diterbitkan → paksa login ulang.
     if (cred && Number(cred.token_version ?? 1) !== Number(payload.token_version ?? 1)) return null
 
     return {
       kind: 'portal_ortu',
-      ...(guardianId ? { guardian_id: guardianId } : {}),
       santri_id: santri.id,
       nis: santri.nis,
       nama: santri.nama_lengkap,

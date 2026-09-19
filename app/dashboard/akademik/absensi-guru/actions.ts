@@ -16,21 +16,6 @@ import {
   resolveGuruForDate,
   type GuruJadwalSession,
 } from '@/lib/akademik/guru-jadwal'
-import { bulanTerkunciDalamRentang } from '@/lib/akademik/absensi-guru-kunci'
-
-/**
- * Bulan yang rekapnya sudah dikunci sekpen tidak boleh berubah lagi: payroll
- * memotong gaji berdasarkan angka itu, dan koreksi diam-diam sesudahnya membuat
- * slip gaji tidak lagi cocok dengan rekap yang jadi dasarnya.
- */
-async function tolakBilaBulanTerkunci(tanggalList: string[]) {
-  const terkunci = await bulanTerkunciDalamRentang(tanggalList)
-  if (!terkunci.length) return null
-  return {
-    error: `Rekap absensi guru bulan ${terkunci.join(', ')} sudah dikunci dan tidak dapat diubah. `
-      + 'Buka kuncinya lebih dulu di halaman Rekap Kinerja Guru.',
-  }
-}
 
 const VALID_SESI = ['shubuh', 'ashar', 'maghrib'] as const
 type SessionType = typeof VALID_SESI[number]
@@ -541,12 +526,6 @@ export async function simpanAbsensiGuru(
   const session = await getSession()
   if (payload.length === 0 && liburInput.length === 0) return { error: 'Tidak ada data untuk disimpan' }
 
-  const ditolak = await tolakBilaBulanTerkunci([
-    ...payload.map(item => String(item?.tanggal || '')),
-    ...liburInput.map(item => String(item?.tanggal || '')),
-  ])
-  if (ditolak) return ditolak
-
   const normalizeStatus = (value: unknown) => {
     const status = String(value || 'H').toUpperCase()
     return status === 'A' || status === 'B' ? status : 'H'
@@ -745,9 +724,6 @@ export async function importAbsensiGuruHistoris(
   if (result.conflicts.length > 0) {
     return { error: `Ada ${result.conflicts.length} konflik status dalam file Excel. Periksa preview sebelum import.` }
   }
-
-  const ditolak = await tolakBilaBulanTerkunci(result.groups.map(group => String(group.tanggal || '')))
-  if (ditolak) return ditolak
 
   const statements = result.groups.map(group => ({
     sql: `

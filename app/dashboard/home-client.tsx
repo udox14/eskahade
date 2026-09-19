@@ -169,13 +169,6 @@ function sortGroupItems(group: string, items: FiturAkses[]) {
 // ── Deskripsi tiap fitur ──────────────────────────────────────────────────────
 const FITUR_DESC: Record<string, string> = {
   '/dashboard/santri':                               'Lihat dan kelola seluruh data induk santri yang aktif.',
-  '/dashboard/keuangan-terpusat':                   'Ringkasan penerimaan, tunggakan, hak penerima, saldo jajan, dan kas loket.',
-  '/dashboard/keuangan-terpusat/tagihan':           'Kelola tarif, tagihan, pesanan, dan pembayaran item santri.',
-  '/dashboard/keuangan-terpusat/payout':            'Pantau hak penerima dan catat pencairan tunai atau transfer manual.',
-  '/dashboard/keuangan-terpusat/loket':             'Terima pembayaran, setor atau tarik uang jajan, dan kelola shift kas.',
-  '/dashboard/keuangan-terpusat/kredensial':        'Terbitkan, cetak, blokir, dan ganti kartu QR santri.',
-  '/dashboard/keuangan-terpusat/transaksi':         'Telusuri transaksi, laporan, rekonsiliasi, koreksi, dan audit.',
-  '/dashboard/keuangan-terpusat/pengaturan':        'Atur kebijakan pembayaran, rekening, VA, limit, akses unit, dan kas.',
   '/dashboard/dewan-santri/sensus':                  'Input dan kelola data sensus penduduk santri per asrama.',
   '/dashboard/dewan-santri/sensus/laporan':          'Cetak laporan hasil sensus penduduk dalam format yang rapi.',
   '/dashboard/santri/input':                         'Input data santri baru beserta identitas awalnya.',
@@ -305,7 +298,6 @@ const GROUP_META: Record<string, { label: string; icon: React.ElementType }> = {
   'Keuangan':     { label: 'Keuangan',             icon: CreditCard },
   'Operasional':  { label: 'Kas Operasional',      icon: Briefcase },
   'UPK':          { label: 'UPK & Kitab',          icon: ShoppingCart },
-  'Keuangan Terpusat': { label: 'Keuangan Terpusat', icon: Bank },
   'EHB':          { label: 'Ujian EHB',            icon: ClipboardList },
   'PSB':          { label: 'Pendaftaran PSB',      icon: UserPlus },
   'POSKESTREN':   { label: 'POSKESTREN',           icon: Stethoscope },
@@ -336,14 +328,14 @@ const THEME_STYLES: Record<string, { shades: string[]; text: string; border: str
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Administrator', keamanan: 'Petugas Keamanan', sekpen: 'Sekretaris Pendidikan',
-  dewan_santri: 'Dewan Santri', pengurus_asrama: 'Pengurus Asrama', operator_loket: 'Operator Loket',
+  dewan_santri: 'Dewan Santri', pengurus_asrama: 'Pengurus Asrama',
   wali_kelas: 'Wali Kelas', guru: 'Guru', bendahara: 'Bendahara',
   pimpinan: 'Pimpinan',
 }
 
 const ROLE_EMOJI: Record<string, string> = {
   admin: '🛡️', keamanan: '🔐', sekpen: '📋',
-  dewan_santri: '🏛️', pengurus_asrama: '🏠', wali_kelas: '📚', bendahara: '💰', operator_loket: '🏧',
+  dewan_santri: '🏛️', pengurus_asrama: '🏠', wali_kelas: '📚', bendahara: '💰',
   pimpinan: '🧑‍💼',
 }
 
@@ -360,7 +352,6 @@ const GROUP_ORDER = [
   'Absensi Akademik',
   'Absensi',
   'Keuangan Pusat',
-  'Keuangan Terpusat',
   'Keuangan Santri',
   'Keuangan',
   'Operasional',
@@ -409,7 +400,6 @@ const GROUP_COLORS: Record<string, { bg: string; text: string; hoverText: string
   'Absensi Akademik':      { bg: 'bg-teal-50 text-teal-600', text: 'text-teal-600', hoverText: 'group-hover:text-teal-700' },
   'Absensi':               { bg: 'bg-teal-50 text-teal-600', text: 'text-teal-600', hoverText: 'group-hover:text-teal-700' },
   'Keuangan Pusat':        { bg: 'bg-emerald-50 text-emerald-600', text: 'text-emerald-600', hoverText: 'group-hover:text-emerald-700' },
-  'Keuangan Terpusat':     { bg: 'bg-teal-50 text-teal-600', text: 'text-teal-600', hoverText: 'group-hover:text-teal-700' },
   'Keuangan Santri':       { bg: 'bg-cyan-50 text-cyan-600', text: 'text-cyan-600', hoverText: 'group-hover:text-cyan-700' },
   'Keuangan':              { bg: 'bg-emerald-50 text-emerald-600', text: 'text-emerald-600', hoverText: 'group-hover:text-emerald-700' },
   'UPK':                   { bg: 'bg-amber-50 text-amber-600', text: 'text-amber-600', hoverText: 'group-hover:text-amber-700' },

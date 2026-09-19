@@ -15,11 +15,6 @@ import {
  * Perhitungan rekap kinerja guru, dipisah dari server action supaya modul lain
  * bisa memakainya tanpa lewat lapisan HTTP.
  *
- * Pemakainya ada dua dan keduanya wajib melihat angka yang identik: halaman
- * rekap milik sekpen, dan payroll di keuangan terpusat yang memotong gaji
- * berdasarkan angka itu. Kalau definisi "alfa" sempat bercabang di dua tempat,
- * guru akan melihat satu angka di rekap dan angka lain di slip gajinya - dan
- * yang salah selalu dianggap yang mengurangi uangnya.
  *
  * Satuan hitungnya adalah SESI, bukan hari: shubuh, ashar, dan maghrib dihitung
  * terpisah, sehingga satu guru bisa punya tiga waktu wajib dalam sehari.

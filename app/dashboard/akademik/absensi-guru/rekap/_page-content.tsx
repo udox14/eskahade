@@ -1,19 +1,16 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import {
-  bukaKunciRekapBulanAction,
   getGuruOptionsForRekap,
   getMarhalahList,
   getRekapDetailGuru,
   getRekapKinerjaGuru,
   getRentangEfektif,
-  getStatusKunciBulan,
   getTahunAjaranList,
-  kunciRekapBulanAction,
 } from './actions'
 import { useReactToPrint } from '@/lib/pdf/client'
-import { AlertTriangle, ChevronDown, Filter, Search, Loader2, Printer, Palette, Circle, Users, UserRound, Lock, LockOpen } from 'lucide-react'
+import { AlertTriangle, ChevronDown, Filter, Search, Loader2, Printer, Palette, Circle, Users, UserRound } from 'lucide-react'
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -386,7 +383,6 @@ export default function RekapAbsensiGuruPage() {
         </div>
       </div>
 
-      <KunciBulanPanel startDate={startDate} endDate={endDate} />
 
       {activeTab === 'semua' ? (
         <SemuaGuruView
@@ -451,169 +447,6 @@ export default function RekapAbsensiGuruPage() {
           )}
         </div>
       </div>
-    </div>
-  )
-}
-
-function labelBulan(periodKey: string) {
-  const [tahun, bulan] = periodKey.split('-')
-  return `${NAMA_BULAN[Number(bulan) - 1] || periodKey} ${tahun}`
-}
-
-/**
- * Panel kunci bulanan.
- *
- * Payroll di keuangan terpusat menarik jumlah sesi alfa dan badal dari rekap
- * ini, dan bendahara tidak boleh mengubahnya. Karena itu harus ada satu momen
- * eksplisit ketika sekpen menyatakan angka bulan ini sudah benar. Sebelum
- * dikunci, payroll menolak menghitung; sesudah dikunci, absensi bulan itu tidak
- * dapat disimpan atau diimpor ulang.
- */
-type StatusKunci = {
-  periodKey: string
-  kunci: { locked_by_nama: string | null; locked_at: string; note: string | null } | null
-  bolehMengunci: boolean
-}
-
-function KunciBulanPanel({ startDate, endDate }: { startDate: string; endDate: string }) {
-  const periodKey = startDate.slice(0, 7)
-  const [status, setStatus] = useState<StatusKunci | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [pending, setPending] = useState(false)
-  const [pesan, setPesan] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null)
-  const [catatan, setCatatan] = useState('')
-  const [konfirmasiBuka, setKonfirmasiBuka] = useState(false)
-
-  const muat = useCallback(() => {
-    if (!/^\d{4}-\d{2}$/.test(periodKey)) return
-    setLoading(true)
-    getStatusKunciBulan(periodKey)
-      .then(setStatus)
-      .finally(() => setLoading(false))
-  }, [periodKey])
-
-  useEffect(() => { muat() }, [muat])
-
-  if (!periodKey || !status) {
-    return null
-  }
-
-  const terkunci = Boolean(status.kunci)
-  // Rentang yang tidak persis satu bulan penuh tetap boleh dikunci, tapi yang
-  // terkunci adalah seluruh bulannya - bukan hanya tanggal yang tampil.
-  const rentangSebulanPenuh = startDate.endsWith('-01') && endDate.slice(0, 7) === periodKey
-
-  const jalankan = async (aksi: () => Promise<{ success: boolean; error?: string }>, sukses: string) => {
-    setPending(true)
-    setPesan(null)
-    try {
-      const hasil = await aksi()
-      if (hasil?.success) {
-        setPesan({ tone: 'ok', text: sukses })
-        setCatatan('')
-        muat()
-      } else {
-        setPesan({ tone: 'err', text: hasil?.error || 'Tindakan gagal.' })
-      }
-    } catch (error) {
-      setPesan({ tone: 'err', text: error instanceof Error ? error.message : 'Tindakan gagal.' })
-    } finally {
-      setPending(false)
-      setKonfirmasiBuka(false)
-    }
-  }
-
-  return (
-    <div className={`rounded-xl border p-5 shadow-sm ${terkunci ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex items-start gap-3">
-          <div className={`mt-0.5 rounded-lg p-2 ${terkunci ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-            {terkunci ? <Lock className="h-5 w-5" /> : <LockOpen className="h-5 w-5" />}
-          </div>
-          <div>
-            <p className="font-black text-slate-900">
-              {terkunci ? `Rekap ${labelBulan(periodKey)} sudah final` : `Rekap ${labelBulan(periodKey)} masih bisa dikoreksi`}
-            </p>
-            {status.kunci ? (
-              <p className="mt-1 text-sm text-emerald-800">
-                Dikunci {status.kunci.locked_by_nama ? `oleh ${status.kunci.locked_by_nama} ` : ''}
-                pada {String(status.kunci.locked_at).slice(0, 16).replace('T', ' ')}. Payroll bulan ini sudah boleh dihitung bendahara.
-                {status.kunci.note ? <span className="block text-xs text-emerald-700">Catatan: {status.kunci.note}</span> : null}
-              </p>
-            ) : (
-              <p className="mt-1 text-sm text-amber-800">
-                Bendahara belum bisa menghitung payroll bulan ini. Selesaikan koreksi absensi, lalu kunci supaya angkanya tidak berubah lagi setelah dipakai menghitung gaji.
-              </p>
-            )}
-            {!rentangSebulanPenuh && (
-              <p className="mt-1 text-xs text-slate-500">
-                Rentang yang Anda tampilkan bukan satu bulan penuh. Kunci tetap berlaku untuk seluruh {labelBulan(periodKey)}.
-              </p>
-            )}
-          </div>
-        </div>
-
-        {status.bolehMengunci && (
-          <div className="flex flex-col items-stretch gap-2 lg:w-80">
-            {!terkunci && (
-              <input
-                value={catatan}
-                onChange={e => setCatatan(e.target.value)}
-                placeholder="Catatan (opsional)"
-                className="w-full rounded-xl border border-slate-200 p-2 text-sm"
-              />
-            )}
-            {terkunci ? (
-              konfirmasiBuka ? (
-                <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
-                  <p className="text-xs text-slate-600">
-                    Membuka kunci memungkinkan absensi {labelBulan(periodKey)} diubah lagi. Bila payroll bulan ini sudah dihitung, bendahara wajib menghitung ulang sebelum menyetujui.
-                  </p>
-                  <input
-                    value={catatan}
-                    onChange={e => setCatatan(e.target.value)}
-                    placeholder="Alasan membuka kunci (opsional)"
-                    className="w-full rounded-xl border border-slate-200 p-2 text-sm"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      disabled={pending}
-                      onClick={() => jalankan(() => bukaKunciRekapBulanAction(periodKey, catatan), `Kunci ${labelBulan(periodKey)} dibuka.`)}
-                      className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
-                    >
-                      Ya, buka kunci
-                    </button>
-                    <button onClick={() => setKonfirmasiBuka(false)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold">Batal</button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  disabled={pending || loading}
-                  onClick={() => setKonfirmasiBuka(true)}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:opacity-50"
-                >
-                  <LockOpen className="h-4 w-4" />Buka kunci untuk koreksi
-                </button>
-              )
-            ) : (
-              <button
-                disabled={pending || loading}
-                onClick={() => jalankan(() => kunciRekapBulanAction(periodKey, catatan), `Rekap ${labelBulan(periodKey)} dikunci.`)}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow disabled:opacity-50"
-              >
-                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-                Kunci rekap {labelBulan(periodKey)}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {pesan && (
-        <p className={`mt-3 rounded-lg px-3 py-2 text-sm font-bold ${pesan.tone === 'ok' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-          {pesan.text}
-        </p>
-      )}
     </div>
   )
 }

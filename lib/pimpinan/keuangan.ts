@@ -1,4 +1,4 @@
-import { financeQuery, query } from '@/lib/db'
+import { query } from '@/lib/db'
 import { currentMonthWib, monthPeriod, safeNumber, type MonthPeriod } from './helpers'
 
 export type KeuanganMonitoring = {
@@ -18,67 +18,29 @@ export type KeuanganMonitoring = {
 }
 
 async function getSaldoAkun(): Promise<Array<{ code: string; name: string; balance_rupiah: number }>> {
-  try {
-    return await financeQuery<{ code: string; name: string; balance_rupiah: number }>(
-      `SELECT a.code, a.name, COALESCE(b.balance_rupiah, 0) AS balance_rupiah
-       FROM finance_accounts a
-       LEFT JOIN finance_account_balances b ON b.account_id = a.id
-       WHERE a.is_active = 1
-       ORDER BY a.code`
-    )
-  } catch {
-    return []
-  }
+  return []
 }
 
 async function getArusKas(period: MonthPeriod): Promise<{ masuk: number; keluar: number; selisih: number }> {
   try {
-    const rows = await financeQuery<{ masuk: number; keluar: number }>(
-      `SELECT
-         COALESCE(SUM(CASE WHEN e.side = 'DEBIT' THEN e.amount_rupiah ELSE 0 END), 0) AS masuk,
-         COALESCE(SUM(CASE WHEN e.side = 'CREDIT' THEN e.amount_rupiah ELSE 0 END), 0) AS keluar
-       FROM finance_journal_entries e
-       JOIN finance_journals j ON j.id = e.journal_id AND j.status = 'POSTED'
-       WHERE date(j.effective_date) BETWEEN ? AND ?`,
-      [period.from, period.to]
+    const rows = await query<{ masuk: number }>(
+      `SELECT COALESCE(SUM(amount), 0) AS masuk FROM (
+         SELECT nominal_bayar AS amount FROM spp_log WHERE date(tanggal_bayar) BETWEEN ? AND ?
+         UNION ALL
+         SELECT nominal_bayar AS amount FROM pembayaran_tahunan
+         WHERE date(tanggal_bayar) BETWEEN ? AND ? AND COALESCE(status, 'AKTIF') != 'VOID'
+       )`,
+      [period.from, period.to, period.from, period.to]
     )
-    const row = rows[0]
-    const masuk = safeNumber(row?.masuk)
-    const keluar = safeNumber(row?.keluar)
-    return { masuk, keluar, selisih: masuk - keluar }
+    const masuk = safeNumber(rows[0]?.masuk)
+    return { masuk, keluar: 0, selisih: masuk }
   } catch {
     return { masuk: 0, keluar: 0, selisih: 0 }
   }
 }
 
 export async function getFinanceAlerts(): Promise<KeuanganMonitoring['alert']> {
-  try {
-    const rows = await financeQuery<{ kind: string; count: number; amount_rupiah: number }>(
-      `SELECT 'LATE_TOPUP' AS kind, COUNT(*) AS count, COALESCE(SUM(amount_rupiah), 0) AS amount_rupiah
-       FROM finance_payment_intents WHERE review_status = 'REQUIRED'
-       UNION ALL
-       SELECT 'SELISIH_BANK', COUNT(*), COALESCE(SUM(ABS(difference_rupiah)), 0)
-       FROM finance_reconciliation_checks WHERE difference_rupiah <> 0
-       UNION ALL
-       SELECT 'PAYOUT_GAGAL', COUNT(*), COALESCE(SUM(amount_rupiah), 0)
-       FROM finance_payouts WHERE status = 'GAGAL'`
-    )
-    const labelMap: Record<string, string> = {
-      LATE_TOPUP: 'Topup perlu review',
-      SELISIH_BANK: 'Selisih dengan rekening koran',
-      PAYOUT_GAGAL: 'Pencairan gagal',
-    }
-    return rows
-      .map(row => ({
-        kind: row.kind,
-        label: labelMap[row.kind] ?? row.kind,
-        count: safeNumber(row.count),
-        amount_rupiah: safeNumber(row.amount_rupiah),
-      }))
-      .filter(row => row.count > 0)
-  } catch {
-    return []
-  }
+  return []
 }
 
 async function getSppBulan(period: MonthPeriod): Promise<KeuanganMonitoring['spp']> {

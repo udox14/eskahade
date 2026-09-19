@@ -76,11 +76,6 @@ const ALL_ROLES = [
   'wali_kelas',
   'guru',
   'bendahara',
-  'operator_loket',
-  'admin_koperasi',
-  'petugas_koperasi',
-  'pengelola_makan',
-  'pengelola_laundry',
   'poskestren',
   'pimpinan',
   'poskestren:bendahara',
@@ -100,11 +95,6 @@ const ROLE_LABEL: Record<string, string> = {
   wali_kelas:      'Wali Kelas',
   guru:            'Guru',
   bendahara:       'Bendahara',
-  operator_loket:  'Operator Loket',
-  admin_koperasi: 'Admin Koperasi',
-  petugas_koperasi: 'Petugas Koperasi',
-  pengelola_makan: 'Pengelola Makan',
-  pengelola_laundry: 'Pengelola Laundry',
   poskestren:      'POSKESTREN',
   pimpinan:        'Pimpinan',
   'poskestren:bendahara': 'Bendahara POS',
@@ -124,11 +114,6 @@ const ROLE_LABEL_FULL: Record<string, string> = {
   wali_kelas:      'Wali Kelas',
   guru:            'Guru',
   bendahara:       'Bendahara',
-  operator_loket:  'Operator Loket',
-  admin_koperasi: 'Admin Koperasi',
-  petugas_koperasi: 'Petugas Koperasi',
-  pengelola_makan: 'Pengelola Makan',
-  pengelola_laundry: 'Pengelola Laundry',
   poskestren:      'Petugas POSKESTREN',
   pimpinan:        'Pimpinan',
   'poskestren:bendahara': 'Bendahara POSKESTREN',
@@ -148,7 +133,6 @@ const ROLE_COLOR: Record<string, string> = {
   wali_kelas:      'bg-teal-100 text-teal-700 border-teal-200',
   guru:            'bg-indigo-100 text-indigo-700 border-indigo-200',
   bendahara:       'bg-yellow-100 text-yellow-700 border-yellow-200',
-  operator_loket:  'bg-cyan-100 text-cyan-700 border-cyan-200',
   poskestren:      'bg-emerald-100 text-emerald-700 border-emerald-200',
   pimpinan:        'bg-indigo-100 text-indigo-700 border-indigo-200',
   'poskestren:bendahara': 'bg-teal-100 text-teal-700 border-teal-200',
@@ -168,7 +152,6 @@ const ROLE_BG_SOFT: Record<string, string> = {
   wali_kelas:      'bg-teal-50 border-teal-200',
   guru:            'bg-indigo-50 border-indigo-200',
   bendahara:       'bg-yellow-50 border-yellow-200',
-  operator_loket:  'bg-cyan-50 border-cyan-200',
   poskestren:      'bg-emerald-50 border-emerald-200',
   pimpinan:        'bg-indigo-50 border-indigo-200',
   'poskestren:bendahara': 'bg-teal-50 border-teal-200',
@@ -188,7 +171,6 @@ const ROLE_HEADER: Record<string, string> = {
   wali_kelas:      'from-teal-600 to-teal-700',
   guru:            'from-indigo-600 to-indigo-700',
   bendahara:       'from-yellow-500 to-yellow-600',
-  operator_loket:  'from-cyan-600 to-cyan-700',
   poskestren:      'from-emerald-600 to-emerald-700',
   pimpinan:        'from-indigo-600 to-indigo-700',
   'poskestren:bendahara': 'from-teal-600 to-teal-700',
@@ -1411,13 +1393,13 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
   }
 
   async function handleResetDemo() {
-    if (!confirm('Reset SEMUA data demo (DEMO_DB dan DEMO_FINANCE_DB) lalu isi ulang data sampel? Data demo saat ini akan dihapus. Data ASLI tidak terpengaruh.')) return
+    if (!confirm('Reset SEMUA data demo (DEMO_DB) dan isi ulang data sampel? Data demo saat ini akan dihapus. Data ASLI tidak terpengaruh.')) return
     setResetting(true)
     try {
       const res = await fetch('/api/demo/reset', { method: 'POST' })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || 'Reset gagal')
-      showToast(`Sandbox di-reset (${json.seeded} seed aplikasi, ${json.financeSeed?.students || 0} santri finansial, ${json.syncedUsers} user demo).`, 'success')
+      showToast(`Data demo di-reset ( seed,  user demo).`, 'success')
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Reset gagal', 'error')
     } finally {
@@ -1750,7 +1732,7 @@ export function FiturAksesClient({ fiturList: initial, globalBottomNavEnabled: i
           <RotateCcw className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
           <span>
             <strong>Akun Demo</strong> — kosongkan sandbox aplikasi dan keuangan lalu isi ulang data sampel.
-            Hanya berlaku ke <strong>DEMO_DB</strong> dan <strong>DEMO_FINANCE_DB</strong>; data asli aman.
+            Hanya berlaku ke <strong>DEMO_DB</strong>, data asli aman.
           </span>
         </div>
         <button

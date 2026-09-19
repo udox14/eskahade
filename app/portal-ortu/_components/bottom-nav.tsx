@@ -2,12 +2,12 @@
 
 import Link, { useLinkStatus } from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Bank, CalendarCheck, House, ShieldWarning, User } from '@phosphor-icons/react'
+import { CalendarCheck, House, Receipt, ShieldWarning, User } from '@phosphor-icons/react'
 
 const TABS = [
   { n: '01', href: '/portal-ortu/beranda', label: 'Beranda', icon: House },
   { n: '02', href: '/portal-ortu/absensi', label: 'Pengajian', icon: CalendarCheck },
-  { n: '03', href: '/portal-ortu/keuangan', label: 'Keuangan', icon: Bank },
+  { n: '03', href: '/portal-ortu/tagihan', label: 'Tagihan', icon: Receipt },
   { n: '04', href: '/portal-ortu/pelanggaran', label: 'Keamanan', icon: ShieldWarning },
   { n: '05', href: '/portal-ortu/akun', label: 'Akun', icon: User },
 ]

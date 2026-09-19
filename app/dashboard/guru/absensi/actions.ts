@@ -1,8 +1,8 @@
 'use server'
 
 import { actorFromSession, logActivity } from '@/lib/activity-log'
-import { canAccessKelas, getAccessibleKelasForSession, getGuruIdForSession, getSantriForKelas } from '@/lib/akademik/guru-access'
-import { getSession, hasAnyRole, isAdmin, type SessionUser } from '@/lib/auth/session'
+import { getGuruIdForSession, getSantriForKelas } from '@/lib/akademik/guru-access'
+import { getSession, hasAnyRole, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
 import { batch, execute, generateId, query, queryOne } from '@/lib/db'
 import { toWibDateInputValue } from '@/lib/date/wib'
 
@@ -102,18 +102,51 @@ function sessionScope(session: SessionUser, alias = 'aps') {
   return canViewAll(session) ? { sql: '', params: [] as unknown[] } : { sql: `AND ${alias}.created_by = ?`, params: [session.id] }
 }
 
+async function getAccessibleKelasForAbsensi(session: SessionUser): Promise<{ id: string; nama_kelas: string }[]> {
+  if (canViewAll(session)) {
+    return query<{ id: string; nama_kelas: string }>(`SELECT k.id, k.nama_kelas
+      FROM kelas k
+      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+      ORDER BY k.nama_kelas`)
+  }
+
+  const guruId = await getGuruIdForSession(session)
+  if (!guruId) {
+    if (!hasRole(session, 'wali_kelas')) return []
+    return query<{ id: string; nama_kelas: string }>(`SELECT k.id, k.nama_kelas
+      FROM kelas k
+      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+      WHERE k.wali_kelas_id = ?
+      ORDER BY k.nama_kelas`, [session.id])
+  }
+
+  return query<{ id: string; nama_kelas: string }>(`SELECT DISTINCT k.id, k.nama_kelas
+    FROM kelas k
+    JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+    LEFT JOIN kelas_jadwal_guru_mingguan kj ON kj.kelas_id = k.id AND kj.guru_id = ?
+    WHERE kj.id IS NOT NULL
+       OR k.guru_shubuh_id = ?
+       OR k.guru_ashar_id = ?
+       OR k.guru_maghrib_id = ?
+       OR k.wali_kelas_id = ?
+    ORDER BY k.nama_kelas`, [guruId, guruId, guruId, guruId, session.id])
+}
+
+async function canAccessKelasForAbsensi(session: SessionUser, kelasId: string) {
+  return (await getAccessibleKelasForAbsensi(session)).some(kelas => kelas.id === kelasId)
+}
+
 export async function getAbsensiPengajarInitialData() {
   const session = await getSession()
   if (!session) return { kelas: [], canViewAll: false }
-  await ensureSchema()
-  return { kelas: await getAccessibleKelasForSession(session), canViewAll: canViewAll(session) }
+  return { kelas: await getAccessibleKelasForAbsensi(session), canViewAll: canViewAll(session) }
 }
 
 export async function openOrCreateAbsensiPengajarSession(kelasId: string, waktu: WaktuPengajian) {
   const session = await getSession()
   if (!session) return { error: 'Tidak terautentikasi.' }
   if (!isWaktu(waktu)) return { error: 'Waktu pengajian tidak valid.' }
-  if (!(await canAccessKelas(session, kelasId))) return { error: 'Akses kelas ditolak.' }
+  if (!(await canAccessKelasForAbsensi(session, kelasId))) return { error: 'Akses kelas ditolak.' }
   await ensureSchema()
 
   const tanggal = toWibDateInputValue()
@@ -167,7 +200,7 @@ export async function openOrCreateAbsensiPengajarSession(kelasId: string, waktu:
 
 export async function getAbsensiPengajarSession(sesiId: string, kelasId: string) {
   const session = await getSession()
-  if (!session || !(await canAccessKelas(session, kelasId))) return { error: 'Akses ditolak.' }
+  if (!session || !(await canAccessKelasForAbsensi(session, kelasId))) return { error: 'Akses ditolak.' }
   await ensureSchema()
   const scope = sessionScope(session)
   const sesi = await queryOne<SessionRow>(`SELECT aps.id, aps.kelas_id, aps.tanggal, aps.waktu, aps.created_by,
@@ -195,7 +228,7 @@ export async function saveAbsensiPengajarChanges(payload: {
   changes: { riwayatId: string; status: StatusAbsensiPengajar }[]
 }) {
   const session = await getSession()
-  if (!session || !(await canAccessKelas(session, payload.kelasId))) return { error: 'Akses ditolak.' }
+  if (!session || !(await canAccessKelasForAbsensi(session, payload.kelasId))) return { error: 'Akses ditolak.' }
   await ensureSchema()
   const sesi = await queryOne<{ id: string; created_by: string }>(
     'SELECT id, created_by FROM absensi_pengajar_sesi WHERE id = ? AND kelas_id = ?',
@@ -232,7 +265,7 @@ export async function saveAbsensiPengajarChanges(payload: {
 
 export async function getAbsensiPengajarStats(kelasId: string): Promise<AbsensiPengajarStats | { error: string }> {
   const session = await getSession()
-  if (!session || !(await canAccessKelas(session, kelasId))) return { error: 'Akses ditolak.' }
+  if (!session || !(await canAccessKelasForAbsensi(session, kelasId))) return { error: 'Akses ditolak.' }
   await ensureSchema()
   const scope = sessionScope(session)
   const row = await queryOne<StatsRow>(`SELECT COUNT(DISTINCT aps.id) AS total_sesi,
@@ -251,7 +284,7 @@ export async function getAbsensiPengajarStats(kelasId: string): Promise<AbsensiP
 
 export async function getAbsensiPengajarRecapPage(kelasId: string, cursor?: string | null, limit = 8) {
   const session = await getSession()
-  if (!session || !(await canAccessKelas(session, kelasId))) return { error: 'Akses ditolak.' }
+  if (!session || !(await canAccessKelasForAbsensi(session, kelasId))) return { error: 'Akses ditolak.' }
   await ensureSchema()
   const scope = sessionScope(session)
   const pageSize = Math.max(1, Math.min(16, Math.round(limit)))

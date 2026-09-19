@@ -289,26 +289,10 @@ export async function setBebas(
   if (!santriIds.length) return { error: 'Tidak ada santri dipilih.' }
 
   const now = new Date().toISOString()
-  const actorId = session?.id ?? 'system'
-  // Sinkron ke santri_pembebasan_biaya (lib/finance/exemptions.ts) supaya
-  // toggle dari sini juga terbaca di panel Pembebasan Keuangan Terpusat —
-  // bebas_spp tetap ditulis langsung (bukan lewat setExemption) karena
-  // sudah dalam satu batch bareng update lain di sini.
-  await batch(santriIds.flatMap(id => [
-    {
-      sql: `UPDATE santri SET bebas_spp = ?, updated_at = ? WHERE id = ?`,
-      params: [bebas ? 1 : 0, now, id],
-    },
-    {
-      sql: `INSERT INTO santri_pembebasan_biaya (id, santri_id, service_kind, is_active, alasan, created_by, updated_by, updated_at)
-            VALUES (?, ?, 'SPP', ?, ?, ?, ?, ?)
-            ON CONFLICT(santri_id, service_kind) DO UPDATE SET
-              is_active = excluded.is_active,
-              updated_by = excluded.updated_by,
-              updated_at = excluded.updated_at`,
-      params: [generateId(), id, bebas ? 1 : 0, 'Diatur dari Master > Alat Santri', actorId, actorId, now],
-    },
-  ]))
+  await batch(santriIds.map(id => ({
+    sql: `UPDATE santri SET bebas_spp = ?, updated_at = ? WHERE id = ?`,
+    params: [bebas ? 1 : 0, now, id],
+  })))
 
   await logActivity({
     actor: actorFromSession(session),

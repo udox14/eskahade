@@ -617,9 +617,6 @@ export default function MonitoringSetoranPage() {
               {savingBillingStart ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             </button>
           </form>
-          <p className="text-[11px] font-semibold text-amber-700">
-            Pengaturan ini sudah pindah ke Keuangan Terpusat → Tarif Layanan — form di sini tidak lagi berpengaruh.
-          </p>
         </div>
 
         <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">

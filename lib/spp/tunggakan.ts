@@ -1,12 +1,4 @@
 import { query, queryOne } from '@/lib/db'
-import { getServiceBillingStart, getServiceTariffForMonth, listServiceTariffs, type ServiceTariffRow } from '@/lib/finance/service-tariffs'
-
-// Resolusi lokal dari daftar tarif (sudah urut effective_month DESC) —
-// menghindari query berulang per bulan saat mengisi grid/loop 12 bulan.
-function pickTariff(rows: ServiceTariffRow[], yyyymm: string): number | null {
-  const row = rows.find(r => r.effective_month <= yyyymm)
-  return row ? Number(row.amount_rupiah) : null
-}
 
 export const BULAN_SPP = [
   'Januari',
@@ -139,22 +131,27 @@ export function monthLabel(tahun: number, bulan: number) {
   return `${BULAN_SPP[bulan - 1] ?? `Bulan ${bulan}`} ${tahun}`
 }
 
-// Sumber kebenaran tanggal awal tagihan SPP sekarang finance_settings
-// (FINANCE_DB, dikelola dari Keuangan Terpusat → Tarif Layanan) — bukan lagi
-// app_settings.spp_tagihan_mulai. getServiceBillingStart selalu mengembalikan
-// nilai untuk 'SPP' (ada fallback bawaan), jadi non-null di sini aman.
 export async function getSppBillingStartSetting(): Promise<SppBillingStart> {
-  return (await getServiceBillingStart('SPP')) as SppBillingStart
+  const row = await queryOne<{ value: string }>(
+    `SELECT value FROM app_settings WHERE key = 'spp_tagihan_mulai'`
+  )
+  const value = row?.value ?? '2026-06'
+  const [tahunMulai, bulanMulai] = value.split('-').map(Number)
+  return {
+    tahun: Number.isFinite(tahunMulai) ? tahunMulai : 2026,
+    bulan: Number.isFinite(bulanMulai) ? bulanMulai : 1,
+    value,
+  }
 }
 
-// Sumber kebenaran tarif SPP sekarang finance_service_tariffs (FINANCE_DB,
-// effective-dated per bulan) — bukan lagi spp_settings (per tahun). `bulan`
-// wajib diisi supaya perubahan tarif di tengah tahun tidak menimpa bulan lain
-// yang sudah dibuat tagihannya.
-export async function getNominalSppForYear(tahun: number, bulan: number) {
-  const yyyymm = `${tahun}-${String(bulan).padStart(2, '0')}`
-  const nominal = await getServiceTariffForMonth('SPP', yyyymm)
-  return nominal ?? 70000
+export async function getNominalSppForYear(tahun: number, _bulan?: number) {
+  const row = await queryOne<{ nominal: number }>(
+    `SELECT nominal FROM spp_settings
+     WHERE tahun_kalender = ? AND is_active = 1
+     ORDER BY id DESC LIMIT 1`,
+    [tahun]
+  )
+  return row?.nominal ?? 70000
 }
 
 export async function getTunggakanSppSantri(santriId: string, asOf = new Date()): Promise<SppTunggakanSummary> {
@@ -195,13 +192,13 @@ export async function getTunggakanSppSantri(santriId: string, asOf = new Date())
     [santriId, studentStartKey, endKey]
   )
   const waivedKeys = new Set(waivedRows.map(row => periodKey(row.tahun, row.bulan)))
-  const tariffRows = await listServiceTariffs('SPP')
 
   const berjalan: SppTunggakanItem[] = []
   if ((santri?.bebas_spp ?? 0) !== 1) {
     for (let year = studentBillingStart.tahun; year <= currentYear; year++) {
       const fromMonth = year === studentBillingStart.tahun ? studentBillingStart.bulan : 1
       const toMonth = year === currentYear ? currentMonth : 12
+      const nominal = await getNominalSppForYear(year)
       for (let month = fromMonth; month <= toMonth; month++) {
         const key = periodKey(year, month)
         if (paidKeys.has(key) || waivedKeys.has(key)) continue
@@ -212,7 +209,7 @@ export async function getTunggakanSppSantri(santriId: string, asOf = new Date())
           bulan: month,
           nama_bulan: BULAN_SPP[month - 1] ?? `Bulan ${month}`,
           label: monthLabel(year, month),
-          nominal: pickTariff(tariffRows, `${year}-${String(month).padStart(2, '0')}`) ?? 70000,
+          nominal,
         })
       }
     }
@@ -306,7 +303,8 @@ export async function getSppMonthlyGrid(santriId: string, tahun: number): Promis
     [santriId, tahun]
   )
   const waivedMonths = new Set(waivedRows.map(row => row.bulan))
-  const tariffRows = await listServiceTariffs('SPP')
+
+  const nominalTahun = await getNominalSppForYear(tahun)
 
   const cells: SppMonthCell[] = []
   for (let bulan = 1; bulan <= 12; bulan++) {
@@ -315,7 +313,7 @@ export async function getSppMonthlyGrid(santriId: string, tahun: number): Promis
     const paid = paidByMonth.get(bulan)
 
     let status: SppMonthStatus
-    let nominal = pickTariff(tariffRows, `${tahun}-${String(bulan).padStart(2, '0')}`) ?? 70000
+    let nominal = nominalTahun
 
     if (!billable) {
       status = 'BELUM_ADA_TAGIHAN'

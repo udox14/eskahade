@@ -117,19 +117,6 @@ export async function getDB() {
   return env.DB
 }
 
-/**
- * Database khusus domain keuangan. Seluruh mutasi yang memengaruhi uang wajib
- * selesai dalam satu transaksi/batch pada binding ini; jangan membuat batch
- * yang mencampur statement DB utama dan FINANCE_DB.
- */
-export async function getFinanceDB() {
-  const { env } = await getCloudflareContext({ async: true })
-  const { isDemoRequest } = await import('@/lib/auth/demo-context')
-  if (await isDemoRequest()) return env.DEMO_FINANCE_DB
-  if (await isTesterRequest(env.DB)) return wrapReadOnlyDB(env.FINANCE_DB)
-  return env.FINANCE_DB
-}
-
 // Banyak baris
 export async function query<T = Record<string, unknown>>(
   sql: string,
@@ -143,30 +130,12 @@ export async function query<T = Record<string, unknown>>(
 // Alias queryAll = query
 export const queryAll = query
 
-export async function financeQuery<T = Record<string, unknown>>(
-  sql: string,
-  params: unknown[] = []
-): Promise<T[]> {
-  const db = await getFinanceDB()
-  const { results } = await db.prepare(sql).bind(...params).all()
-  return (results ?? []) as T[]
-}
-
 // Satu baris
 export async function queryOne<T = Record<string, unknown>>(
   sql: string,
   params: unknown[] = []
 ): Promise<T | null> {
   const db = await getDB()
-  const result = await db.prepare(sql).bind(...params).first()
-  return (result ?? null) as T | null
-}
-
-export async function financeQueryOne<T = Record<string, unknown>>(
-  sql: string,
-  params: unknown[] = []
-): Promise<T | null> {
-  const db = await getFinanceDB()
   const result = await db.prepare(sql).bind(...params).first()
   return (result ?? null) as T | null
 }
@@ -181,30 +150,11 @@ export async function execute(
   return { success: result.success }
 }
 
-export async function financeExecute(
-  sql: string,
-  params: unknown[] = []
-): Promise<{ success: boolean }> {
-  const db = await getFinanceDB()
-  const result = await db.prepare(sql).bind(...params).run()
-  return { success: result.success }
-}
-
 // Batch statements
 export async function batch(
   statements: { sql: string; params?: unknown[] }[]
 ): Promise<void> {
   const db = await getDB()
-  const prepared = statements.map(({ sql, params = [] }) =>
-    db.prepare(sql).bind(...params)
-  )
-  await db.batch(prepared)
-}
-
-export async function financeBatch(
-  statements: { sql: string; params?: unknown[] }[]
-): Promise<void> {
-  const db = await getFinanceDB()
   const prepared = statements.map(({ sql, params = [] }) =>
     db.prepare(sql).bind(...params)
   )

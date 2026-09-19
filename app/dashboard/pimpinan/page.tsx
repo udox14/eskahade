@@ -71,7 +71,7 @@ export default async function PimpinanRingkasanPage() {
 
         <SectionCard
           title="Arus Kas 30 Hari Terakhir"
-          subtitle="Pemasukan dan pengeluaran dari jurnal keuangan terpusat."
+          subtitle="Penerimaan SPP dan PSB dari sistem lama."
         >
           {data.cashTrend.length === 0 ? (
             <div className="py-10 text-center text-sm text-slate-400">Belum ada transaksi dalam 30 hari terakhir.</div>

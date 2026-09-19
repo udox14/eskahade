@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { execute, financeQueryOne, generateId, getFinanceDB, queryOne } from '@/lib/db'
+import { execute, queryOne } from '@/lib/db'
 import { hashPassword, verifyPassword } from '@/lib/auth/password'
 import { createPortalToken, portalCookieOptions } from '@/lib/portal/session'
-import { logActivity } from '@/lib/activity-log'
-import { syncFinanceStudentSnapshot } from '@/lib/finance/snapshots'
+import { logActivity } from '@/lib/activity-log'
 
 // Password default saat kredensial belum pernah dibuat: NIS itu sendiri,
 // atau tanggal lahir format DDMMYYYY (santri.tanggal_lahir = 'YYYY-MM-DD').
@@ -163,32 +162,8 @@ export async function POST(request: NextRequest) {
       [santri.id]
     )
 
-    // Migrasi kompatibel: kredensial lama tetap dapat login, lalu dibuatkan akun
-    // wali baru. Petugas dapat menautkan anak lain ke akun ini kemudian.
-    let guardianId: string | undefined
-    try {
-      await syncFinanceStudentSnapshot(santri.id)
-      const existingGuardian = await financeQueryOne<{ id: string }>(`SELECT id FROM finance_guardians WHERE legacy_santri_id=? LIMIT 1`, [santri.id])
-      guardianId = existingGuardian?.id || generateId()
-      if (!existingGuardian) {
-        const currentHash = cred?.password_hash || (await queryOne<{ password_hash: string }>(`SELECT password_hash FROM portal_ortu_credentials WHERE santri_id=?`, [santri.id]))?.password_hash
-        if (currentHash) {
-          const db = await getFinanceDB()
-          await db.batch([
-            db.prepare(`INSERT INTO finance_guardians(id,display_name,password_hash,status,legacy_santri_id) VALUES(?,?,?,'ACTIVE',?)`).bind(guardianId, `Wali ${santri.nama_lengkap}`, currentHash, santri.id),
-            db.prepare(`INSERT OR IGNORE INTO finance_guardian_students(guardian_id,santri_id,relationship,verified_at)
-              VALUES(?,?,'WALI',datetime('now'))`).bind(guardianId, santri.id),
-          ])
-        }
-      }
-    } catch (migrationError) {
-      console.warn('[portal] guardian migration deferred', migrationError)
-      guardianId = undefined
-    }
-
     const token = await createPortalToken({
-      kind: 'portal_ortu',
-      ...(guardianId ? { guardian_id: guardianId } : {}),
+      kind: 'portal_ortu',
       santri_id: santri.id,
       nis: santri.nis,
       nama: santri.nama_lengkap,

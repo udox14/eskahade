@@ -283,7 +283,7 @@ export function KonfirmasiPortalClient({
                   )}
                   {row.status === 'terkonfirmasi' && !undo && (
                     <span className="text-[11px] text-slate-400">
-                      Sudah lunas lewat Keuangan Terpusat. Koreksi kesalahan lewat Transaksi &amp; Jurnal.
+                      Pembayaran sudah dikonfirmasi. Hubungi bendahara untuk koreksi.
                     </span>
                   )}
                   {row.status === 'menunggu_konfirmasi' && !row.bukti_url && (
