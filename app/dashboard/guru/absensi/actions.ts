@@ -6,8 +6,8 @@ import { getSession, hasAnyRole, hasRole, isAdmin, type SessionUser } from '@/li
 import { batch, execute, generateId, query, queryOne } from '@/lib/db'
 import { toWibDateInputValue } from '@/lib/date/wib'
 
-export const WAKTU_PENGAJIAN = ['shubuh', 'ashar', 'maghrib'] as const
-export const STATUS_ABSENSI_PENGAJAR = ['H', 'S', 'I', 'A'] as const
+const WAKTU_PENGAJIAN = ['shubuh', 'ashar', 'maghrib'] as const
+const STATUS_ABSENSI_PENGAJAR = ['H', 'S', 'I', 'A'] as const
 export type WaktuPengajian = typeof WAKTU_PENGAJIAN[number]
 export type StatusAbsensiPengajar = typeof STATUS_ABSENSI_PENGAJAR[number]
 
