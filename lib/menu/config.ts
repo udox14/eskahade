@@ -119,6 +119,7 @@ export const ICON_MAP: Record<string, React.ElementType> = {
   Settings2: Wrench,
   ReceiptText: FileText,
   CashRegister: Wallet,
+  QrCode: IdentificationCard,
 };
 
 export function getIcon(name: string): React.ElementType {
@@ -201,6 +202,8 @@ export const ROLE_LABEL: Record<string, string> = {
   wali_kelas: 'Wali Kelas',
   guru: 'Guru',
   bendahara: 'Bendahara',
+  admin_koperasi: 'Admin Koperasi',
+  petugas_koperasi: 'Petugas Koperasi',
   poskestren: 'POSKESTREN',
   pimpinan: 'Pimpinan',
 };

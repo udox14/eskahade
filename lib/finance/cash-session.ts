@@ -1,15 +1,20 @@
 // lib/finance/cash-session.ts
-// Modul Fondasi Minimum Sesi Kas (Fase 4C & PRD #23)
-// Menjamin setiap penerimaan tunai terhubung ke sesi kas aktif (non-orphan),
-// saldo awal (opening balance) merepresentasikan kas fisik riil,
-// dan dapat direkonsiliasi secara authoritatif.
+// Modul Fondasi & Lifecycle Sesi Kas (Fase 4C & Fase 6: PRD #23, Implementation Plan #2.1 #4 & #20)
+// Menjamin:
+// 1. Setiap transaksi tunai (penerimaan pembayaran, setoran, dan penarikan) terhubung ke sesi kas aktif (non-orphan).
+// 2. Saldo awal (opening balance) merepresentasikan kas fisik riil di laci kasir.
+// 3. Pelacakan kas masuk (cash-in) dan kas keluar (cash-out).
+// 4. Penutupan sesi kas dengan penghitungan fisik (actual closing balance), kalkulasi selisih otomatis,
+//    serta audit trail catatan selisih (difference_notes) jika terjadi mismatch.
+// 5. Rekalkulasi authoritatif dari entri buku besar mutasi riil (finance_payments & finance_wallet_ledger).
 
-import { queryOne, execute, generateId, now } from '@/lib/db'
+import { query, queryOne, execute, generateId, now } from '@/lib/db'
 
 export interface FinanceCashSession {
   id: string
   session_code: string
   operator_id: string
+  operator_name?: string | null
   opened_at: string
   opening_balance: number
   total_cash_in: number
@@ -22,6 +27,16 @@ export interface FinanceCashSession {
   status: 'OPEN' | 'CLOSED'
   created_at: string
   updated_at: string
+}
+
+export interface CashSessionTransactionSummary {
+  session: FinanceCashSession
+  paymentsCount: number
+  totalPaymentsAmount: number
+  withdrawalsCount: number
+  totalWithdrawalsAmount: number
+  topupsCount: number
+  totalTopupsAmount: number
 }
 
 function generateSessionCode(): string {
@@ -38,14 +53,32 @@ export async function getActiveCashSession(
   operatorId: string
 ): Promise<FinanceCashSession | null> {
   const existing = await queryOne<FinanceCashSession>(
-    `SELECT * FROM finance_cash_sessions
-     WHERE operator_id = ? AND status = 'OPEN'
-     ORDER BY opened_at DESC
+    `SELECT s.*, u.full_name AS operator_name
+     FROM finance_cash_sessions s
+     LEFT JOIN users u ON u.id = s.operator_id
+     WHERE s.operator_id = ? AND s.status = 'OPEN'
+     ORDER BY s.opened_at DESC
      LIMIT 1`,
     [operatorId]
   )
 
   return existing || null
+}
+
+/**
+ * Mengambil sesi kas berdasarkan ID.
+ */
+export async function getCashSessionById(
+  sessionId: string
+): Promise<FinanceCashSession | null> {
+  const session = await queryOne<FinanceCashSession>(
+    `SELECT s.*, u.full_name AS operator_name
+     FROM finance_cash_sessions s
+     LEFT JOIN users u ON u.id = s.operator_id
+     WHERE s.id = ?`,
+    [sessionId]
+  )
+  return session || null
 }
 
 /**
@@ -81,7 +114,10 @@ export async function openCashSession(
   )
 
   const created = await queryOne<FinanceCashSession>(
-    `SELECT * FROM finance_cash_sessions WHERE id = ?`,
+    `SELECT s.*, u.full_name AS operator_name
+     FROM finance_cash_sessions s
+     LEFT JOIN users u ON u.id = s.operator_id
+     WHERE s.id = ?`,
     [id]
   )
 
@@ -112,9 +148,32 @@ export async function recordCashInToSession(
 }
 
 /**
+ * Mencatat pengeluaran tunai (cash-out, misal penarikan uang jajan di loket) dari sesi kas
+ * dan mengkinikan derived cache:
+ * total_cash_out bertambah, expected_closing_balance berkurang.
+ */
+export async function recordCashOutFromSession(
+  sessionId: string,
+  amount: number
+): Promise<void> {
+  if (amount <= 0) return
+
+  await execute(
+    `UPDATE finance_cash_sessions
+     SET total_cash_out = total_cash_out + ?,
+         expected_closing_balance = expected_closing_balance - ?,
+         updated_at = ?
+     WHERE id = ?`,
+    [amount, amount, now(), sessionId]
+  )
+}
+
+/**
  * Rekalkulasi Authoritatif Sesi Kas (Implementation Plan 2.1 #4 & 2.3)
- * Menghitung saldo kas fisik & penerimaan aktual dari mutasi riil finance_payments.
- * expected_closing_balance = opening_balance + authoritative_cash_in - total_cash_out
+ * Menghitung saldo kas fisik & penerimaan aktual dari mutasi riil:
+ * - Kas Masuk authoritatif: SUM(gross_amount) dari finance_payments (channel = 'CASH', status = 'PAID')
+ * - Kas Keluar authoritatif: SUM(amount) dari finance_wallet_ledger (movement_type = 'WITHDRAWAL_LOKET', direction = 'OUT')
+ * expected_closing_balance = opening_balance + authoritative_cash_in - authoritative_cash_out
  */
 export async function recalculateCashSession(
   sessionId: string
@@ -127,29 +186,220 @@ export async function recalculateCashSession(
     throw new Error(`Sesi kas dengan ID "${sessionId}" tidak ditemukan.`)
   }
 
-  // Hitung akumulasi tunai masuk authoritatif dari finance_payments
-  const cashInRes = await queryOne<{ total_cash_in: number }>(
-    `SELECT COALESCE(SUM(gross_amount), 0) AS total_cash_in
+  // 1. Hitung kas masuk dari pembayaran tagihan kewajiban (finance_payments)
+  const paymentsRes = await queryOne<{ total_payment_in: number }>(
+    `SELECT COALESCE(SUM(gross_amount), 0) AS total_payment_in
+     FROM finance_payments
+     WHERE cash_session_id = ? AND channel = 'CASH' AND status = 'PAID'`,
+    [sessionId]
+  )
+  const paymentCashIn = paymentsRes?.total_payment_in ?? 0
+
+  // 2. Hitung kas masuk dari setoran uang jajan tunai (finance_wallet_ledger TOPUP_CASH)
+  const topupRes = await queryOne<{ total_topup_in: number }>(
+    `SELECT COALESCE(SUM(amount), 0) AS total_topup_in
+     FROM finance_wallet_ledger
+     WHERE cash_session_id = ? AND direction = 'IN' AND movement_type = 'TOPUP_CASH'`,
+    [sessionId]
+  )
+  const topupCashIn = topupRes?.total_topup_in ?? 0
+
+  const authoritativeCashIn = paymentCashIn + topupCashIn
+
+  // 3. Hitung akumulasi tunai keluar authoritatif dari pencairan uang jajan (finance_wallet_ledger WITHDRAWAL_LOKET)
+  const cashOutRes = await queryOne<{ total_cash_out: number }>(
+    `SELECT COALESCE(SUM(amount), 0) AS total_cash_out
+     FROM finance_wallet_ledger
+     WHERE cash_session_id = ? AND direction = 'OUT' AND movement_type = 'WITHDRAWAL_LOKET'`,
+    [sessionId]
+  )
+  const authoritativeCashOut = cashOutRes?.total_cash_out ?? 0
+
+  const expectedClosing = session.opening_balance + authoritativeCashIn - authoritativeCashOut
+
+  // Jika sesi sudah ditutup dan memiliki actual_closing_balance, perbarui juga selisihnya
+  const updatedDifference = session.actual_closing_balance !== null
+    ? session.actual_closing_balance - expectedClosing
+    : session.difference
+
+  await execute(
+    `UPDATE finance_cash_sessions
+     SET total_cash_in = ?,
+         total_cash_out = ?,
+         expected_closing_balance = ?,
+         difference = ?,
+         updated_at = ?
+     WHERE id = ?`,
+    [authoritativeCashIn, authoritativeCashOut, expectedClosing, updatedDifference, now(), sessionId]
+  )
+
+  const updated = await queryOne<FinanceCashSession>(
+    `SELECT s.*, u.full_name AS operator_name
+     FROM finance_cash_sessions s
+     LEFT JOIN users u ON u.id = s.operator_id
+     WHERE s.id = ?`,
+    [sessionId]
+  )
+  return updated!
+}
+
+/**
+ * Menutup sesi kas loket secara authoritatif (PRD #23).
+ * Menjamin:
+ * 1. Sesi berstatus 'OPEN'.
+ * 2. Input saldo fisik penutupan kasir (actual_closing_balance) divalidasi integer >= 0.
+ * 3. Menghitung selisih (difference = actual_closing_balance - expected_closing_balance).
+ * 4. Jika terdapat selisih (difference !== 0), catatan penjelasan selisih (notes) WAJIB diisi.
+ * 5. Menyimpan status 'CLOSED', actual_closing_balance, difference, difference_notes, dan closed_at.
+ * 6. Tidak ada hard delete atau perubahan historis diam-diam.
+ */
+export async function closeCashSession(
+  sessionId: string,
+  operatorId: string,
+  actualClosingBalance: number,
+  notes?: string
+): Promise<FinanceCashSession> {
+  const session = await queryOne<FinanceCashSession>(
+    `SELECT * FROM finance_cash_sessions WHERE id = ?`,
+    [sessionId]
+  )
+  if (!session) {
+    throw new Error(`Sesi kas dengan ID "${sessionId}" tidak ditemukan.`)
+  }
+  if (session.status === 'CLOSED') {
+    throw new Error(`Sesi kas dengan kode "${session.session_code}" sudah ditutup sebelumnya.`)
+  }
+
+  const validActual = Math.floor(actualClosingBalance)
+  if (validActual < 0 || !Number.isFinite(validActual)) {
+    throw new Error('Saldo fisik penutupan kas (actual closing balance) tidak boleh bernilai negatif.')
+  }
+
+  // 1. Rekalkulasi authoritatif sebelum menutup untuk menjamin integritas expected closing balance
+  const recalculated = await recalculateCashSession(sessionId)
+  const expectedClosing = recalculated.expected_closing_balance
+  const difference = validActual - expectedClosing
+  const cleanNotes = notes?.trim() || null
+
+  // 2. PRD #23: Jika terdapat selisih fisik riil, catatan penjelasan alasan selisih WAJIB diisi
+  if (difference !== 0 && !cleanNotes) {
+    const diffType = difference > 0 ? 'lebih (overage)' : 'kurang (shortage)'
+    const absDiff = Math.abs(difference).toLocaleString('id-ID')
+    throw new Error(
+      `Terdapat selisih ${diffType} kas fisik sebesar Rp${absDiff}. Catatan penjelasan alasan selisih wajib diisi.`
+    )
+  }
+
+  const timestamp = now()
+
+  await execute(
+    `UPDATE finance_cash_sessions
+     SET status = 'CLOSED',
+         actual_closing_balance = ?,
+         difference = ?,
+         difference_notes = ?,
+         closed_at = ?,
+         updated_at = ?
+     WHERE id = ?`,
+    [validActual, difference, cleanNotes, timestamp, timestamp, sessionId]
+  )
+
+  const closed = await queryOne<FinanceCashSession>(
+    `SELECT s.*, u.full_name AS operator_name
+     FROM finance_cash_sessions s
+     LEFT JOIN users u ON u.id = s.operator_id
+     WHERE s.id = ?`,
+    [sessionId]
+  )
+  return closed!
+}
+
+/**
+ * Mengambil ringkasan data transaksi dalam satu sesi kas.
+ */
+export async function getCashSessionSummary(
+  sessionId: string
+): Promise<CashSessionTransactionSummary | null> {
+  const session = await getCashSessionById(sessionId)
+  if (!session) return null
+
+  // Agregasi pembayaran tunai
+  const payRes = await queryOne<{ count: number; total: number }>(
+    `SELECT COUNT(*) AS count, COALESCE(SUM(gross_amount), 0) AS total
      FROM finance_payments
      WHERE cash_session_id = ? AND channel = 'CASH' AND status = 'PAID'`,
     [sessionId]
   )
 
-  const authoritativeCashIn = cashInRes?.total_cash_in ?? 0
-  const expectedClosing = session.opening_balance + authoritativeCashIn - session.total_cash_out
-
-  await execute(
-    `UPDATE finance_cash_sessions
-     SET total_cash_in = ?,
-         expected_closing_balance = ?,
-         updated_at = ?
-     WHERE id = ?`,
-    [authoritativeCashIn, expectedClosing, now(), sessionId]
-  )
-
-  const updated = await queryOne<FinanceCashSession>(
-    `SELECT * FROM finance_cash_sessions WHERE id = ?`,
+  // Agregasi penarikan uang jajan
+  const withRes = await queryOne<{ count: number; total: number }>(
+    `SELECT COUNT(*) AS count, COALESCE(SUM(amount), 0) AS total
+     FROM finance_wallet_ledger
+     WHERE cash_session_id = ? AND direction = 'OUT' AND movement_type = 'WITHDRAWAL_LOKET'`,
     [sessionId]
   )
-  return updated!
+
+  // Agregasi setoran tunai uang jajan
+  const topRes = await queryOne<{ count: number; total: number }>(
+    `SELECT COUNT(*) AS count, COALESCE(SUM(amount), 0) AS total
+     FROM finance_wallet_ledger
+     WHERE cash_session_id = ? AND direction = 'IN' AND movement_type = 'TOPUP_CASH'`,
+    [sessionId]
+  )
+
+  return {
+    session,
+    paymentsCount: payRes?.count ?? 0,
+    totalPaymentsAmount: payRes?.total ?? 0,
+    withdrawalsCount: withRes?.count ?? 0,
+    totalWithdrawalsAmount: withRes?.total ?? 0,
+    topupsCount: topRes?.count ?? 0,
+    totalTopupsAmount: topRes?.total ?? 0,
+  }
+}
+
+/**
+ * Mengambil histori sesi kas berpaginasi.
+ */
+export async function getCashSessionHistory(options?: {
+  operatorId?: string
+  status?: 'OPEN' | 'CLOSED'
+  page?: number
+  pageSize?: number
+}): Promise<{ items: FinanceCashSession[]; total: number }> {
+  const page = Math.max(1, options?.page ?? 1)
+  const pageSize = Math.max(1, Math.min(100, options?.pageSize ?? 20))
+  const offset = (page - 1) * pageSize
+
+  const conditions: string[] = ['1 = 1']
+  const params: unknown[] = []
+
+  if (options?.operatorId) {
+    conditions.push('s.operator_id = ?')
+    params.push(options.operatorId)
+  }
+  if (options?.status) {
+    conditions.push('s.status = ?')
+    params.push(options.status)
+  }
+
+  const whereClause = conditions.join(' AND ')
+
+  const countRow = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) AS total FROM finance_cash_sessions s WHERE ${whereClause}`,
+    params
+  )
+  const total = countRow?.total ?? 0
+
+  const items = await query<FinanceCashSession>(
+    `SELECT s.*, u.full_name AS operator_name
+     FROM finance_cash_sessions s
+     LEFT JOIN users u ON u.id = s.operator_id
+     WHERE ${whereClause}
+     ORDER BY s.opened_at DESC
+     LIMIT ? OFFSET ?`,
+    [...params, pageSize, offset]
+  )
+
+  return { items, total }
 }

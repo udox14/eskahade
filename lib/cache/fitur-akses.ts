@@ -90,6 +90,7 @@ async function ensureFiturAksesReady() {
       ('EHB', 'Rekap Menghafal', '/dashboard/ehb/absensi-menghafal/rekap', 'ClipboardList', '["admin","pengurus_asrama","keamanan"]', 1, 5),
       ('Keuangan Pusat', 'Keuangan Non-SPP', '/dashboard/keuangan/non-spp', 'HandCoins', '["admin","bendahara"]', 1, 0),
       ('Keuangan', 'Status Pembayaran', '/dashboard/keuangan/status-pembayaran', 'CreditCard', '["admin","bendahara","pimpinan"]', 1, 0),
+      ('Operasional', 'Loket Kasir', '/dashboard/koperasi/loket', 'CashRegister', '["admin","bendahara","admin_koperasi","petugas_koperasi"]', 1, 1),
       ('Master Data', 'Setup Tahun Ajaran', '/dashboard/setup-tahun-ajaran', 'ClipboardList', '["admin"]', 1, 2),
       ('Master Data', 'Pembagian Kitab Guru', '/dashboard/master/guru-kitab', 'BookOpen', '["admin"]', 1, 6),
       ('Master Data', 'Masa Santri Baru', '/dashboard/pengaturan/santri-baru', 'CalendarDays', '["admin"]', 1, 7),
