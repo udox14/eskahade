@@ -15,11 +15,12 @@ import {
   ChevronRight,
   Filter,
 } from 'lucide-react'
-import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 import Pagination from '@/components/ui/pagination'
 import { StatCardSkeleton, TableSkeleton } from '@/components/ui/skeletons'
+import { StatusPembayaranDetailDrawer } from './detail-drawer'
+import { CatatPembayaranModal } from './catat-bayar-modal'
 import {
   getStatusPembayaranData,
   type EnrichedStudentObligationMatrixItem,
@@ -52,6 +53,9 @@ export default function StatusPembayaranContent({
   const [activeTab, setActiveTab] = useState<TabType>('RINGKASAN')
   const [isPending, startTransition] = useTransition()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [selectedSantriId, setSelectedSantriId] = useState<string | null>(null)
+  const [isCatatBayarOpen, setIsCatatBayarOpen] = useState<boolean>(false)
+  const [catatBayarSantriId, setCatatBayarSantriId] = useState<string | null>(null)
 
   // Filter States
   const [selectedPeriod, setSelectedPeriod] = useState<string>(initialData.selectedPeriod)
@@ -302,12 +306,13 @@ export default function StatusPembayaranContent({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                disabled
-                aria-disabled="true"
-                title="Pencatatan pembayaran belum tersedia"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-400 cursor-not-allowed shadow-none select-none"
+                onClick={() => {
+                  setCatatBayarSantriId(null)
+                  setIsCatatBayarOpen(true)
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition cursor-pointer"
               >
-                <Wallet className="h-4 w-4 text-slate-400" />
+                <Wallet className="h-4 w-4 text-white" />
                 <span>Catat Pembayaran</span>
               </button>
             </div>
@@ -609,9 +614,13 @@ export default function StatusPembayaranContent({
                             clickable={false}
                           />
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-900 truncate">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedSantriId(item.santriId)}
+                              className="font-semibold text-slate-900 hover:text-emerald-600 transition-colors truncate block text-left cursor-pointer"
+                            >
                               {item.namaLengkap}
-                            </p>
+                            </button>
                             <p className="text-xs text-slate-500 truncate">
                               NIS {item.nis} · {item.asrama || 'Non-Asrama'}{item.kamar ? ` / ${item.kamar}` : ''}
                             </p>
@@ -693,11 +702,7 @@ export default function StatusPembayaranContent({
                       <td className="py-4 pl-3 pr-5 text-right whitespace-nowrap">
                         <button
                           type="button"
-                          onClick={() => {
-                            toast.info(`Detail Kewajiban: ${item.namaLengkap}`, {
-                              description: `Right Slide-over Drawer detail finansial santri dijadwalkan untuk Subfase 4B.`,
-                            })
-                          }}
+                          onClick={() => setSelectedSantriId(item.santriId)}
                           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 transition cursor-pointer"
                         >
                           <span>Detail</span>
@@ -724,6 +729,32 @@ export default function StatusPembayaranContent({
           />
         )}
       </div>
+
+      {/* 9. RIGHT SLIDE-OVER DETAIL DRAWER (FASE 4B) */}
+      <StatusPembayaranDetailDrawer
+        key={selectedSantriId || 'drawer'}
+        santriId={selectedSantriId}
+        selectedPeriod={selectedPeriod}
+        onClose={() => setSelectedSantriId(null)}
+        onRecordPayment={(santriId) => {
+          setSelectedSantriId(null)
+          setCatatBayarSantriId(santriId)
+          setIsCatatBayarOpen(true)
+        }}
+      />
+
+      {/* 10. MODAL CATAT PEMBAYARAN TUNAI (FASE 4C) */}
+      <CatatPembayaranModal
+        isOpen={isCatatBayarOpen}
+        initialSantriId={catatBayarSantriId}
+        onClose={() => {
+          setIsCatatBayarOpen(false)
+          setCatatBayarSantriId(null)
+        }}
+        onSuccess={() => {
+          fetchData()
+        }}
+      />
     </div>
   )
 }
