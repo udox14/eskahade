@@ -181,3 +181,238 @@ export interface RecordUnallocatedPaymentInput {
 export interface PaymentWithAllocations extends FinancePayment {
   allocations: FinanceAllocation[]
 }
+
+// ============================================================
+// Duitku Payment Gateway Types (Fase 3B)
+// ============================================================
+
+export interface DuitkuConfig {
+  merchantCode: string
+  apiKey: string
+  environment: 'sandbox' | 'production'
+  callbackUrl?: string
+  returnUrl?: string
+  defaultExpiryMinutes: number
+}
+
+export interface DuitkuCallbackPayload {
+  merchantCode: string
+  amount: string | number
+  merchantOrderId: string
+  productDetail?: string
+  additionalParam?: string
+  paymentCode?: string
+  resultCode: string // '00' = Success, '01' = Failed
+  merchantUserId?: string
+  reference: string
+  signature: string
+  publisherOrderId?: string
+  spUserHash?: string
+  settlementDate?: string
+  issuerCode?: string
+  customerName?: string
+}
+
+export interface DuitkuCreateTransactionInput {
+  paymentAmount: number
+  paymentMethod: string
+  merchantOrderId: string
+  productDetails: string
+  email: string
+  phoneNumber?: string
+  customerVaName: string
+  callbackUrl?: string
+  returnUrl?: string
+  expiryPeriod?: number // in minutes
+}
+
+export interface DuitkuCreateTransactionResponse {
+  merchantCode: string
+  reference: string
+  paymentUrl: string
+  vaNumber?: string
+  qrString?: string
+  amount: string
+  statusCode: string // '00' = Success
+  statusMessage: string
+}
+
+export interface DuitkuCheckTransactionResponse {
+  merchantOrderId: string
+  reference: string
+  amount: string
+  fee: string
+  statusCode: string // '00' = Success, '01' = Pending, '02' = Canceled
+  statusMessage: string
+}
+
+export interface ProcessDuitkuCallbackResult {
+  success: boolean
+  message: string
+  paymentId?: string
+  paymentNumber?: string
+  orderId?: string | null
+  reconciliationItemId?: string
+  isDuplicate: boolean
+  matchType:
+    | 'ORDER_ALLOCATED'
+    | 'UNALLOCATED_TRANSFER'
+    | 'UNMATCHED_EXTERNAL'
+    | 'EXPIRED_OR_CANCELLED_ORDER'
+    | 'AMOUNT_MISMATCH'
+    | 'ALREADY_PROCESSED'
+}
+
+// ============================================================
+// Duitku SNAP API Types (Fixed Virtual Account)
+// ============================================================
+
+export interface DuitkuSnapConfig {
+  partnerId: string
+  partnerServiceId: string // Prefix VA bank dari Duitku
+  clientSecret: string
+  privateKey: string
+  duitkuPublicKey?: string
+  environment: 'sandbox' | 'production'
+  defaultTrxType: 'C' | 'O' // 'C' = Close Amount, 'O' = Open Amount
+}
+
+export interface SnapTokenResponse {
+  responseCode: string // '2007300'
+  responseMessage: string
+  accessToken: string
+  tokenType: string // 'Bearer'
+  expiresIn: string // e.g. '900'
+}
+
+export interface SnapCreateVaInput {
+  customerNo: string
+  virtualAccountName: string
+  trxId: string
+  trxType?: 'C' | 'O'
+  amount?: number
+  expiredDate?: string // ISO-8601
+  minAmount?: number
+  maxAmount?: number
+}
+
+export interface SnapCreateVaResponse {
+  responseCode: string // '2002700'
+  responseMessage: string
+  virtualAccountData: {
+    partnerServiceId: string
+    customerNo: string
+    virtualAccountNo: string
+    virtualAccountName: string
+    trxId: string
+    totalAmount: {
+      value: string
+      currency: string
+    }
+    virtualAccountTrxType: 'C' | 'O'
+    expiredDate: string
+  }
+}
+
+export interface SnapUpdateVaInput {
+  customerNo: string
+  virtualAccountName?: string
+  trxId: string
+  amount?: number
+  expiredDate?: string
+}
+
+export interface SnapUpdateVaResponse {
+  responseCode: string // '2002800'
+  responseMessage: string
+  virtualAccountData: {
+    partnerServiceId: string
+    customerNo: string
+    virtualAccountNo: string
+    virtualAccountName: string
+    trxId: string
+    totalAmount: {
+      value: string
+      currency: string
+    }
+  }
+}
+
+export interface SnapInquiryVaResponse {
+  responseCode: string // '2003000'
+  responseMessage: string
+  virtualAccountData: {
+    partnerServiceId: string
+    customerNo: string
+    virtualAccountNo: string
+    virtualAccountName: string
+    trxId: string
+    totalAmount: {
+      value: string
+      currency: string
+    }
+    virtualAccountTrxType: 'C' | 'O'
+    expiredDate: string
+  }
+}
+
+export interface SnapPaymentNotificationPayload {
+  partnerServiceId: string
+  customerNo: string
+  virtualAccountNo: string
+  paymentRequestId: string
+  trxId: string
+  paidAmount: {
+    value: string
+    currency: string
+  }
+  additionalInfo: {
+    reference: string
+    paymentCode?: string
+    [key: string]: unknown
+  }
+}
+
+export interface SnapPaymentNotificationResponse {
+  responseCode: string // '2002500'
+  responseMessage: string
+  virtualAccountData?: {
+    partnerServiceId: string
+    customerNo: string
+    virtualAccountNo: string
+    virtualAccountName: string
+    paymentRequestId: string
+    paidAmount: {
+      value: string
+      currency: string
+    }
+  }
+}
+
+export interface ProcessSnapPaymentResult {
+  success: boolean
+  responseCode: string
+  responseMessage: string
+  paymentId?: string
+  paymentNumber?: string
+  orderId?: string | null
+  isDuplicate: boolean
+  matchType:
+    | 'ORDER_ALLOCATED'
+    | 'UNALLOCATED_TRANSFER'
+    | 'EXPIRED_OR_CANCELLED_ORDER'
+    | 'AMOUNT_MISMATCH'
+    | 'ALREADY_PROCESSED'
+  virtualAccountData?: {
+    partnerServiceId: string
+    customerNo: string
+    virtualAccountNo: string
+    virtualAccountName: string
+    paymentRequestId: string
+    paidAmount: {
+      value: string
+      currency: string
+    }
+  }
+}
+
