@@ -436,7 +436,24 @@ export async function recalculateObligation(
      WHERE obligation_id = ?`,
     [obligationId]
   )
-  const allocationsPaid = sumResult?.total ?? 0
+  const grossAllocations = sumResult?.total ?? 0
+
+  // Periksa akumulasi koreksi (VOID / REVERSAL / REFUND) pada finance_correction_items jika tabel tersedia
+  let totalCorrections = 0
+  const corrTable = await queryOne<{ name: string }>(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='finance_correction_items'`
+  )
+  if (corrTable) {
+    const corrResult = await queryOne<{ total: number | null }>(
+      `SELECT COALESCE(SUM(amount), 0) AS total
+       FROM finance_correction_items
+       WHERE obligation_id = ?`,
+      [obligationId]
+    )
+    totalCorrections = corrResult?.total ?? 0
+  }
+
+  const netAllocationsPaid = Math.max(0, grossAllocations - totalCorrections)
 
   // Periksa apakah ada pembayaran legacy yang terbawa pada kewajiban ini (khusus USPP)
   let legacyPaid = 0
@@ -447,7 +464,7 @@ export async function recalculateObligation(
     }
   }
 
-  const totalPaid = legacyPaid + allocationsPaid
+  const totalPaid = legacyPaid + netAllocationsPaid
 
   // Hitung status derived baru
   const newStatus = computeObligationStatus(

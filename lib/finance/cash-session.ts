@@ -206,14 +206,31 @@ export async function recalculateCashSession(
 
   const authoritativeCashIn = paymentCashIn + topupCashIn
 
-  // 3. Hitung akumulasi tunai keluar authoritatif dari pencairan uang jajan (finance_wallet_ledger WITHDRAWAL_LOKET)
+  // 3a. Hitung akumulasi tunai keluar authoritatif dari pencairan uang jajan loket (finance_wallet_ledger WITHDRAWAL_LOKET)
   const cashOutRes = await queryOne<{ total_cash_out: number }>(
     `SELECT COALESCE(SUM(amount), 0) AS total_cash_out
      FROM finance_wallet_ledger
      WHERE cash_session_id = ? AND direction = 'OUT' AND movement_type = 'WITHDRAWAL_LOKET'`,
     [sessionId]
   )
-  const authoritativeCashOut = cashOutRes?.total_cash_out ?? 0
+  const walletCashOut = cashOutRes?.total_cash_out ?? 0
+
+  // 3b. Hitung akumulasi tunai keluar authoritatif dari refund/koreksi tunai (finance_corrections method = 'CASH')
+  let correctionCashOut = 0
+  const corrTable = await queryOne<{ name: string }>(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='finance_corrections'`
+  )
+  if (corrTable) {
+    const correctionOutRes = await queryOne<{ total_correction_out: number }>(
+      `SELECT COALESCE(SUM(total_amount), 0) AS total_correction_out
+       FROM finance_corrections
+       WHERE cash_session_id = ? AND method = 'CASH'`,
+      [sessionId]
+    )
+    correctionCashOut = correctionOutRes?.total_correction_out ?? 0
+  }
+
+  const authoritativeCashOut = walletCashOut + correctionCashOut
 
   const expectedClosing = session.opening_balance + authoritativeCashIn - authoritativeCashOut
 
