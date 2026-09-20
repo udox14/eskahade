@@ -35,17 +35,147 @@ export interface UserFinancePermissions {
   role: string
 }
 
+export type TabType = 'RINGKASAN' | 'BULANAN' | 'TAHUNAN' | 'USPP' | 'TUNGGAKAN'
+
+export interface RingkasanItemStatus {
+  status: FinanceObligationStatus | 'NOT_MATERIALIZED' | 'TUNGGAKAN'
+  label: string
+  amountExpected: number
+  amountPaid: number
+  amountExempted: number
+  remaining: number
+}
+
+export interface RingkasanRowItem {
+  santriId: string
+  nis: string
+  namaLengkap: string
+  asrama: string | null
+  kamar: string | null
+  kelasSekolah: string | null
+  spp: RingkasanItemStatus
+  uangMakan: RingkasanItemStatus
+  uangNyuci: RingkasanItemStatus
+  ehb: RingkasanItemStatus
+  kesehatan: RingkasanItemStatus
+  ekskul: RingkasanItemStatus
+  uspp: RingkasanItemStatus
+  totalRemaining: number
+  overallStatus: 'LUNAS' | 'CICILAN' | 'BELUM_LUNAS' | 'BEBAS'
+  hasLegacyTunggakan: boolean
+  legacyTunggakanSpp: number
+}
+
+export interface BulananRowItem {
+  obligationId: string
+  santriId: string
+  nis: string
+  namaLengkap: string
+  asrama: string | null
+  kamar: string | null
+  kelasSekolah: string | null
+  itemType: 'SPP' | 'UANG_MAKAN' | 'UANG_NYUCI'
+  itemLabel: string
+  period: string
+  periodLabel: string
+  amountExpected: number
+  amountPaid: number
+  amountExempted: number
+  remaining: number
+  status: FinanceObligationStatus
+  statusLabel: string
+  lastPaymentAt: string | null
+  lastPaymentMethod: string | null
+  providerName: string | null
+}
+
+export interface TahunanRowItem {
+  obligationId: string
+  santriId: string
+  nis: string
+  namaLengkap: string
+  asrama: string | null
+  kamar: string | null
+  kelasSekolah: string | null
+  itemType: 'EHB' | 'KESEHATAN' | 'EKSKUL'
+  itemLabel: string
+  academicYear: string
+  academicYearLabel: string
+  amountExpected: number
+  amountPaid: number
+  amountExempted: number
+  remaining: number
+  status: FinanceObligationStatus
+  statusLabel: string
+  lastPaymentAt: string | null
+  lastPaymentMethod: string | null
+}
+
+export interface UsppRowItem {
+  obligationId: string | null
+  santriId: string
+  nis: string
+  namaLengkap: string
+  asrama: string | null
+  kamar: string | null
+  kelasSekolah: string | null
+  amountExpected: number
+  amountPaid: number
+  amountExempted: number
+  remaining: number
+  installmentCount: number
+  lastInstallmentAmount: number | null
+  lastInstallmentAt: string | null
+  lastInstallmentMethod: string | null
+  status: 'BELUM_BAYAR' | 'MENCICIL' | 'LUNAS' | 'BEBAS'
+  statusLabel: string
+}
+
+export interface TunggakanRowItem {
+  obligationId: string
+  santriId: string
+  nis: string
+  namaLengkap: string
+  asrama: string | null
+  kamar: string | null
+  kelasSekolah: string | null
+  itemType: 'SPP' | 'UANG_MAKAN' | 'UANG_NYUCI'
+  itemLabel: string
+  period: string
+  periodLabel: string
+  amountExpected: number
+  amountPaid: number
+  amountExempted: number
+  remaining: number
+  overdueSince: string
+  overdueDuration: string
+  lastPaymentAt: string | null
+  lastPaymentMethod: string | null
+  isLegacy: boolean
+}
+
 export interface StatusPembayaranQueryParams {
+  tab?: TabType
   period?: string
+  academicYear?: string
+  itemType?: string
   asrama?: string
-  status?: 'ALL' | 'LUNAS' | 'CICILAN' | 'BELUM_LUNAS' | 'BEBAS'
+  kelas?: string
+  status?: string
   search?: string
   page?: number
   pageSize?: number
+  currentDateOverride?: string
 }
 
 export interface StatusPembayaranResponse {
+  activeTab: TabType
   items: EnrichedStudentObligationMatrixItem[]
+  ringkasanItems?: RingkasanRowItem[]
+  bulananItems?: BulananRowItem[]
+  tahunanItems?: TahunanRowItem[]
+  usppItems?: UsppRowItem[]
+  tunggakanItems?: TunggakanRowItem[]
   kpi: StatusPembayaranKpi
   pagination: {
     currentPage: number
@@ -55,15 +185,21 @@ export interface StatusPembayaranResponse {
   }
   isPreCutoverPeriod: boolean
   selectedPeriod: string
+  selectedAcademicYear?: string
   userPermissions: UserFinancePermissions
 }
 
 export interface FilterOptionsResponse {
   asramaList: string[]
+  kelasList: string[]
   periodList: Array<{
     value: string
     label: string
     isPreCutover: boolean
+  }>
+  academicYearList: Array<{
+    value: string
+    label: string
   }>
   currentPeriod: string
   userPermissions: UserFinancePermissions
@@ -117,6 +253,16 @@ export interface PaymentHistoryAllocationItem {
   amount: number
 }
 
+export interface PaymentCorrectionItem {
+  id: string
+  correctionNumber: string
+  correctionType: 'VOID' | 'REVERSAL' | 'REFUND'
+  amount: number
+  method: string | null
+  reason: string
+  createdAt: string
+}
+
 export interface PaymentHistoryItem {
   id: string
   paymentNumber: string
@@ -131,6 +277,7 @@ export interface PaymentHistoryItem {
   paidAt: string
   externalReference: string | null
   allocations: PaymentHistoryAllocationItem[]
+  corrections?: PaymentCorrectionItem[]
 }
 
 export interface UsppInstallmentHistoryItem {
@@ -238,6 +385,7 @@ const BULAN_NAMES = [
  * Format string YYYY-MM ke format label Indonesia "Bulan YYYY"
  */
 function formatPeriodLabel(period: string): string {
+  if (!period) return '-'
   if (period === 'LIFETIME') return 'Sepanjang Pendidikan'
   const parts = period.split('-')
   if (parts.length === 1) return `Tahun ${period}`
@@ -249,13 +397,67 @@ function formatPeriodLabel(period: string): string {
 }
 
 /**
- * Helper untuk mendapatkan periode default (bulan berjalan)
+ * Helper untuk mendapatkan periode default (bulan berjalan di Asia/Jakarta)
  */
-function getDefaultPeriod(): string {
+function getCurrentPeriodJakarta(overrideDateStr?: string): string {
+  if (overrideDateStr) {
+    const match = overrideDateStr.match(/^(\d{4})-(\d{2})/)
+    if (match) return `${match[1]}-${match[2]}`
+  }
   const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  return `${year}-${month}`
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+  })
+  return formatter.format(now)
+}
+
+function getDefaultPeriod(): string {
+  return getCurrentPeriodJakarta()
+}
+
+/**
+ * Normalisasi metode pembayaran ke bahasa operator:
+ * - Tunai
+ * - Virtual Account
+ * - QRIS
+ * - Transfer via Portal
+ * Tidak pernah mengarang metode dari kewajiban.
+ */
+function normalizePaymentMethod(channel?: string | null, method?: string | null): string {
+  if (!channel && !method) return '-'
+  const ch = (channel || '').toUpperCase().trim()
+  const m = (method || '').toUpperCase().trim()
+  if (ch === 'CASH' || m === 'CASH') return 'Tunai'
+  if (m.includes('QRIS')) return 'QRIS'
+  if (m.includes('VA') || m.includes('VIRTUAL_ACCOUNT')) return 'Virtual Account'
+  if (ch === 'DUITKU') return 'Transfer via Portal'
+  if (m === 'TRANSFER') return 'Transfer'
+  return m || ch || '-'
+}
+
+/**
+ * Menghitung umur tunggakan secara presisi per bulan
+ */
+function calculateOverdueAge(period: string, currentPeriod: string): { overdueSince: string; overdueDuration: string } {
+  const parts = period.split('-').map(Number)
+  const cParts = currentPeriod.split('-').map(Number)
+  const pYear = parts[0]
+  const pMonth = parts[1] || 1
+  const cYear = cParts[0]
+  const cMonth = cParts[1] || 1
+  const diffMonths = (cYear - pYear) * 12 + (cMonth - pMonth)
+  const overdueSince = formatPeriodLabel(period)
+  let overdueDuration = `${diffMonths} bulan`
+  if (diffMonths <= 0) {
+    overdueDuration = 'Bulan ini'
+  } else if (diffMonths === 1) {
+    overdueDuration = '1 bulan'
+  } else {
+    overdueDuration = `${diffMonths} bulan`
+  }
+  return { overdueSince, overdueDuration }
 }
 
 /**
@@ -278,14 +480,11 @@ export async function authorizeUser(): Promise<{
     throw new Error('Akses ditolak: Pengguna tidak memiliki role yang valid.')
   }
 
-  // 1. canAccessFeatureForSession adalah authority utama untuk verifikasi akses fitur.
-  // Tidak menggunakan permissive fallback yang dapat mengubah hasil false menjadi true.
   const hasAccess = await canAccessFeatureForSession(session, '/dashboard/keuangan/status-pembayaran')
   if (!hasAccess) {
     throw new Error('Akses ditolak: Anda tidak memiliki hak akses untuk membuka data Status Pembayaran.')
   }
 
-  // 2. Proteksi ketat mutation: Pimpinan dan Tester SELALU view-only
   const isViewOnly = roles.includes('pimpinan') || roles.includes('tester')
   const canMutate = !isViewOnly && (roles.includes('admin') || roles.includes('bendahara'))
 
@@ -304,8 +503,7 @@ export async function authorizeUser(): Promise<{
 
 /**
  * Mengambil histori tunggakan SPP legacy (periode sebelum cutover 2026-07)
- * langsung dari tabel resmi D1 `spp_tunggakan_historis` (status = 'BELUM_LUNAS' dan tahun*100+bulan < 202607)
- * tanpa menduplikasi baris di finance_obligations.
+ * langsung dari tabel resmi D1 `spp_tunggakan_historis`.
  */
 async function fetchLegacySppArrears(santriIds: string[]): Promise<Map<string, { total: number; count: number }>> {
   const map = new Map<string, { total: number; count: number }>()
@@ -342,33 +540,1000 @@ async function fetchLegacySppArrears(santriIds: string[]): Promise<Map<string, {
 }
 
 /**
+ * Mengambil informasi pembayaran nyata terakhir untuk daftar obligation_id (efektif setelah koreksi)
+ */
+async function fetchLatestPaymentsForObligations(
+  obligationIds: string[]
+): Promise<Map<string, { paidAt: string; method: string; amount: number }>> {
+  const map = new Map<string, { paidAt: string; method: string; amount: number }>()
+  if (obligationIds.length === 0) return map
+
+  const CHUNK_SIZE = 60
+  for (let i = 0; i < obligationIds.length; i += CHUNK_SIZE) {
+    const chunk = obligationIds.slice(i, i + CHUNK_SIZE)
+    const ph = chunk.map(() => '?').join(',')
+
+    try {
+      const rows = await query<{
+        obligation_id: string
+        paid_at: string
+        channel: string
+        method: string
+        net_alloc: number
+      }>(
+        `SELECT
+           a.obligation_id,
+           p.paid_at,
+           p.channel,
+           p.method,
+           (a.amount - COALESCE((SELECT SUM(ci.amount) FROM finance_correction_items ci WHERE ci.target_allocation_id = a.id), 0)) as net_alloc
+         FROM finance_allocations a
+         JOIN finance_payments p ON a.payment_id = p.id
+         WHERE a.obligation_id IN (${ph})
+         ORDER BY p.paid_at DESC, p.created_at DESC`,
+        chunk
+      )
+
+      for (const r of rows) {
+        if ((r.net_alloc ?? 0) <= 0) continue // Abaikan alokasi yang telah void/refund penuh
+        if (!map.has(r.obligation_id)) {
+          map.set(r.obligation_id, {
+            paidAt: r.paid_at,
+            method: normalizePaymentMethod(r.channel, r.method),
+            amount: r.net_alloc,
+          })
+        }
+      }
+    } catch (err: unknown) {
+      console.error('[status-pembayaran] Gagal mengambil latest payments:', err)
+    }
+  }
+
+  return map
+}
+
+/**
+ * Mengambil ringkasan cicilan USPP untuk daftar santri (efektif setelah koreksi)
+ */
+async function fetchUsppInstallmentStats(
+  santriIds: string[]
+): Promise<Map<string, { count: number; lastAmount: number | null; lastPaidAt: string | null; lastMethod: string | null }>> {
+  const map = new Map<string, { count: number; lastAmount: number | null; lastPaidAt: string | null; lastMethod: string | null }>()
+  if (santriIds.length === 0) return map
+
+  const CHUNK_SIZE = 60
+  for (let i = 0; i < santriIds.length; i += CHUNK_SIZE) {
+    const chunk = santriIds.slice(i, i + CHUNK_SIZE)
+    const ph = chunk.map(() => '?').join(',')
+
+    try {
+      const rows = await query<{
+        santri_id: string
+        paid_at: string
+        channel: string
+        method: string
+        net_alloc: number
+      }>(
+        `SELECT
+           p.santri_id,
+           p.paid_at,
+           p.channel,
+           p.method,
+           (a.amount - COALESCE((SELECT SUM(ci.amount) FROM finance_correction_items ci WHERE ci.target_allocation_id = a.id), 0)) as net_alloc
+         FROM finance_allocations a
+         JOIN finance_payments p ON a.payment_id = p.id
+         WHERE a.item_type = 'USPP'
+           AND p.santri_id IN (${ph})
+         ORDER BY p.paid_at DESC, p.created_at DESC`,
+        chunk
+      )
+
+      for (const r of rows) {
+        if ((r.net_alloc ?? 0) <= 0) continue
+        const prev = map.get(r.santri_id)
+        if (!prev) {
+          map.set(r.santri_id, {
+            count: 1,
+            lastAmount: r.net_alloc,
+            lastPaidAt: r.paid_at,
+            lastMethod: normalizePaymentMethod(r.channel, r.method),
+          })
+        } else {
+          prev.count += 1
+        }
+      }
+    } catch (err: unknown) {
+      console.error('[status-pembayaran] Gagal membaca statistik cicilan USPP:', err)
+    }
+  }
+
+  return map
+}
+
+// ─── QUERY ENGINE PER TAB (C3 REDESIGN) ──────────────────────────────────────
+
+async function fetchRingkasanData(options: {
+  selectedPeriod: string
+  currentPeriod: string
+  asramaFilter?: string
+  kelasFilter?: string
+  searchFilter?: string
+  statusFilter?: string
+  page: number
+  pageSize: number
+}): Promise<{ items: RingkasanRowItem[]; totalCount: number }> {
+  const whereClauses: string[] = ["s.status_global = 'aktif'"]
+  const params: unknown[] = []
+
+  if (options.asramaFilter && options.asramaFilter !== 'ALL') {
+    whereClauses.push('s.asrama = ?')
+    params.push(options.asramaFilter)
+  }
+  if (options.kelasFilter && options.kelasFilter !== 'ALL') {
+    whereClauses.push('s.kelas_sekolah = ?')
+    params.push(options.kelasFilter)
+  }
+  if (options.searchFilter) {
+    whereClauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)')
+    const q = `%${options.searchFilter}%`
+    params.push(q, q)
+  }
+
+  const whereSql = whereClauses.join(' AND ')
+
+  // Total santri aktif sesuai kriteria filter
+  const countRes = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) as total FROM santri s WHERE ${whereSql}`,
+    params
+  )
+  const totalCount = countRes?.total ?? 0
+
+  const limit = options.pageSize > 0 ? options.pageSize : 50
+  const offset = (Math.max(1, options.page) - 1) * limit
+
+  const studentRows = await query<{
+    id: string
+    nis: string
+    nama_lengkap: string
+    asrama: string | null
+    kamar: string | null
+    kelas_sekolah: string | null
+  }>(
+    `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.kelas_sekolah
+     FROM santri s
+     WHERE ${whereSql}
+     ORDER BY s.nama_lengkap ASC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  )
+
+  if (studentRows.length === 0) {
+    return { items: [], totalCount }
+  }
+
+  const santriIds = studentRows.map(s => s.id)
+  const legacyMap = await fetchLegacySppArrears(santriIds)
+
+  // Mapping periode bulanan dan tahunan
+  const monthlyPeriod = options.selectedPeriod
+  const annualYear = monthlyPeriod.split('-')[0] || '2026'
+
+  // Ambil seluruh kewajiban untuk santri pada page ini dengan net allocation authoritative
+  const ph = santriIds.map(() => '?').join(',')
+  const obligationRows = await query<{
+    id: string
+    santri_id: string
+    item_type: string
+    period: string
+    amount_expected: number
+    amount_exempted: number
+    status: string
+    gross_paid: number
+    total_corr: number
+  }>(
+    `SELECT
+       o.id,
+       o.santri_id,
+       o.item_type,
+       o.period,
+       o.amount_expected,
+       o.amount_exempted,
+       o.status,
+       (SELECT COALESCE(SUM(amount), 0) FROM finance_allocations WHERE obligation_id = o.id) as gross_paid,
+       (SELECT COALESCE(SUM(amount), 0) FROM finance_correction_items WHERE obligation_id = o.id) as total_corr
+     FROM finance_obligations o
+     WHERE o.santri_id IN (${ph})
+       AND (o.period = ? OR o.period = ? OR o.period = 'LIFETIME')`,
+    [...santriIds, monthlyPeriod, annualYear]
+  )
+
+  // Kelompokkan kewajiban per santri dan item_type
+  const obMap = new Map<string, Map<string, typeof obligationRows[0]>>()
+  for (const ob of obligationRows) {
+    let studentObs = obMap.get(ob.santri_id)
+    if (!studentObs) {
+      studentObs = new Map()
+      obMap.set(ob.santri_id, studentObs)
+    }
+    studentObs.set(ob.item_type, ob)
+  }
+
+  const makeItemStatus = (
+    ob: typeof obligationRows[0] | undefined,
+    isMonthly: boolean
+  ): RingkasanItemStatus => {
+    if (!ob) {
+      return {
+        status: 'NOT_MATERIALIZED',
+        label: 'Belum Ada Tagihan',
+        amountExpected: 0,
+        amountPaid: 0,
+        amountExempted: 0,
+        remaining: 0,
+      }
+    }
+
+    const expected = ob.amount_expected ?? 0
+    const exempted = ob.amount_exempted ?? 0
+    const netPaid = Math.max(0, (ob.gross_paid ?? 0) - (ob.total_corr ?? 0))
+    const remaining = Math.max(0, expected - exempted - netPaid)
+
+    if (ob.status === 'EXEMPTED' || (expected > 0 && exempted >= expected)) {
+      return {
+        status: 'EXEMPTED',
+        label: 'Dibebaskan',
+        amountExpected: expected,
+        amountPaid: netPaid,
+        amountExempted: exempted,
+        remaining: 0,
+      }
+    }
+
+    if (remaining <= 0 && expected > 0) {
+      return {
+        status: 'PAID',
+        label: 'Lunas',
+        amountExpected: expected,
+        amountPaid: netPaid,
+        amountExempted: exempted,
+        remaining: 0,
+      }
+    }
+
+    if (netPaid > 0) {
+      return {
+        status: 'PARTIALLY_PAID',
+        label: ob.item_type === 'USPP' ? 'Mencicil' : 'Sebagian',
+        amountExpected: expected,
+        amountPaid: netPaid,
+        amountExempted: exempted,
+        remaining,
+      }
+    }
+
+    // Belum bayar: cek apakah tunggakan untuk bulanan
+    if (isMonthly && ob.period < options.currentPeriod) {
+      return {
+        status: 'TUNGGAKAN',
+        label: 'Tunggakan',
+        amountExpected: expected,
+        amountPaid: 0,
+        amountExempted: exempted,
+        remaining,
+      }
+    }
+
+    return {
+      status: 'UNPAID',
+      label: 'Belum Lunas',
+      amountExpected: expected,
+      amountPaid: 0,
+      amountExempted: exempted,
+      remaining,
+    }
+  }
+
+  const items: RingkasanRowItem[] = studentRows.map(s => {
+    const studentObs = obMap.get(s.id)
+    const spp = makeItemStatus(studentObs?.get('SPP'), true)
+    const uangMakan = makeItemStatus(studentObs?.get('UANG_MAKAN'), true)
+    const uangNyuci = makeItemStatus(studentObs?.get('UANG_NYUCI'), true)
+    const ehb = makeItemStatus(studentObs?.get('EHB'), false)
+    const kesehatan = makeItemStatus(studentObs?.get('KESEHATAN'), false)
+    const ekskul = makeItemStatus(studentObs?.get('EKSKUL'), false)
+    const uspp = makeItemStatus(studentObs?.get('USPP'), false)
+
+    const legacyInfo = legacyMap.get(s.id) ?? { total: 0, count: 0 }
+    const totalRemaining =
+      spp.remaining +
+      uangMakan.remaining +
+      uangNyuci.remaining +
+      ehb.remaining +
+      kesehatan.remaining +
+      ekskul.remaining +
+      uspp.remaining +
+      legacyInfo.total
+
+    const allItems = [spp, uangMakan, uangNyuci, ehb, kesehatan, ekskul, uspp]
+    const hasUnpaid = allItems.some(it => it.remaining > 0) || legacyInfo.total > 0
+    const hasPartial = allItems.some(it => it.status === 'PARTIALLY_PAID')
+
+    let overallStatus: 'LUNAS' | 'CICILAN' | 'BELUM_LUNAS' | 'BEBAS' = 'LUNAS'
+    if (!hasUnpaid) {
+      overallStatus = 'LUNAS'
+    } else if (hasPartial) {
+      overallStatus = 'CICILAN'
+    } else {
+      overallStatus = 'BELUM_LUNAS'
+    }
+
+    return {
+      santriId: s.id,
+      nis: s.nis,
+      namaLengkap: s.nama_lengkap,
+      asrama: s.asrama,
+      kamar: s.kamar,
+      kelasSekolah: s.kelas_sekolah,
+      spp,
+      uangMakan,
+      uangNyuci,
+      ehb,
+      kesehatan,
+      ekskul,
+      uspp,
+      totalRemaining,
+      overallStatus,
+      hasLegacyTunggakan: legacyInfo.total > 0,
+      legacyTunggakanSpp: legacyInfo.total,
+    }
+  })
+
+  return { items, totalCount }
+}
+
+async function fetchBulananData(options: {
+  selectedPeriod: string
+  currentPeriod: string
+  asramaFilter?: string
+  kelasFilter?: string
+  itemFilter?: string
+  statusFilter?: string
+  searchFilter?: string
+  page: number
+  pageSize: number
+}): Promise<{ items: BulananRowItem[]; totalCount: number }> {
+  const whereClauses: string[] = [
+    "s.status_global = 'aktif'",
+    "o.item_type IN ('SPP', 'UANG_MAKAN', 'UANG_NYUCI')",
+    "o.period = ?",
+  ]
+  const params: unknown[] = [options.selectedPeriod]
+
+  if (options.itemFilter && options.itemFilter !== 'ALL') {
+    whereClauses.push('o.item_type = ?')
+    params.push(options.itemFilter)
+  }
+  if (options.asramaFilter && options.asramaFilter !== 'ALL') {
+    whereClauses.push('s.asrama = ?')
+    params.push(options.asramaFilter)
+  }
+  if (options.kelasFilter && options.kelasFilter !== 'ALL') {
+    whereClauses.push('s.kelas_sekolah = ?')
+    params.push(options.kelasFilter)
+  }
+  if (options.searchFilter) {
+    whereClauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)')
+    const q = `%${options.searchFilter}%`
+    params.push(q, q)
+  }
+
+  // Net calculations
+  const grossSql = `(SELECT COALESCE(SUM(amount), 0) FROM finance_allocations WHERE obligation_id = o.id)`
+  const corrSql = `(SELECT COALESCE(SUM(amount), 0) FROM finance_correction_items WHERE obligation_id = o.id)`
+  const netPaidSql = `MAX(0, ${grossSql} - ${corrSql})`
+  const remainingSql = `MAX(0, o.amount_expected - o.amount_exempted - ${netPaidSql})`
+
+  if (options.statusFilter && options.statusFilter !== 'ALL') {
+    if (options.statusFilter === 'LUNAS') {
+      whereClauses.push(`(${remainingSql} = 0 AND o.amount_expected > 0)`)
+    } else if (options.statusFilter === 'SEBAGIAN' || options.statusFilter === 'CICILAN') {
+      whereClauses.push(`(${netPaidSql} > 0 AND ${remainingSql} > 0)`)
+    } else if (options.statusFilter === 'BELUM_LUNAS') {
+      whereClauses.push(`(${netPaidSql} = 0 AND ${remainingSql} > 0)`)
+    } else if (options.statusFilter === 'BEBAS' || options.statusFilter === 'EXEMPTED') {
+      whereClauses.push(`(o.status = 'EXEMPTED' OR (o.amount_expected > 0 AND o.amount_exempted >= o.amount_expected))`)
+    }
+  }
+
+  const whereSql = whereClauses.join(' AND ')
+
+  const countRes = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) as total
+     FROM finance_obligations o
+     JOIN santri s ON o.santri_id = s.id
+     WHERE ${whereSql}`,
+    params
+  )
+  const totalCount = countRes?.total ?? 0
+
+  const limit = options.pageSize > 0 ? options.pageSize : 50
+  const offset = (Math.max(1, options.page) - 1) * limit
+
+  const rows = await query<{
+    id: string
+    santri_id: string
+    nis: string
+    nama_lengkap: string
+    asrama: string | null
+    kamar: string | null
+    kelas_sekolah: string | null
+    item_type: 'SPP' | 'UANG_MAKAN' | 'UANG_NYUCI'
+    period: string
+    amount_expected: number
+    amount_exempted: number
+    status: string
+    gross_paid: number
+    total_corr: number
+    provider_name: string | null
+  }>(
+    `SELECT
+       o.id,
+       o.santri_id,
+       s.nis,
+       s.nama_lengkap,
+       s.asrama,
+       s.kamar,
+       s.kelas_sekolah,
+       o.item_type,
+       o.period,
+       o.amount_expected,
+       o.amount_exempted,
+       o.status,
+       ${grossSql} as gross_paid,
+       ${corrSql} as total_corr,
+       m.nama_jasa as provider_name
+     FROM finance_obligations o
+     JOIN santri s ON o.santri_id = s.id
+     LEFT JOIN master_jasa m ON o.provider_id = m.id
+     WHERE ${whereSql}
+     ORDER BY s.nama_lengkap ASC, o.item_type ASC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  )
+
+  const obligationIds = rows.map(r => r.id)
+  const paymentsMap = await fetchLatestPaymentsForObligations(obligationIds)
+
+  const items: BulananRowItem[] = rows.map(r => {
+    const expected = r.amount_expected ?? 0
+    const exempted = r.amount_exempted ?? 0
+    const netPaid = Math.max(0, (r.gross_paid ?? 0) - (r.total_corr ?? 0))
+    const remaining = Math.max(0, expected - exempted - netPaid)
+
+    let status: FinanceObligationStatus = 'UNPAID'
+    let statusLabel = 'Belum Lunas'
+    if (r.status === 'EXEMPTED' || (expected > 0 && exempted >= expected)) {
+      status = 'EXEMPTED'
+      statusLabel = 'Dibebaskan'
+    } else if (remaining <= 0 && expected > 0) {
+      status = 'PAID'
+      statusLabel = 'Lunas'
+    } else if (netPaid > 0) {
+      status = 'PARTIALLY_PAID'
+      statusLabel = 'Sebagian'
+    }
+
+    const payInfo = paymentsMap.get(r.id)
+
+    return {
+      obligationId: r.id,
+      santriId: r.santri_id,
+      nis: r.nis,
+      namaLengkap: r.nama_lengkap,
+      asrama: r.asrama,
+      kamar: r.kamar,
+      kelasSekolah: r.kelas_sekolah,
+      itemType: r.item_type,
+      itemLabel: FINANCE_ITEM_LABELS[r.item_type as keyof typeof FINANCE_ITEM_LABELS] || r.item_type,
+      period: r.period,
+      periodLabel: formatPeriodLabel(r.period),
+      amountExpected: expected,
+      amountPaid: netPaid,
+      amountExempted: exempted,
+      remaining,
+      status,
+      statusLabel,
+      lastPaymentAt: payInfo?.paidAt ?? null,
+      lastPaymentMethod: payInfo?.method ?? null,
+      providerName: r.provider_name,
+    }
+  })
+
+  return { items, totalCount }
+}
+
+async function fetchTahunanData(options: {
+  academicYear?: string
+  asramaFilter?: string
+  kelasFilter?: string
+  itemFilter?: string
+  statusFilter?: string
+  searchFilter?: string
+  page: number
+  pageSize: number
+}): Promise<{ items: TahunanRowItem[]; totalCount: number }> {
+  const annualPeriod = options.academicYear ? options.academicYear.split('/')[0] : '2026'
+
+  const whereClauses: string[] = [
+    "s.status_global = 'aktif'",
+    "o.item_type IN ('EHB', 'KESEHATAN', 'EKSKUL')",
+    "o.period = ?",
+  ]
+  const params: unknown[] = [annualPeriod]
+
+  if (options.itemFilter && options.itemFilter !== 'ALL') {
+    whereClauses.push('o.item_type = ?')
+    params.push(options.itemFilter)
+  }
+  if (options.asramaFilter && options.asramaFilter !== 'ALL') {
+    whereClauses.push('s.asrama = ?')
+    params.push(options.asramaFilter)
+  }
+  if (options.kelasFilter && options.kelasFilter !== 'ALL') {
+    whereClauses.push('s.kelas_sekolah = ?')
+    params.push(options.kelasFilter)
+  }
+  if (options.searchFilter) {
+    whereClauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)')
+    const q = `%${options.searchFilter}%`
+    params.push(q, q)
+  }
+
+  const grossSql = `(SELECT COALESCE(SUM(amount), 0) FROM finance_allocations WHERE obligation_id = o.id)`
+  const corrSql = `(SELECT COALESCE(SUM(amount), 0) FROM finance_correction_items WHERE obligation_id = o.id)`
+  const netPaidSql = `MAX(0, ${grossSql} - ${corrSql})`
+  const remainingSql = `MAX(0, o.amount_expected - o.amount_exempted - ${netPaidSql})`
+
+  if (options.statusFilter && options.statusFilter !== 'ALL') {
+    if (options.statusFilter === 'LUNAS') {
+      whereClauses.push(`(${remainingSql} = 0 AND o.amount_expected > 0)`)
+    } else if (options.statusFilter === 'SEBAGIAN' || options.statusFilter === 'CICILAN') {
+      whereClauses.push(`(${netPaidSql} > 0 AND ${remainingSql} > 0)`)
+    } else if (options.statusFilter === 'BELUM_LUNAS') {
+      whereClauses.push(`(${netPaidSql} = 0 AND ${remainingSql} > 0)`)
+    } else if (options.statusFilter === 'BEBAS' || options.statusFilter === 'EXEMPTED') {
+      whereClauses.push(`(o.status = 'EXEMPTED' OR (o.amount_expected > 0 AND o.amount_exempted >= o.amount_expected))`)
+    }
+  }
+
+  const whereSql = whereClauses.join(' AND ')
+
+  const countRes = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) as total
+     FROM finance_obligations o
+     JOIN santri s ON o.santri_id = s.id
+     WHERE ${whereSql}`,
+    params
+  )
+  const totalCount = countRes?.total ?? 0
+
+  const limit = options.pageSize > 0 ? options.pageSize : 50
+  const offset = (Math.max(1, options.page) - 1) * limit
+
+  const rows = await query<{
+    id: string
+    santri_id: string
+    nis: string
+    nama_lengkap: string
+    asrama: string | null
+    kamar: string | null
+    kelas_sekolah: string | null
+    item_type: 'EHB' | 'KESEHATAN' | 'EKSKUL'
+    period: string
+    amount_expected: number
+    amount_exempted: number
+    status: string
+    gross_paid: number
+    total_corr: number
+  }>(
+    `SELECT
+       o.id,
+       o.santri_id,
+       s.nis,
+       s.nama_lengkap,
+       s.asrama,
+       s.kamar,
+       s.kelas_sekolah,
+       o.item_type,
+       o.period,
+       o.amount_expected,
+       o.amount_exempted,
+       o.status,
+       ${grossSql} as gross_paid,
+       ${corrSql} as total_corr
+     FROM finance_obligations o
+     JOIN santri s ON o.santri_id = s.id
+     WHERE ${whereSql}
+     ORDER BY s.nama_lengkap ASC, o.item_type ASC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  )
+
+  const obligationIds = rows.map(r => r.id)
+  const paymentsMap = await fetchLatestPaymentsForObligations(obligationIds)
+
+  const nextYear = parseInt(annualPeriod, 10) + 1
+  const academicYearLabel = `${annualPeriod}/${nextYear}`
+
+  const items: TahunanRowItem[] = rows.map(r => {
+    const expected = r.amount_expected ?? 0
+    const exempted = r.amount_exempted ?? 0
+    const netPaid = Math.max(0, (r.gross_paid ?? 0) - (r.total_corr ?? 0))
+    const remaining = Math.max(0, expected - exempted - netPaid)
+
+    let status: FinanceObligationStatus = 'UNPAID'
+    let statusLabel = 'Belum Lunas'
+    if (r.status === 'EXEMPTED' || (expected > 0 && exempted >= expected)) {
+      status = 'EXEMPTED'
+      statusLabel = 'Dibebaskan'
+    } else if (remaining <= 0 && expected > 0) {
+      status = 'PAID'
+      statusLabel = 'Lunas'
+    } else if (netPaid > 0) {
+      status = 'PARTIALLY_PAID'
+      statusLabel = 'Sebagian'
+    }
+
+    const payInfo = paymentsMap.get(r.id)
+
+    return {
+      obligationId: r.id,
+      santriId: r.santri_id,
+      nis: r.nis,
+      namaLengkap: r.nama_lengkap,
+      asrama: r.asrama,
+      kamar: r.kamar,
+      kelasSekolah: r.kelas_sekolah,
+      itemType: r.item_type,
+      itemLabel: FINANCE_ITEM_LABELS[r.item_type as keyof typeof FINANCE_ITEM_LABELS] || r.item_type,
+      academicYear: annualPeriod,
+      academicYearLabel,
+      amountExpected: expected,
+      amountPaid: netPaid,
+      amountExempted: exempted,
+      remaining,
+      status,
+      statusLabel,
+      lastPaymentAt: payInfo?.paidAt ?? null,
+      lastPaymentMethod: payInfo?.method ?? null,
+    }
+  })
+
+  return { items, totalCount }
+}
+
+async function fetchUsppData(options: {
+  asramaFilter?: string
+  kelasFilter?: string
+  statusFilter?: string
+  searchFilter?: string
+  page: number
+  pageSize: number
+}): Promise<{ items: UsppRowItem[]; totalCount: number }> {
+  const whereClauses: string[] = ["s.status_global = 'aktif'"]
+  const params: unknown[] = []
+
+  if (options.asramaFilter && options.asramaFilter !== 'ALL') {
+    whereClauses.push('s.asrama = ?')
+    params.push(options.asramaFilter)
+  }
+  if (options.kelasFilter && options.kelasFilter !== 'ALL') {
+    whereClauses.push('s.kelas_sekolah = ?')
+    params.push(options.kelasFilter)
+  }
+  if (options.searchFilter) {
+    whereClauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)')
+    const q = `%${options.searchFilter}%`
+    params.push(q, q)
+  }
+
+  const grossSql = `(SELECT COALESCE(SUM(amount), 0) FROM finance_allocations WHERE obligation_id = o.id)`
+  const corrSql = `(SELECT COALESCE(SUM(amount), 0) FROM finance_correction_items WHERE obligation_id = o.id)`
+  const netPaidSql = `MAX(0, ${grossSql} - ${corrSql})`
+  const remainingSql = `MAX(0, COALESCE(o.amount_expected, 0) - COALESCE(o.amount_exempted, 0) - ${netPaidSql})`
+
+  if (options.statusFilter && options.statusFilter !== 'ALL') {
+    if (options.statusFilter === 'LUNAS') {
+      whereClauses.push(`(o.id IS NOT NULL AND ${remainingSql} = 0 AND o.amount_expected > 0)`)
+    } else if (options.statusFilter === 'MENCICIL' || options.statusFilter === 'CICILAN') {
+      whereClauses.push(`(o.id IS NOT NULL AND ${netPaidSql} > 0 AND ${remainingSql} > 0)`)
+    } else if (options.statusFilter === 'BELUM_BAYAR' || options.statusFilter === 'BELUM_LUNAS') {
+      whereClauses.push(`(o.id IS NULL OR (${netPaidSql} = 0 AND ${remainingSql} > 0))`)
+    } else if (options.statusFilter === 'BEBAS' || options.statusFilter === 'EXEMPTED') {
+      whereClauses.push(`(o.id IS NOT NULL AND (o.status = 'EXEMPTED' OR (o.amount_expected > 0 AND o.amount_exempted >= o.amount_expected)))`)
+    }
+  }
+
+  const whereSql = whereClauses.join(' AND ')
+
+  const countRes = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) as total
+     FROM santri s
+     LEFT JOIN finance_obligations o ON s.id = o.santri_id AND o.item_type = 'USPP' AND o.period = 'LIFETIME'
+     WHERE ${whereSql}`,
+    params
+  )
+  const totalCount = countRes?.total ?? 0
+
+  const limit = options.pageSize > 0 ? options.pageSize : 50
+  const offset = (Math.max(1, options.page) - 1) * limit
+
+  const rows = await query<{
+    id: string | null
+    santri_id: string
+    nis: string
+    nama_lengkap: string
+    asrama: string | null
+    kamar: string | null
+    kelas_sekolah: string | null
+    amount_expected: number | null
+    amount_exempted: number | null
+    status: string | null
+    gross_paid: number
+    total_corr: number
+  }>(
+    `SELECT
+       o.id,
+       s.id as santri_id,
+       s.nis,
+       s.nama_lengkap,
+       s.asrama,
+       s.kamar,
+       s.kelas_sekolah,
+       o.amount_expected,
+       o.amount_exempted,
+       o.status,
+       ${grossSql} as gross_paid,
+       ${corrSql} as total_corr
+     FROM santri s
+     LEFT JOIN finance_obligations o ON s.id = o.santri_id AND o.item_type = 'USPP' AND o.period = 'LIFETIME'
+     WHERE ${whereSql}
+     ORDER BY s.nama_lengkap ASC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  )
+
+  const santriIds = rows.map(r => r.santri_id)
+  const installmentStats = await fetchUsppInstallmentStats(santriIds)
+
+  const items: UsppRowItem[] = rows.map(r => {
+    const expected = r.amount_expected ?? 0
+    const exempted = r.amount_exempted ?? 0
+    const netPaid = Math.max(0, (r.gross_paid ?? 0) - (r.total_corr ?? 0))
+    const remaining = Math.max(0, expected - exempted - netPaid)
+
+    const stats = installmentStats.get(r.santri_id)
+    const installmentCount = stats?.count ?? 0
+
+    let status: 'BELUM_BAYAR' | 'MENCICIL' | 'LUNAS' | 'BEBAS' = 'BELUM_BAYAR'
+    let statusLabel = 'Belum Bayar'
+
+    if (r.status === 'EXEMPTED' || (expected > 0 && exempted >= expected)) {
+      status = 'BEBAS'
+      statusLabel = 'Dibebaskan'
+    } else if (remaining <= 0 && expected > 0) {
+      status = 'LUNAS'
+      statusLabel = 'Lunas'
+    } else if (netPaid > 0) {
+      status = 'MENCICIL'
+      statusLabel = 'Mencicil'
+    }
+
+    return {
+      obligationId: r.id,
+      santriId: r.santri_id,
+      nis: r.nis,
+      namaLengkap: r.nama_lengkap,
+      asrama: r.asrama,
+      kamar: r.kamar,
+      kelasSekolah: r.kelas_sekolah,
+      amountExpected: expected,
+      amountPaid: netPaid,
+      amountExempted: exempted,
+      remaining,
+      installmentCount,
+      lastInstallmentAmount: stats?.lastAmount ?? null,
+      lastInstallmentAt: stats?.lastPaidAt ?? null,
+      lastInstallmentMethod: stats?.lastMethod ?? null,
+      status,
+      statusLabel,
+    }
+  })
+
+  return { items, totalCount }
+}
+
+async function fetchTunggakanData(options: {
+  currentPeriod: string
+  periodFilter?: string
+  asramaFilter?: string
+  kelasFilter?: string
+  itemFilter?: string
+  searchFilter?: string
+  page: number
+  pageSize: number
+}): Promise<{ items: TunggakanRowItem[]; totalCount: number }> {
+  // Aturan kaku: Tunggakan hanya mencakup SPP, Uang Makan, dan Uang Nyuci
+  // yang periodenya < currentPeriodJakarta DAN memiliki sisa > 0.
+  const whereClauses: string[] = [
+    "s.status_global = 'aktif'",
+    "o.item_type IN ('SPP', 'UANG_MAKAN', 'UANG_NYUCI')",
+    "o.period < ?",
+  ]
+  const params: unknown[] = [options.currentPeriod]
+
+  if (options.periodFilter && options.periodFilter !== 'ALL') {
+    // Validasi: jika filter periode >= currentPeriod, periode tersebut bukan tunggakan
+    if (options.periodFilter >= options.currentPeriod) {
+      return { items: [], totalCount: 0 }
+    }
+    whereClauses.push('o.period = ?')
+    params.push(options.periodFilter)
+  }
+
+  if (options.itemFilter && options.itemFilter !== 'ALL') {
+    if (['SPP', 'UANG_MAKAN', 'UANG_NYUCI'].includes(options.itemFilter)) {
+      whereClauses.push('o.item_type = ?')
+      params.push(options.itemFilter)
+    } else {
+      // Item selain SPP/Makan/Cuci (misal Tahunan/USPP) tidak punya due date authoritative -> 0 rows
+      return { items: [], totalCount: 0 }
+    }
+  }
+
+  if (options.asramaFilter && options.asramaFilter !== 'ALL') {
+    whereClauses.push('s.asrama = ?')
+    params.push(options.asramaFilter)
+  }
+  if (options.kelasFilter && options.kelasFilter !== 'ALL') {
+    whereClauses.push('s.kelas_sekolah = ?')
+    params.push(options.kelasFilter)
+  }
+  if (options.searchFilter) {
+    whereClauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)')
+    const q = `%${options.searchFilter}%`
+    params.push(q, q)
+  }
+
+  // Outstanding authoritative > 0
+  const grossSql = `(SELECT COALESCE(SUM(amount), 0) FROM finance_allocations WHERE obligation_id = o.id)`
+  const corrSql = `(SELECT COALESCE(SUM(amount), 0) FROM finance_correction_items WHERE obligation_id = o.id)`
+  const netPaidSql = `MAX(0, ${grossSql} - ${corrSql})`
+  const remainingSql = `(o.amount_expected - o.amount_exempted - ${netPaidSql})`
+
+  whereClauses.push(`${remainingSql} > 0`)
+  whereClauses.push(`o.status != 'EXEMPTED'`)
+
+  const whereSql = whereClauses.join(' AND ')
+
+  const countRes = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) as total
+     FROM finance_obligations o
+     JOIN santri s ON o.santri_id = s.id
+     WHERE ${whereSql}`,
+    params
+  )
+  const totalCount = countRes?.total ?? 0
+
+  const limit = options.pageSize > 0 ? options.pageSize : 50
+  const offset = (Math.max(1, options.page) - 1) * limit
+
+  const rows = await query<{
+    id: string
+    santri_id: string
+    nis: string
+    nama_lengkap: string
+    asrama: string | null
+    kamar: string | null
+    kelas_sekolah: string | null
+    item_type: 'SPP' | 'UANG_MAKAN' | 'UANG_NYUCI'
+    period: string
+    amount_expected: number
+    amount_exempted: number
+    gross_paid: number
+    total_corr: number
+  }>(
+    `SELECT
+       o.id,
+       o.santri_id,
+       s.nis,
+       s.nama_lengkap,
+       s.asrama,
+       s.kamar,
+       s.kelas_sekolah,
+       o.item_type,
+       o.period,
+       o.amount_expected,
+       o.amount_exempted,
+       ${grossSql} as gross_paid,
+       ${corrSql} as total_corr
+     FROM finance_obligations o
+     JOIN santri s ON o.santri_id = s.id
+     WHERE ${whereSql}
+     ORDER BY o.period ASC, s.nama_lengkap ASC, o.item_type ASC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, offset]
+  )
+
+  const obligationIds = rows.map(r => r.id)
+  const paymentsMap = await fetchLatestPaymentsForObligations(obligationIds)
+
+  const items: TunggakanRowItem[] = rows.map(r => {
+    const expected = r.amount_expected ?? 0
+    const exempted = r.amount_exempted ?? 0
+    const netPaid = Math.max(0, (r.gross_paid ?? 0) - (r.total_corr ?? 0))
+    const remaining = Math.max(0, expected - exempted - netPaid)
+
+    const { overdueSince, overdueDuration } = calculateOverdueAge(r.period, options.currentPeriod)
+    const payInfo = paymentsMap.get(r.id)
+
+    return {
+      obligationId: r.id,
+      santriId: r.santri_id,
+      nis: r.nis,
+      namaLengkap: r.nama_lengkap,
+      asrama: r.asrama,
+      kamar: r.kamar,
+      kelasSekolah: r.kelas_sekolah,
+      itemType: r.item_type,
+      itemLabel: FINANCE_ITEM_LABELS[r.item_type as keyof typeof FINANCE_ITEM_LABELS] || r.item_type,
+      period: r.period,
+      periodLabel: formatPeriodLabel(r.period),
+      amountExpected: expected,
+      amountPaid: netPaid,
+      amountExempted: exempted,
+      remaining,
+      overdueSince,
+      overdueDuration,
+      lastPaymentAt: payInfo?.paidAt ?? null,
+      lastPaymentMethod: payInfo?.method ?? null,
+      isLegacy: false,
+    }
+  })
+
+  return { items, totalCount }
+}
+
+/**
  * Mengambil data matriks status pembayaran utama beserta agregasi 4 KPI cards
- * dan integrasi coexistence legacy tunggakan pra-cutover.
+ * dan integrasi per tab (Ringkasan, Bulanan, Tahunan, USPP, Tunggakan).
  */
 export async function getStatusPembayaranData(
   params?: StatusPembayaranQueryParams
 ): Promise<StatusPembayaranResponse> {
   const { permissions } = await authorizeUser()
 
-  const selectedPeriod = params?.period?.trim() || getDefaultPeriod()
+  const currentPeriod = getCurrentPeriodJakarta(params?.currentDateOverride)
+  const selectedPeriod = params?.period?.trim() || currentPeriod
   const isPreCutoverPeriod = selectedPeriod < FINANCE_CUTOVER_START_MONTHLY
   const asramaFilter = params?.asrama?.trim() || undefined
+  const kelasFilter = params?.kelas?.trim() || undefined
+  const itemFilter = params?.itemType?.trim() || undefined
   const searchFilter = params?.search?.trim() || undefined
   const statusFilter = params?.status && params.status !== 'ALL' ? params.status : undefined
   const page = Math.max(1, params?.page ?? 1)
   const pageSize = params?.pageSize !== undefined ? params.pageSize : 50
+  const activeTab: TabType = params?.tab || 'RINGKASAN'
 
-  // 1. Ambil matriks kewajiban dari finance engine
+  // 1. Ambil matriks kewajiban dari finance engine (untuk kompatibilitas KPI & legacy)
   const rawMatrix = await getStudentsObligationMatrix(selectedPeriod, {
     asrama: asramaFilter,
     search: searchFilter,
   })
 
-  // 2. Ambil tunggakan legacy pra-cutover untuk santri yang terlibat
   const santriIds = rawMatrix.map(item => item.santriId)
   const legacyArrearsMap = await fetchLegacySppArrears(santriIds)
 
-  // 3. Lakukan enrichment data untuk coexistence (tanpa insert ke finance_obligations)
   const enrichedList: EnrichedStudentObligationMatrixItem[] = rawMatrix.map(item => {
     const legacyInfo = legacyArrearsMap.get(item.santriId) ?? { total: 0, count: 0 }
     const legacyTunggakanSpp = legacyInfo.total
@@ -385,7 +1550,7 @@ export async function getStatusPembayaranData(
     }
   })
 
-  // 4. Hitung agregasi 4 Summary KPI Cards dari SELURUH dataset terfilter (sebelum pemotongan paginasi)
+  // 2. Hitung 4 Summary KPI Cards dari SELURUH dataset terfilter sebelum pemotongan paginasi
   const totalSantri = enrichedList.length
   let totalLunas = 0
   let totalBelumLunas = 0
@@ -408,10 +1573,90 @@ export async function getStatusPembayaranData(
     totalTunggakanNominal,
   }
 
-  // 5. Filter status jika diminta (LUNAS, CICILAN, BELUM_LUNAS, BEBAS)
-  let filteredList = enrichedList
+  // 3. Eksekusi query spesifik sesuai tab aktif
+  let ringkasanItems: RingkasanRowItem[] | undefined
+  let bulananItems: BulananRowItem[] | undefined
+  let tahunanItems: TahunanRowItem[] | undefined
+  let usppItems: UsppRowItem[] | undefined
+  let tunggakanItems: TunggakanRowItem[] | undefined
+
+  let totalTabItems = enrichedList.length
+
+  if (activeTab === 'RINGKASAN') {
+    const ringkasanRes = await fetchRingkasanData({
+      selectedPeriod,
+      currentPeriod,
+      asramaFilter,
+      kelasFilter,
+      searchFilter,
+      statusFilter,
+      page,
+      pageSize,
+    })
+    ringkasanItems = ringkasanRes.items
+    totalTabItems = ringkasanRes.totalCount
+  } else if (activeTab === 'BULANAN') {
+    const bulananRes = await fetchBulananData({
+      selectedPeriod,
+      currentPeriod,
+      asramaFilter,
+      kelasFilter,
+      itemFilter,
+      statusFilter,
+      searchFilter,
+      page,
+      pageSize,
+    })
+    bulananItems = bulananRes.items
+    totalTabItems = bulananRes.totalCount
+  } else if (activeTab === 'TAHUNAN') {
+    const tahunanRes = await fetchTahunanData({
+      academicYear: params?.academicYear,
+      asramaFilter,
+      kelasFilter,
+      itemFilter,
+      statusFilter,
+      searchFilter,
+      page,
+      pageSize,
+    })
+    tahunanItems = tahunanRes.items
+    totalTabItems = tahunanRes.totalCount
+  } else if (activeTab === 'USPP') {
+    const usppRes = await fetchUsppData({
+      asramaFilter,
+      kelasFilter,
+      statusFilter,
+      searchFilter,
+      page,
+      pageSize,
+    })
+    usppItems = usppRes.items
+    totalTabItems = usppRes.totalCount
+  } else if (activeTab === 'TUNGGAKAN') {
+    const tunggakanRes = await fetchTunggakanData({
+      currentPeriod,
+      periodFilter: params?.period,
+      asramaFilter,
+      kelasFilter,
+      itemFilter,
+      searchFilter,
+      page,
+      pageSize,
+    })
+    tunggakanItems = tunggakanRes.items
+    totalTabItems = tunggakanRes.totalCount
+  }
+
+  // Paginasi aman
+  const effectiveSize = pageSize === 0 ? totalTabItems : pageSize
+  const totalPages = pageSize === 0 ? 1 : Math.max(1, Math.ceil(totalTabItems / effectiveSize))
+  const safePage = Math.min(page, totalPages)
+
+  // Backward-compatible slice for rawMatrix (Fase 4A tests)
+  let filteredRawList = enrichedList
   if (statusFilter) {
-    filteredList = enrichedList.filter(item => {
+    filteredRawList = enrichedList.filter(item => {
       if (statusFilter === 'LUNAS') {
         return item.overallStatus === 'LUNAS' && !item.hasLegacyTunggakan
       }
@@ -421,32 +1666,33 @@ export async function getStatusPembayaranData(
       return item.overallStatus === statusFilter
     })
   }
-
-  // 6. Paginasi aman: dihitung dari total filtered list
-  const totalItems = filteredList.length
-  const effectiveSize = pageSize === 0 ? totalItems : pageSize
-  const totalPages = pageSize === 0 ? 1 : Math.max(1, Math.ceil(totalItems / effectiveSize))
-  const safePage = Math.min(page, totalPages)
   const startIndex = pageSize === 0 ? 0 : (safePage - 1) * effectiveSize
-  const paginatedItems = pageSize === 0 ? filteredList : filteredList.slice(startIndex, startIndex + effectiveSize)
+  const paginatedRawItems = pageSize === 0 ? filteredRawList : filteredRawList.slice(startIndex, startIndex + effectiveSize)
 
   return {
-    items: paginatedItems,
+    activeTab,
+    items: paginatedRawItems,
+    ringkasanItems,
+    bulananItems,
+    tahunanItems,
+    usppItems,
+    tunggakanItems,
     kpi,
     pagination: {
       currentPage: safePage,
       pageSize,
-      totalItems,
+      totalItems: totalTabItems,
       totalPages,
     },
     isPreCutoverPeriod,
     selectedPeriod,
+    selectedAcademicYear: params?.academicYear || selectedPeriod.split('-')[0] || '2026',
     userPermissions: permissions,
   }
 }
 
 /**
- * Mengambil opsi filter untuk dropdown (daftar asrama dan daftar periode yang valid)
+ * Mengambil opsi filter dropdown (asrama, kelas, periode bulanan, dan tahun ajaran)
  */
 export async function getStatusPembayaranFilterOptions(): Promise<FilterOptionsResponse> {
   const { permissions } = await authorizeUser()
@@ -465,7 +1711,21 @@ export async function getStatusPembayaranFilterOptions(): Promise<FilterOptionsR
     asramaList = []
   }
 
-  // 2. Susun daftar periode (12 bulan ke belakang hingga 3 bulan ke depan dari saat ini)
+  // 2. Ambil daftar kelas aktif
+  let kelasList: string[] = []
+  try {
+    const kRows = await query<{ kelas_sekolah: string }>(
+      `SELECT DISTINCT kelas_sekolah
+       FROM santri
+       WHERE status_global = 'aktif' AND kelas_sekolah IS NOT NULL AND TRIM(kelas_sekolah) != ''
+       ORDER BY kelas_sekolah ASC`
+    )
+    kelasList = kRows.map(r => r.kelas_sekolah)
+  } catch {
+    kelasList = []
+  }
+
+  // 3. Susun daftar periode (12 bulan ke belakang hingga 6 bulan ke depan)
   const periodList: FilterOptionsResponse['periodList'] = []
   const currentPeriod = getDefaultPeriod()
 
@@ -486,9 +1746,35 @@ export async function getStatusPembayaranFilterOptions(): Promise<FilterOptionsR
     })
   }
 
+  // 4. Susun daftar tahun ajaran
+  let academicYearList: FilterOptionsResponse['academicYearList'] = []
+  try {
+    const taRows = await query<{ id: number; nama: string; is_active: number }>(
+      `SELECT id, nama, is_active FROM tahun_ajaran ORDER BY nama DESC`
+    )
+    academicYearList = taRows.map(r => ({
+      value: r.nama.split('/')[0] || r.nama,
+      label: r.nama,
+    }))
+  } catch {
+    academicYearList = [
+      { value: '2026', label: '2026/2027' },
+      { value: '2025', label: '2025/2026' },
+    ]
+  }
+
+  if (academicYearList.length === 0) {
+    academicYearList = [
+      { value: '2026', label: '2026/2027' },
+      { value: '2025', label: '2025/2026' },
+    ]
+  }
+
   return {
     asramaList,
+    kelasList,
     periodList,
+    academicYearList,
     currentPeriod,
     userPermissions: permissions,
   }
@@ -502,18 +1788,18 @@ interface RawObligationDetailRow {
   period: string
   amount_expected: number
   amount_exempted: number
-  amount_paid: number
   status: string
   provider_id: string | null
   provider_name: string | null
   created_at: string
   updated_at: string
+  gross_paid: number
+  total_corr: number
 }
 
 /**
- * Mengambil rincian detail kewajiban finansial santri, drilldown per kategori
- * (Bulanan, Tahunan, USPP, Tunggakan), coexistence tunggakan pra-cutover,
- * dan histori pembayaran nyata (read-only).
+ * Mengambil rincian detail kewajiban finansial santri, drilldown per kategori,
+ * coexistence tunggakan pra-cutover, histori pembayaran nyata, dan catatan koreksi.
  */
 export async function getStudentPaymentDetail(
   santriId: string
@@ -566,11 +1852,16 @@ export async function getStudentPaymentDetail(
     tempatMencuci: santriRow.tempat_mencuci,
   }
 
-  // 2. Ambil seluruh kewajiban santri dari finance_obligations
+  // 2. Ambil seluruh kewajiban santri dengan authoritative net allocation & corrections
+  const grossSql = `(SELECT COALESCE(SUM(amount), 0) FROM finance_allocations WHERE obligation_id = o.id)`
+  const corrSql = `(SELECT COALESCE(SUM(amount), 0) FROM finance_correction_items WHERE obligation_id = o.id)`
+
   const obligationRows = await query<RawObligationDetailRow>(
-    `SELECT o.id, o.item_type, o.period, o.amount_expected, o.amount_exempted, o.amount_paid,
+    `SELECT o.id, o.item_type, o.period, o.amount_expected, o.amount_exempted,
             o.status, o.provider_id, o.created_at, o.updated_at,
-            m.nama_jasa AS provider_name
+            m.nama_jasa AS provider_name,
+            ${grossSql} as gross_paid,
+            ${corrSql} as total_corr
      FROM finance_obligations o
      LEFT JOIN master_jasa m ON o.provider_id = m.id
      WHERE o.santri_id = ?
@@ -581,9 +1872,18 @@ export async function getStudentPaymentDetail(
   const mapObligation = (r: RawObligationDetailRow): ObligationBreakdownItem => {
     const expected = r.amount_expected ?? 0
     const exempted = r.amount_exempted ?? 0
-    const paid = r.amount_paid ?? 0
-    const remaining = Math.max(0, expected - exempted - paid)
+    const netPaid = Math.max(0, (r.gross_paid ?? 0) - (r.total_corr ?? 0))
+    const remaining = Math.max(0, expected - exempted - netPaid)
     const label = FINANCE_ITEM_LABELS[r.item_type as keyof typeof FINANCE_ITEM_LABELS] || r.item_type
+
+    let computedStatus: FinanceObligationStatus = (r.status || 'UNPAID') as FinanceObligationStatus
+    if (r.status === 'EXEMPTED' || (expected > 0 && exempted >= expected)) {
+      computedStatus = 'EXEMPTED'
+    } else if (remaining <= 0 && expected > 0) {
+      computedStatus = 'PAID'
+    } else if (netPaid > 0) {
+      computedStatus = 'PARTIALLY_PAID'
+    }
 
     return {
       id: r.id,
@@ -593,9 +1893,9 @@ export async function getStudentPaymentDetail(
       periodLabel: formatPeriodLabel(r.period),
       amountExpected: expected,
       amountExempted: exempted,
-      amountPaid: paid,
+      amountPaid: netPaid,
       remaining,
-      status: (r.status || 'UNPAID') as FinanceObligationStatus,
+      status: computedStatus,
       providerName: r.provider_name,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
@@ -638,7 +1938,7 @@ export async function getStudentPaymentDetail(
     console.error('[detail-drawer] Gagal membaca spp_tunggakan_historis:', err instanceof Error ? err.message : err)
   }
 
-  // 4. Ambil histori cicilan khusus USPP (read-only)
+  // 4. Ambil histori cicilan khusus USPP (read-only, urut kronologis)
   let usppInstallments: UsppInstallmentHistoryItem[] = []
   try {
     const usppAllocRows = await query<{
@@ -665,7 +1965,7 @@ export async function getStudentPaymentDetail(
       paymentId: r.payment_id,
       paymentNumber: r.payment_number,
       channel: r.channel,
-      method: r.method,
+      method: normalizePaymentMethod(r.channel, r.method),
       amount: r.amount ?? 0,
       paidAt: r.paid_at,
       externalReference: r.external_reference,
@@ -674,7 +1974,7 @@ export async function getStudentPaymentDetail(
     console.error('[detail-drawer] Gagal membaca histori cicilan USPP:', err instanceof Error ? err.message : err)
   }
 
-  // 5. Ambil histori pembayaran nyata secara PAYMENT-DRIVEN (read-only)
+  // 5. Ambil histori pembayaran nyata secara PAYMENT-DRIVEN beserta rincian koreksi (read-only)
   let riwayatBayar: PaymentHistoryItem[] = []
   try {
     const paymentRows = await query<{
@@ -728,6 +2028,43 @@ export async function getStudentPaymentDetail(
         allocMap.set(a.payment_id, list)
       }
 
+      // Ambil koreksi yang menargetkan pembayaran-pembayaran ini
+      const corrMap = new Map<string, PaymentCorrectionItem[]>()
+      try {
+        const corrRows = await query<{
+          id: string
+          target_payment_id: string
+          correction_number: string
+          correction_type: 'VOID' | 'REVERSAL' | 'REFUND'
+          total_amount: number
+          method: string | null
+          reason: string
+          created_at: string
+        }>(
+          `SELECT id, target_payment_id, correction_number, correction_type, total_amount, method, reason, created_at
+           FROM finance_corrections
+           WHERE target_payment_id IN (${placeholders})
+           ORDER BY created_at ASC`,
+          paymentIds
+        )
+
+        for (const c of corrRows) {
+          const cList = corrMap.get(c.target_payment_id) || []
+          cList.push({
+            id: c.id,
+            correctionNumber: c.correction_number,
+            correctionType: c.correction_type,
+            amount: c.total_amount ?? 0,
+            method: c.method,
+            reason: c.reason,
+            createdAt: c.created_at,
+          })
+          corrMap.set(c.target_payment_id, cList)
+        }
+      } catch (err: unknown) {
+        console.error('[detail-drawer] Gagal membaca koreksi transaksi:', err)
+      }
+
       riwayatBayar = paymentRows.map(p => {
         const allocs = allocMap.get(p.id) || []
         const allocatedAmount = allocs.reduce((sum, it) => sum + it.amount, 0)
@@ -744,11 +2081,13 @@ export async function getStudentPaymentDetail(
           statusLabel = 'Teralokasi Sebagian'
         }
 
+        const paymentCorrections = corrMap.get(p.id) || []
+
         return {
           id: p.id,
           paymentNumber: p.payment_number,
           channel: p.channel,
-          method: p.method,
+          method: normalizePaymentMethod(p.channel, p.method),
           grossAmount,
           allocatedAmount: isUnallocated ? 0 : allocatedAmount,
           unallocatedAmount,
@@ -758,6 +2097,7 @@ export async function getStudentPaymentDetail(
           paidAt: p.paid_at,
           externalReference: p.external_reference,
           allocations: isUnallocated ? [] : allocs,
+          corrections: paymentCorrections.length > 0 ? paymentCorrections : undefined,
         }
       })
     }

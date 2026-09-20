@@ -1129,12 +1129,20 @@ def test_ui_and_export_components_structural_integrity():
         assert "bendahara" in act_content
         assert "pimpinan" in act_content
 
-    # Verify report printable view contains Pesantren Kop and signatures
+    # Verify report printable view integrates with C1 shared print infrastructure & signatures
     with open(ROOT / "components" / "finance" / "report-printable-view.tsx", "r", encoding="utf-8") as f:
         print_content = f.read()
-        assert "PONDOK PESANTREN ESKAHADE" in print_content
+        assert "PrintDocumentShell" in print_content
+        assert "DEFAULT_LETTERHEAD_PROFILES" in print_content
+        assert "PONDOK PESANTREN ESKAHADE" not in print_content
         assert "Bendahara Pesantren" in print_content
         assert "Petugas Pembuat Laporan" in print_content
+
+    # Verify shared letterhead default profile points to authoritative Sukahideng
+    with open(ROOT / "lib" / "print" / "letterhead.ts", "r", encoding="utf-8") as f:
+        lh_content = f.read()
+        assert "Pondok Pesantren Sukahideng" in lh_content
+        assert "DEFAULT_LETTERHEAD_PROFILES" in lh_content
 
     print("[OK] All Fase 10 read-model engine, exports, and UI components verified on disk.")
 

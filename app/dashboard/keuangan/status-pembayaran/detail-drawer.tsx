@@ -668,6 +668,29 @@ export function StatusPembayaranDetailDrawer({
                               </div>
                             )}
 
+                            {/* Rincian Koreksi / Penyesuaian Terkait jika ada */}
+                            {pay.corrections && pay.corrections.length > 0 && (
+                              <div className="pt-2 border-t border-rose-100 space-y-1 text-xs">
+                                <span className="text-rose-600 text-[11px] font-medium flex items-center gap-1">
+                                  <AlertCircle className="h-3 w-3 text-rose-500" />
+                                  Koreksi / Penyesuaian Terkait:
+                                </span>
+                                <div className="space-y-1">
+                                  {pay.corrections.map((c) => (
+                                    <div key={c.id} className="flex items-center justify-between text-rose-700 bg-rose-50/60 px-2 py-1 rounded">
+                                      <span className="truncate mr-2">
+                                        <span className="font-semibold">{c.correctionNumber}</span> ({c.correctionType})
+                                        {c.reason ? ` · ${c.reason}` : ''}
+                                      </span>
+                                      <span className="font-mono font-semibold text-rose-700 shrink-0">
+                                        -{formatRupiah(c.amount)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             {/* Peringatan Remainder Unallocated / Perlu Rekonsiliasi */}
                             {pay.unallocatedAmount > 0 && (
                               <div className="rounded-lg bg-amber-50/80 border border-amber-200/70 p-2.5 text-xs text-amber-900 flex items-start justify-between gap-2">
