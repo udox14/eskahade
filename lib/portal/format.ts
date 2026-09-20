@@ -1,7 +1,8 @@
 // Format util kecil untuk portal ortu
 
 export function formatRupiah(value: number) {
-  return `Rp ${new Intl.NumberFormat('id-ID').format(Math.max(0, Math.round(value || 0)))}`
+  if (!Number.isFinite(value) || value <= 0) return 'Rp0'
+  return `Rp${Math.round(value).toLocaleString('id-ID')}`
 }
 
 const BULAN_ID = [

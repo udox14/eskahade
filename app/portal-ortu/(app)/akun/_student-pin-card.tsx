@@ -66,15 +66,15 @@ export function StudentPinCard({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs space-y-4">
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
       {/* Header Kartu */}
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
             <KeyRound className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-900">PIN Transaksi Santri (Koperasi)</h3>
+            <h3 className="text-sm font-semibold text-slate-900">PIN Transaksi Santri (Koperasi)</h3>
             <p className="text-xs text-slate-500">
               PIN 6-digit untuk transaksi uang jajan {santriNama} (NIS {nis}).
             </p>
@@ -83,12 +83,12 @@ export function StudentPinCard({
 
         {/* Status Badge */}
         <span
-          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold ring-1 ring-inset ${
             isLocked
-              ? 'bg-rose-50 border-rose-200 text-rose-700'
+              ? 'bg-rose-50 ring-rose-600/20 text-rose-700'
               : hasPin
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-              : 'bg-amber-50 border-amber-200 text-amber-700'
+              ? 'bg-emerald-50 ring-emerald-600/20 text-emerald-700'
+              : 'bg-amber-50 ring-amber-600/20 text-amber-700'
           }`}
         >
           {isLocked ? (
@@ -133,7 +133,7 @@ export function StudentPinCard({
             value={passwordPortal}
             onChange={e => setPasswordPortal(e.target.value)}
             placeholder="Masukkan password login Anda untuk konfirmasi"
-            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden"
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
             required
           />
           <p className="mt-0.5 text-[11px] text-slate-400">
@@ -167,7 +167,7 @@ export function StudentPinCard({
                 setPinBaru(val)
               }}
               placeholder="6 digit angka (misal: 123456)"
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold font-mono tracking-widest text-slate-900 focus:border-emerald-500 focus:outline-hidden"
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold font-mono tracking-widest text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
               required
             />
           </div>
@@ -187,7 +187,7 @@ export function StudentPinCard({
                 setKonfirmasiPin(val)
               }}
               placeholder="Ketik ulang 6 digit"
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold font-mono tracking-widest text-slate-900 focus:border-emerald-500 focus:outline-hidden"
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold font-mono tracking-widest text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
               required
             />
           </div>
@@ -201,7 +201,7 @@ export function StudentPinCard({
         <button
           type="submit"
           disabled={isSaving}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 py-2.5 text-xs font-semibold text-white shadow-xs disabled:opacity-50 transition"
         >
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           <span>{isSaving ? 'Memverifikasi & Menyimpan…' : 'Simpan PIN Baru Santri'}</span>

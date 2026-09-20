@@ -10,9 +10,9 @@ export const dynamic = 'force-dynamic'
 
 const SESI_LABEL = { shubuh: 'Shubuh', ashar: 'Ashar', maghrib: 'Maghrib' } as const
 const STATUS_STYLE: Record<string, { label: string; cls: string }> = {
-  A: { label: 'Alfa', cls: 'portal-badge-danger' },
-  S: { label: 'Sakit', cls: 'portal-badge-neutral' },
-  I: { label: 'Izin', cls: 'portal-badge-warning' },
+  A: { label: 'Alfa', cls: 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-600/20' },
+  S: { label: 'Sakit', cls: 'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-600/20' },
+  I: { label: 'Izin', cls: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20' },
 }
 
 // Default bulan (tanpa query ?bulan=) mengikuti WIB, bukan waktu server.
@@ -47,69 +47,68 @@ export default async function AbsensiPage({
   return (
     <div>
       <PortalPageHeader
-        index="02"
         kicker="Rekap Pengajian"
         title="Kehadiran Pengajian"
         subtitle={rekap.namaKelas ? `Kelas ${rekap.namaKelas} • 3 sesi per hari (Shubuh, Ashar, Maghrib)` : '3 sesi per hari (Shubuh, Ashar, Maghrib)'}
       >
         {/* Pemilih bulan */}
-        <div className="mt-5 flex items-center justify-between rounded-[var(--p-radius-md)] bg-white/10 border border-white/15 px-2 py-2">
+        <div className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 border border-slate-200 px-2 py-1.5 shadow-2xs">
           <Link
             href={`/portal-ortu/absensi?bulan=${shiftBulan(tahun, bulan, -1)}`}
-            className="p-2 rounded-[var(--p-radius-sm)] active:bg-white/10"
+            className="p-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition active:scale-95"
             aria-label="Bulan sebelumnya"
           >
-            <CaretLeft className="w-4 h-4 text-white" />
+            <CaretLeft className="w-4 h-4" />
           </Link>
-          <p className="text-sm font-bold text-white">{namaBulanId(bulan)} {tahun}</p>
+          <p className="text-xs sm:text-sm font-semibold text-slate-800">{namaBulanId(bulan)} {tahun}</p>
           <Link
             href={`/portal-ortu/absensi?bulan=${shiftBulan(tahun, bulan, 1)}`}
-            className="p-2 rounded-[var(--p-radius-sm)] active:bg-white/10"
+            className="p-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-200/60 transition active:scale-95"
             aria-label="Bulan berikutnya"
           >
-            <CaretRight className="w-4 h-4 text-white" />
+            <CaretRight className="w-4 h-4" />
           </Link>
         </div>
       </PortalPageHeader>
 
-      <div className="px-5 pt-5 space-y-4">
+      <div className="px-4 pt-4 sm:px-5 pb-24 space-y-4">
         {/* Banner Keterangan Update Data */}
-        <div className="portal-rise flex items-center gap-2.5 rounded-[var(--p-radius-md)] border-l-4 border-[var(--p-warning)] bg-[var(--p-warning-soft)] px-4 py-3 text-xs">
-          <Clock className="w-4 h-4 shrink-0 text-[var(--p-warning)]" />
-          <p className="font-semibold text-[var(--p-ink)] leading-normal">
-            <span className="font-bold">Informasi Data:</span> Data kehadiran diperbarui setiap <span className="font-extrabold underline decoration-[var(--p-warning)]">Selasa malam</span> (tidak real-time).
+        <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs text-amber-900 shadow-2xs">
+          <Clock className="w-4 h-4 shrink-0 text-amber-600" />
+          <p className="font-medium leading-normal">
+            <span className="font-bold">Informasi Data:</span> Data kehadiran diperbarui setiap <span className="font-bold underline decoration-amber-400">Selasa malam</span> (tidak real-time).
           </p>
         </div>
 
         {/* Kartu rekap */}
-        <div className="portal-rise portal-rise-1 portal-card p-5">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--p-muted)]">Kehadiran</p>
-              <p className="portal-display mt-1 text-3xl leading-none text-[var(--p-ink)]">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Kehadiran</p>
+              <p className="mt-1 text-3xl font-bold leading-none text-slate-900">
                 {rekap.totalSesi > 0 ? `${persen}%` : '—'}
               </p>
             </div>
-            <p className="text-xs font-semibold text-[var(--p-muted)]">
+            <p className="text-xs font-medium text-slate-500">
               {rekap.hadir} dari {rekap.totalSesi} sesi aktif
             </p>
           </div>
-          <div className="mt-3 h-2 rounded-full bg-[var(--p-paper)] border border-[var(--p-line)] overflow-hidden">
+          <div className="mt-3.5 h-2.5 rounded-full bg-slate-100 border border-slate-200 overflow-hidden">
             <div
-              className="h-full rounded-full bg-[var(--p-ink)] transition-all"
+              className="h-full rounded-full bg-emerald-600 transition-all duration-500"
               style={{ width: `${persen}%` }}
             />
           </div>
           <div className="mt-4 grid grid-cols-4 gap-2 text-center">
             {[
-              { label: 'Hadir', value: rekap.hadir, cls: 'text-[var(--p-success)]' },
-              { label: 'Sakit', value: rekap.sakit, cls: 'text-[var(--p-muted)]' },
-              { label: 'Izin', value: rekap.izin, cls: 'text-[var(--p-warning)]' },
-              { label: 'Alfa', value: rekap.alfa, cls: 'text-[var(--p-red)]' },
+              { label: 'Hadir', value: rekap.hadir, cls: 'text-emerald-700' },
+              { label: 'Sakit', value: rekap.sakit, cls: 'text-slate-600' },
+              { label: 'Izin', value: rekap.izin, cls: 'text-amber-700' },
+              { label: 'Alfa', value: rekap.alfa, cls: 'text-rose-700' },
             ].map(item => (
-              <div key={item.label} className="rounded-[var(--p-radius-md)] bg-[var(--p-paper)] border border-[var(--p-line)] py-2.5">
-                <p className={`portal-display text-lg leading-none ${item.cls}`}>{item.value}</p>
-                <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[var(--p-muted)]">
+              <div key={item.label} className="rounded-lg bg-slate-50 border border-slate-100 py-2.5">
+                <p className={`text-lg font-bold leading-none ${item.cls}`}>{item.value}</p>
+                <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                   {item.label}
                 </p>
               </div>
@@ -118,8 +117,8 @@ export default async function AbsensiPage({
         </div>
 
         {/* Detail hari bermasalah */}
-        <div className="portal-rise portal-rise-2">
-          <h2 className="px-1 text-xs font-bold uppercase tracking-[0.18em] text-[var(--p-muted)]">
+        <div className="space-y-2">
+          <h2 className="px-0.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
             Catatan Ketidakhadiran
           </h2>
           {!rekap.punyaKelas ? (
@@ -127,13 +126,13 @@ export default async function AbsensiPage({
           ) : rekap.detail.length === 0 ? (
             <EmptyNote text="Alhamdulillah, tidak ada catatan sakit/izin/alfa pada bulan ini." positive />
           ) : (
-            <div className="mt-2 space-y-2.5">
+            <div className="space-y-2.5">
               {rekap.detail.map(row => (
                 <div
                   key={row.tanggal}
-                  className="portal-card px-4 py-3.5"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-xs"
                 >
-                  <p className="text-sm font-bold text-[var(--p-ink)]">{formatTanggalId(row.tanggal)}</p>
+                  <p className="text-sm font-semibold text-slate-900">{formatTanggalId(row.tanggal)}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {(['shubuh', 'ashar', 'maghrib'] as const).map(sesi => {
                       const status = row[sesi]
@@ -142,7 +141,7 @@ export default async function AbsensiPage({
                       return (
                         <span
                           key={sesi}
-                          className={`portal-badge ${style.cls}`}
+                          className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ${style.cls}`}
                         >
                           {SESI_LABEL[sesi]}: {style.label}
                         </span>
@@ -162,12 +161,12 @@ export default async function AbsensiPage({
 function EmptyNote({ text, positive }: { text: string; positive?: boolean }) {
   return (
     <div
-      className={`mt-2 flex items-center gap-2.5 rounded-[var(--p-radius-md)] border px-4 py-4 ${
-        positive ? 'bg-[var(--p-success-soft)] border-[#cde3d4]' : 'bg-[var(--p-white)] border-[var(--p-line)]'
+      className={`flex items-center gap-2.5 rounded-xl border px-4 py-3.5 shadow-xs ${
+        positive ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800' : 'bg-white border-slate-200 text-slate-500'
       }`}
     >
-      <CalendarX className={`w-4 h-4 ${positive ? 'text-[var(--p-success)]' : 'text-[var(--p-muted)]'}`} />
-      <p className={`text-xs font-semibold ${positive ? 'text-[var(--p-success)]' : 'text-[var(--p-muted)]'}`}>{text}</p>
+      <CalendarX className={`w-4 h-4 shrink-0 ${positive ? 'text-emerald-600' : 'text-slate-400'}`} />
+      <p className="text-xs font-medium">{text}</p>
     </div>
   )
 }

@@ -7,9 +7,9 @@ import { PortalPageHeader } from '../../_components/page-header'
 export const dynamic = 'force-dynamic'
 
 const JENIS_STYLE: Record<string, string> = {
-  RINGAN: 'portal-badge-warning',
-  SEDANG: 'bg-orange-100 text-orange-700 border-orange-200',
-  BERAT: 'portal-badge-danger',
+  RINGAN: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20',
+  SEDANG: 'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20',
+  BERAT: 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-600/20',
 }
 
 export default async function PelanggaranPage() {
@@ -20,58 +20,57 @@ export default async function PelanggaranPage() {
   return (
     <div>
       <PortalPageHeader
-        index="05"
         kicker="Catatan Keamanan"
         title="Pelanggaran"
         subtitle="Catatan kedisiplinan dari bagian keamanan pesantren"
       >
-        <div className="mt-5 flex items-center gap-4 rounded-[var(--p-radius-md)] bg-white/10 border border-white/15 px-4 py-3">
+        <div className="mt-3 flex items-center gap-4 rounded-lg bg-slate-50 border border-slate-200 px-4 py-2.5 shadow-2xs">
           <div>
-            <p className="portal-display text-2xl leading-none text-white">{totalPoin}</p>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-white/60">Total Poin</p>
+            <p className="text-xl font-bold leading-none text-slate-900">{totalPoin}</p>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Total Poin</p>
           </div>
-          <div className="w-px h-8 bg-white/15" />
+          <div className="w-px h-7 bg-slate-200" />
           <div>
-            <p className="portal-display text-2xl leading-none text-white">{daftar.length}</p>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-white/60">Catatan</p>
+            <p className="text-xl font-bold leading-none text-slate-900">{daftar.length}</p>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Catatan</p>
           </div>
         </div>
       </PortalPageHeader>
 
-      <div className="px-5 pt-5">
+      <div className="px-4 pt-4 sm:px-5 pb-24 space-y-4">
         {daftar.length === 0 ? (
-          <div className="portal-rise portal-rise-1 flex items-center gap-3 rounded-[var(--p-radius-card)] bg-[var(--p-success-soft)] border border-[#cde3d4] px-5 py-6">
-            <ShieldCheck className="w-6 h-6 shrink-0 text-[var(--p-success)]" />
+          <div className="flex items-center gap-3 rounded-xl bg-emerald-50/70 border border-emerald-200 px-4 py-4 shadow-xs">
+            <ShieldCheck className="w-6 h-6 shrink-0 text-emerald-600" />
             <div>
-              <p className="text-sm font-bold text-[var(--p-success)]">Alhamdulillah, bersih!</p>
-              <p className="mt-0.5 text-xs text-[var(--p-success)]">
-                Tidak ada catatan pelanggaran untuk putra Anda.
+              <p className="text-sm font-semibold text-emerald-900">Alhamdulillah, bersih!</p>
+              <p className="mt-0.5 text-xs text-emerald-700">
+                Tidak ada catatan pelanggaran untuk santri ini.
               </p>
             </div>
           </div>
         ) : (
           <div className="space-y-2.5">
-            {daftar.map((item, index) => (
+            {daftar.map((item) => (
               <div
                 key={item.id}
-                className={`portal-rise ${index < 4 ? `portal-rise-${index + 1}` : ''} portal-card px-4 py-3.5`}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-xs"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span
-                    className={`portal-badge ${
-                      JENIS_STYLE[String(item.jenis).toUpperCase()] || 'portal-badge-neutral'
+                    className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ${
+                      JENIS_STYLE[String(item.jenis).toUpperCase()] || 'bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-600/20'
                     }`}
                   >
                     {item.jenis}
                   </span>
-                  <span className="text-[11px] font-semibold text-[var(--p-muted)]">
+                  <span className="text-xs text-slate-400 font-medium">
                     {formatTanggalId(item.tanggal)}
                   </span>
                 </div>
                 {item.deskripsi && (
-                  <p className="mt-2 text-sm leading-relaxed text-[var(--p-ink)]">{item.deskripsi}</p>
+                  <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700">{item.deskripsi}</p>
                 )}
-                <p className="mt-1.5 text-[11px] font-bold text-[var(--p-red)]">{item.poin} poin</p>
+                <p className="mt-1.5 text-xs font-semibold text-rose-600">{item.poin} poin</p>
               </div>
             ))}
           </div>

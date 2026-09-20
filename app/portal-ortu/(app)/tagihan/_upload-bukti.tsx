@@ -95,16 +95,16 @@ export function UploadBukti({
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="w-full rounded-2xl border-2 border-dashed border-[var(--p-line)] bg-[var(--p-cream)] p-4 text-center active:scale-[0.99] transition"
+        className="w-full rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100/80 p-4 text-center active:scale-[0.99] transition"
       >
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="Pratinjau bukti" className="mx-auto max-h-56 rounded-xl object-contain" />
+          <img src={preview} alt="Pratinjau bukti" className="mx-auto max-h-56 rounded-lg object-contain" />
         ) : (
           <div className="py-5">
-            <Camera className="mx-auto w-7 h-7 text-[var(--p-muted)]" />
-            <p className="mt-2 text-sm font-bold text-[var(--p-ink)]">Pilih foto bukti</p>
-            <p className="mt-0.5 text-[11px] text-[var(--p-muted)]">
+            <Camera className="mx-auto w-7 h-7 text-slate-400" />
+            <p className="mt-2 text-sm font-semibold text-slate-800">Pilih foto bukti</p>
+            <p className="mt-0.5 text-xs text-slate-500">
               Screenshot m-banking atau foto struk transfer/QRIS
             </p>
           </div>
@@ -114,7 +114,7 @@ export function UploadBukti({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="mt-2 w-full text-center text-[11px] font-bold text-[var(--p-emerald)]"
+          className="mt-2 w-full text-center text-xs font-semibold text-emerald-700 hover:text-emerald-800"
         >
           Ganti foto
         </button>
@@ -124,7 +124,7 @@ export function UploadBukti({
         type="button"
         disabled={!file || sending}
         onClick={handleSubmit}
-        className="mt-4 w-full rounded-2xl bg-[var(--p-emerald)] py-3.5 text-sm font-bold text-white active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2"
+        className="mt-4 w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 py-3.5 text-sm font-semibold text-white active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs"
       >
         {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
         {sending ? 'Mengunggah…' : buttonLabel}

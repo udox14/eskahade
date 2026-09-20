@@ -3,6 +3,7 @@
 import { useRef } from 'react'
 import { Printer, X, CheckCircle2 } from 'lucide-react'
 import type { PortalTransactionHistoryItem } from '@/lib/portal/finance'
+import { formatRupiah } from '@/lib/portal/format'
 import DocumentLetterhead from '@/components/print/document-letterhead'
 
 interface ReceiptModalProps {
@@ -14,14 +15,6 @@ interface ReceiptModalProps {
     kamar?: string | null
   }
   onClose: () => void
-}
-
-function formatRupiah(amount: number): string {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0,
-  }).format(amount)
 }
 
 export function ReceiptModal({ item, santri, onClose }: ReceiptModalProps) {
@@ -41,17 +34,17 @@ export function ReceiptModal({ item, santri, onClose }: ReceiptModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs animate-in fade-in duration-200 print:p-0 print:bg-white">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-100 overflow-hidden print:shadow-none print:max-w-none">
+      <div className="w-full max-w-md rounded-xl bg-white shadow-xl border border-slate-200 overflow-hidden print:shadow-none print:max-w-none">
         {/* Action Header (Hidden saat print) */}
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3.5 print:hidden">
-          <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+          <div className="flex items-center gap-2 text-slate-800 font-semibold text-sm">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
             <span>{item.type === 'TOPUP' ? 'Bukti Top-up Uang Jajan' : 'Kuitansi Pembayaran Resmi'}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 shadow-2xs"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow-xs transition"
             >
               <Printer className="h-3.5 w-3.5" />
               <span>Cetak / PDF</span>

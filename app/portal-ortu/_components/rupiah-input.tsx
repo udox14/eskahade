@@ -34,7 +34,7 @@ export function RupiahInput({
 
   return (
     <div className="relative">
-      <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-[var(--p-muted)]">
+      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
         Rp
       </span>
       <input
@@ -45,7 +45,7 @@ export function RupiahInput({
         value={display}
         onChange={handleChange}
         placeholder={placeholder ?? '0'}
-        className="portal-field !pl-9"
+        className="w-full rounded-lg border border-slate-300 bg-white py-2 pr-3 pl-8 text-xs font-semibold text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden disabled:bg-slate-100 disabled:opacity-50 transition"
       />
     </div>
   )

@@ -20,12 +20,11 @@ export default async function AkunPage() {
   return (
     <div>
       <PortalPageHeader
-        index="06"
         kicker="Pengaturan Akun"
         title={session.nama}
         subtitle={`NIS ${session.nis}${session.asrama ? ` • Asrama ${session.asrama}` : ''}${session.kamar ? ` • Kamar ${session.kamar}` : ''}`}
       />
-      <div className="px-5 pt-5 space-y-5 pb-16">
+      <div className="px-4 pt-4 sm:px-5 pb-24 space-y-4">
         {/* Kartu Limit Penarikan Uang Jajan */}
         <WalletLimitCard
           initialDaily={parentLimits?.parent_daily_limit ?? null}

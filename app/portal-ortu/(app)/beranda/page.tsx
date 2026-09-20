@@ -39,71 +39,71 @@ export default async function BerandaPage() {
 
   return (
     <div>
-      {/* Header identitas — siku, spine merah, kartu identitas sebaris (bukan hero blob) */}
-      <div className="relative bg-[var(--p-ink)] pl-7 pr-6 pt-10 pb-6 border-l-4 border-[var(--p-red)]">
-        <div className="relative portal-rise flex items-center gap-4">
-          <div className="w-14 h-14 shrink-0 overflow-hidden bg-white/10 border border-white/15">
+      {/* Header identitas — bersih, ramah, proporsional */}
+      <div className="bg-white border-b border-slate-200/80 px-5 pt-6 pb-5">
+        <div className="portal-rise flex items-center gap-4">
+          <div className="w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shadow-2xs">
             {session.foto_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={session.foto_url} alt={session.nama} className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center portal-display text-xl text-white/80">
+              <div className="w-full h-full flex items-center justify-center font-bold text-xl text-slate-600">
                 {session.nama.charAt(0)}
               </div>
             )}
           </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold tracking-[0.22em] uppercase text-white/55">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
               Assalamu&rsquo;alaikum, Wali dari
             </p>
-            <h1 className="portal-display mt-0.5 text-2xl leading-tight text-white truncate">
+            <h1 className="portal-display mt-0.5 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl truncate">
               {session.nama}
             </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+              <span className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700">NIS {session.nis}</span>
+              {session.asrama && <span className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700">{session.asrama}</span>}
+              {session.kamar && <span className="rounded-md bg-slate-100 px-2 py-0.5 font-medium text-slate-700">Kamar {session.kamar}</span>}
+            </div>
           </div>
-        </div>
-        <div className="relative portal-rise mt-4 flex divide-x divide-white/15 border-t border-white/15 pt-3 text-[10px] text-white/60">
-          <span className="pr-3 font-semibold">NIS {session.nis}</span>
-          {session.asrama && <span className="px-3 font-semibold">{session.asrama}</span>}
-          {session.kamar && <span className="pl-3 font-semibold">Kamar {session.kamar}</span>}
         </div>
       </div>
 
-      <div className="px-5 pt-4 space-y-4">
-        {/* Ringkasan bulan ini — grid dua kolom asimetris, angka raksasa */}
+      <div className="px-5 pt-5 space-y-5">
+        {/* Ringkasan bulan ini */}
         <div>
-          <p className="portal-section-label mb-3">01 — Ringkasan Bulan Ini</p>
-          <div className="portal-rise portal-rise-3 grid grid-cols-2 border border-[var(--p-line)] divide-x divide-[var(--p-line)]">
-            <Link href="/portal-ortu/absensi" className="p-4">
+          <p className="portal-section-label mb-2.5">Ringkasan Bulan Ini</p>
+          <div className="portal-rise portal-rise-3 grid grid-cols-2 gap-3">
+            <Link href="/portal-ortu/absensi" className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs hover:border-emerald-300 transition-colors block">
               <div className="flex items-center justify-between">
-                <CalendarCheck className="w-4 h-4 text-[var(--p-ink)]" />
-                <span className="portal-index text-[var(--p-muted)]">{persenHadir !== null ? `${persenHadir}%` : '—'}</span>
+                <CalendarCheck className="w-4 h-4 text-emerald-700" />
+                <span className="portal-index text-xs text-slate-500 font-semibold">{persenHadir !== null ? `${persenHadir}%` : '—'}</span>
               </div>
-              <p className="portal-display mt-3 text-3xl leading-none text-[var(--p-ink)]">
+              <p className="portal-display mt-2 text-2xl font-bold leading-none text-slate-900">
                 {absen.totalSesi > 0 ? `${absen.hadir}/${absen.totalSesi}` : '—'}
               </p>
-              <p className="mt-1.5 text-[11px] font-semibold text-[var(--p-muted)]">
+              <p className="mt-1.5 text-xs font-semibold text-slate-600">
                 Kehadiran pengajian
               </p>
               {(absen.alfa > 0 || absen.izin > 0 || absen.sakit > 0) ? (
-                <p className="mt-1 text-[10px] text-[var(--p-red)] font-semibold">
+                <p className="mt-1 text-xs text-rose-600 font-medium">
                   {absen.alfa > 0 ? `${absen.alfa} alfa ` : ''}
                   {absen.sakit > 0 ? `${absen.sakit} sakit ` : ''}
                   {absen.izin > 0 ? `${absen.izin} izin` : ''}
                 </p>
               ) : (
-                <p className="mt-1 text-[10px] text-[var(--p-muted)]">Update Selasa malam</p>
+                <p className="mt-1 text-xs text-slate-400">Update Selasa malam</p>
               )}
             </Link>
-            <Link href="/portal-ortu/pelanggaran" className="p-4">
+            <Link href="/portal-ortu/pelanggaran" className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs hover:border-rose-300 transition-colors block">
               <div className="flex items-center justify-between">
-                <ShieldWarning className="w-4 h-4 text-[var(--p-red)]" />
-                <span className="portal-index text-[var(--p-muted)]">{pelanggaran.length}</span>
+                <ShieldWarning className="w-4 h-4 text-rose-600" />
+                <span className="portal-index text-xs text-slate-500 font-semibold">{pelanggaran.length}</span>
               </div>
-              <p className="portal-display mt-3 text-3xl leading-none text-[var(--p-ink)]">{totalPoin}</p>
-              <p className="mt-1.5 text-[11px] font-semibold text-[var(--p-muted)]">
+              <p className="portal-display mt-2 text-2xl font-bold leading-none text-slate-900">{totalPoin}</p>
+              <p className="mt-1.5 text-xs font-semibold text-slate-600">
                 Poin pelanggaran
               </p>
-              <p className="mt-1 text-[10px] text-[var(--p-muted)]">{pelanggaran.length} catatan tercatat</p>
+              <p className="mt-1 text-xs text-slate-400">{pelanggaran.length} catatan tercatat</p>
             </Link>
           </div>
         </div>
@@ -111,40 +111,40 @@ export default async function BerandaPage() {
         {/* Keuangan & Uang Jajan */}
         {billing && (
           <div>
-            <p className="portal-section-label mb-3">02 — Keuangan & Uang Jajan</p>
-            <div className="portal-rise portal-rise-4 grid grid-cols-2 border border-[var(--p-line)] divide-x divide-[var(--p-line)]">
-              <Link href="/portal-ortu/tagihan" className="p-4">
+            <p className="portal-section-label mb-2.5">Keuangan & Uang Jajan</p>
+            <div className="portal-rise portal-rise-4 grid grid-cols-2 gap-3">
+              <Link href="/portal-ortu/tagihan" className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs hover:border-emerald-300 transition-colors block">
                 <div className="flex items-center justify-between">
-                  <Receipt className="w-4 h-4 text-[var(--p-ink)]" />
-                  <span className="portal-index text-[var(--p-muted)]">
+                  <Receipt className="w-4 h-4 text-emerald-700" />
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${billing.obligations.totalRemaining > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
                     {billing.obligations.totalRemaining > 0 ? 'Tagihan' : 'Lunas'}
                   </span>
                 </div>
-                <p className="portal-display mt-3 text-xl leading-none text-[var(--p-emerald-deep)] truncate">
+                <p className="portal-display mt-2 text-lg font-bold leading-none text-slate-900 truncate">
                   {billing.obligations.totalRemaining > 0
                     ? formatRupiah(billing.obligations.totalRemaining)
-                    : 'Rp 0'}
+                    : 'Rp0'}
                 </p>
-                <p className="mt-1.5 text-[11px] font-semibold text-[var(--p-muted)]">
+                <p className="mt-1.5 text-xs font-semibold text-slate-600">
                   Total sisa tagihan
                 </p>
-                <p className="mt-1 text-[10px] text-[var(--p-muted)]">
+                <p className="mt-1 text-xs text-emerald-700 font-medium">
                   {billing.obligations.totalRemaining > 0 ? 'Ketuk untuk bayar' : 'Semua pos lunas'}
                 </p>
               </Link>
-              <Link href="/portal-ortu/tagihan" className="p-4">
+              <Link href="/portal-ortu/tagihan" className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs hover:border-emerald-300 transition-colors block">
                 <div className="flex items-center justify-between">
-                  <Wallet className="w-4 h-4 text-[var(--p-ink)]" />
-                  <span className="portal-index text-[var(--p-muted)]">Saldo</span>
+                  <Wallet className="w-4 h-4 text-emerald-700" />
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Saldo</span>
                 </div>
-                <p className="portal-display mt-3 text-xl leading-none text-[var(--p-ink)] truncate">
+                <p className="portal-display mt-2 text-lg font-bold leading-none text-slate-900 truncate">
                   {formatRupiah(billing.wallet.balance)}
                 </p>
-                <p className="mt-1.5 text-[11px] font-semibold text-[var(--p-muted)]">
+                <p className="mt-1.5 text-xs font-semibold text-slate-600">
                   Dompet Uang Jajan
                 </p>
-                <p className="mt-1 text-[10px] text-[var(--p-muted)]">
-                  Limit harian {formatRupiah(billing.wallet.effectiveDailyLimit)}
+                <p className="mt-1 text-xs text-slate-400 truncate">
+                  Limit: {formatRupiah(billing.wallet.effectiveDailyLimit)}/hari
                 </p>
               </Link>
             </div>
@@ -152,9 +152,9 @@ export default async function BerandaPage() {
         )}
 
         {pelanggaranBulanIni.length === 0 && absen.alfa === 0 && (
-          <div className="flex items-center gap-2.5 border-l-4 border-[var(--p-success)] bg-[var(--p-success-soft)] px-4 py-3">
-            <Sparkle className="w-4 h-4 text-[var(--p-success)]" />
-            <p className="text-xs font-semibold text-[var(--p-success)]">
+          <div className="flex items-center gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-4 py-3.5 shadow-2xs">
+            <Sparkle className="w-4 h-4 shrink-0 text-emerald-700" />
+            <p className="text-xs font-medium text-emerald-900 leading-relaxed">
               Alhamdulillah, tidak ada catatan pelanggaran maupun alfa bulan ini.
             </p>
           </div>

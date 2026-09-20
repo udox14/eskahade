@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Wallet, ShieldCheck, Loader2 } from 'lucide-react'
+import { formatRupiah } from '@/lib/portal/format'
 import { updateParentLimitsAction } from '../tagihan/actions'
 
 interface WalletLimitCardProps {
@@ -11,14 +12,6 @@ interface WalletLimitCardProps {
   initialWeekly: number | null
   initialMonthly: number | null
   globalDailyLimit: number
-}
-
-function formatRupiah(amount: number): string {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0,
-  }).format(amount)
 }
 
 export function WalletLimitCard({
@@ -66,27 +59,27 @@ export function WalletLimitCard({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs space-y-4">
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
       <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
           <Wallet className="h-4 w-4" />
         </div>
         <div>
-          <h3 className="text-sm font-bold text-slate-900">Limit Penarikan Uang Jajan</h3>
+          <h3 className="text-sm font-semibold text-slate-900">Limit Penarikan Uang Jajan</h3>
           <p className="text-xs text-slate-500">Batasi penarikan uang saku santri di loket koperasi.</p>
         </div>
       </div>
 
-      <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 text-xs text-indigo-950 space-y-1">
-        <div className="flex items-center gap-1.5 font-bold">
-          <ShieldCheck className="h-4 w-4 text-indigo-600" />
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
+        <div className="flex items-center gap-1.5 font-semibold text-slate-800">
+          <ShieldCheck className="h-4 w-4 text-emerald-600" />
           <span>Aturan Limit Efektif</span>
         </div>
         <p className="text-slate-600">
           Pesantren memberlakukan batas maksimal harian <strong className="text-slate-900">{formatRupiah(globalDailyLimit)}</strong>.
           Sistem akan menggunakan batas terkecil antara limit Anda dan limit pesantren.
         </p>
-        <p className="pt-1 font-semibold text-indigo-900">
+        <p className="pt-1 font-semibold text-emerald-800">
           Limit Harian Efektif Saat Ini: {formatRupiah(effectiveDaily)}/hari
         </p>
       </div>
@@ -103,7 +96,7 @@ export function WalletLimitCard({
             value={daily}
             onChange={e => setDaily(e.target.value)}
             placeholder={`Kosongkan untuk ikut limit pesantren (${formatRupiah(globalDailyLimit)})`}
-            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-hidden"
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
           />
           <p className="mt-0.5 text-[11px] text-slate-400">Contoh: 30000 untuk maksimal Rp30.000/hari</p>
         </div>
@@ -119,7 +112,7 @@ export function WalletLimitCard({
             value={weekly}
             onChange={e => setWeekly(e.target.value)}
             placeholder="Tidak dibatasi mingguan"
-            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-hidden"
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
           />
         </div>
 
@@ -134,14 +127,14 @@ export function WalletLimitCard({
             value={monthly}
             onChange={e => setMonthly(e.target.value)}
             placeholder="Tidak dibatasi bulanan"
-            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-hidden"
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
           />
         </div>
 
         <button
           type="submit"
           disabled={isSaving}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 py-2.5 text-xs font-semibold text-white shadow-xs disabled:opacity-50 transition"
         >
           {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           <span>Simpan Batas Limit</span>

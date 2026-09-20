@@ -17,12 +17,17 @@ export function BottomSheet({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
-      <button aria-label="Tutup" onClick={onClose} className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" />
-      <div className="portal-theme relative w-full max-w-md max-h-[88dvh] overflow-y-auto rounded-t-[var(--p-radius-lg)] bg-[var(--p-paper)] p-5 pb-8 portal-rise">
+      <button aria-label="Tutup" onClick={onClose} className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs" />
+      <div className="relative w-full max-w-md max-h-[88dvh] overflow-y-auto rounded-t-2xl bg-white p-5 pb-8 shadow-2xl border-t border-slate-200 animate-in slide-in-from-bottom duration-200">
+        <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-3" />
         <div className="flex items-center justify-between">
-          <h3 className="portal-display text-xl text-[var(--p-ink)]">{title}</h3>
-          <button onClick={onClose} className="p-2 rounded-[var(--p-radius-sm)] bg-white border border-[var(--p-line)]" aria-label="Tutup">
-            <X className="w-4 h-4 text-[var(--p-muted)]" />
+          <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+            aria-label="Tutup"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
         <div className="mt-4">{children}</div>

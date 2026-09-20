@@ -18,7 +18,7 @@ export default async function TagihanPage() {
         title="Tagihan & Pembayaran"
         subtitle="Pilih tagihan, cicil USPP, isi uang jajan, dan bayar online otomatis via Virtual Account & QRIS."
       />
-      <div className="px-4 sm:px-6 -mt-8 pb-16">
+      <div className="px-4 pt-4 sm:px-5 pb-36">
         <TagihanClient billingData={billingData} />
       </div>
     </div>

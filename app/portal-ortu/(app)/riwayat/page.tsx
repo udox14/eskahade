@@ -69,7 +69,7 @@ export default async function RiwayatPage() {
         title="Riwayat Transaksi"
         subtitle="Riwayat pembayaran resmi tagihan, Uang Jajan & kuitansi sah"
       />
-      <div className="px-5 -mt-9">
+      <div className="px-4 pt-4 sm:px-5 pb-24 space-y-4">
         <RiwayatClient
           history={history}
           santri={billing.santri}
