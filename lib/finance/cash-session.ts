@@ -190,7 +190,7 @@ export async function recalculateCashSession(
   const paymentsRes = await queryOne<{ total_payment_in: number }>(
     `SELECT COALESCE(SUM(gross_amount), 0) AS total_payment_in
      FROM finance_payments
-     WHERE cash_session_id = ? AND channel = 'CASH' AND status = 'PAID'`,
+     WHERE cash_session_id = ? AND channel = 'CASH' AND status = 'PAID' AND fund_management = 'KOPERASI'`,
     [sessionId]
   )
   const paymentCashIn = paymentsRes?.total_payment_in ?? 0

@@ -130,6 +130,8 @@ export default function PengaturanKeuanganContent({
         {activeTab === 'tarif' && (
           <TarifTab
             tariffs={data.tariffs}
+            tariffOverrides={data.tariffOverrides}
+            koperasiCutover={data.koperasiCutover}
             academicYears={data.academicYears}
             canMutate={canMutate}
             onRefresh={refreshData}
@@ -140,6 +142,7 @@ export default function PengaturanKeuanganContent({
           <PembebasanTab
             exemptions={data.exemptions}
             academicYears={data.academicYears}
+            legacySppCount={data.legacySppCount}
             canMutate={canMutate}
             onRefresh={refreshData}
           />

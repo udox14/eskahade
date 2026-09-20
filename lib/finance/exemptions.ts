@@ -130,22 +130,10 @@ export async function grantExemption(
           [nowStr, ob.id]
         )
       } else if (ob.amount_paid > 0 && ob.amount_paid < ob.amount_expected) {
-        // Tagihan sudah dibayar sebagian -> Bebaskan sisa yang belum dibayar,
-        // Dengan sisa dibebaskan, kewajiban terpenuhi (PAID)!
-        const remainingToExempt = ob.amount_expected - ob.amount_paid
-        const newStatus = computeObligationStatus(
-          ob.amount_expected,
-          remainingToExempt,
-          ob.amount_paid
-        )
-        await execute(
-          `UPDATE finance_obligations
-           SET amount_exempted = ?,
-               status = ?,
-               updated_at = ?
-           WHERE id = ?`,
-          [remainingToExempt, newStatus, nowStr, ob.id]
-        )
+        // Tagihan sudah dibayar sebagian (PARTIALLY_PAID) / Blocker 6:
+        // JANGAN ubah secara diam-diam menjadi EXEMPTED atau PAID penuh.
+        // Status PARTIALLY_PAID dan riwayat pembayaran dipertahankan (REVIEW_REQUIRED).
+        // Tidak ada refund atau manipulasi saldo otomatis tanpa verifikasi operator.
       }
       // Jika sudah PAID (amount_paid >= amount_expected), jangan diubah secara retroaktif!
     }
@@ -413,4 +401,382 @@ export async function listAllExemptions(filter?: {
      ORDER BY created_at DESC`,
     params
   )
+}
+
+// ─── GROUP / BULK WAIVER RULE ENGINE ────────────────────────────────────────
+
+export interface GroupExemptionPreview {
+  targetType: 'INDIVIDUAL' | 'KELAS'
+  targetValue: string
+  targetLabel: string
+  itemType: FinanceItemType | 'ALL'
+  periodStart: string | null
+  periodEnd: string | null
+  totalStudents: number
+  alreadyExemptedCount: number
+  alreadyPaidCount: number
+  partiallyPaidCount: number
+  partiallyPaidAmount: number
+  partiallyRemainingAmount: number
+  reviewRequiredCount: number
+  unpaidCount: number
+  sampleStudents: Array<{
+    id: string
+    nis: string
+    nama_lengkap: string
+    kelas: string | null
+    asrama: string | null
+    kamar: string | null
+  }>
+}
+
+export interface GroupExemptionApplyResult {
+  targetType: 'INDIVIDUAL' | 'KELAS'
+  targetValue: string
+  totalTargeted: number
+  exemptionsCreated: number
+  obligationsUpdated: number
+  alreadyExempted: number
+  partiallyPaidSkipped: number
+  partiallyPaidAmount: number
+  partiallyRemainingAmount: number
+  errors: Array<{ santriId: string; error: string }>
+}
+
+export interface LegacySppExemptionMigrationResult {
+  totalLegacyFound: number
+  migratedCount: number
+  alreadyMigratedCount: number
+  obligationsUpdated: number
+}
+
+/**
+ * Pratinjau dampak aturan pembebasan biaya untuk target Individual atau Kelas.
+ * Menghitung santri terdampak, tagihan yang sudah dibayar, belum dibayar, atau sudah dibebaskan.
+ */
+export async function previewGroupExemption(params: {
+  targetType: 'INDIVIDUAL' | 'KELAS'
+  targetValue: string
+  itemType: FinanceItemType | 'ALL'
+  periodStart?: string | null
+  periodEnd?: string | null
+  academicYearId?: number | null
+}): Promise<GroupExemptionPreview> {
+  const periodStart = params.periodStart || null
+  const periodEnd = params.periodEnd || null
+
+  let studentsQuery = `
+    SELECT id, nis, nama_lengkap, kelas_sekolah AS kelas, asrama, kamar
+    FROM santri
+    WHERE status_global = 'aktif'
+  `
+  const queryParams: unknown[] = []
+
+  if (params.targetType === 'INDIVIDUAL') {
+    studentsQuery += ` AND id = ?`
+    queryParams.push(params.targetValue)
+  } else {
+    studentsQuery += ` AND (kelas_sekolah = ? OR kelas_sekolah LIKE ?)`
+    queryParams.push(params.targetValue, `${params.targetValue}%`)
+  }
+
+  studentsQuery += ` ORDER BY nama_lengkap ASC`
+
+  const students = await query<{
+    id: string
+    nis: string
+    nama_lengkap: string
+    kelas: string | null
+    asrama: string | null
+    kamar: string | null
+  }>(studentsQuery, queryParams)
+
+  let alreadyExemptedCount = 0
+  let alreadyPaidCount = 0
+  let partiallyPaidCount = 0
+  let partiallyPaidAmount = 0
+  let partiallyRemainingAmount = 0
+  let reviewRequiredCount = 0
+  let unpaidCount = 0
+
+  for (const s of students) {
+    // 1. Cek apakah santri sudah memiliki pembebasan aktif untuk item dan periode ini
+    const testPeriod = periodStart || '2026-07'
+    const activeEx = await checkExemption(s.id, params.itemType === 'ALL' ? 'SPP' : params.itemType, testPeriod, params.academicYearId)
+    if (activeEx) {
+      alreadyExemptedCount++
+    }
+
+    // 2. Cek status kewajiban jika periode spesifik ditentukan
+    if (params.itemType !== 'ALL') {
+      let obQuery = `SELECT status, amount_paid, amount_expected FROM finance_obligations
+                     WHERE santri_id = ? AND item_type = ?`
+      const obParams: unknown[] = [s.id, params.itemType]
+      if (periodStart) {
+        obQuery += ` AND period = ?`
+        obParams.push(periodStart)
+      }
+      const ob = await queryOne<{ status: string; amount_paid: number; amount_expected: number }>(
+        obQuery,
+        obParams
+      )
+      if (ob) {
+        if (ob.status === 'PAID') {
+          alreadyPaidCount++
+        } else if (ob.status === 'PARTIALLY_PAID' || (ob.amount_paid > 0 && ob.amount_paid < ob.amount_expected)) {
+          partiallyPaidCount++
+          partiallyPaidAmount += ob.amount_paid
+          partiallyRemainingAmount += Math.max(0, ob.amount_expected - ob.amount_paid)
+          reviewRequiredCount++
+        } else if (ob.status === 'UNPAID') {
+          unpaidCount++
+        }
+      } else {
+        unpaidCount++
+      }
+    } else {
+      unpaidCount++
+    }
+  }
+
+  const targetLabel =
+    params.targetType === 'INDIVIDUAL'
+      ? students[0]?.nama_lengkap || params.targetValue
+      : `Kelas ${params.targetValue}`
+
+  return {
+    targetType: params.targetType,
+    targetValue: params.targetValue,
+    targetLabel,
+    itemType: params.itemType,
+    periodStart,
+    periodEnd,
+    totalStudents: students.length,
+    alreadyExemptedCount,
+    alreadyPaidCount,
+    partiallyPaidCount,
+    partiallyPaidAmount,
+    partiallyRemainingAmount,
+    reviewRequiredCount,
+    unpaidCount,
+    sampleStudents: students.slice(0, 15),
+  }
+}
+
+/**
+ * Menerapkan pembebasan biaya massal (Group Waiver) secara kanonikal dan idempoten.
+ * Memperbarui status kewajiban yang belum dibayar menjadi EXEMPTED tanpa membuat payment palsu,
+ * dan menjaga utuh riwayat pembayaran yang sudah ada (non-retroaktif).
+ */
+export async function applyGroupExemption(params: {
+  targetType: 'INDIVIDUAL' | 'KELAS'
+  targetValue: string
+  itemType: FinanceItemType | 'ALL'
+  periodStart?: string | null
+  periodEnd?: string | null
+  academicYearId?: number | null
+  reason: string
+  notes?: string | null
+  createdBy?: string | null
+}): Promise<GroupExemptionApplyResult> {
+  let studentsQuery = `
+    SELECT id, nama_lengkap, kelas_sekolah AS kelas
+    FROM santri
+    WHERE status_global = 'aktif'
+  `
+  const queryParams: unknown[] = []
+
+  if (params.targetType === 'INDIVIDUAL') {
+    studentsQuery += ` AND id = ?`
+    queryParams.push(params.targetValue)
+  } else {
+    studentsQuery += ` AND (kelas_sekolah = ? OR kelas_sekolah LIKE ?)`
+    queryParams.push(params.targetValue, `${params.targetValue}%`)
+  }
+
+  const students = await query<{ id: string; nama_lengkap: string; kelas: string | null }>(
+    studentsQuery,
+    queryParams
+  )
+
+  let exemptionsCreated = 0
+  let obligationsUpdated = 0
+  let alreadyExempted = 0
+  let partiallyPaidSkipped = 0
+  let partiallyPaidAmount = 0
+  let partiallyRemainingAmount = 0
+  const errors: Array<{ santriId: string; error: string }> = []
+
+  const periodStart = params.periodStart || null
+  const periodEnd = params.periodEnd || null
+
+  for (const student of students) {
+    try {
+      // Cek apakah santri memiliki kewajiban partially paid yang dikecualikan dari pembebasan otomatis
+      const partiallyPaidObs = await query<{ id: string; amount_paid: number; amount_expected: number }>(
+        `SELECT id, amount_paid, amount_expected FROM finance_obligations
+         WHERE santri_id = ?
+           AND (item_type = ? OR ? = 'ALL')
+           AND amount_paid > 0
+           AND amount_paid < amount_expected`,
+        [student.id, params.itemType, params.itemType]
+      )
+      for (const po of partiallyPaidObs) {
+        partiallyPaidSkipped++
+        partiallyPaidAmount += po.amount_paid
+        partiallyRemainingAmount += Math.max(0, po.amount_expected - po.amount_paid)
+      }
+
+      // Cek apakah santri sudah memiliki pembebasan identik yang aktif
+      const existingActive = await queryOne<{ id: string }>(
+        `SELECT id FROM finance_exemptions
+         WHERE santri_id = ?
+           AND status = 'ACTIVE'
+           AND (item_type = ? OR item_type = 'ALL')
+           AND (
+             (period_start IS NULL AND ? IS NULL) OR (period_start = ?)
+           )
+           AND (
+             (period_end IS NULL AND ? IS NULL) OR (period_end = ?)
+           ) LIMIT 1`,
+        [student.id, params.itemType, periodStart, periodStart, periodEnd, periodEnd]
+      )
+
+      if (existingActive) {
+        alreadyExempted++
+        continue
+      }
+
+      await grantExemption({
+        santri_id: student.id,
+        item_type: params.itemType,
+        academic_year_id: params.academicYearId ?? null,
+        period_start: periodStart,
+        period_end: periodEnd,
+        reason: params.reason,
+        notes: params.notes ?? null,
+        created_by: params.createdBy ?? null,
+      })
+
+      exemptionsCreated++
+      obligationsUpdated++
+    } catch (err: unknown) {
+      errors.push({
+        santriId: student.id,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  return {
+    targetType: params.targetType,
+    targetValue: params.targetValue,
+    totalTargeted: students.length,
+    exemptionsCreated,
+    obligationsUpdated,
+    alreadyExempted,
+    partiallyPaidSkipped,
+    partiallyPaidAmount,
+    partiallyRemainingAmount,
+    errors,
+  }
+}
+
+/**
+ * Memigrasikan data pembebasan SPP legacy (santri_pembebasan_biaya / santri.bebas_spp)
+ * ke model kanonikal finance_exemptions secara idempoten dan aman.
+ */
+export async function migrateLegacySppExemptions(
+  createdBy?: string | null
+): Promise<LegacySppExemptionMigrationResult> {
+  // 1. Ambil santri bebas SPP dari santri_pembebasan_biaya jika ada, atau fallback ke santri.bebas_spp
+  let legacyRows: Array<{ santri_id: string; alasan: string | null }> = []
+
+  try {
+    legacyRows = await query<{ santri_id: string; alasan: string | null }>(
+      `SELECT santri_id, alasan FROM santri_pembebasan_biaya
+       WHERE service_kind = 'SPP' AND is_active = 1`
+    )
+  } catch {
+    // Fallback jika tabel santri_pembebasan_biaya tidak ada
+    legacyRows = []
+  }
+
+  if (legacyRows.length === 0) {
+    const santriBebas = await query<{ id: string }>(
+      `SELECT id FROM santri WHERE bebas_spp = 1 AND status_global = 'aktif'`
+    )
+    legacyRows = santriBebas.map((s) => ({
+      santri_id: s.id,
+      alasan: 'Migrasi otomatis dari santri.bebas_spp',
+    }))
+  }
+
+  let migratedCount = 0
+  let alreadyMigratedCount = 0
+  let obligationsUpdated = 0
+  const nowStr = now()
+
+  for (const row of legacyRows) {
+    // Cek apakah sudah ada pembebasan SPP permanen aktif
+    const existing = await queryOne<{ id: string }>(
+      `SELECT id FROM finance_exemptions
+       WHERE santri_id = ? AND item_type = 'SPP' AND period_start IS NULL AND period_end IS NULL AND status = 'ACTIVE' LIMIT 1`,
+      [row.santri_id]
+    )
+
+    if (existing) {
+      alreadyMigratedCount++
+      continue
+    }
+
+    const exId = generateId()
+    const reasonText = row.alasan || 'Migrasi Pembebasan SPP Permanen Legacy'
+
+    await execute(
+      `INSERT INTO finance_exemptions (
+         id, santri_id, item_type, academic_year_id, period_start, period_end,
+         reason, notes, status, created_by, created_at
+       ) VALUES (?, ?, 'SPP', NULL, NULL, NULL, ?, 'Migrasi Otomatis Legacy SPP Exemption', 'ACTIVE', ?, ?)`,
+      [exId, row.santri_id, reasonText, createdBy ?? null, nowStr]
+    )
+
+    // Perbarui seluruh kewajiban SPP yang belum dibayar untuk santri ini
+    const unpaidObligations = await query<{ id: string; amount_expected: number; amount_paid: number }>(
+      `SELECT id, amount_expected, amount_paid FROM finance_obligations
+       WHERE santri_id = ? AND item_type = 'SPP'`,
+      [row.santri_id]
+    )
+
+    for (const ob of unpaidObligations) {
+      if (ob.amount_paid === 0) {
+        await execute(
+          `UPDATE finance_obligations
+           SET amount_exempted = amount_expected, status = 'EXEMPTED', updated_at = ?
+           WHERE id = ?`,
+          [nowStr, ob.id]
+        )
+        obligationsUpdated++
+      } else if (ob.amount_paid < ob.amount_expected) {
+        const remaining = ob.amount_expected - ob.amount_paid
+        const newStatus = computeObligationStatus(ob.amount_expected, remaining, ob.amount_paid)
+        await execute(
+          `UPDATE finance_obligations
+           SET amount_exempted = ?, status = ?, updated_at = ?
+           WHERE id = ?`,
+          [remaining, newStatus, nowStr, ob.id]
+        )
+        obligationsUpdated++
+      }
+    }
+
+    migratedCount++
+  }
+
+  return {
+    totalLegacyFound: legacyRows.length,
+    migratedCount,
+    alreadyMigratedCount,
+    obligationsUpdated,
+  }
 }

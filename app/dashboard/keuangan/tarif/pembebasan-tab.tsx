@@ -3,13 +3,16 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import {
-  grantExemptionAction,
   revokeExemptionAction,
+  previewExemptionRuleAction,
+  applyGroupExemptionAction,
+  migrateLegacySppExemptionsAction,
   searchActiveStudents,
   type ExemptionWithStudent,
   type AcademicYearOption,
 } from './actions'
 import type { FinanceItemType } from '@/lib/finance/types'
+import type { GroupExemptionPreview } from '@/lib/finance/exemptions'
 import {
   ShieldCheck,
   Plus,
@@ -18,11 +21,16 @@ import {
   XCircle,
   Info,
   ArrowCounterClockwise,
+  UsersThree,
+  User,
+  Eye,
+  Lightning,
 } from '@phosphor-icons/react'
 
 interface PembebasanTabProps {
   exemptions: ExemptionWithStudent[]
   academicYears: AcademicYearOption[]
+  legacySppCount?: number
   canMutate: boolean
   onRefresh: () => void
 }
@@ -38,9 +46,12 @@ const ITEM_OPTIONS: Array<{ value: FinanceItemType | 'ALL'; label: string }> = [
   { value: 'USPP', label: 'USPP / Bangunan' },
 ]
 
+const KELAS_OPTIONS = ['7', '8', '9', '10', '11', '12']
+
 export default function PembebasanTab({
   exemptions,
   academicYears,
+  legacySppCount = 0,
   canMutate,
   onRefresh,
 }: PembebasanTabProps) {
@@ -48,8 +59,10 @@ export default function PembebasanTab({
   const [filterItem, setFilterItem] = useState<string>('ALL')
   const [searchQuery, setSearchQuery] = useState<string>('')
 
-  // Modal Grant Exemption
+  // Modal Grant / Group Exemption
   const [showGrantModal, setShowGrantModal] = useState(false)
+  const [targetScope, setTargetScope] = useState<'INDIVIDUAL' | 'KELAS'>('INDIVIDUAL')
+  const [selectedKelas, setSelectedKelas] = useState<string>('7')
   const [studentSearch, setStudentSearch] = useState('')
   const [studentOptions, setStudentOptions] = useState<
     Array<{ id: string; nis: string; nama_lengkap: string; asrama: string | null; kamar: string | null }>
@@ -68,6 +81,13 @@ export default function PembebasanTab({
   const [reason, setReason] = useState<string>('')
   const [notes, setNotes] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Preview State
+  const [isPreviewing, setIsPreviewing] = useState(false)
+  const [previewData, setPreviewData] = useState<GroupExemptionPreview | null>(null)
+
+  // Legacy SPP Migration State
+  const [isMigratingLegacy, setIsMigratingLegacy] = useState(false)
 
   // Modal Revoke Exemption
   const [revokeTarget, setRevokeTarget] = useState<ExemptionWithStudent | null>(null)
@@ -96,6 +116,8 @@ export default function PembebasanTab({
   }, [studentSearch])
 
   const handleOpenGrantModal = () => {
+    setTargetScope('INDIVIDUAL')
+    setSelectedKelas('7')
     setSelectedStudent(null)
     setStudentSearch('')
     setStudentOptions([])
@@ -106,13 +128,57 @@ export default function PembebasanTab({
     setPeriodEnd('')
     setReason('')
     setNotes('')
+    setPreviewData(null)
     setShowGrantModal(true)
+  }
+
+  const handlePreview = async () => {
+    if (targetScope === 'INDIVIDUAL' && !selectedStudent) {
+      toast.error('Pilih santri terlebih dahulu untuk melihat pratinjau.')
+      return
+    }
+    setIsPreviewing(true)
+    const res = await previewExemptionRuleAction({
+      target: targetScope,
+      kelas: selectedKelas,
+      santri_id: selectedStudent?.id,
+      item_type: itemType,
+      period_start: periodStart || undefined,
+      period_end: periodEnd || undefined,
+    })
+    setIsPreviewing(false)
+    if (res.success && res.preview) {
+      setPreviewData(res.preview)
+    } else {
+      toast.error(res.error || 'Gagal membuat pratinjau pembebasan.')
+    }
+  }
+
+  const handleMigrateLegacySpp = async () => {
+    if (!confirm(`Migrasikan seluruh data pembebasan SPP legacy (${legacySppCount} data) ke sistem pembebasan baru secara aman dan idempoten?`)) {
+      return
+    }
+    setIsMigratingLegacy(true)
+    const toastId = toast.loading('Memigrasikan data pembebasan SPP legacy...')
+    const res = await migrateLegacySppExemptionsAction()
+    setIsMigratingLegacy(false)
+    toast.dismiss(toastId)
+    if (res.success && res.result) {
+      toast.success(`Migrasi selesai: ${res.result.migratedCount} baru, ${res.result.alreadyMigratedCount} sudah ada, ${res.result.obligationsUpdated} kewajiban diperbarui.`)
+      onRefresh()
+    } else {
+      toast.error(res.error || 'Gagal memigrasikan pembebasan SPP legacy.')
+    }
   }
 
   const handleGrantSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedStudent) {
+    if (targetScope === 'INDIVIDUAL' && !selectedStudent) {
       toast.error('Santri penerima beasiswa/pembebasan wajib dipilih.')
+      return
+    }
+    if (targetScope === 'KELAS' && !selectedKelas) {
+      toast.error('Kelas target pembebasan wajib dipilih.')
       return
     }
     if (!reason.trim()) {
@@ -125,10 +191,12 @@ export default function PembebasanTab({
     }
 
     setIsSubmitting(true)
-    const toastId = toast.loading('Menyimpan data pembebasan biaya...')
+    const toastId = toast.loading('Menyimpan aturan pembebasan biaya...')
 
-    const res = await grantExemptionAction({
-      santri_id: selectedStudent.id,
+    const res = await applyGroupExemptionAction({
+      target: targetScope,
+      kelas: selectedKelas,
+      santri_id: selectedStudent?.id,
       item_type: itemType,
       academic_year_id: academicYearId ? parseInt(academicYearId, 10) : null,
       period_start: periodStart || null,
@@ -140,8 +208,11 @@ export default function PembebasanTab({
     setIsSubmitting(false)
     toast.dismiss(toastId)
 
-    if (res.success) {
-      toast.success(`Pembebasan biaya untuk "${selectedStudent.nama_lengkap}" berhasil diberikan.`)
+    if (res.success && res.result) {
+      const targetLabel = targetScope === 'INDIVIDUAL' ? selectedStudent?.nama_lengkap : `Kelas ${selectedKelas}`
+      toast.success(
+        `Pembebasan biaya untuk ${targetLabel} berhasil diterapkan: ${res.result.exemptionsCreated} santri baru dibebaskan, ${res.result.obligationsUpdated} kewajiban diperbarui.`
+      )
       setShowGrantModal(false)
       onRefresh()
     } else {
@@ -241,14 +312,27 @@ export default function PembebasanTab({
           </div>
         </div>
 
-        <div>
+        <div className="flex items-center gap-2">
+          {canMutate && legacySppCount > 0 && (
+            <button
+              type="button"
+              onClick={handleMigrateLegacySpp}
+              disabled={isMigratingLegacy}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold rounded-lg shadow-xs transition-colors disabled:opacity-50"
+              title={`Migrasikan ${legacySppCount} santri bebas SPP dari data legacy`}
+            >
+              <Lightning className="w-3.5 h-3.5 text-amber-600" weight="fill" />
+              <span>Sinkron SPP Legacy ({legacySppCount})</span>
+            </button>
+          )}
+
           {canMutate ? (
             <button
               onClick={handleOpenGrantModal}
               className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
             >
               <Plus className="w-4 h-4" weight="bold" />
-              Berikan Pembebasan
+              Buat Pembebasan
             </button>
           ) : (
             <div className="inline-flex items-center gap-1.5 text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
@@ -382,69 +466,137 @@ export default function PembebasanTab({
             </div>
 
             <form onSubmit={handleGrantSubmit} className="p-5 space-y-4">
-              {/* Santri Picker */}
+              {/* Target Scope Switcher */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Santri Penerima <span className="text-red-500">*</span>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Sasaran Pembebasan <span className="text-red-500">*</span>
                 </label>
-                {selectedStudent ? (
-                  <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs">
-                    <div>
-                      <span className="font-semibold text-emerald-900">{selectedStudent.nama_lengkap}</span>
-                      <span className="text-emerald-700 ml-2 font-mono">NIS: {selectedStudent.nis}</span>
-                      {selectedStudent.asrama && (
-                        <span className="text-emerald-600 ml-2 font-mono">({selectedStudent.asrama})</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetScope('INDIVIDUAL')
+                      setPreviewData(null)
+                    }}
+                    className={`flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-semibold border transition-all ${
+                      targetScope === 'INDIVIDUAL'
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <User className="w-3.5 h-3.5" weight={targetScope === 'INDIVIDUAL' ? 'bold' : 'regular'} />
+                    <span>Santri Perorangan</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetScope('KELAS')
+                      setPreviewData(null)
+                    }}
+                    className={`flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-semibold border transition-all ${
+                      targetScope === 'KELAS'
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <UsersThree className="w-3.5 h-3.5" weight={targetScope === 'KELAS' ? 'bold' : 'regular'} />
+                    <span>Rombongan / Kelas</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Santri Picker or Kelas Picker */}
+              {targetScope === 'INDIVIDUAL' ? (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Santri Penerima <span className="text-red-500">*</span>
+                  </label>
+                  {selectedStudent ? (
+                    <div className="flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs">
+                      <div>
+                        <span className="font-semibold text-emerald-900">{selectedStudent.nama_lengkap}</span>
+                        <span className="text-emerald-700 ml-2 font-mono">NIS: {selectedStudent.nis}</span>
+                        {selectedStudent.asrama && (
+                          <span className="text-emerald-600 ml-2 font-mono">({selectedStudent.asrama})</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedStudent(null)
+                          setPreviewData(null)
+                        }}
+                        className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 underline"
+                      >
+                        Ganti
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <MagnifyingGlass className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                        <input
+                          type="text"
+                          value={studentSearch}
+                          onChange={(e) => handleStudentSearchChange(e.target.value)}
+                          placeholder="Ketik nama atau NIS santri aktif..."
+                          className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+                        />
+                      </div>
+                      {studentOptions.length > 0 && (
+                        <div className="max-h-36 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-lg bg-white shadow-xs">
+                          {studentOptions.map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedStudent(s)
+                                setStudentSearch('')
+                                setStudentOptions([])
+                                setPreviewData(null)
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center justify-between"
+                            >
+                              <span className="font-medium text-slate-800">{s.nama_lengkap}</span>
+                              <span className="text-[11px] text-slate-400 font-mono">NIS: {s.nis}</span>
+                            </button>
+                          ))}
+                        </div>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedStudent(null)}
-                      className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 underline"
-                    >
-                      Ganti
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <MagnifyingGlass className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-                      <input
-                        type="text"
-                        value={studentSearch}
-                        onChange={(e) => handleStudentSearchChange(e.target.value)}
-                        placeholder="Ketik nama atau NIS santri aktif..."
-                        className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
-                      />
-                    </div>
-                    {studentOptions.length > 0 && (
-                      <div className="max-h-36 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-lg bg-white shadow-xs">
-                        {studentOptions.map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedStudent(s)
-                              setStudentSearch('')
-                              setStudentOptions([])
-                            }}
-                            className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center justify-between"
-                          >
-                            <span className="font-medium text-slate-800">{s.nama_lengkap}</span>
-                            <span className="text-[11px] text-slate-400 font-mono">NIS: {s.nis}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Tingkat Kelas <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={selectedKelas}
+                    onChange={(e) => {
+                      setSelectedKelas(e.target.value)
+                      setPreviewData(null)
+                    }}
+                    className="w-full text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+                  >
+                    {KELAS_OPTIONS.map((k) => (
+                      <option key={k} value={k}>
+                        Kelas {k} (Seluruh Rombel / Cabang Kelas {k})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Item Pembayaran</label>
                   <select
                     value={itemType}
-                    onChange={(e) => setItemType(e.target.value as FinanceItemType | 'ALL')}
+                    onChange={(e) => {
+                      setItemType(e.target.value as FinanceItemType | 'ALL')
+                      setPreviewData(null)
+                    }}
                     className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
                   >
                     {ITEM_OPTIONS.map((item) => (
@@ -458,7 +610,10 @@ export default function PembebasanTab({
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Tahun Ajaran</label>
                   <select
                     value={academicYearId}
-                    onChange={(e) => setAcademicYearId(e.target.value)}
+                    onChange={(e) => {
+                      setAcademicYearId(e.target.value)
+                      setPreviewData(null)
+                    }}
                     className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
                   >
                     <option value="">Semua / Sepanjang Waktu</option>
@@ -480,7 +635,10 @@ export default function PembebasanTab({
                     type="text"
                     placeholder="Contoh: 2026-07"
                     value={periodStart}
-                    onChange={(e) => setPeriodStart(e.target.value)}
+                    onChange={(e) => {
+                      setPeriodStart(e.target.value)
+                      setPreviewData(null)
+                    }}
                     className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden font-mono"
                   />
                 </div>
@@ -492,7 +650,10 @@ export default function PembebasanTab({
                     type="text"
                     placeholder="Contoh: 2027-06"
                     value={periodEnd}
-                    onChange={(e) => setPeriodEnd(e.target.value)}
+                    onChange={(e) => {
+                      setPeriodEnd(e.target.value)
+                      setPreviewData(null)
+                    }}
                     className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden font-mono"
                   />
                 </div>
@@ -521,6 +682,51 @@ export default function PembebasanTab({
                   onChange={(e) => setNotes(e.target.value)}
                   className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden resize-none"
                 />
+              </div>
+
+              {/* Preview Trigger & Card */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={handlePreview}
+                  disabled={isPreviewing || (targetScope === 'INDIVIDUAL' && !selectedStudent)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <Eye className={`w-3.5 h-3.5 ${isPreviewing ? 'animate-spin' : ''}`} />
+                  <span>{isPreviewing ? 'Menghitung...' : 'Pratinjau Dampak (Preview)'}</span>
+                </button>
+
+                {previewData && (
+                  <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1.5 animate-in fade-in duration-100">
+                    <div className="font-semibold text-slate-800 flex items-center justify-between">
+                      <span>Sasaran: {previewData.targetLabel}</span>
+                      <span className="text-[11px] text-slate-500 font-normal">Total {previewData.totalStudents} santri</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200 text-[11px]">
+                      <div>
+                        <span className="text-slate-500">Sudah Bebas: </span>
+                        <span className="font-semibold text-slate-700 font-mono">{previewData.alreadyExemptedCount}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Belum Lunas: </span>
+                        <span className="font-semibold text-amber-700 font-mono">{previewData.unpaidCount}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Sudah Lunas (Aman): </span>
+                        <span className="font-semibold text-emerald-700 font-mono">{previewData.alreadyPaidCount}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Sebagian Lunas: </span>
+                        <span className="font-semibold text-sky-700 font-mono">{previewData.partiallyPaidCount}</span>
+                      </div>
+                    </div>
+                    {previewData.partiallyPaidCount > 0 && (
+                      <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800">
+                        ⚠️ <strong>Perhatian:</strong> Terdapat {previewData.partiallyPaidCount} tagihan cicilan sebagian (sudah dibayar: Rp {new Intl.NumberFormat('id-ID').format(previewData.partiallyPaidAmount || 0)}, sisa: Rp {new Intl.NumberFormat('id-ID').format(previewData.partiallyRemainingAmount || 0)}). Tagihan ini <strong>dikecualikan secara aman</strong> dari pembebasan otomatis (Review Diperlukan).
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">

@@ -16,11 +16,24 @@ import { revalidatePath } from 'next/cache'
 import {
   listTariffs,
   createTariff,
+  listTariffOverrides,
+  setTariffOverride,
+  deleteTariffOverride,
 } from '@/lib/finance/tariffs'
 import {
   grantExemption,
   revokeExemption,
+  previewGroupExemption,
+  applyGroupExemption,
+  migrateLegacySppExemptions,
+  type GroupExemptionPreview,
+  type GroupExemptionApplyResult,
+  type LegacySppExemptionMigrationResult,
 } from '@/lib/finance/exemptions'
+import {
+  getKoperasiEffectiveTimestamp,
+  setKoperasiEffectiveTimestamp,
+} from '@/lib/finance/fund-management'
 import {
   getGlobalDailyLimit,
   setGlobalDailyLimit,
@@ -36,6 +49,7 @@ import {
 } from '@/lib/finance/gateway/duitku-snap'
 import type {
   FinanceTariff,
+  FinanceTariffOverride,
   FinanceItemType,
   FinanceInstallmentRule,
 } from '@/lib/finance/types'
@@ -150,6 +164,7 @@ export interface MaskedGatewaySettings {
 
 export interface PengaturanKeuanganData {
   tariffs: FinanceTariff[]
+  tariffOverrides: FinanceTariffOverride[]
   academicYears: AcademicYearOption[]
   exemptions: ExemptionWithStudent[]
   globalDailyLimit: number
@@ -167,6 +182,13 @@ export interface PengaturanKeuanganData {
     profiles: LetterheadProfile[]
     configs: DocumentPrintConfig[]
   }
+  koperasiCutover: {
+    effectiveAt: string | null
+    isStarted: boolean
+    hasKoperasiPayments?: boolean
+    koperasiPaymentsCount?: number
+  }
+  legacySppCount: number
   userPermissions: UserFinancePermissions
 }
 
@@ -263,8 +285,19 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
     kelasList: [],
   }))
 
-  // 5. Konfigurasi Gateway & Fixed VA Ter-Masking + Kop/Print Settings
-  const [duitkuV2, snapConfig, settingsRows, vaCountRow, letterheadProfiles, documentPrintConfigs] = await Promise.all([
+  // 5. Konfigurasi Gateway & Fixed VA Ter-Masking + Kop/Print Settings + Overrides & Cutover
+  const [
+    duitkuV2,
+    snapConfig,
+    settingsRows,
+    vaCountRow,
+    letterheadProfiles,
+    documentPrintConfigs,
+    tariffOverrides,
+    koperasiEffectiveAt,
+    legacySppRow,
+    koperasiPaymentsRow,
+  ] = await Promise.all([
     getDuitkuV2Config().catch(() => ({
       merchantCode: '',
       apiKey: '',
@@ -296,6 +329,10 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
     queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM finance_student_va`).catch(() => ({ count: 0 })),
     getLetterheadProfiles().catch(() => []),
     getDocumentPrintConfigs().catch(() => []),
+    listTariffOverrides().catch(() => []),
+    getKoperasiEffectiveTimestamp().catch(() => null),
+    queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM santri_pembebasan_biaya WHERE is_active = 1`).catch(() => ({ count: 0 })),
+    queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM finance_payments WHERE fund_management = 'KOPERASI'`).catch(() => ({ count: 0 })),
   ])
 
   const settingsMap = new Map<string, string>()
@@ -356,6 +393,7 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
 
   return {
     tariffs,
+    tariffOverrides,
     academicYears,
     exemptions,
     globalDailyLimit,
@@ -368,6 +406,13 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
       profiles: letterheadProfiles,
       configs: documentPrintConfigs,
     },
+    koperasiCutover: {
+      effectiveAt: koperasiEffectiveAt,
+      isStarted: Boolean(koperasiEffectiveAt && koperasiEffectiveAt.length > 0),
+      hasKoperasiPayments: (koperasiPaymentsRow?.count ?? 0) > 0,
+      koperasiPaymentsCount: koperasiPaymentsRow?.count ?? 0,
+    },
+    legacySppCount: legacySppRow?.count || 0,
     userPermissions: {
       canMutate,
       role: userRole,
@@ -786,3 +831,209 @@ export async function saveDocumentPrintConfigsAction(
     return { success: false, error: err instanceof Error ? err.message : String(err) }
   }
 }
+
+// ─── SERVER ACTIONS: TARIF KHUSUS PERIODE (OVERRIDES) ────────────────────────
+
+export async function listTariffOverridesAction(): Promise<{
+  success: boolean
+  overrides: FinanceTariffOverride[]
+  error?: string
+}> {
+  try {
+    const overrides = await listTariffOverrides()
+    return { success: true, overrides }
+  } catch (err: unknown) {
+    return { success: false, overrides: [], error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function saveTariffOverrideAction(input: {
+  item_type: FinanceItemType
+  period: string
+  nominal: number
+  notes?: string | null
+}): Promise<{ success: boolean; override?: FinanceTariffOverride; error?: string }> {
+  try {
+    const { userId } = await assertMutationPermission()
+    if (!input.item_type || !input.period) {
+      return { success: false, error: 'Jenis pos dan periode wajib diisi.' }
+    }
+    const periodTrimmed = input.period.trim()
+    if (!/^\d{4}-\d{2}$/.test(periodTrimmed)) {
+      return { success: false, error: 'Format periode harus YYYY-MM (contoh: 2026-07).' }
+    }
+    if (typeof input.nominal !== 'number' || input.nominal < 0) {
+      return { success: false, error: 'Nominal override harus berupa angka positif atau nol.' }
+    }
+    const override = await setTariffOverride({
+      item_type: input.item_type,
+      period: periodTrimmed,
+      nominal: input.nominal,
+      notes: input.notes?.trim() || null,
+      created_by: userId,
+    })
+    revalidatePath('/dashboard/keuangan/tarif')
+    return { success: true, override }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function deleteTariffOverrideAction(
+  itemType: FinanceItemType,
+  period: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await assertMutationPermission()
+    await deleteTariffOverride(itemType, period.trim())
+    revalidatePath('/dashboard/keuangan/tarif')
+    return { success: true }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+// ─── SERVER ACTIONS: GROUP & ADVANCED EXEMPTIONS ────────────────────────────
+
+export async function previewExemptionRuleAction(input: {
+  target: 'INDIVIDUAL' | 'KELAS'
+  kelas?: string
+  santri_id?: string
+  item_type: FinanceItemType | 'ALL'
+  period_start?: string
+  period_end?: string
+}): Promise<{ success: boolean; preview?: GroupExemptionPreview; error?: string }> {
+  try {
+    const session = await getSession()
+    if (!session) {
+      return { success: false, error: 'Sesi autentikasi telah berakhir.' }
+    }
+    const targetValue = input.target === 'INDIVIDUAL' ? (input.santri_id || '') : (input.kelas || '')
+    if (!targetValue) {
+      return { success: false, error: 'Target pembebasan wajib ditentukan.' }
+    }
+    const preview = await previewGroupExemption({
+      targetType: input.target,
+      targetValue,
+      itemType: input.item_type,
+      periodStart: input.period_start || null,
+      periodEnd: input.period_end || null,
+    })
+    return { success: true, preview }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function applyGroupExemptionAction(input: {
+  target: 'INDIVIDUAL' | 'KELAS'
+  kelas?: string
+  santri_id?: string
+  item_type: FinanceItemType | 'ALL'
+  academic_year_id?: number | null
+  period_start?: string | null
+  period_end?: string | null
+  reason: string
+  notes?: string | null
+}): Promise<{ success: boolean; result?: GroupExemptionApplyResult; error?: string }> {
+  try {
+    const { userId } = await assertMutationPermission()
+    if (!input.reason || input.reason.trim().length === 0) {
+      return { success: false, error: 'Alasan pembebasan wajib diisi.' }
+    }
+    const targetValue = input.target === 'INDIVIDUAL' ? (input.santri_id || '') : (input.kelas || '')
+    if (!targetValue) {
+      return { success: false, error: 'Target pembebasan wajib ditentukan.' }
+    }
+    const result = await applyGroupExemption({
+      targetType: input.target,
+      targetValue,
+      itemType: input.item_type,
+      academicYearId: input.academic_year_id ?? null,
+      periodStart: input.period_start || null,
+      periodEnd: input.period_end || null,
+      reason: input.reason,
+      notes: input.notes || null,
+      createdBy: userId,
+    })
+    revalidatePath('/dashboard/keuangan/tarif')
+    return { success: true, result }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function migrateLegacySppExemptionsAction(): Promise<{
+  success: boolean
+  result?: LegacySppExemptionMigrationResult
+  error?: string
+}> {
+  try {
+    const { userId } = await assertMutationPermission()
+    const result = await migrateLegacySppExemptions(userId)
+    revalidatePath('/dashboard/keuangan/tarif')
+    return { success: true, result }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+// ─── SERVER ACTIONS: KOPERASI CUTOVER CONTROL ───────────────────────────────
+
+export async function getKoperasiCutoverStatusAction(): Promise<{
+  effectiveAt: string | null
+  isStarted: boolean
+  hasKoperasiPayments: boolean
+  koperasiPaymentsCount: number
+}> {
+  const [effectiveAt, kopPaymentRow] = await Promise.all([
+    getKoperasiEffectiveTimestamp(),
+    queryOne<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM finance_payments WHERE fund_management = 'KOPERASI'`
+    ).catch(() => ({ count: 0 })),
+  ])
+  const count = kopPaymentRow?.count ?? 0
+  return {
+    effectiveAt,
+    isStarted: Boolean(effectiveAt && effectiveAt.length > 0),
+    hasKoperasiPayments: count > 0,
+    koperasiPaymentsCount: count,
+  }
+}
+
+export async function setKoperasiCutoverAction(
+  effectiveAt: string | null
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { userId } = await assertMutationPermission()
+    const targetTimestamp = effectiveAt ? effectiveAt.trim() : null
+
+    // Guard (Blocker 7): Jika mencoba reset ke Pra-Koperasi (targetTimestamp kosong/null)
+    if (!targetTimestamp) {
+      const kopPaymentRow = await queryOne<{ count: number }>(
+        `SELECT COUNT(*) AS count FROM finance_payments WHERE fund_management = 'KOPERASI'`
+      ).catch(() => ({ count: 0 }))
+
+      const count = kopPaymentRow?.count ?? 0
+      if (count > 0) {
+        return {
+          success: false,
+          error: `Cutover Koperasi tidak dapat direset ke Pra-Koperasi karena sudah terdapat ${count} transaksi pembayaran Koperasi tercatat. Klasifikasi pembayaran finansial masa lalu bersifat immutable demi integritas audit.`,
+        }
+      }
+    } else {
+      const date = new Date(targetTimestamp)
+      if (isNaN(date.getTime())) {
+        return { success: false, error: 'Format tanggal cutover tidak valid.' }
+      }
+    }
+
+    await setKoperasiEffectiveTimestamp(targetTimestamp, userId)
+    revalidatePath('/dashboard/keuangan/tarif')
+    revalidatePath('/dashboard/keuangan')
+    return { success: true }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+

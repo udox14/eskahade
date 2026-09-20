@@ -58,6 +58,18 @@ export interface FinanceTariff {
   created_at: string
 }
 
+export interface FinanceTariffOverride {
+  id: string
+  item_type: FinanceItemType
+  period: string // YYYY-MM
+  nominal: number
+  academic_year_id: number | null
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface FinanceExemption {
   id: string
   santri_id: string

@@ -113,8 +113,11 @@ export async function getDistributionSummary(
            WHERE di.allocation_id = a.id)
         ), 0) AS total_disbursed
       FROM finance_allocations a
+      JOIN finance_payments p ON a.payment_id = p.id
       JOIN finance_obligations o ON a.obligation_id = o.id
       WHERE a.target_type = 'OBLIGATION'
+        AND p.fund_management = 'KOPERASI'
+        AND p.correction_status != 'FULLY_CORRECTED'
         AND a.item_type IN (${inPlaceholders})
         AND a.provider_id IS NULL
         AND (
@@ -221,8 +224,11 @@ export async function getDistributionSummary(
          WHERE di.allocation_id = a.id)
       ), 0) AS total_disbursed
     FROM finance_allocations a
+    JOIN finance_payments p ON a.payment_id = p.id
     JOIN finance_obligations o ON a.obligation_id = o.id
     WHERE a.target_type = 'OBLIGATION'
+      AND p.fund_management = 'KOPERASI'
+      AND p.correction_status != 'FULLY_CORRECTED'
       AND a.item_type = ?
       ${fundProviderFilter}
       AND o.period = ?
@@ -396,8 +402,11 @@ export async function getProviderDistributionList(
          WHERE di.allocation_id = a.id)
       ), 0) AS total_disbursed
     FROM finance_allocations a
+    JOIN finance_payments p ON a.payment_id = p.id
     JOIN finance_obligations o ON a.obligation_id = o.id
     WHERE a.target_type = 'OBLIGATION'
+      AND p.fund_management = 'KOPERASI'
+      AND p.correction_status != 'FULLY_CORRECTED'
       AND a.item_type = ?
       AND o.period = ?
       AND a.provider_id IS NOT NULL
@@ -591,8 +600,11 @@ export async function getBendaharaDistributionList(
            WHERE di.allocation_id = a.id)
         ), 0) AS total_disbursed
       FROM finance_allocations a
+      JOIN finance_payments p ON a.payment_id = p.id
       JOIN finance_obligations o ON a.obligation_id = o.id
       WHERE a.target_type = 'OBLIGATION'
+        AND p.fund_management = 'KOPERASI'
+        AND p.correction_status != 'FULLY_CORRECTED'
         AND a.item_type = ?
         AND a.provider_id IS NULL
         AND o.period = ?
@@ -712,8 +724,11 @@ export async function getEligibleAllocationsForDistribution(params: {
       a.distribution_status,
       a.created_at
     FROM finance_allocations a
+    JOIN finance_payments p ON a.payment_id = p.id
     JOIN finance_obligations o ON a.obligation_id = o.id
     WHERE a.target_type = 'OBLIGATION'
+      AND p.fund_management = 'KOPERASI'
+      AND p.correction_status != 'FULLY_CORRECTED'
       AND a.item_type = ?
       AND o.period = ?
       AND ((a.amount - COALESCE((
