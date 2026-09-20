@@ -9,6 +9,7 @@
 
 import { query, queryOne } from '@/lib/db'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
+import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
 
 export type TransactionCategory =
   | 'PAYMENT'
@@ -103,7 +104,7 @@ export async function getGlobalTransactionHistory(
   params: GlobalTransactionQueryParams
 ): Promise<GlobalTransactionHistoryResponse> {
   const page = Math.max(1, params.page || 1)
-  const pageSize = Math.max(1, Math.min(100, params.pageSize || 20))
+  const pageSize = Math.max(1, Math.min(100, params.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
   const offset = (page - 1) * pageSize
   const sortBy = params.sortBy || 'createdAt'
   const sortDir = params.sortDirection === 'asc' ? 'ASC' : 'DESC'

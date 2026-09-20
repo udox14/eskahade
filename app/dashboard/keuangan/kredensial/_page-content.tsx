@@ -15,12 +15,16 @@ import {
   X,
   CheckSquare,
   Square,
+  Layers,
+  RefreshCw,
 } from 'lucide-react'
+
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 import Pagination from '@/components/ui/pagination'
 import { StatCardSkeleton, TableSkeleton } from '@/components/ui/skeletons'
 import { CardPrintSheet } from './card-print-sheet'
+import { PinSlipPrintSheet, type PinSlipItem } from './pin-slip-print-sheet'
 import {
   getKredensialData,
   issueCardAction,
@@ -31,11 +35,17 @@ import {
   resetPinAction,
   unlockPinAction,
   getCardsForBatchPrint,
+  getBulkIssuanceCandidatesAction,
+  issueCardBatchChunkAction,
+  recoverStudentPinsBatchChunkAction,
   type StudentCredentialRow,
   type KredensialResponse,
   type KredensialQueryParams,
   type CardPrintItem,
+  type BulkCandidateScope,
+  type BulkCandidatesSummary,
 } from './actions'
+
 
 interface KredensialContentProps {
   initialData: KredensialResponse
@@ -56,7 +66,7 @@ export default function KredensialContent({ initialData }: KredensialContentProp
   const [selectedCardStatus, setSelectedCardStatus] = useState<string>('ALL')
   const [selectedPinStatus, setSelectedPinStatus] = useState<string>('ALL')
   const [currentPage, setCurrentPage] = useState<number>(1)
-  const [pageSize, setPageSize] = useState<number>(20)
+  const [pageSize, setPageSize] = useState<number>(50)
 
   // Batch Print Selection
   const [selectedSantriIds, setSelectedSantriIds] = useState<Set<string>>(new Set())
@@ -73,6 +83,32 @@ export default function KredensialContent({ initialData }: KredensialContentProp
   const [issueModalSantri, setIssueModalSantri] = useState<StudentCredentialRow | null>(null)
   const [issueReason, setIssueReason] = useState<string>('')
   const [isIssuingCard, setIsIssuingCard] = useState(false)
+
+  // Bulk Issuance Modal State
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
+  const [bulkScopeType, setBulkScopeType] = useState<BulkCandidateScope['type']>('ALL_UNISSUED')
+  const [bulkAsrama, setBulkAsrama] = useState<string>('ALL')
+  const [bulkSummary, setBulkSummary] = useState<BulkCandidatesSummary | null>(null)
+  const [isLoadingBulkSummary, setIsLoadingBulkSummary] = useState(false)
+  const [isProcessingBulk, setIsProcessingBulk] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState({
+    total: 0,
+    completed: 0,
+    success: 0,
+    skipped: 0,
+    failed: 0,
+    currentChunk: 0,
+    totalChunks: 0,
+  })
+  const [bulkGeneratedSlips, setBulkGeneratedSlips] = useState<PinSlipItem[]>([])
+  const [bulkNewlyIssuedCardIds, setBulkNewlyIssuedCardIds] = useState<string[]>([])
+  const [bulkIssuedPinNotRetrievable, setBulkIssuedPinNotRetrievable] = useState<
+    Array<{ santriId: string; namaLengkap: string; nis: string; asrama: string | null; kamar: string | null }>
+  >([])
+  const [isRecoveringPins, setIsRecoveringPins] = useState(false)
+  const [bulkCompleted, setBulkCompleted] = useState(false)
+  const [isShowingPinSlipSheet, setIsShowingPinSlipSheet] = useState(false)
+
 
   const searchInputId = useId()
   const asramaSelectId = useId()
@@ -292,6 +328,196 @@ export default function KredensialContent({ initialData }: KredensialContentProp
     }
   }
 
+  // Open Bulk Modal & Load Candidates
+  const fetchBulkCandidates = async (scopeType: BulkCandidateScope['type'], asramaValue: string) => {
+    setIsLoadingBulkSummary(true)
+    try {
+      const summary = await getBulkIssuanceCandidatesAction({
+        type: scopeType,
+        asrama: asramaValue !== 'ALL' ? asramaValue : undefined,
+        search: searchQuery.trim() || undefined,
+        santriIds: scopeType === 'SELECTED_IDS' ? Array.from(selectedSantriIds) : undefined,
+      })
+      setBulkSummary(summary)
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Gagal menghitung target penerbitan.')
+    } finally {
+      setIsLoadingBulkSummary(false)
+    }
+  }
+
+  const handleOpenBulkModal = () => {
+    setIsBulkModalOpen(true)
+    setBulkCompleted(false)
+    setBulkGeneratedSlips([])
+    setBulkNewlyIssuedCardIds([])
+    setBulkIssuedPinNotRetrievable([])
+    setBulkProgress({
+      total: 0,
+      completed: 0,
+      success: 0,
+      skipped: 0,
+      failed: 0,
+      currentChunk: 0,
+      totalChunks: 0,
+    })
+    fetchBulkCandidates(bulkScopeType, bulkAsrama)
+  }
+
+  const handleScopeChange = (type: BulkCandidateScope['type'], asramaVal: string = bulkAsrama) => {
+    setBulkScopeType(type)
+    setBulkAsrama(asramaVal)
+    fetchBulkCandidates(type, asramaVal)
+  }
+
+  // Execute Bulk Issuance sequentially in chunks of 50
+  const handleStartBulkIssuance = async () => {
+    if (!bulkSummary || bulkSummary.candidateIds.length === 0) return
+    setIsProcessingBulk(true)
+    setBulkCompleted(false)
+
+    const targetIds = bulkSummary.candidateIds
+    const chunkSize = 50
+    const totalChunks = Math.ceil(targetIds.length / chunkSize)
+
+    let completed = 0
+    let success = 0
+    let skipped = bulkSummary.alreadyActiveCount
+    let failed = 0
+    const newSlips: PinSlipItem[] = []
+    const newCards: string[] = []
+    const notRetrievable: Array<{ santriId: string; namaLengkap: string; nis: string; asrama: string | null; kamar: string | null }> = []
+
+    for (let i = 0; i < targetIds.length; i += chunkSize) {
+      const chunk = targetIds.slice(i, i + chunkSize)
+      const currentChunkIndex = Math.floor(i / chunkSize) + 1
+
+      setBulkProgress({
+        total: targetIds.length,
+        completed,
+        success,
+        skipped,
+        failed,
+        currentChunk: currentChunkIndex,
+        totalChunks,
+      })
+
+      try {
+        const res = await issueCardBatchChunkAction(chunk)
+        completed += chunk.length
+        success += res.successCount
+        skipped += res.skippedCount + (res.issuedPinNotRetrievableCount || 0)
+        failed += res.failedCount
+
+        res.items.forEach((item) => {
+          if (item.status === 'SUCCESS') {
+            newCards.push(item.santriId)
+            if (item.initialPin) {
+              newSlips.push({
+                santriId: item.santriId,
+                namaLengkap: item.namaLengkap,
+                nis: item.nis,
+                asrama: item.asrama,
+                kamar: item.kamar,
+                initialPin: item.initialPin,
+              })
+            }
+          } else if (item.status === 'ISSUED_PIN_NOT_RETRIEVABLE') {
+            notRetrievable.push({
+              santriId: item.santriId,
+              namaLengkap: item.namaLengkap,
+              nis: item.nis,
+              asrama: item.asrama,
+              kamar: item.kamar,
+            })
+          }
+        })
+      } catch {
+        completed += chunk.length
+        failed += chunk.length
+      }
+
+      setBulkProgress({
+        total: targetIds.length,
+        completed,
+        success,
+        skipped,
+        failed,
+        currentChunk: currentChunkIndex,
+        totalChunks,
+      })
+    }
+
+    setBulkGeneratedSlips(newSlips)
+    setBulkNewlyIssuedCardIds(newCards)
+    setBulkIssuedPinNotRetrievable(notRetrievable)
+    setIsProcessingBulk(false)
+    setBulkCompleted(true)
+    fetchData()
+  }
+
+  // Recovery PIN Santri Terdampak (Response Lost / Retry)
+  const handleRecoverAffectedPins = async () => {
+    if (bulkIssuedPinNotRetrievable.length === 0) return
+    const count = bulkIssuedPinNotRetrievable.length
+    if (
+      !window.confirm(
+        `Reset PIN dan buat PIN baru untuk ${count} santri yang kartu aktifnya tidak dapat menampilkan PIN awal? PIN baru akan otomatis ditambahkan ke Lembar Cetak PIN.`
+      )
+    ) {
+      return
+    }
+
+    setIsRecoveringPins(true)
+    try {
+      const targetIds = bulkIssuedPinNotRetrievable.map((s) => s.santriId)
+      const chunkSize = 50
+      const addedSlips: PinSlipItem[] = []
+
+      for (let i = 0; i < targetIds.length; i += chunkSize) {
+        const chunk = targetIds.slice(i, i + chunkSize)
+        const res = await recoverStudentPinsBatchChunkAction(chunk)
+        res.items.forEach((item) => {
+          if (item.status === 'SUCCESS' && item.newPin) {
+            addedSlips.push({
+              santriId: item.santriId,
+              namaLengkap: item.namaLengkap,
+              nis: item.nis,
+              asrama: item.asrama,
+              kamar: item.kamar,
+              initialPin: item.newPin,
+            })
+          }
+        })
+      }
+
+      setBulkGeneratedSlips((prev) => [...prev, ...addedSlips])
+      setBulkIssuedPinNotRetrievable([])
+      setSuccessMessage(
+        `Berhasil me-reset dan membuat ${addedSlips.length} PIN baru. Silakan cetak Lembar PIN sekarang.`
+      )
+      fetchData()
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : 'Gagal melakukan recovery PIN santri.')
+    } finally {
+      setIsRecoveringPins(false)
+    }
+  }
+
+
+  const handlePrintNewlyIssuedCards = async () => {
+    if (bulkNewlyIssuedCardIds.length === 0) return
+    setIsLoadingPrint(true)
+    try {
+      const cards = await getCardsForBatchPrint(bulkNewlyIssuedCardIds)
+      setPrintItems(cards)
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Gagal memuat kartu untuk dicetak.')
+    } finally {
+      setIsLoadingPrint(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <DashboardPageHeader
@@ -372,37 +598,50 @@ export default function KredensialContent({ initialData }: KredensialContentProp
         )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200">
-        <button
-          type="button"
-          onClick={() => setActiveTab('LIST')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition ${
-            activeTab === 'LIST'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <CreditCard className="h-4 w-4" />
-          Daftar Kartu &amp; Santri
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('BATCH_PRINT')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition ${
-            activeTab === 'BATCH_PRINT'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <Printer className="h-4 w-4" />
-          Cetak Kartu (Batch Print)
-          {selectedSantriIds.size > 0 && (
-            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700">
-              {selectedSantriIds.size}
-            </span>
-          )}
-        </button>
+      {/* Tabs & Bulk Action Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 gap-2 pb-1 sm:pb-0">
+        <div className="flex">
+          <button
+            type="button"
+            onClick={() => setActiveTab('LIST')}
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition ${
+              activeTab === 'LIST'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <CreditCard className="h-4 w-4" />
+            Daftar Kartu &amp; Santri
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('BATCH_PRINT')}
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition ${
+              activeTab === 'BATCH_PRINT'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Printer className="h-4 w-4" />
+            Cetak Kartu (Batch Print)
+            {selectedSantriIds.size > 0 && (
+              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700">
+                {selectedSantriIds.size}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {data.userPermissions.canMutate && (
+          <button
+            type="button"
+            onClick={handleOpenBulkModal}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors self-start sm:self-auto mb-2 sm:mb-0"
+          >
+            <Layers className="h-4 w-4" />
+            <span>Terbitkan Kartu Massal</span>
+          </button>
+        )}
       </div>
 
       {/* Filter Toolbar */}
@@ -882,6 +1121,331 @@ export default function KredensialContent({ initialData }: KredensialContentProp
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal Penerbitan Kartu Massal */}
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs"
+            onClick={() => !isProcessingBulk && setIsBulkModalOpen(false)}
+          />
+          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Layers className="h-5 w-5 text-emerald-600" />
+                <h3 className="font-bold text-slate-900 text-base">
+                  Penerbitan Kartu &amp; PIN Santri Massal
+                </h3>
+              </div>
+              {!isProcessingBulk && (
+                <button
+                  type="button"
+                  onClick={() => setIsBulkModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+
+            {!bulkCompleted ? (
+              <div className="space-y-4 text-xs">
+                <p className="text-slate-600 leading-relaxed">
+                  Menerbitkan kartu fisik santri secara berurutan dalam batch aman (50 santri/chunk). Santri yang belum memiliki PIN akan otomatis dibuatkan <span className="font-semibold text-slate-800">PIN acak 6-digit unik</span> (hash PBKDF2), sedangkan santri yang sudah memiliki PIN akan tetap dipertahankan.
+                </p>
+
+                {/* Scope Selection */}
+                {!isProcessingBulk && (
+                  <div className="space-y-2 border border-slate-200 rounded-xl p-3.5 bg-slate-50/50">
+                    <label className="font-bold text-slate-800 block">Pilih Cakupan Penerbitan:</label>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="bulkScope"
+                          checked={bulkScopeType === 'ALL_UNISSUED'}
+                          onChange={() => handleScopeChange('ALL_UNISSUED')}
+                          className="text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="text-slate-700 font-medium">
+                          Semua santri aktif yang belum memiliki kartu ACTIVE
+                        </span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="bulkScope"
+                          checked={bulkScopeType === 'BY_ASRAMA'}
+                          onChange={() => handleScopeChange('BY_ASRAMA')}
+                          className="text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="text-slate-700 font-medium">Per Asrama tertentu</span>
+                      </label>
+
+                      {bulkScopeType === 'BY_ASRAMA' && (
+                        <div className="pl-6 pt-1">
+                          <select
+                            value={bulkAsrama}
+                            onChange={(e) => handleScopeChange('BY_ASRAMA', e.target.value)}
+                            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 focus:outline-none"
+                          >
+                            <option value="ALL">Pilih Asrama</option>
+                            {data.asramaList.map((a) => (
+                              <option key={a} value={a}>
+                                {a}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {hasActiveFilters && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="bulkScope"
+                            checked={bulkScopeType === 'FILTERED'}
+                            onChange={() => handleScopeChange('FILTERED')}
+                            className="text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span className="text-slate-700 font-medium">
+                            Santri sesuai filter &amp; pencarian tabel saat ini
+                          </span>
+                        </label>
+                      )}
+
+                      {selectedSantriIds.size > 0 && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="bulkScope"
+                            checked={bulkScopeType === 'SELECTED_IDS'}
+                            onChange={() => handleScopeChange('SELECTED_IDS')}
+                            className="text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span className="text-slate-700 font-medium">
+                            Santri yang dipilih di tabel ({selectedSantriIds.size} santri)
+                          </span>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Candidate Summary Breakdown */}
+                {isLoadingBulkSummary ? (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center text-slate-400">
+                    <span className="animate-spin inline-block mr-2">⏳</span>
+                    Menghitung data target santri...
+                  </div>
+                ) : bulkSummary ? (
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                      <div className="text-slate-500 text-[10px] font-semibold uppercase">Target Total</div>
+                      <div className="text-base font-bold text-slate-900 mt-0.5 font-mono">
+                        {bulkSummary.totalCandidates.toLocaleString('id-ID')}
+                      </div>
+                    </div>
+                    <div className="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50">
+                      <div className="text-emerald-700 text-[10px] font-semibold uppercase">Siap Diterbitkan</div>
+                      <div className="text-base font-bold text-emerald-800 mt-0.5 font-mono">
+                        {bulkSummary.eligibleCount.toLocaleString('id-ID')}
+                      </div>
+                    </div>
+                    <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                      <div className="text-slate-500 text-[10px] font-semibold uppercase">Sudah Aktif (Skip)</div>
+                      <div className="text-base font-bold text-slate-600 mt-0.5 font-mono">
+                        {bulkSummary.alreadyActiveCount.toLocaleString('id-ID')}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Progress Bar & Status */}
+                {isProcessingBulk && (
+                  <div className="space-y-2 border border-slate-200 rounded-xl p-4 bg-slate-50">
+                    <div className="flex justify-between text-xs font-semibold text-slate-700">
+                      <span>
+                        Memproses chunk {bulkProgress.currentChunk} dari {bulkProgress.totalChunks}...
+                      </span>
+                      <span className="font-mono">
+                        {bulkProgress.total > 0
+                          ? Math.min(100, Math.round((bulkProgress.completed / bulkProgress.total) * 100))
+                          : 0}
+                        %
+                      </span>
+                    </div>
+
+                    <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className="bg-emerald-600 h-2.5 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${
+                            bulkProgress.total > 0
+                              ? Math.min(100, Math.round((bulkProgress.completed / bulkProgress.total) * 100))
+                              : 0
+                          }%`,
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex justify-between text-[11px] text-slate-500 pt-1">
+                      <span>Selesai: {bulkProgress.completed} santri</span>
+                      <span className="text-emerald-700 font-semibold">Berhasil: {bulkProgress.success}</span>
+                      {bulkProgress.skipped > 0 && <span>Dilewati: {bulkProgress.skipped}</span>}
+                      {bulkProgress.failed > 0 && <span className="text-rose-600 font-semibold">Gagal: {bulkProgress.failed}</span>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Modal Footer Actions */}
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    disabled={isProcessingBulk}
+                    onClick={() => setIsBulkModalOpen(false)}
+                    className="rounded-lg border border-slate-200 px-4 py-2 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isProcessingBulk || !bulkSummary || bulkSummary.eligibleCount === 0}
+                    onClick={handleStartBulkIssuance}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    <Layers className="h-4 w-4" />
+                    <span>
+                      {isProcessingBulk
+                        ? 'Sedang Menerbitkan...'
+                        : `Mulai Terbitkan (${bulkSummary?.eligibleCount || 0} Santri)`}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Completed Screen */
+              <div className="space-y-4 text-xs">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                    <span className="font-bold text-sm">Penerbitan Kartu Massal Selesai</span>
+                  </div>
+                  <p className="text-xs text-emerald-800 leading-relaxed">
+                    Sistem telah selesai memproses seluruh antrean kartu santri tanpa duplikasi kartu aktif.
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono text-center">
+                    <div className="bg-white/80 rounded p-1.5 border border-emerald-200">
+                      <div className="text-[10px] text-slate-500 font-sans">Kartu Terbit</div>
+                      <div className="font-bold text-slate-900 text-sm">{bulkProgress.success}</div>
+                    </div>
+                    <div className="bg-white/80 rounded p-1.5 border border-emerald-200">
+                      <div className="text-[10px] text-slate-500 font-sans">PIN Dibuat</div>
+                      <div className="font-bold text-slate-900 text-sm">{bulkGeneratedSlips.length}</div>
+                    </div>
+                    <div className="bg-white/80 rounded p-1.5 border border-emerald-200">
+                      <div className="text-[10px] text-slate-500 font-sans">Dilewati</div>
+                      <div className="font-bold text-slate-900 text-sm">{bulkProgress.skipped}</div>
+                    </div>
+                    <div className="bg-white/80 rounded p-1.5 border border-emerald-200">
+                      <div className="text-[10px] text-slate-500 font-sans">Gagal</div>
+                      <div className="font-bold text-slate-900 text-sm">{bulkProgress.failed}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {bulkIssuedPinNotRetrievable.length > 0 && (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-4 text-rose-950 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-rose-900">
+                      <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                      <span>{bulkIssuedPinNotRetrievable.length} Santri Memiliki Kartu Aktif tetapi PIN Tidak Dapat Ditampilkan</span>
+                    </div>
+                    <p className="text-xs text-rose-800 leading-relaxed">
+                      <strong>Kartu sudah diterbitkan, tetapi PIN awal tidak dapat ditampilkan kembali. Reset PIN untuk membuat PIN baru.</strong>
+                      <br />
+                      Hal ini terjadi jika sesi penerbitan terputus atau diulang saat PIN awal sudah tersimpan di database.
+                    </p>
+                    <div className="pt-1 flex flex-wrap items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        disabled={isRecoveringPins}
+                        onClick={handleRecoverAffectedPins}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 hover:bg-rose-800 text-white px-3.5 py-2 font-semibold text-xs transition-colors shadow-xs disabled:opacity-50"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${isRecoveringPins ? 'animate-spin' : ''}`} />
+                        <span>
+                          {isRecoveringPins
+                            ? 'Mereset PIN...'
+                            : `Reset PIN Santri Terdampak (${bulkIssuedPinNotRetrievable.length} Santri)`}
+                        </span>
+                      </button>
+                      <span className="text-[11px] text-rose-700 font-medium">
+                        * PIN baru akan otomatis ditambahkan ke Lembar Cetak PIN di bawah.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {bulkGeneratedSlips.length > 0 && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-amber-900 text-xs flex items-start gap-2.5">
+                    <ShieldCheck className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-bold">One-Time Plaintext PIN:</span> Ditemukan {bulkGeneratedSlips.length} santri yang memiliki PIN awal siap didistribusikan. Cetak lembar slip PIN sekarang sebelum menutup modal ini. Setelah modal ditutup, plaintext PIN tidak dapat diakses kembali.
+                    </div>
+                  </div>
+                )}
+
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
+                  <div className="flex flex-wrap gap-2">
+                    {bulkGeneratedSlips.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsShowingPinSlipSheet(true)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 font-semibold shadow-xs transition-colors text-xs"
+                      >
+                        <Printer className="h-4 w-4" />
+                        <span>Cetak Lembar PIN ({bulkGeneratedSlips.length})</span>
+                      </button>
+                    )}
+
+                    {bulkNewlyIssuedCardIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handlePrintNewlyIssuedCards}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 font-semibold shadow-xs transition-colors text-xs"
+                      >
+                        <Printer className="h-4 w-4" />
+                        <span>Cetak Kartu ({bulkNewlyIssuedCardIds.length})</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsBulkModalOpen(false)
+                      setBulkCompleted(false)
+                    }}
+                    className="rounded-lg border border-slate-200 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50 transition-colors text-xs"
+                  >
+                    Selesai &amp; Tutup
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* PIN Slip Print Sheet */}
+      {isShowingPinSlipSheet && bulkGeneratedSlips.length > 0 && (
+        <PinSlipPrintSheet
+          slips={bulkGeneratedSlips}
+          onClose={() => setIsShowingPinSlipSheet(false)}
+        />
       )}
 
       {/* Batch Print Preview Sheet */}

@@ -144,6 +144,7 @@ export async function getPenyaluranPageData(params?: {
   tab?: string
   period?: string
   historyPage?: number
+  historyPageSize?: number
   historySearch?: string
   historyRecipientType?: string
   historyItemType?: string
@@ -186,7 +187,7 @@ export async function getPenyaluranPageData(params?: {
   // Riwayat Penyaluran
   const history = await getDistributionHistory({
     page: params?.historyPage || 1,
-    pageSize: 20,
+    pageSize: params?.historyPageSize || 50,
     search: params?.historySearch || undefined,
     recipientType:
       params?.historyRecipientType && params.historyRecipientType !== 'ALL'

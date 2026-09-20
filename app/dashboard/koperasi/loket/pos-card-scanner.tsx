@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useEffect, useState } from 'react'
-import { QrCode, Search, X, Loader2, CreditCard, Sparkles } from 'lucide-react'
+import { QrCode, Search, X, Loader2, CreditCard } from 'lucide-react'
 
 interface PosCardScannerProps {
   onScan: (identifier: string) => Promise<void>
@@ -102,10 +102,7 @@ export default function PosCardScanner({
         </div>
 
         <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
-          <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3 text-amber-500" />
-            <span>Mendukung scanner fisik USB/Bluetooth maupun pencarian manual santri.</span>
-          </div>
+          <span>Mendukung pemindai barcode / QR fisik via USB dan Bluetooth, serta pencarian manual santri.</span>
         </div>
       </form>
     </div>

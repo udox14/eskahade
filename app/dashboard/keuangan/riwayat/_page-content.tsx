@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import Pagination from '@/components/ui/pagination'
+import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
 import { TransactionDetailDrawer } from './transaction-detail-drawer'
 import { getGlobalHistoryData, type UserHistoryPermissions } from './actions'
 import type {
@@ -74,7 +75,7 @@ export default function RiwayatTransaksiContent({
   const [sortBy, setSortBy] = useState<'createdAt' | 'amount' | 'transactionNumber'>('createdAt')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(DEFAULT_FINANCE_PAGE_SIZE)
 
   // Drawer Selected Transaction State
   const [selectedTransaction, setSelectedTransaction] = useState<GlobalTransactionRow | null>(null)

@@ -9,8 +9,10 @@ import {
   Building,
   ArrowDownLeft,
   ArrowUpRight,
+  Printer,
 } from 'lucide-react'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
+import { TransactionReceiptModal } from '@/components/finance/transaction-receipt-modal'
 import { getTransactionDetail } from './actions'
 import type { GlobalTransactionRow } from '@/lib/finance/history'
 
@@ -48,6 +50,7 @@ export function TransactionDetailDrawer({
   const [detailData, setDetailData] = useState<Awaited<ReturnType<typeof getTransactionDetail>> | null>(null)
   const [isPending, startTransition] = useTransition()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isReceiptOpen, setIsReceiptOpen] = useState<boolean>(false)
 
   useEffect(() => {
     if (!transaction) return
@@ -312,7 +315,15 @@ export function TransactionDetailDrawer({
             </div>
 
             {/* Footer Drawer */}
-            <div className="bg-slate-50 px-6 py-3.5 flex justify-end">
+            <div className="bg-slate-50 px-6 py-3.5 flex items-center justify-between border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setIsReceiptOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 transition"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                <span>Cetak Kuitansi / Bukti</span>
+              </button>
               <button
                 type="button"
                 onClick={onClose}
@@ -321,6 +332,14 @@ export function TransactionDetailDrawer({
                 Tutup
               </button>
             </div>
+
+            {/* Receipt Modal */}
+            <TransactionReceiptModal
+              isOpen={isReceiptOpen}
+              onClose={() => setIsReceiptOpen(false)}
+              transaction={transaction}
+              detailData={detailData}
+            />
 
           </div>
         </div>

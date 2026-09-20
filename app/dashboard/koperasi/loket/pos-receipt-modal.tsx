@@ -62,12 +62,11 @@ export default function PosReceiptModal({
             className="bg-white p-5 rounded-2xl border border-dashed border-slate-300 font-mono text-xs space-y-3 text-slate-800 shadow-2xs"
           >
             {/* Header Struk */}
-            <div className="text-center space-y-1 pb-3 border-b border-slate-200">
-              <h4 className="font-bold text-sm tracking-wider text-slate-900 uppercase">
-                KOPERASI PESANTREN ESKAHADE
+            <div className="text-center space-y-0.5 pb-3 border-b border-slate-200">
+              <h4 className="font-bold text-xs tracking-wider text-slate-900 uppercase">
+                Koperasi Pondok Pesantren Sukahideng
               </h4>
-              <p className="text-[10px] text-slate-500">Layanan Loket & Uang Jajan Santri</p>
-              <p className="text-[10px] font-bold text-slate-700 mt-1">
+              <p className="text-[10px] font-bold text-slate-700 pt-1">
                 {isWithdrawal ? '*** BUKTI PENCAIRAN UANG JAJAN ***' : '*** BUKTI PENERIMAAN KAS ***'}
               </p>
             </div>

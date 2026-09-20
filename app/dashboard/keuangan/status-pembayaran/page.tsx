@@ -16,7 +16,7 @@ export default async function StatusPembayaranPage() {
   const filterOptions = await getStatusPembayaranFilterOptions()
   const initialData = await getStatusPembayaranData({
     period: filterOptions.currentPeriod,
-    pageSize: 20,
+    pageSize: 50,
     page: 1,
   })
 

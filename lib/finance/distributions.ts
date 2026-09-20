@@ -23,6 +23,7 @@ import type {
   DistributionDetailWithItems,
 } from '@/lib/finance/distribution-types'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
+import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
 
 export const BENDAHARA_ITEM_TYPES: FinanceItemType[] = [
   'SPP',
@@ -875,7 +876,7 @@ export async function getDistributionHistory(filter: DistributionHistoryFilter =
   pageSize: number
 }> {
   const page = Math.max(1, filter.page || 1)
-  const pageSize = Math.max(1, filter.pageSize || 20)
+  const pageSize = Math.max(1, filter.pageSize || DEFAULT_FINANCE_PAGE_SIZE)
   const offset = (page - 1) * pageSize
 
   const conditions: string[] = ['1=1']

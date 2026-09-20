@@ -146,7 +146,7 @@ export default function GatewayTab({
         <Lock className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" weight="bold" />
         <div className="text-xs space-y-1">
           <div className="font-bold text-slate-100 flex items-center gap-2">
-            Isolasi Kredensial & Masking Data Sensitif (PRD #31.4 & #38)
+            Isolasi Kredensial & Masking Data Sensitif
           </div>
           <p className="text-slate-300 leading-relaxed">
             Kunci API rahasia (<code className="font-mono text-emerald-300">API Key</code>, <code className="font-mono text-emerald-300">Client Secret</code>, dan <code className="font-mono text-emerald-300">Private Key</code>) dimasking secara ketat di sisi server dan <span className="font-semibold text-white">tidak pernah dibocorkan ke client browser</span>. Untuk memperbarui kredensial, masukkan kunci baru ke dalam kolom input. Jika dibiarkan kosong, kredensial tersimpan yang aktif akan tetap dipertahankan.
@@ -307,7 +307,7 @@ export default function GatewayTab({
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" weight="bold" />
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Skema Biaya Gateway (PRD #9)
+                  Skema Biaya Transaksi Gateway
                 </h3>
               </div>
             </div>
@@ -456,7 +456,7 @@ export default function GatewayTab({
               <div className="flex items-center gap-2">
                 <QrCode className="w-4 h-4 text-emerald-600" weight="bold" />
                 <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Fixed Virtual Account SNAP BI (PRD #8)
+                  Fixed Virtual Account SNAP BI
                 </h3>
               </div>
               <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
@@ -559,7 +559,7 @@ export default function GatewayTab({
           <div className="flex items-center gap-2">
             <Bank className="w-4 h-4 text-emerald-600" weight="bold" />
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Rekening Bank Penampung Settlement Pesantren (PRD #31.4 & #32)
+              Rekening Bank Penampung Settlement Pesantren
             </h3>
           </div>
           <span className="text-[11px] text-slate-500">Tujuan pencairan otomatis payment gateway</span>

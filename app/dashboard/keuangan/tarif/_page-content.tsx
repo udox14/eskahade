@@ -1,3 +1,7 @@
+// app/dashboard/keuangan/tarif/_page-content.tsx
+// Halaman Pengaturan Keuangan Terpadu Pesantren
+// Menghilangkan dekorasi berlebih pada header, menyelaraskan tipografi, dan menambahkan tab Kop & Cetak.
+
 'use client'
 
 import { useState, useTransition } from 'react'
@@ -10,12 +14,14 @@ import TarifTab from './tarif-tab'
 import PembebasanTab from './pembebasan-tab'
 import LimitJajanTab from './limit-jajan-tab'
 import GatewayTab from './gateway-tab'
+import KopTab from './kop-tab'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
   Tag,
   ShieldCheck,
   Wallet,
   CreditCard,
-  GearSix,
+  Printer,
   ArrowClockwise,
   Eye,
 } from '@phosphor-icons/react'
@@ -24,7 +30,7 @@ interface PengaturanKeuanganContentProps {
   initialData: PengaturanKeuanganData
 }
 
-type TabKey = 'tarif' | 'pembebasan' | 'limit' | 'gateway'
+type TabKey = 'tarif' | 'pembebasan' | 'limit' | 'gateway' | 'kop'
 
 export default function PengaturanKeuanganContent({
   initialData,
@@ -52,50 +58,39 @@ export default function PengaturanKeuanganContent({
     { key: 'pembebasan', label: 'Pembebasan Biaya', icon: ShieldCheck, badge: data.exemptions.filter(e => e.status === 'ACTIVE').length },
     { key: 'limit', label: 'Limit Uang Jajan', icon: Wallet },
     { key: 'gateway', label: 'Payment Gateway Duitku', icon: CreditCard },
+    { key: 'kop', label: 'Kop & Cetak', icon: Printer },
   ]
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-emerald-50 rounded-xl text-emerald-700 border border-emerald-100">
-              <GearSix className="w-5 h-5" weight="bold" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-slate-900 tracking-tight">
-                Pengaturan Keuangan
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Konfigurasi tarif terversi, pembebasan biaya santri, limit buku besar uang jajan, dan gateway pembayaran.
-              </p>
-            </div>
+      {/* 1. Standard Page Header (Matching existing application pattern without decorative icon) */}
+      <DashboardPageHeader
+        title="Pengaturan Keuangan"
+        description="Konfigurasi tarif terversi, pembebasan biaya santri, limit buku besar uang jajan, gateway pembayaran, dan profil kop cetak resmi."
+        action={
+          <div className="flex items-center gap-3">
+            {!canMutate && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                <Eye className="w-4 h-4 text-amber-600" />
+                <span>Mode Lihat Saja ({userRole.toUpperCase()})</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={refreshData}
+              disabled={isPending}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 shadow-xs transition-colors disabled:opacity-50"
+            >
+              <ArrowClockwise className={`w-3.5 h-3.5 ${isPending ? 'animate-spin' : ''}`} weight="bold" />
+              <span>Segarkan</span>
+            </button>
           </div>
-        </div>
+        }
+      />
 
-        <div className="flex items-center gap-3 shrink-0">
-          {!canMutate && (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
-              <Eye className="w-4 h-4 text-amber-600" />
-              <span>Akses Mode Lihat Saja ({userRole.toUpperCase()})</span>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={refreshData}
-            disabled={isPending}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 shadow-xs transition-colors disabled:opacity-50"
-          >
-            <ArrowClockwise className={`w-3.5 h-3.5 ${isPending ? 'animate-spin' : ''}`} weight="bold" />
-            <span>Segarkan</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Internal Sub-Navigation Tabs (UI_UX_GUIDELINES #24) */}
-      <div className="border-b border-slate-200/80">
+      {/* 2. Internal Sub-Navigation Tabs */}
+      <div className="border-b border-slate-200">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
           {tabs.map((tab) => {
             const Icon = tab.icon
@@ -105,7 +100,7 @@ export default function PengaturanKeuanganContent({
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all shrink-0 ${
+                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-all shrink-0 ${
                   isActive
                     ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50 rounded-t-lg'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
@@ -130,7 +125,7 @@ export default function PengaturanKeuanganContent({
         </div>
       </div>
 
-      {/* Tab Panels */}
+      {/* 3. Tab Panels */}
       <div>
         {activeTab === 'tarif' && (
           <TarifTab
@@ -153,7 +148,10 @@ export default function PengaturanKeuanganContent({
         {activeTab === 'limit' && (
           <LimitJajanTab
             globalDailyLimit={data.globalDailyLimit}
-            studentLimits={data.studentLimits}
+            initialStudentLimits={data.studentLimits}
+            initialPagination={data.studentLimitsPagination}
+            initialAsramaList={data.asramaList}
+            initialKelasList={data.kelasList}
             canMutate={canMutate}
             onRefresh={refreshData}
           />
@@ -164,6 +162,14 @@ export default function PengaturanKeuanganContent({
             gatewayConfig={data.gatewayConfig}
             canMutate={canMutate}
             onRefresh={refreshData}
+          />
+        )}
+
+        {activeTab === 'kop' && (
+          <KopTab
+            initialProfiles={data.printSettings.profiles}
+            initialConfigs={data.printSettings.configs}
+            canMutate={canMutate}
           />
         )}
       </div>

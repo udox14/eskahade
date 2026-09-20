@@ -9,6 +9,10 @@ import {
   getFinanceDashboardFullData,
   type FinanceDashboardData,
 } from '@/lib/finance/dashboard'
+import {
+  getActiveCashSession,
+  type FinanceCashSession,
+} from '@/lib/finance/cash-session'
 
 export interface UserDashboardPermissions {
   canView: boolean
@@ -18,6 +22,7 @@ export interface UserDashboardPermissions {
 export interface DashboardActionResponse {
   data: FinanceDashboardData
   userPermissions: UserDashboardPermissions
+  activeCashSession: FinanceCashSession | null
 }
 
 export async function getDashboardData(
@@ -45,7 +50,10 @@ export async function getDashboardData(
     throw new Error('Anda tidak memiliki izin untuk mengakses Dashboard Keuangan.')
   }
 
-  const fullData = await getFinanceDashboardFullData(period)
+  const [fullData, activeCashSession] = await Promise.all([
+    getFinanceDashboardFullData(period),
+    getActiveCashSession(session.id),
+  ])
 
   return {
     data: fullData,
@@ -53,5 +61,6 @@ export async function getDashboardData(
       canView: true,
       role: session.role || roles[0] || 'bendahara',
     },
+    activeCashSession,
   }
 }

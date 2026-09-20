@@ -16,6 +16,7 @@ import {
   ShieldWarning,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import InputSettlementModal from './input-settlement-modal'
 import ManualAllocationModal from './manual-allocation-modal'
 import RecordCorrectionModal from './record-correction-modal'
@@ -100,32 +101,26 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
   return (
     <div className="space-y-6 pb-12">
       {/* 1. Header & Controls */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-800">
-            Rekonsiliasi & Koreksi
-          </h1>
-          <p className="text-xs text-slate-500">
-            Pencocokan tiga arah Duitku ↔ Bank, rekonsiliasi kas loket, resolusi transfer ambigu, dan histori koreksi non-destruktif.
-          </p>
-        </div>
-
-        {/* Period Picker */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-slate-500">Periode:</label>
-          <select
-            value={selectedPeriod}
-            onChange={(e) => handlePeriodChange(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs focus:border-emerald-500 focus:outline-hidden"
-          >
-            {data.periodOptions.map((opt: PeriodOption) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <DashboardPageHeader
+        title="Rekonsiliasi & Koreksi"
+        description="Pencocokan tiga arah Duitku ↔ Bank, rekonsiliasi kas loket, resolusi transfer ambigu, dan histori koreksi non-destruktif."
+        action={
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-slate-500">Periode:</label>
+            <select
+              value={selectedPeriod}
+              onChange={(e) => handlePeriodChange(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs focus:border-emerald-500 focus:outline-hidden"
+            >
+              {data.periodOptions.map((opt: PeriodOption) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        }
+      />
 
       {/* 2. Summary KPI Cards (Maksimal 4 Cards Operasional) */}
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
@@ -300,7 +295,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="border-b border-slate-100 bg-slate-50 text-[11px] font-semibold text-slate-500">
+                    <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold text-slate-600">
                       <tr>
                         <th className="px-5 py-3">No. Settlement</th>
                         <th className="px-5 py-3">Tanggal</th>
@@ -320,7 +315,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                           <td className="px-5 py-3">{s.settlement_date}</td>
                           <td className="px-5 py-3">
                             <div className="font-medium text-slate-800">{s.destination_bank}</div>
-                            <div className="text-[10px] text-slate-400">{s.destination_account}</div>
+                            <div className="text-xs text-slate-500">{s.destination_account}</div>
                           </td>
                           <td className="px-5 py-3 text-center font-medium">{s.total_payments_count} trx</td>
                           <td className="px-5 py-3 text-right">Rp {s.total_gross_amount.toLocaleString('id-ID')}</td>
@@ -330,7 +325,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                           </td>
                           <td className="px-5 py-3 text-center">
                             <span
-                              className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                                 s.status === 'COMPLETED'
                                   ? 'bg-emerald-50 text-emerald-700'
                                   : 'bg-amber-50 text-amber-700'
@@ -369,7 +364,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="border-b border-slate-100 bg-slate-50 text-[11px] font-semibold text-slate-500">
+                  <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold text-slate-600">
                     <tr>
                       <th className="px-5 py-3">Kode Sesi</th>
                       <th className="px-5 py-3">Kasir / Operator</th>
@@ -388,7 +383,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                       <tr key={s.sessionId} className="hover:bg-slate-50/60">
                         <td className="px-5 py-3 font-semibold text-slate-800">{s.sessionCode}</td>
                         <td className="px-5 py-3">{s.operatorName || '-'}</td>
-                        <td className="px-5 py-3 text-[11px] text-slate-500">
+                        <td className="px-5 py-3 text-xs text-slate-500">
                           <div>Buka: {s.openedAt.slice(0, 16).replace('T', ' ')}</div>
                           {s.closedAt && <div>Tutup: {s.closedAt.slice(0, 16).replace('T', ' ')}</div>}
                         </td>
@@ -412,15 +407,15 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                         </td>
                         <td className="px-5 py-3 text-center">
                           {s.reconciliationStatus === 'SEIMBANG' ? (
-                            <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                            <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
                               Seimbang
                             </span>
                           ) : s.reconciliationStatus === 'SELISIH' ? (
-                            <span className="inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                            <span className="inline-flex rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
                               Ada Selisih
                             </span>
                           ) : (
-                            <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                            <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
                               Sesi Terbuka
                             </span>
                           )}
@@ -444,8 +439,8 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                   <span className="text-xs font-semibold text-slate-800">
                     Transaksi Belum Dialokasikan (Transfer Tanpa Order Aktif)
                   </span>
-                  <p className="text-[11px] text-slate-500">
-                    Sesuai PRD Aturan Anti-Menebak Alokasi: Dana diamankan dan hanya dialokasikan setelah konfirmasi Bendahara.
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Aturan Integritas Alokasi: Dana diamankan dan hanya dialokasikan setelah konfirmasi Bendahara.
                   </p>
                 </div>
               </div>
@@ -474,12 +469,12 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                     <tbody className="divide-y divide-slate-100 text-slate-700">
                       {data.unallocatedData.items.map((row: UnallocatedReconciliationRow) => (
                         <tr key={row.id} className="hover:bg-slate-50/60">
-                          <td className="px-5 py-3 text-[11px] text-slate-500">
+                          <td className="px-5 py-3 text-xs text-slate-500">
                             {row.paid_at.slice(0, 16).replace('T', ' ')}
                           </td>
                           <td className="px-5 py-3">
                             <div className="font-semibold text-slate-800">{row.santri_name}</div>
-                            <div className="text-[10px] text-slate-400">NIS: {row.nis}</div>
+                            <div className="text-xs text-slate-500">NIS: {row.nis}</div>
                           </td>
                           <td className="px-5 py-3 font-medium text-slate-700">{row.payment_number}</td>
                           <td className="px-5 py-3">{row.method}</td>
@@ -487,11 +482,11 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                             Rp {row.discrepancy_amount.toLocaleString('id-ID')}
                           </td>
                           <td className="px-5 py-3">
-                            <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                            <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
                               {row.match_status}
                             </span>
                           </td>
-                          <td className="px-5 py-3 text-[11px] text-slate-500 max-w-xs truncate">
+                          <td className="px-5 py-3 text-xs text-slate-500 max-w-xs truncate">
                             {row.resolution_notes || '-'}
                           </td>
                           <td className="px-5 py-3 text-center">
@@ -505,7 +500,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                                 <ArrowRight size={13} />
                               </button>
                             ) : (
-                              <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                              <span className="rounded bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
                                 {row.resolution_action}
                               </span>
                             )}
@@ -648,7 +643,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="border-b border-slate-100 bg-slate-50 text-[11px] font-semibold text-slate-500">
+                    <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold text-slate-600">
                       <tr>
                         <th className="px-5 py-3">No. Koreksi</th>
                         <th className="px-5 py-3">Waktu</th>
@@ -665,12 +660,12 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                       {data.correctionData.corrections.map((c: EnrichedCorrection) => (
                         <tr key={c.id} className="hover:bg-slate-50/60">
                           <td className="px-5 py-3 font-semibold text-slate-800">{c.correction_number}</td>
-                          <td className="px-5 py-3 text-[11px] text-slate-500">
+                          <td className="px-5 py-3 text-xs text-slate-500">
                             {c.created_at.slice(0, 16).replace('T', ' ')}
                           </td>
                           <td className="px-5 py-3">
                             <span
-                              className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${
                                 c.correction_type === 'VOID'
                                   ? 'bg-slate-100 text-slate-800'
                                   : c.correction_type === 'REVERSAL'
@@ -683,17 +678,17 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                           </td>
                           <td className="px-5 py-3">
                             <div className="font-semibold text-slate-800">{c.santri_name}</div>
-                            <div className="text-[10px] text-slate-400">NIS: {c.nis}</div>
+                            <div className="text-xs text-slate-500">NIS: {c.nis}</div>
                           </td>
                           <td className="px-5 py-3 font-medium text-slate-700">{c.payment_number}</td>
                           <td className="px-5 py-3 text-right font-bold text-rose-700">
                             Rp {c.total_amount.toLocaleString('id-ID')}
                           </td>
                           <td className="px-5 py-3 text-slate-600">{c.method || 'Internal/Buku'}</td>
-                          <td className="px-5 py-3 text-[11px] text-slate-600 max-w-xs truncate">
+                          <td className="px-5 py-3 text-xs text-slate-600 max-w-xs truncate">
                             {c.reason}
                           </td>
-                          <td className="px-5 py-3 text-[11px] text-slate-500">{c.creator_name || '-'}</td>
+                          <td className="px-5 py-3 text-xs text-slate-500">{c.creator_name || '-'}</td>
                         </tr>
                       ))}
                     </tbody>

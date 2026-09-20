@@ -38,7 +38,7 @@ interface CatatPenyaluranTarget {
 interface CatatPenyaluranModalProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess: () => void
+  onSuccess: (newDistributionId?: string) => void
   target: CatatPenyaluranTarget | null
 }
 
@@ -48,7 +48,7 @@ function CatatPenyaluranForm({
   target,
 }: {
   onClose: () => void
-  onSuccess: () => void
+  onSuccess: (newDistributionId?: string) => void
   target: CatatPenyaluranTarget
 }) {
   const [isPending, startTransition] = useTransition()
@@ -164,7 +164,7 @@ function CatatPenyaluranForm({
 
     startTransition(async () => {
       try {
-        await recordDistributionAction({
+        const res = await recordDistributionAction({
           recipientType: target.recipientType,
           recipientId: target.recipientId,
           itemType: target.itemType,
@@ -182,7 +182,7 @@ function CatatPenyaluranForm({
         toast.success(
           `Penyaluran dana Rp ${parsedAmount.toLocaleString('id-ID')} ke ${target.recipientName} berhasil dicatat!`
         )
-        onSuccess()
+        onSuccess(res?.data?.id)
         onClose()
       } catch (err: unknown) {
         toast.error(err instanceof Error ? err.message : 'Gagal mencatat penyaluran dana.')

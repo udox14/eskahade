@@ -356,7 +356,7 @@ export async function getStatusPembayaranData(
   const searchFilter = params?.search?.trim() || undefined
   const statusFilter = params?.status && params.status !== 'ALL' ? params.status : undefined
   const page = Math.max(1, params?.page ?? 1)
-  const pageSize = params?.pageSize !== undefined ? params.pageSize : 20
+  const pageSize = params?.pageSize !== undefined ? params.pageSize : 50
 
   // 1. Ambil matriks kewajiban dari finance engine
   const rawMatrix = await getStudentsObligationMatrix(selectedPeriod, {

@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { getDistributionReceiptAction } from './actions'
 import type { DistributionDetailWithItems } from '@/lib/finance/distribution-types'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
+import DocumentLetterhead from '@/components/print/document-letterhead'
 import {
   Printer,
   X,
@@ -98,15 +99,12 @@ export default function BuktiPenyaluranModal({
           ) : (
             <>
               {/* Slip Kop */}
-              <div className="border-b-2 border-slate-900 pb-4 text-center">
-                <h2 className="text-lg font-black uppercase tracking-wider text-slate-950">
-                  Pesantren Sukahideng
-                </h2>
-                <p className="text-xs text-slate-600 mt-0.5 font-medium">
-                  Sistem Administrasi & Keuangan Terpadu Pesantren
-                </p>
-                <div className="inline-block mt-2 px-3 py-0.5 rounded-md bg-slate-100 text-slate-800 text-[11px] font-bold uppercase tracking-widest">
-                  Tanda Terima Penyaluran Dana
+              <div>
+                <DocumentLetterhead />
+                <div className="text-center -mt-2 mb-4">
+                  <div className="inline-block px-3 py-0.5 rounded-md bg-slate-100 text-slate-800 text-[11px] font-bold uppercase tracking-widest">
+                    Tanda Terima Penyaluran Dana
+                  </div>
                 </div>
               </div>
 

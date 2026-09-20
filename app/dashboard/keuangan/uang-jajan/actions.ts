@@ -142,7 +142,7 @@ export async function getUangJajanData(
   const asramaFilter = (params.asrama || 'ALL').trim()
   const saldoFilter = params.saldoFilter || 'ALL'
   const page = Math.max(1, params.page || 1)
-  const pageSize = Math.max(1, Math.min(100, params.pageSize || 20))
+  const pageSize = Math.max(1, Math.min(100, params.pageSize || 50))
   const offset = (page - 1) * pageSize
 
   // 1. KPI Global Seluruh Santri Aktif

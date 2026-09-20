@@ -103,7 +103,7 @@ export default function LaporanKeuanganContent({
   const [providerId, setProviderId] = useState('ALL')
   const [exemptionStatus, setExemptionStatus] = useState<'ACTIVE' | 'REVOKED' | 'ALL'>('ALL')
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
+  const [pageSize, setPageSize] = useState(50)
 
   // ── 3. REPORT DATA STATES ───────────────────────────────────────────────────
   const [receiptsData, setReceiptsData] = useState<ReceiptsReportResponse>(initialReceipts)

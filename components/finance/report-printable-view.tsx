@@ -1,7 +1,7 @@
 // components/finance/report-printable-view.tsx
-// Komponen Preview & Cetak Laporan Keuangan Siap Cetak (Fase 10: PRD Bab 34 & UI/UX Guidelines #44)
-// Menjamin:
-// 1. Kop surat formal Pondok Pesantren Eskahade.
+// Komponen Preview & Cetak Laporan Keuangan Siap Cetak
+// Menggunakan Shared Print Infrastructure (PrintDocumentShell & DocumentLetterhead):
+// 1. Kop identitas resmi Pondok Pesantren Sukahideng (atau profil terpilih dari konfigurasi).
 // 2. Tampilan preview bersih, printer-friendly (hitam/slate, tanpa background pekat).
 // 3. Integrasi pencetakan langsung via react-to-print.
 // 4. Pengesahan tanda tangan Bendahara dan Petugas Pembuat Laporan.
@@ -11,6 +11,12 @@
 import React, { useRef } from 'react'
 import { useReactToPrint } from 'react-to-print'
 import { Printer, X } from 'lucide-react'
+import { PrintDocumentShell } from '@/components/print/print-document-shell'
+import {
+  DEFAULT_LETTERHEAD_PROFILES,
+  type LetterheadProfile,
+  type LetterheadMode,
+} from '@/lib/print/letterhead'
 
 export interface PrintableColumn<T> {
   header: string
@@ -35,19 +41,23 @@ interface ReportPrintableViewProps<T> {
   data: T[]
   footerTotals?: Array<{ label: string; value: string; colSpan?: number }>
   orientation?: 'portrait' | 'landscape'
+  letterheadProfile?: LetterheadProfile | null
+  letterheadMode?: LetterheadMode
 }
 
 export default function ReportPrintableView<T>({
   isOpen,
   onClose,
   title,
-  subtitle = 'Sistem Manajemen Keuangan Baru',
+  subtitle = 'Sistem Informasi Keuangan Pesantren Terpadu',
   filterSummary = 'Semua Data',
   kpis = [],
   columns,
   data,
   footerTotals = [],
   orientation = 'portrait',
+  letterheadProfile,
+  letterheadMode = 'default',
 }: ReportPrintableViewProps<T>) {
   const printRef = useRef<HTMLDivElement>(null)
 
@@ -58,14 +68,11 @@ export default function ReportPrintableView<T>({
 
   if (!isOpen) return null
 
-  const printTimestamp = new Date().toLocaleDateString('id-ID', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Jakarta',
-  })
+  // Fallback to Sukahideng default if not provided
+  const activeProfile =
+    letterheadProfile === undefined
+      ? DEFAULT_LETTERHEAD_PROFILES[0]
+      : letterheadProfile
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs animate-in fade-in duration-150">
@@ -104,50 +111,29 @@ export default function ReportPrintableView<T>({
 
         {/* Scrollable Printable Sheet Preview */}
         <div className="p-6 overflow-y-auto flex-1 bg-slate-100 flex justify-center">
-          <div
+          <PrintDocumentShell
             ref={printRef}
-            className={`bg-white p-8 rounded-sm shadow-md text-slate-900 font-sans print:shadow-none print:p-0 w-full ${
-              orientation === 'landscape' ? 'max-w-5xl' : 'max-w-3xl'
-            }`}
-            style={{ minHeight: '297mm' }}
+            letterheadProfile={activeProfile}
+            letterheadMode={letterheadMode}
+            title={title}
+            subtitle={subtitle}
+            filterSummary={filterSummary}
+            orientation={orientation}
+            showSignatureBlock={true}
+            signatoryTitleLeft={'Mengetahui,\nBendahara Pesantren'}
+            signatoryNameLeft={'( Ust. Bendahara, M.Pd. )'}
+            signatoryTitleRight={'Petugas Pembuat Laporan'}
+            signatoryNameRight={'( Petugas Administrasi Keuangan )'}
+            signatoryLocation="Tasikmalaya"
+            footerNote="Dicetak resmi oleh Sistem Informasi Keuangan Pesantren Sukahideng"
           >
-            {/* Kop Pesantren */}
-            <div className="border-b-2 border-slate-900 pb-3 mb-5 text-center">
-              <h1 className="text-xl font-bold tracking-wider text-slate-900 uppercase">
-                PONDOK PESANTREN ESKAHADE
-              </h1>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Jl. Pesantren Sukahideng No. 01, Sukapada, Kec. Pagerageung, Kab. Tasikmalaya, Jawa Barat
-              </p>
-              <p className="text-[11px] text-slate-500">
-                Sistem Informasi Keuangan Pesantren Terpadu • Website: eskahade.sch.id
-              </p>
-            </div>
-
-            {/* Judul Laporan & Metadata */}
-            <div className="mb-5 text-center">
-              <h2 className="text-base font-bold uppercase tracking-wide text-slate-900 underline underline-offset-4">
-                {title}
-              </h2>
-              <p className="text-xs text-slate-600 mt-1">{subtitle}</p>
-              <div className="inline-flex items-center gap-4 mt-2 px-3 py-1 bg-slate-50 border border-slate-200 rounded text-[11px] text-slate-600">
-                <span>
-                  <strong>Parameter Filter:</strong> {filterSummary}
-                </span>
-                <span>•</span>
-                <span>
-                  <strong>Waktu Cetak:</strong> {printTimestamp} WIB
-                </span>
-              </div>
-            </div>
-
             {/* KPI Summary Block (Jika Ada) */}
             {kpis.length > 0 && (
               <div className="mb-5 grid grid-cols-2 md:grid-cols-4 gap-2">
                 {kpis.map((kpi, idx) => (
                   <div
                     key={idx}
-                    className="p-2.5 border border-slate-200 rounded bg-slate-50/70 text-center"
+                    className="p-2.5 border border-slate-200 rounded bg-slate-50/70 text-center print:border-slate-300"
                   >
                     <p className="text-[10px] text-slate-500 uppercase tracking-wider">{kpi.label}</p>
                     <p className="text-xs font-bold text-slate-900 mt-0.5">{kpi.value}</p>
@@ -160,7 +146,7 @@ export default function ReportPrintableView<T>({
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse border border-slate-300">
                 <thead>
-                  <tr className="bg-slate-100 text-slate-800 font-semibold border-b border-slate-300">
+                  <tr className="bg-slate-100 text-slate-800 font-semibold border-b border-slate-300 print:bg-slate-100">
                     <th className="py-2 px-2 border border-slate-300 text-center w-8">No</th>
                     {columns.map((col, idx) => (
                       <th
@@ -232,35 +218,7 @@ export default function ReportPrintableView<T>({
                 )}
               </table>
             </div>
-
-            {/* Blok Tanda Tangan Resmi */}
-            <div className="mt-10 pt-4 grid grid-cols-2 text-center text-xs break-inside-avoid">
-              <div className="space-y-1">
-                <p className="text-slate-600">Mengetahui,</p>
-                <p className="font-bold text-slate-900">Bendahara Pesantren Eskahade</p>
-                <div className="h-16"></div>
-                <p className="font-semibold text-slate-900 underline underline-offset-2">
-                  ( Ust. Bendahara, M.Pd. )
-                </p>
-                <p className="text-[10px] text-slate-500">NIP: 19850612.201201.1.002</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-slate-600">Tasikmalaya, {printTimestamp.slice(0, 15)}</p>
-                <p className="font-bold text-slate-900">Petugas Pembuat Laporan</p>
-                <div className="h-16"></div>
-                <p className="font-semibold text-slate-900 underline underline-offset-2">
-                  ( Petugas Administrasi Keuangan )
-                </p>
-                <p className="text-[10px] text-slate-500">Bagian Tata Usaha & Koperasi</p>
-              </div>
-            </div>
-
-            {/* Footer Cetak */}
-            <div className="mt-8 pt-2 border-t border-dashed border-slate-300 text-[10px] text-slate-400 flex justify-between">
-              <span>Dicetak otomatis oleh Sistem Keuangan Baru Eskahade</span>
-              <span>Halaman 1 dari 1</span>
-            </div>
-          </div>
+          </PrintDocumentShell>
         </div>
       </div>
     </div>

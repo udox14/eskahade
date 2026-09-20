@@ -22,8 +22,13 @@ import {
 import {
   getStudentPinStatus,
   verifyStudentPin,
+  resetStudentPin,
+  setStudentPin,
+  validatePinFormat,
+  generateRandomPin,
   type PinStatus,
 } from '@/lib/finance/pins'
+
 import {
   getStudentWalletBalance,
   evaluateWalletLimit,
@@ -404,7 +409,99 @@ export async function verifyStudentLoketPin(
   }
 }
 
+// ─── UBAH & RESET PIN SANTRI DI LOKET ──────────────────────────────────────
+
+/**
+ * Santri mengubah PIN di loket secara mandiri dengan memasukkan PIN lama.
+ * Memverifikasi PIN lama terlebih dahulu; jika sah, mengupdate hash PIN baru.
+ */
+export async function changeStudentPinAtLoketAction(
+  santriId: string,
+  oldPin: string,
+  newPin: string,
+  confirmPin: string
+): Promise<{ success: boolean; message: string }> {
+  const { userId } = await authorizeLoketOperator(false)
+
+  const cleanOld = String(oldPin ?? '').trim()
+  const cleanNew = String(newPin ?? '').trim()
+  const cleanConfirm = String(confirmPin ?? '').trim()
+
+  if (!cleanOld) throw new Error('PIN lama santri wajib diisi.')
+  if (cleanNew !== cleanConfirm) throw new Error('Konfirmasi PIN baru tidak sama dengan PIN baru.')
+  validatePinFormat(cleanNew)
+
+  // Cek status PIN saat ini
+  const status = await getStudentPinStatus(santriId)
+  if (status.isLocked) {
+    throw new Error('PIN santri sedang terkunci karena terlalu sering salah memasukkan PIN. Harap gunakan fitur Reset PIN Petugas.')
+  }
+  if (!status.hasPin) {
+    throw new Error('Santri belum memiliki PIN terdaftar. Harap lakukan inisialisasi / reset PIN oleh petugas.')
+  }
+
+  // Verifikasi PIN lama
+  const verifyResult = await verifyStudentPin(santriId, cleanOld)
+  if (!verifyResult.verified) {
+    if (verifyResult.locked) {
+      throw new Error('PIN santri sekarang terkunci sementara karena salah memasukkan PIN 3 kali.')
+    }
+    throw new Error(`PIN lama santri salah. Sisa kesempatan: ${verifyResult.attemptsLeft} kali.`)
+  }
+
+  // Update hash PIN baru & catat audit log
+  await resetStudentPin(
+    santriId,
+    cleanNew,
+    userId,
+    'Diubah di loket atas permintaan santri'
+  )
+
+  return { success: true, message: 'PIN santri berhasil diubah.' }
+}
+
+/**
+ * Petugas loket / admin mereset PIN santri darurat (karena lupa / terkunci).
+ * Menghasilkan PIN acak 6 digit baru secara kriptografis (Web Crypto API),
+ * menyimpan hash PBKDF2 di database, dan mengembalikan PIN plaintext satu kali
+ * untuk diberikan / dicetak struk oleh petugas.
+ */
+export async function resetStudentPinAtLoketAction(
+  santriId: string,
+  reason: string
+): Promise<{ success: boolean; newPlaintextPin: string; message: string }> {
+  const { userId, operatorName } = await authorizeLoketOperator(true)
+
+  const cleanReason = String(reason ?? '').trim()
+  if (!cleanReason) {
+    throw new Error('Alasan reset PIN darurat wajib diisi oleh petugas.')
+  }
+
+  const student = await queryOne<{ id: string; nama_lengkap: string; nis: string }>(
+    `SELECT id, nama_lengkap, nis FROM santri WHERE id = ?`,
+    [santriId]
+  )
+  if (!student) {
+    throw new Error(`Santri dengan ID "${santriId}" tidak ditemukan.`)
+  }
+
+  // Generate PIN acak 6-digit yang aman
+  const newPin = generateRandomPin()
+
+  // Update / Set PIN santri & catat audit log dengan performer petugas
+  await setStudentPin(santriId, newPin, userId, {
+    reason: `Reset PIN darurat oleh kasir (${operatorName}): ${cleanReason}`,
+  })
+
+  return {
+    success: true,
+    newPlaintextPin: newPin,
+    message: 'PIN santri berhasil di-reset menjadi PIN baru.',
+  }
+}
+
 // ─── KEUANGAN & OBLIGASI SANTRI DI LOKET ───────────────────────────────────
+
 
 /**
  * Mengambil data finansial santri setelah verifikasi identitas:

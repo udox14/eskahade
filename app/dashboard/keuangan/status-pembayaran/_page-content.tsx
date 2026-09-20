@@ -63,7 +63,7 @@ export default function StatusPembayaranContent({
   const [selectedAsrama, setSelectedAsrama] = useState<string>('ALL')
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL')
   const [currentPage, setCurrentPage] = useState<number>(1)
-  const [pageSize, setPageSize] = useState<number>(20)
+  const [pageSize, setPageSize] = useState<number>(50)
 
   // Accessible IDs for form controls
   const searchInputId = useId()

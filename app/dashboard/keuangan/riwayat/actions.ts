@@ -77,7 +77,7 @@ export async function getInitialHistoryData(): Promise<HistoryActionResponse> {
   }
 
   const [history, filterOptions] = await Promise.all([
-    getGlobalTransactionHistory({ page: 1, pageSize: 20 }),
+    getGlobalTransactionHistory({ page: 1, pageSize: 50 }),
     getHistoryFilterOptions(),
   ])
 

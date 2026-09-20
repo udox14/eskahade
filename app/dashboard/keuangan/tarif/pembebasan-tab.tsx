@@ -263,7 +263,7 @@ export default function PembebasanTab({
       <div className="flex items-start gap-3 p-3.5 bg-sky-50/70 border border-sky-200/80 rounded-xl text-xs text-sky-800">
         <Info className="w-4 h-4 text-sky-600 mt-0.5 shrink-0" weight="bold" />
         <div>
-          <span className="font-semibold">Ketentuan Non-Retroaktif (PRD #14):</span> Pembebasan biaya hanya membebaskan sisa kewajiban yang belum dibayar. Transaksi pembayaran yang sudah sukses tercatat di masa lalu <span className="font-semibold">tidak diubah atau di-void secara otomatis</span>. Saat pembebasan dicabut (REVOKED), sisa tagihan yang belum terbayar dipulihkan secara akurat tanpa menghapus jejak histori.
+          <span className="font-semibold">Ketentuan Pemberlakuan Pembebasan Biaya:</span> Pembebasan biaya hanya membebaskan sisa kewajiban yang belum dibayar. Transaksi pembayaran yang sudah sukses tercatat di masa lalu <span className="font-semibold">tidak diubah atau di-void secara otomatis</span>. Saat pembebasan dicabut (REVOKED), sisa tagihan yang belum terbayar dipulihkan secara akurat tanpa menghapus jejak histori.
         </div>
       </div>
 

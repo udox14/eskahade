@@ -17,6 +17,7 @@
 
 import { query, queryOne } from '@/lib/db'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
+import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
 
 // ── TYPES & INTERFACES ────────────────────────────────────────────────────────
 
@@ -550,7 +551,7 @@ export async function getReceiptsReport(
   filters: ReceiptsReportFilter
 ): Promise<ReceiptsReportResponse> {
   const page = Math.max(1, filters.page || 1)
-  const pageSize = Math.max(1, Math.min(200, filters.pageSize || 25))
+  const pageSize = Math.max(1, Math.min(200, filters.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
   const offset = (page - 1) * pageSize
 
   const conditions: string[] = ["fp.status IN ('PAID', 'SETTLED')"]
@@ -739,7 +740,7 @@ export async function getDistributionsReport(
   filters: DistributionsReportFilter
 ): Promise<DistributionsReportResponse> {
   const page = Math.max(1, filters.page || 1)
-  const pageSize = Math.max(1, Math.min(200, filters.pageSize || 25))
+  const pageSize = Math.max(1, Math.min(200, filters.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
   const offset = (page - 1) * pageSize
 
   const conditions: string[] = ['1 = 1']
@@ -891,7 +892,7 @@ export async function getArrearsReport(
   filters: ArrearsReportFilter
 ): Promise<ArrearsReportResponse> {
   const page = Math.max(1, filters.page || 1)
-  const pageSize = Math.max(1, Math.min(200, filters.pageSize || 25))
+  const pageSize = Math.max(1, Math.min(200, filters.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
   const offset = (page - 1) * pageSize
 
   // Invariant authoritatif Fase 8 & Fase 10:
@@ -1077,7 +1078,7 @@ export async function getExemptionsReport(
   filters: ExemptionsReportFilter
 ): Promise<ExemptionsReportResponse> {
   const page = Math.max(1, filters.page || 1)
-  const pageSize = Math.max(1, Math.min(200, filters.pageSize || 25))
+  const pageSize = Math.max(1, Math.min(200, filters.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
   const offset = (page - 1) * pageSize
 
   const conditions: string[] = ['1 = 1']
@@ -1542,7 +1543,7 @@ export async function getWalletReport(
 ): Promise<WalletReportResponse> {
   const mode = filters.mode || 'SUMMARY'
   const page = Math.max(1, filters.page || 1)
-  const pageSize = Math.max(1, Math.min(200, filters.pageSize || 25))
+  const pageSize = Math.max(1, Math.min(200, filters.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
   const offset = (page - 1) * pageSize
 
   // KPI Utama (Total In, Total Out, Saldo Berjalan Keseluruhan)
@@ -1812,7 +1813,7 @@ export async function getCashSessionsReport(
   filters: CashSessionsReportFilter
 ): Promise<CashSessionsReportResponse> {
   const page = Math.max(1, filters.page || 1)
-  const pageSize = Math.max(1, Math.min(200, filters.pageSize || 25))
+  const pageSize = Math.max(1, Math.min(200, filters.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
   const offset = (page - 1) * pageSize
 
   // Invariant authoritatif Rekonstruksi Kas Loket (PRD #23 & Fase 10):
@@ -2227,7 +2228,7 @@ export async function getSettlementsReport(
   filters: SettlementsReportFilter
 ): Promise<SettlementsReportResponse> {
   const page = Math.max(1, filters.page || 1)
-  const pageSize = Math.max(1, Math.min(200, filters.pageSize || 25))
+  const pageSize = Math.max(1, Math.min(200, filters.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
   const offset = (page - 1) * pageSize
 
   const conditions: string[] = ['1 = 1']
@@ -2351,7 +2352,7 @@ export async function getReconciliationsReport(
   filters: ReconciliationsReportFilter
 ): Promise<ReconciliationsReportResponse> {
   const page = Math.max(1, filters.page || 1)
-  const pageSize = Math.max(1, Math.min(200, filters.pageSize || 25))
+  const pageSize = Math.max(1, Math.min(200, filters.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
   const offset = (page - 1) * pageSize
 
   const conditions: string[] = ['1 = 1']

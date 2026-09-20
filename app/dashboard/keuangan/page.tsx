@@ -19,6 +19,7 @@ export default async function DashboardKeuanganPage() {
     <DashboardKeuanganContent
       initialData={initialResponse.data}
       userPermissions={initialResponse.userPermissions}
+      initialCashSession={initialResponse.activeCashSession}
     />
   )
 }

@@ -22,7 +22,7 @@ export default async function KredensialPage() {
   // 2. Ambil dataset awal
   const initialData = await getKredensialData({
     page: 1,
-    pageSize: 20,
+    pageSize: 50,
   })
 
   return <KredensialContent initialData={initialData} />

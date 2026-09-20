@@ -15,7 +15,7 @@ export default async function LaporanKeuanganPage() {
   // 2. Muat data inisial filter options dan laporan penerimaan default
   const [filterOptions, initialReceipts] = await Promise.all([
     getReportFilterOptions(),
-    getReceiptsReport({ page: 1, pageSize: 25 }),
+    getReceiptsReport({ page: 1, pageSize: 50 }),
   ])
 
   return (

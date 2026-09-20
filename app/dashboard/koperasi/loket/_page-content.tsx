@@ -9,7 +9,9 @@ import PosStudentCard from './pos-student-card'
 import PosPinPad from './pos-pin-pad'
 import PosActionPanel from './pos-action-panel'
 import PosReceiptModal from './pos-receipt-modal'
+import PosPinModal from './pos-pin-modal'
 import CashSessionModal from './cash-session-modal'
+
 import SessionHistoryDrawer from './session-history-drawer'
 import {
   openLoketCashSession,
@@ -56,10 +58,12 @@ export default function LoketContent({ initialData }: LoketContentProps) {
   const [currentStudent, setCurrentStudent] = useState<StudentLoketProfile | null>(null)
   const [financials, setFinancials] = useState<StudentLoketFinancials | null>(null)
 
-  // PIN Pad state
+  // PIN Pad & Pin Management state
   const [isPinPadOpen, setIsPinPadOpen] = useState(false)
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false)
   const [isPinVerified, setIsPinVerified] = useState(false)
   const [verificationToken, setVerificationToken] = useState<string | null>(null)
+
 
   // Receipt Modal state
   const [receipt, setReceipt] = useState<LoketWithdrawalReceipt | LoketPaymentReceipt | null>(null)
@@ -137,7 +141,21 @@ export default function LoketContent({ initialData }: LoketContentProps) {
     return res
   }
 
+  // 2.1 Handler Callback Sukses Ubah / Reset PIN Santri
+  const handlePinModalSuccess = async () => {
+    if (!currentStudent) return
+    try {
+      const refreshed = await lookupStudentForLoket(currentStudent.nis || currentStudent.id)
+      if (refreshed) {
+        setCurrentStudent(refreshed)
+      }
+    } catch (err) {
+      console.error('Gagal merefresh status santri:', err)
+    }
+  }
+
   // 3. Handler Eksekusi Penarikan Uang Jajan
+
   const handleWithdrawal = async (amount: number, notes?: string) => {
     if (!currentStudent || !verificationToken) {
       toast.error('Verifikasi PIN santri terlebih dahulu.')
@@ -296,6 +314,7 @@ export default function LoketContent({ initialData }: LoketContentProps) {
               student={currentStudent}
               onReset={handleResetForNewTransaction}
               onPromptPin={() => setIsPinPadOpen(true)}
+              onOpenPinModal={() => setIsPinModalOpen(true)}
               isPinVerified={isPinVerified}
             />
 
@@ -348,7 +367,19 @@ export default function LoketContent({ initialData }: LoketContentProps) {
         />
       )}
 
+      {/* 4.1 Modal Kelola / Ubah / Reset PIN Santri */}
+      {currentStudent && (
+        <PosPinModal
+          isOpen={isPinModalOpen}
+          student={currentStudent}
+          isViewOnly={isViewOnly}
+          onClose={() => setIsPinModalOpen(false)}
+          onSuccess={handlePinModalSuccess}
+        />
+      )}
+
       {/* 5. Modal Buka / Tutup Sesi Kas */}
+
       <CashSessionModal
         mode={sessionModalMode || 'OPEN'}
         isOpen={sessionModalMode !== null}

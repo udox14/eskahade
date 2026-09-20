@@ -7,6 +7,9 @@ import type {
   FinanceDistributionRecipientType,
 } from '@/lib/finance/distribution-types'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
+import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import Pagination from '@/components/ui/pagination'
+import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
 import CatatPenyaluranModal from './catat-penyaluran-modal'
 import RekeningModal from './rekening-modal'
 import BuktiPenyaluranModal from './bukti-penyaluran-modal'
@@ -34,6 +37,7 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
   )
   const [selectedPeriod, setSelectedPeriod] = useState<string>(initialData.selectedPeriod)
   const [historySearch, setHistorySearch] = useState<string>('')
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_FINANCE_PAGE_SIZE)
 
   // Modal states
   const [disburseModalTarget, setDisburseModalTarget] = useState<{
@@ -61,7 +65,8 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
     tab = activeTab,
     period = selectedPeriod,
     search = historySearch,
-    page = 1
+    page = 1,
+    size = pageSize
   ) => {
     startTransition(async () => {
       try {
@@ -70,6 +75,7 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
           period,
           historySearch: search,
           historyPage: page,
+          historyPageSize: size,
         })
         setData(next)
       } catch (err: unknown) {
@@ -80,35 +86,26 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
 
   const handleTabChange = (tab: FinanceDistributionRecipientType | 'RIWAYAT') => {
     setActiveTab(tab)
-    refreshData(tab, selectedPeriod, historySearch, 1)
+    refreshData(tab, selectedPeriod, historySearch, 1, pageSize)
   }
 
   const handlePeriodChange = (period: string) => {
     setSelectedPeriod(period)
-    refreshData(activeTab, period, historySearch, 1)
+    refreshData(activeTab, period, historySearch, 1, pageSize)
   }
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    refreshData(activeTab, selectedPeriod, historySearch, 1)
+    refreshData(activeTab, selectedPeriod, historySearch, 1, pageSize)
   }
 
   return (
     <div className="space-y-6 pb-12">
       {/* Header Halaman */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <HandCoins size={28} className="text-emerald-600" weight="duotone" />
-            Penyaluran Dana
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Pengelolaan & penyaluran dana hak Bendahara Pesantren, Katering, dan Laundry.
-          </p>
-        </div>
-
-        {/* Filter Periode */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+      <DashboardPageHeader
+        title="Penyaluran Dana"
+        description="Pengelolaan & penyaluran dana hak Bendahara Pesantren, Katering, dan Laundry."
+        action={
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white shadow-xs">
             <CalendarBlank size={16} className="text-slate-500" />
             <span className="text-xs text-slate-500 font-medium">Periode:</span>
@@ -125,8 +122,8 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
               ))}
             </select>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -575,35 +572,17 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
           )}
 
           {/* Pagination */}
-          {data.history.totalPages > 1 && (
-            <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <div>
-                Halaman {data.history.page} dari {data.history.totalPages}
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={data.history.page <= 1 || isPending}
-                  onClick={() =>
-                    refreshData(activeTab, selectedPeriod, historySearch, data.history.page - 1)
-                  }
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Sebelumnya
-                </button>
-                <button
-                  type="button"
-                  disabled={data.history.page >= data.history.totalPages || isPending}
-                  onClick={() =>
-                    refreshData(activeTab, selectedPeriod, historySearch, data.history.page + 1)
-                  }
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Selanjutnya
-                </button>
-              </div>
-            </div>
-          )}
+          <Pagination
+            currentPage={data.history.page}
+            totalPages={data.history.totalPages}
+            pageSize={pageSize}
+            total={data.history.totalItems}
+            onPageChange={(p) => refreshData(activeTab, selectedPeriod, historySearch, p, pageSize)}
+            onPageSizeChange={(s) => {
+              setPageSize(s)
+              refreshData(activeTab, selectedPeriod, historySearch, 1, s)
+            }}
+          />
         </div>
       )}
 
@@ -611,7 +590,12 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
       <CatatPenyaluranModal
         isOpen={!!disburseModalTarget}
         onClose={() => setDisburseModalTarget(null)}
-        onSuccess={() => refreshData()}
+        onSuccess={(newId) => {
+          refreshData()
+          if (newId) {
+            setReceiptDistributionId(newId)
+          }
+        }}
         target={disburseModalTarget}
       />
 

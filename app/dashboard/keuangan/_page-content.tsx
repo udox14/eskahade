@@ -29,10 +29,12 @@ import {
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { getDashboardData, type UserDashboardPermissions } from './actions'
 import type { FinanceDashboardData } from '@/lib/finance/dashboard'
+import type { FinanceCashSession } from '@/lib/finance/cash-session'
 
 interface DashboardKeuanganContentProps {
   initialData: FinanceDashboardData
   userPermissions: UserDashboardPermissions
+  initialCashSession?: FinanceCashSession | null
 }
 
 /**
@@ -78,9 +80,11 @@ function formatPeriodLabel(period: string): string {
 
 export default function DashboardKeuanganContent({
   initialData,
+  initialCashSession,
 }: DashboardKeuanganContentProps) {
   const [data, setData] = useState<FinanceDashboardData>(initialData)
   const [selectedPeriod, setSelectedPeriod] = useState<string>(initialData.selectedPeriod)
+  const [cashSession, setCashSession] = useState<FinanceCashSession | null>(initialCashSession ?? null)
   const [isPending, startTransition] = useTransition()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -93,6 +97,9 @@ export default function DashboardKeuanganContent({
         setErrorMessage(null)
         const res = await getDashboardData(newPeriod)
         setData(res.data)
+        if (res.activeCashSession !== undefined) {
+          setCashSession(res.activeCashSession)
+        }
       } catch (err) {
         setErrorMessage(err instanceof Error ? err.message : 'Gagal memuat data dashboard.')
       }
@@ -166,6 +173,49 @@ export default function DashboardKeuanganContent({
           {errorMessage}
         </div>
       )}
+
+      {/* Shortcut Status Sesi Kasir Operator */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className={`p-2.5 rounded-xl ${cashSession ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+            <Store className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-800">
+                {cashSession ? 'Sesi Kasir Aktif' : 'Sesi Kasir Belum Dibuka'}
+              </h3>
+              {cashSession ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                  {cashSession.session_code}
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                  Non-aktif
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {cashSession
+                ? `Dibuka ${formatDateIndo(cashSession.opened_at)} • Saldo laci saat ini: ${formatRupiah(cashSession.expected_closing_balance)}`
+                : 'Buka sesi kas di loket kasir untuk mulai melayani transaksi pembayaran tunai atau pencairan uang jajan.'}
+            </p>
+          </div>
+        </div>
+
+        <Link
+          href="/dashboard/koperasi/loket"
+          className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold shadow-2xs transition-colors ${
+            cashSession
+              ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+              : 'bg-emerald-600 text-white hover:bg-emerald-700'
+          }`}
+        >
+          <span>{cashSession ? 'Buka Loket Kasir' : 'Buka Sesi Kas'}</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
 
       {/* 2. Banner Peringatan Rekonsiliasi (Mismatch Alert) */}
       {mismatch.hasMismatch ? (

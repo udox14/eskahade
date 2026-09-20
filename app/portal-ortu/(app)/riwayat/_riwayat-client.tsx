@@ -243,7 +243,7 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
                       </div>
 
                       {/* Action Cetak Bukti untuk transaksi yang lunas */}
-                      {isPaid && item.type === 'PAYMENT' && (
+                      {isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP') && (
                         <button
                           onClick={() => setSelectedReceipt(item)}
                           className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--p-line)] bg-white px-3 py-1.5 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-50 active:scale-95 transition"

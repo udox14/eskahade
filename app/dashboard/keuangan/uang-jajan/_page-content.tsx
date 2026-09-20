@@ -55,7 +55,7 @@ export default function UangJajanContent({ initialData }: UangJajanContentProps)
   const [selectedAsrama, setSelectedAsrama] = useState<string>('ALL')
   const [selectedSaldoFilter, setSelectedSaldoFilter] = useState<'ALL' | 'BER_SALDO' | 'SALDO_KOSONG'>('ALL')
   const [currentPage, setCurrentPage] = useState<number>(1)
-  const [pageSize, setPageSize] = useState<number>(20)
+  const [pageSize, setPageSize] = useState<number>(50)
 
   // Accessible IDs
   const searchInputId = useId()

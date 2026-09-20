@@ -363,15 +363,15 @@ export default function TarifTab({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Aturan Cicilan (PRD #13)
+                  Aturan Cicilan Tagihan
                 </label>
                 {selectedItemType === 'SPP' ? (
                   <div className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2.5">
-                    <span className="font-semibold text-slate-800">Terkunci: Tidak Boleh Dicicil.</span> Sesuai PRD, SPP wajib dilunasi penuh.
+                    <span className="font-semibold text-slate-800">Terkunci: Tidak Boleh Dicicil.</span> SPP wajib dilunasi penuh per periode tagihan.
                   </div>
                 ) : selectedItemType === 'USPP' ? (
                   <div className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
-                    <span className="font-semibold">Terkunci: Boleh Dicicil.</span> Sesuai PRD, USPP selalu boleh dicicil bertahap.
+                    <span className="font-semibold">Terkunci: Boleh Dicicil.</span> USPP dapat dicicil bertahap sesuai kemampuan santri.
                   </div>
                 ) : (
                   <select

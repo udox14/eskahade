@@ -57,6 +57,34 @@ export function validatePinFormat(pin: string): void {
   }
 }
 
+const PIN_SPACE = 1_000_000
+// Domain unsigned 32-bit: [0, 2^32 - 1] di mana 2^32 = 4.294.967.296.
+// 4.294.967.296 / 1.000.000 = 4.294 dengan sisa 967.296.
+// Batas terbesar yang habis dibagi PIN_SPACE adalah 4.294 * 1.000.000 = 4.294.000.000.
+// Nilai dalam rentang [4.294.000.000, 4.294.967.295] ditolak dan diundi ulang (rejection sampling)
+// untuk mengeliminasi modulo bias secara mutlak dan menjamin distribusi seragam (uniform).
+const MAX_UNBIASED_LIMIT = Math.floor(4_294_967_296 / PIN_SPACE) * PIN_SPACE // 4_294_000_000
+
+/**
+ * Menghasilkan PIN acak 6-digit yang aman secara kriptografis (Web Crypto CSPRNG).
+ * Menggunakan rejection sampling pada domain unsigned 32-bit untuk mengeliminasi modulo bias.
+ * Range: 000000 - 999999 (distribusi seragam / uniform).
+ * Catatan: Setiap PIN dibangkitkan secara independen; kesamaan PIN antar dua santri
+ * adalah kemungkinan statistik wajar dan bukan security failure.
+ */
+export function generateRandomPin(): string {
+  const buf = new Uint32Array(1)
+  while (true) {
+    crypto.getRandomValues(buf)
+    const val = buf[0]
+    if (val < MAX_UNBIASED_LIMIT) {
+      const pinNum = val % PIN_SPACE
+      return pinNum.toString().padStart(6, '0')
+    }
+  }
+}
+
+
 /**
  * Mengambil status kredensial PIN santri (apakah sudah dibuat, sedang terkunci, dll).
  */

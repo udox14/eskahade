@@ -3,6 +3,7 @@
 import { useRef } from 'react'
 import { Printer, X, CheckCircle2 } from 'lucide-react'
 import type { PortalTransactionHistoryItem } from '@/lib/portal/finance'
+import DocumentLetterhead from '@/components/print/document-letterhead'
 
 interface ReceiptModalProps {
   item: PortalTransactionHistoryItem
@@ -40,12 +41,12 @@ export function ReceiptModal({ item, santri, onClose }: ReceiptModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs animate-in fade-in duration-200 print:p-0 print:bg-white">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden print:shadow-none print:max-w-none">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-100 overflow-hidden print:shadow-none print:max-w-none">
         {/* Action Header (Hidden saat print) */}
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3.5 print:hidden">
           <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            <span>Kuitansi Pembayaran Resmi</span>
+            <span>{item.type === 'TOPUP' ? 'Bukti Top-up Uang Jajan' : 'Kuitansi Pembayaran Resmi'}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -67,13 +68,13 @@ export function ReceiptModal({ item, santri, onClose }: ReceiptModalProps) {
         {/* Isi Dokumen Kuitansi Resmi */}
         <div ref={printRef} className="p-6 text-slate-800 text-xs space-y-4 print:p-8">
           {/* Header Pesantren */}
-          <div className="border-b-2 border-slate-900 pb-3 text-center space-y-0.5">
-            <h2 className="text-base font-black uppercase tracking-wider text-slate-950">
-              Pondok Pesantren Sukahideng
-            </h2>
-            <p className="text-[11px] text-slate-500 font-medium">
-              Sistem Informasi Keuangan Santri · Tanda Terima Pembayaran Sah
-            </p>
+          <div>
+            <DocumentLetterhead />
+            <div className="text-center -mt-2 mb-3">
+              <span className="inline-block px-2.5 py-0.5 rounded bg-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                {item.type === 'TOPUP' ? 'Bukti Pengisian Saldo Uang Jajan' : 'Tanda Terima Pembayaran Sah'}
+              </span>
+            </div>
           </div>
 
           {/* Meta Kuitansi */}
@@ -153,13 +154,13 @@ export function ReceiptModal({ item, santri, onClose }: ReceiptModalProps) {
             </div>
           </div>
 
-          {/* Footer Validasi Digital */}
+          {/* Footer Dokumen */}
           <div className="border-t border-slate-200 pt-3 text-[10px] text-slate-400 text-center space-y-0.5">
-            <p className="italic">
-              Dokumen ini diterbitkan secara otomatis oleh Sistem Keuangan Pesantren dan merupakan bukti pembayaran yang sah tanpa tanda tangan basah.
+            <p>
+              Tanda terima ini diunduh melalui Portal Orang Tua Pesantren Sukahideng.
             </p>
-            <p className="font-mono text-[9px] text-slate-300">
-              ID: {item.id} · AUTHENTICATED
+            <p className="font-mono text-[9px] text-slate-400">
+              No. Transaksi: {item.referenceNumber}
             </p>
           </div>
         </div>

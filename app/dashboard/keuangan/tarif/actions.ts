@@ -24,8 +24,10 @@ import {
 import {
   getGlobalDailyLimit,
   setGlobalDailyLimit,
+  setParentWalletLimits,
   DEFAULT_GLOBAL_DAILY_LIMIT,
 } from '@/lib/finance/wallet'
+import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
 import {
   getDuitkuV2Config,
 } from '@/lib/finance/gateway/duitku-v2'
@@ -37,6 +39,16 @@ import type {
   FinanceItemType,
   FinanceInstallmentRule,
 } from '@/lib/finance/types'
+import {
+  type LetterheadProfile,
+  type DocumentPrintConfig,
+} from '@/lib/print/letterhead'
+import {
+  getLetterheadProfiles,
+  saveLetterheadProfiles,
+  getDocumentPrintConfigs,
+  saveDocumentPrintConfigs,
+} from '@/lib/print/letterhead-server'
 
 // ─── TYPES ──────────────────────────────────────────────────────────────────
 
@@ -74,17 +86,41 @@ export interface ExemptionWithStudent {
   created_at: string
 }
 
+export type ExemptionWithDetails = ExemptionWithStudent
+
 export interface StudentWalletLimitRow {
   santri_id: string
   nis: string
   nama_lengkap: string
   asrama: string | null
   kamar: string | null
+  kelas?: string | null
   saldo_uang_jajan: number
   parent_daily_limit: number | null
   parent_weekly_limit: number | null
   parent_monthly_limit: number | null
   effective_daily_limit: number
+}
+
+export interface StudentWalletLimitsParams {
+  page?: number
+  pageSize?: number
+  search?: string
+  asrama?: string
+  kelas?: string
+}
+
+export interface StudentWalletLimitsResponse {
+  items: StudentWalletLimitRow[]
+  globalDailyLimit: number
+  pagination: {
+    currentPage: number
+    pageSize: number
+    totalItems: number
+    totalPages: number
+  }
+  asramaList: string[]
+  kelasList: string[]
 }
 
 export interface MaskedGatewaySettings {
@@ -118,7 +154,19 @@ export interface PengaturanKeuanganData {
   exemptions: ExemptionWithStudent[]
   globalDailyLimit: number
   studentLimits: StudentWalletLimitRow[]
+  studentLimitsPagination?: {
+    currentPage: number
+    pageSize: number
+    totalItems: number
+    totalPages: number
+  }
+  asramaList?: string[]
+  kelasList?: string[]
   gatewayConfig: MaskedGatewaySettings
+  printSettings: {
+    profiles: LetterheadProfile[]
+    configs: DocumentPrintConfig[]
+  }
   userPermissions: UserFinancePermissions
 }
 
@@ -197,57 +245,26 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
      ORDER BY e.created_at DESC`
   ).catch(() => [])
 
-  // 4. Limit Uang Jajan Global & Contoh Santri
+  // 4. Limit Uang Jajan Global & Dataset Terpaginasi Awal
   const globalDailyLimit = await getGlobalDailyLimit().catch(() => DEFAULT_GLOBAL_DAILY_LIMIT)
+  const initialLimitsRes = await getStudentWalletLimitsAction({
+    page: 1,
+    pageSize: DEFAULT_FINANCE_PAGE_SIZE,
+  }).catch(() => ({
+    items: [],
+    globalDailyLimit,
+    pagination: {
+      currentPage: 1,
+      pageSize: DEFAULT_FINANCE_PAGE_SIZE,
+      totalItems: 0,
+      totalPages: 1,
+    },
+    asramaList: [],
+    kelasList: [],
+  }))
 
-  const studentRows = await query<{
-    santri_id: string
-    nis: string
-    nama_lengkap: string
-    asrama: string | null
-    kamar: string | null
-    saldo_uang_jajan: number | null
-    parent_daily_limit: number | null
-    parent_weekly_limit: number | null
-    parent_monthly_limit: number | null
-  }>(
-    `SELECT
-       s.id AS santri_id,
-       s.nis,
-       s.nama_lengkap,
-       s.asrama,
-       s.kamar,
-       s.saldo_uang_jajan,
-       wl.parent_daily_limit,
-       wl.parent_weekly_limit,
-       wl.parent_monthly_limit
-     FROM santri s
-     LEFT JOIN finance_wallet_limits wl ON wl.santri_id = s.id
-     WHERE s.status_global = 'aktif'
-     ORDER BY s.nama_lengkap ASC
-     LIMIT 50`
-  ).catch(() => [])
-
-  const studentLimits: StudentWalletLimitRow[] = studentRows.map((s) => {
-    const parentDaily = s.parent_daily_limit !== null ? Number(s.parent_daily_limit) : null
-    const effectiveDaily = parentDaily !== null ? Math.min(globalDailyLimit, parentDaily) : globalDailyLimit
-
-    return {
-      santri_id: s.santri_id,
-      nis: s.nis,
-      nama_lengkap: s.nama_lengkap,
-      asrama: s.asrama,
-      kamar: s.kamar,
-      saldo_uang_jajan: Number(s.saldo_uang_jajan || 0),
-      parent_daily_limit: parentDaily,
-      parent_weekly_limit: s.parent_weekly_limit !== null ? Number(s.parent_weekly_limit) : null,
-      parent_monthly_limit: s.parent_monthly_limit !== null ? Number(s.parent_monthly_limit) : null,
-      effective_daily_limit: effectiveDaily,
-    }
-  })
-
-  // 5. Konfigurasi Gateway & Fixed VA Ter-Masking
-  const [duitkuV2, snapConfig, settingsRows, vaCountRow] = await Promise.all([
+  // 5. Konfigurasi Gateway & Fixed VA Ter-Masking + Kop/Print Settings
+  const [duitkuV2, snapConfig, settingsRows, vaCountRow, letterheadProfiles, documentPrintConfigs] = await Promise.all([
     getDuitkuV2Config().catch(() => ({
       merchantCode: '',
       apiKey: '',
@@ -277,6 +294,8 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
       )`
     ).catch(() => []),
     queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM finance_student_va`).catch(() => ({ count: 0 })),
+    getLetterheadProfiles().catch(() => []),
+    getDocumentPrintConfigs().catch(() => []),
   ])
 
   const settingsMap = new Map<string, string>()
@@ -340,8 +359,15 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
     academicYears,
     exemptions,
     globalDailyLimit,
-    studentLimits,
+    studentLimits: initialLimitsRes.items,
+    studentLimitsPagination: initialLimitsRes.pagination,
+    asramaList: initialLimitsRes.asramaList,
+    kelasList: initialLimitsRes.kelasList,
     gatewayConfig,
+    printSettings: {
+      profiles: letterheadProfiles,
+      configs: documentPrintConfigs,
+    },
     userPermissions: {
       canMutate,
       role: userRole,
@@ -479,6 +505,163 @@ export async function updateGlobalDailyLimitAction(
   }
 }
 
+/**
+ * Mengambil dataset limit uang jajan santri secara server-side dengan pagination & filter.
+ * Default pageSize = 50 (DEFAULT_FINANCE_PAGE_SIZE).
+ */
+export async function getStudentWalletLimitsAction(
+  params?: StudentWalletLimitsParams
+): Promise<StudentWalletLimitsResponse> {
+  const page = Math.max(1, params?.page || 1)
+  const pageSize = Math.max(1, Math.min(100, params?.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
+  const offset = (page - 1) * pageSize
+  const search = (params?.search || '').trim()
+  const asramaFilter = (params?.asrama || 'ALL').trim()
+  const kelasFilter = (params?.kelas || 'ALL').trim()
+
+  const globalDailyLimit = await getGlobalDailyLimit().catch(() => DEFAULT_GLOBAL_DAILY_LIMIT)
+
+  // Ambil daftar filter Asrama & Kelas unik untuk dropdown
+  const [asramaRows, kelasRows] = await Promise.all([
+    query<{ asrama: string }>(
+      `SELECT DISTINCT asrama FROM santri
+       WHERE status_global = 'aktif' AND asrama IS NOT NULL AND TRIM(asrama) != ''
+       ORDER BY asrama ASC`
+    ).catch(() => []),
+    query<{ nama_kelas: string }>(
+      `SELECT DISTINCT k.nama_kelas
+       FROM santri s
+       JOIN kelas k ON k.id = s.kelas_id
+       WHERE s.status_global = 'aktif' AND k.nama_kelas IS NOT NULL AND TRIM(k.nama_kelas) != ''
+       ORDER BY k.nama_kelas ASC`
+    ).catch(() => []),
+  ])
+
+  const asramaList = asramaRows.map(r => r.asrama)
+  const kelasList = kelasRows.map(r => r.nama_kelas)
+
+  // Filter conditions
+  const conditions: string[] = ["s.status_global = 'aktif'"]
+  const queryParams: unknown[] = []
+
+  if (search) {
+    conditions.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)')
+    queryParams.push(`%${search}%`, `%${search}%`)
+  }
+
+  if (asramaFilter && asramaFilter !== 'ALL') {
+    conditions.push('s.asrama = ?')
+    queryParams.push(asramaFilter)
+  }
+
+  if (kelasFilter && kelasFilter !== 'ALL') {
+    conditions.push('k.nama_kelas = ?')
+    queryParams.push(kelasFilter)
+  }
+
+  const whereClause = `WHERE ${conditions.join(' AND ')}`
+
+  // Hitung total data terfilter sebelum LIMIT/OFFSET
+  const countRow = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) AS total
+     FROM santri s
+     LEFT JOIN kelas k ON k.id = s.kelas_id
+     ${whereClause}`,
+    queryParams
+  )
+  const totalItems = countRow?.total ?? 0
+  const totalPages = Math.ceil(totalItems / pageSize) || 1
+
+  // Ambil data halaman dengan LIMIT/OFFSET
+  const rows = await query<{
+    santri_id: string
+    nis: string
+    nama_lengkap: string
+    asrama: string | null
+    kamar: string | null
+    kelas: string | null
+    saldo_uang_jajan: number | null
+    parent_daily_limit: number | null
+    parent_weekly_limit: number | null
+    parent_monthly_limit: number | null
+  }>(
+    `SELECT
+       s.id AS santri_id,
+       s.nis,
+       s.nama_lengkap,
+       s.asrama,
+       s.kamar,
+       k.nama_kelas AS kelas,
+       s.saldo_uang_jajan,
+       wl.parent_daily_limit,
+       wl.parent_weekly_limit,
+       wl.parent_monthly_limit
+     FROM santri s
+     LEFT JOIN finance_wallet_limits wl ON wl.santri_id = s.id
+     LEFT JOIN kelas k ON k.id = s.kelas_id
+     ${whereClause}
+     ORDER BY s.nama_lengkap ASC
+     LIMIT ? OFFSET ?`,
+    [...queryParams, pageSize, offset]
+  ).catch(() => [])
+
+  const items: StudentWalletLimitRow[] = rows.map((s) => {
+    const parentDaily = s.parent_daily_limit !== null ? Number(s.parent_daily_limit) : null
+    const effectiveDaily = parentDaily !== null ? Math.min(globalDailyLimit, parentDaily) : globalDailyLimit
+
+    return {
+      santri_id: s.santri_id,
+      nis: s.nis,
+      nama_lengkap: s.nama_lengkap,
+      asrama: s.asrama,
+      kamar: s.kamar,
+      kelas: s.kelas || null,
+      saldo_uang_jajan: Number(s.saldo_uang_jajan || 0),
+      parent_daily_limit: parentDaily,
+      parent_weekly_limit: s.parent_weekly_limit !== null ? Number(s.parent_weekly_limit) : null,
+      parent_monthly_limit: s.parent_monthly_limit !== null ? Number(s.parent_monthly_limit) : null,
+      effective_daily_limit: effectiveDaily,
+    }
+  })
+
+  return {
+    items,
+    globalDailyLimit,
+    pagination: {
+      currentPage: page,
+      pageSize,
+      totalItems,
+      totalPages,
+    },
+    asramaList,
+    kelasList,
+  }
+}
+
+/**
+ * Server action: Mengatur/memperbarui limit harian orang tua untuk santri individual.
+ */
+export async function updateStudentParentLimitAction(
+  santriId: string,
+  dailyLimit: number | null
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { userId } = await assertMutationPermission()
+
+    if (dailyLimit !== null && (dailyLimit < 0 || !Number.isFinite(dailyLimit))) {
+      return { success: false, error: 'Limit harian orang tua tidak boleh bernilai negatif.' }
+    }
+
+    await setParentWalletLimits(santriId, { daily: dailyLimit }, userId)
+
+    revalidatePath('/dashboard/keuangan/tarif')
+    return { success: true }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { success: false, error: message }
+  }
+}
+
 // ─── SERVER ACTIONS: PAYMENT GATEWAY DUITKU & SETTLEMENT ───────────────────
 
 export async function saveGatewaySettingsAction(
@@ -577,4 +760,32 @@ export async function searchActiveStudents(
      LIMIT 20`,
     [term, term]
   ).catch(() => [])
+}
+
+// ─── KOP SURAT & PRINT CONFIG SERVER ACTIONS ────────────────────────────────
+
+export async function saveLetterheadProfilesAction(
+  profiles: LetterheadProfile[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await assertMutationPermission()
+    await saveLetterheadProfiles(profiles)
+    revalidatePath('/dashboard/keuangan/tarif')
+    return { success: true }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export async function saveDocumentPrintConfigsAction(
+  configs: DocumentPrintConfig[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await assertMutationPermission()
+    await saveDocumentPrintConfigs(configs)
+    revalidatePath('/dashboard/keuangan/tarif')
+    return { success: true }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
 }

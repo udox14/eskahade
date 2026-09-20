@@ -16,6 +16,7 @@ interface PosStudentCardProps {
   student: StudentLoketProfile
   onReset: () => void
   onPromptPin: () => void
+  onOpenPinModal?: () => void
   isPinVerified: boolean
 }
 
@@ -23,8 +24,10 @@ export default function PosStudentCard({
   student,
   onReset,
   onPromptPin,
+  onOpenPinModal,
   isPinVerified,
 }: PosStudentCardProps) {
+
   const isCardActive = student.card?.status === 'ACTIVE'
   const isCardBlocked = student.card?.status === 'BLOCKED'
   const isCardLost = student.card?.status === 'LOST'
@@ -167,8 +170,8 @@ export default function PosStudentCard({
             </span>
           </div>
 
-          {/* Action Bar PIN Verifikasi */}
-          <div className="pt-2 flex items-center justify-center md:justify-start gap-3 border-t border-slate-100">
+          {/* Action Bar PIN Verifikasi & Manajemen PIN */}
+          <div className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-2.5 border-t border-slate-100">
             {isPinVerified ? (
               <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium bg-emerald-50/70 px-3 py-1.5 rounded-lg border border-emerald-200">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -191,9 +194,23 @@ export default function PosStudentCard({
                 </span>
               </button>
             )}
+
+            {/* Tombol Kelola / Ubah / Reset PIN */}
+            {onOpenPinModal && (
+              <button
+                type="button"
+                onClick={onOpenPinModal}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                title="Santri ubah PIN mandiri atau reset PIN darurat oleh petugas"
+              >
+                <KeyRound className="w-3.5 h-3.5 text-slate-600" />
+                <span>Ubah / Reset PIN</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
     </div>
   )
 }
+

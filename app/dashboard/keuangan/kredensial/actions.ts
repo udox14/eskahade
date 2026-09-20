@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne, execute, generateId, now } from '@/lib/db'
 import { getSession, getEffectiveRoles } from '@/lib/auth/session'
 import {
   issueCard,
@@ -8,6 +8,7 @@ import {
   reportLostCard,
   blockCard,
   unblockCard,
+  generateCardToken,
   type CardStatus,
   type FinanceCredential,
 } from '@/lib/finance/cards'
@@ -15,10 +16,69 @@ import {
   setStudentPin,
   resetStudentPin,
   unlockStudentPin,
+  generateRandomPin,
 } from '@/lib/finance/pins'
+import { hashPassword } from '@/lib/auth/password'
 import { generateQrSvg } from '@/lib/finance/qr'
 
+export interface BulkCandidateScope {
+  type: 'ALL_UNISSUED' | 'BY_ASRAMA' | 'FILTERED' | 'SELECTED_IDS'
+  asrama?: string
+  search?: string
+  santriIds?: string[]
+}
+
+export interface BulkCandidatesSummary {
+  totalCandidates: number
+  eligibleCount: number
+  alreadyActiveCount: number
+  candidateIds: string[]
+  skippedSample: Array<{ namaLengkap: string; nis: string; asrama: string | null }>
+}
+
+export interface BatchChunkItemResult {
+  santriId: string
+  namaLengkap: string
+  nis: string
+  asrama: string | null
+  kamar: string | null
+  status: 'SUCCESS' | 'SKIPPED' | 'FAILED' | 'ISSUED_PIN_NOT_RETRIEVABLE'
+  reason?: string
+  cardToken?: string
+  initialPin?: string
+}
+
+export interface BatchChunkResult {
+  success: boolean
+  processedCount: number
+  successCount: number
+  skippedCount: number
+  issuedPinNotRetrievableCount: number
+  failedCount: number
+  items: BatchChunkItemResult[]
+}
+
+export interface RecoverPinChunkItemResult {
+  santriId: string
+  namaLengkap: string
+  nis: string
+  asrama: string | null
+  kamar: string | null
+  status: 'SUCCESS' | 'FAILED'
+  newPin?: string
+  reason?: string
+}
+
+export interface RecoverPinChunkResult {
+  success: boolean
+  processedCount: number
+  successCount: number
+  failedCount: number
+  items: RecoverPinChunkItemResult[]
+}
+
 export interface StudentCredentialRow {
+
   id: string
   nis: string
   namaLengkap: string
@@ -135,7 +195,7 @@ export async function getKredensialData(
   const cardStatusFilter = params.cardStatusFilter || 'ALL'
   const pinStatusFilter = params.pinStatusFilter || 'ALL'
   const page = Math.max(1, params.page || 1)
-  const pageSize = Math.max(1, Math.min(100, params.pageSize || 20))
+  const pageSize = Math.max(1, Math.min(100, params.pageSize || 50))
   const offset = (page - 1) * pageSize
 
   // 1. KPI Global
@@ -504,3 +564,390 @@ export async function getCardsForBatchPrint(
     }),
   }))
 }
+
+/**
+ * Mengambil ringkasan kandidat untuk penerbitan kartu massal.
+ */
+export async function getBulkIssuanceCandidatesAction(
+  scope: BulkCandidateScope
+): Promise<BulkCandidatesSummary> {
+  await authorizeUser()
+
+  const conditions: string[] = ["s.status_global = 'aktif'"]
+  const params: unknown[] = []
+
+  if (scope.type === 'BY_ASRAMA' && scope.asrama && scope.asrama !== 'ALL') {
+    conditions.push('s.asrama = ?')
+    params.push(scope.asrama)
+  } else if (scope.type === 'FILTERED') {
+    if (scope.search && scope.search.trim()) {
+      conditions.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)')
+      params.push(`%${scope.search.trim()}%`, `%${scope.search.trim()}%`)
+    }
+    if (scope.asrama && scope.asrama !== 'ALL') {
+      conditions.push('s.asrama = ?')
+      params.push(scope.asrama)
+    }
+  } else if (scope.type === 'SELECTED_IDS' && scope.santriIds && scope.santriIds.length > 0) {
+    const placeholders = scope.santriIds.map(() => '?').join(', ')
+    conditions.push(`s.id IN (${placeholders})`)
+    params.push(...scope.santriIds)
+  }
+
+  const rows = await query<{
+    id: string
+    nama_lengkap: string
+    nis: string
+    asrama: string | null
+    active_card_id: string | null
+  }>(
+    `SELECT
+       s.id,
+       s.nama_lengkap,
+       s.nis,
+       s.asrama,
+       c.id AS active_card_id
+     FROM santri s
+     LEFT JOIN (
+       SELECT id, santri_id FROM finance_credentials WHERE status = 'ACTIVE'
+     ) c ON c.santri_id = s.id
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY s.asrama ASC, s.nama_lengkap ASC`,
+    params
+  )
+
+  const eligible = rows.filter((r) => !r.active_card_id)
+  const alreadyActive = rows.filter((r) => Boolean(r.active_card_id))
+
+  return {
+    totalCandidates: rows.length,
+    eligibleCount: eligible.length,
+    alreadyActiveCount: alreadyActive.length,
+    candidateIds: eligible.map((r) => r.id),
+    skippedSample: alreadyActive.slice(0, 10).map((r) => ({
+      namaLengkap: r.nama_lengkap,
+      nis: r.nis,
+      asrama: r.asrama,
+    })),
+  }
+}
+
+/**
+ * Server action: Menerbitkan batch kartu santri per chunk (maksimum 50 santri per chunk).
+ * Menjamin:
+ * 1. Santri yang SUDAH memiliki kartu ACTIVE otomatis di-SKIP (tidak merusak kartu existing).
+ * 2. Santri yang BELUM punya PIN di-generate-kan PIN acak 6-digit baru (di-hash PBKDF2).
+ *    Plaintext PIN dikembalikan SEKALI dalam respons untuk cetak slip PIN, tidak pernah disimpan di DB.
+ * 3. Santri yang SUDAH punya PIN dipertahankan PIN-nya (zero reset).
+ * 4. Invariant tepat 1 kartu ACTIVE per santri ditegakkan.
+ */
+export async function issueCardBatchChunkAction(
+  santriIds: string[]
+): Promise<BatchChunkResult> {
+  const auth = await authorizeUser()
+  if (!auth.canMutate) {
+    throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')
+  }
+
+  // Batasi chunk maksimal 50 santri
+  const chunk = santriIds.slice(0, 50)
+  const items: BatchChunkItemResult[] = []
+  let successCount = 0
+  let skippedCount = 0
+  let issuedPinNotRetrievableCount = 0
+  let failedCount = 0
+
+  for (const santriId of chunk) {
+    try {
+      const student = await queryOne<{
+        id: string
+        status_global: string
+        nama_lengkap: string
+        nis: string
+        asrama: string | null
+        kamar: string | null
+      }>(
+        `SELECT id, status_global, nama_lengkap, nis, asrama, kamar FROM santri WHERE id = ?`,
+        [santriId]
+      )
+
+      if (!student) {
+        items.push({
+          santriId,
+          namaLengkap: 'Tidak Ditemukan',
+          nis: '-',
+          asrama: null,
+          kamar: null,
+          status: 'FAILED',
+          reason: 'Santri tidak ditemukan di database.',
+        })
+        failedCount++
+        continue
+      }
+
+      if (student.status_global !== 'aktif') {
+        items.push({
+          santriId,
+          namaLengkap: student.nama_lengkap,
+          nis: student.nis,
+          asrama: student.asrama,
+          kamar: student.kamar,
+          status: 'SKIPPED',
+          reason: `Santri berstatus "${student.status_global}" (tidak aktif).`,
+        })
+        skippedCount++
+        continue
+      }
+
+      // Cek apakah sudah ada kartu ACTIVE
+      const existingActiveCard = await queryOne<{ id: string; card_token: string }>(
+        `SELECT id, card_token FROM finance_credentials WHERE santri_id = ? AND status = 'ACTIVE' LIMIT 1`,
+        [santriId]
+      )
+
+      if (existingActiveCard) {
+        // Cek apakah santri sudah memiliki PIN terdaftar di database
+        const existingPin = await queryOne<{ santri_id: string }>(
+          `SELECT santri_id FROM finance_student_pins WHERE santri_id = ? LIMIT 1`,
+          [santriId]
+        )
+
+        if (existingPin) {
+          // Kartu sudah aktif dan PIN sudah ada (hash), namun plaintext PIN tidak dapat diambil kembali
+          // (misal karena response hilang/timeout saat chunk commit lalu operator retry).
+          items.push({
+            santriId,
+            namaLengkap: student.nama_lengkap,
+            nis: student.nis,
+            asrama: student.asrama,
+            kamar: student.kamar,
+            cardToken: existingActiveCard.card_token,
+            status: 'ISSUED_PIN_NOT_RETRIEVABLE',
+            reason: 'Kartu sudah diterbitkan, tetapi PIN awal tidak dapat ditampilkan kembali. Reset PIN untuk membuat PIN baru.',
+          })
+          issuedPinNotRetrievableCount++
+        } else {
+          items.push({
+            santriId,
+            namaLengkap: student.nama_lengkap,
+            nis: student.nis,
+            asrama: student.asrama,
+            kamar: student.kamar,
+            cardToken: existingActiveCard.card_token,
+            status: 'SKIPPED',
+            reason: 'Sudah memiliki kartu ACTIVE.',
+          })
+          skippedCount++
+        }
+        continue
+      }
+
+      // Cek apakah santri sudah memiliki PIN terdaftar
+      const existingPinRecord = await queryOne<{ santri_id: string }>(
+        `SELECT santri_id FROM finance_student_pins WHERE santri_id = ? LIMIT 1`,
+        [santriId]
+      )
+
+      let generatedPlaintextPin: string | undefined = undefined
+
+      if (!existingPinRecord) {
+        // Santri belum punya PIN -> buat PIN acak 6-digit baru yang aman (unbiased rejection sampling)
+        const randomPin = generateRandomPin()
+        const pinHash = await hashPassword(randomPin)
+        const ts = now()
+        const logId = generateId()
+
+        // Simpan hash PIN (database HANYA menyimpan hash)
+        await execute(
+          `INSERT INTO finance_student_pins (
+             santri_id, pin_hash, failed_attempts, locked_until, updated_at, updated_by
+           ) VALUES (?, ?, 0, NULL, ?, ?)`,
+          [santriId, pinHash, ts, auth.userId]
+        )
+
+        // Catat audit trail
+        await execute(
+          `INSERT INTO finance_pin_audit_logs (
+             id, santri_id, action, performed_by, reason, created_at
+           ) VALUES (?, ?, 'SET', ?, 'Inisialisasi PIN awal via penerbitan kartu massal', ?)`,
+          [logId, santriId, auth.userId, ts]
+        )
+
+        generatedPlaintextPin = randomPin
+      }
+      // Jika santri sudah punya PIN, PERTAHANKAN PIN LAMA (tidak diubah)
+
+      // Terbitkan kartu ACTIVE baru dengan token acak crd_<24_hex>
+      const newCardId = generateId()
+      const cardToken = generateCardToken()
+      const ts = now()
+
+      await execute(
+        `INSERT INTO finance_credentials (
+           id, santri_id, card_token, status, issued_at,
+           issued_by, created_at, updated_at
+         ) VALUES (?, ?, ?, 'ACTIVE', ?, ?, ?, ?)`,
+        [newCardId, santriId, cardToken, ts, auth.userId, ts, ts]
+      )
+
+      items.push({
+        santriId,
+        namaLengkap: student.nama_lengkap,
+        nis: student.nis,
+        asrama: student.asrama,
+        kamar: student.kamar,
+        status: 'SUCCESS',
+        cardToken,
+        initialPin: generatedPlaintextPin,
+      })
+      successCount++
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      items.push({
+        santriId,
+        namaLengkap: '-',
+        nis: '-',
+        asrama: null,
+        kamar: null,
+        status: 'FAILED',
+        reason: errMsg,
+      })
+      failedCount++
+    }
+  }
+
+  return {
+    success: failedCount === 0,
+    processedCount: chunk.length,
+    successCount,
+    skippedCount,
+    issuedPinNotRetrievableCount,
+    failedCount,
+    items,
+  }
+}
+
+/**
+ * Server action: Recovery PIN santri terdampak (response lost / retry penerbitan massal).
+ * Menjamin:
+ * 1. Otorisasi server-side: hanya role yang berwenang mutasi.
+ * 2. Batas chunking maksimal 50 santri.
+ * 3. Generate PIN baru 6 digit numerik acak independen (unbiased rejection sampling).
+ * 4. Replace hash lama PBKDF2 di finance_student_pins, reset failed_attempts = 0, locked_until = NULL.
+ * 5. Audit log mutlak per santri dengan action = 'RESET', performer = userId, dan keterangan recovery.
+ * 6. Mengembalikan plaintext PIN baru SEKALI dalam response chunk untuk dapat langsung dicetak.
+ * 7. Tidak menyimpan plaintext PIN di database maupun server logs.
+ */
+export async function recoverStudentPinsBatchChunkAction(
+  santriIds: string[],
+  reason?: string
+): Promise<RecoverPinChunkResult> {
+  const auth = await authorizeUser()
+  if (!auth.canMutate) {
+    throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')
+  }
+
+  const chunk = santriIds.slice(0, 50)
+  const items: RecoverPinChunkItemResult[] = []
+  let successCount = 0
+  let failedCount = 0
+  const auditReason = reason?.trim() || 'Reset PIN darurat (Recovery response-lost penerbitan kartu massal)'
+
+  for (const santriId of chunk) {
+    try {
+      const student = await queryOne<{
+        id: string
+        status_global: string
+        nama_lengkap: string
+        nis: string
+        asrama: string | null
+        kamar: string | null
+      }>(
+        `SELECT id, status_global, nama_lengkap, nis, asrama, kamar FROM santri WHERE id = ?`,
+        [santriId]
+      )
+
+      if (!student) {
+        items.push({
+          santriId,
+          namaLengkap: 'Tidak Ditemukan',
+          nis: '-',
+          asrama: null,
+          kamar: null,
+          status: 'FAILED',
+          reason: 'Santri tidak ditemukan di database.',
+        })
+        failedCount++
+        continue
+      }
+
+      // Generate PIN acak baru 6 digit dengan rejection sampling
+      const newPin = generateRandomPin()
+      const pinHash = await hashPassword(newPin)
+      const ts = now()
+      const logId = generateId()
+
+      // Update hash PIN di finance_student_pins (atau insert jika belum ada)
+      const existingPin = await queryOne<{ santri_id: string }>(
+        `SELECT santri_id FROM finance_student_pins WHERE santri_id = ? LIMIT 1`,
+        [santriId]
+      )
+
+      if (existingPin) {
+        await execute(
+          `UPDATE finance_student_pins
+           SET pin_hash = ?, failed_attempts = 0, locked_until = NULL, updated_at = ?, updated_by = ?
+           WHERE santri_id = ?`,
+          [pinHash, ts, auth.userId, santriId]
+        )
+      } else {
+        await execute(
+          `INSERT INTO finance_student_pins (
+             santri_id, pin_hash, failed_attempts, locked_until, updated_at, updated_by
+           ) VALUES (?, ?, 0, NULL, ?, ?)`,
+          [santriId, pinHash, ts, auth.userId]
+        )
+      }
+
+      // Audit trail mutlak dengan action 'RESET'
+      await execute(
+        `INSERT INTO finance_pin_audit_logs (
+           id, santri_id, action, performed_by, reason, created_at
+         ) VALUES (?, ?, 'RESET', ?, ?, ?)`,
+        [logId, santriId, auth.userId, auditReason, ts]
+      )
+
+      items.push({
+        santriId,
+        namaLengkap: student.nama_lengkap,
+        nis: student.nis,
+        asrama: student.asrama,
+        kamar: student.kamar,
+        status: 'SUCCESS',
+        newPin,
+      })
+      successCount++
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      items.push({
+        santriId,
+        namaLengkap: '-',
+        nis: '-',
+        asrama: null,
+        kamar: null,
+        status: 'FAILED',
+        reason: errMsg,
+      })
+      failedCount++
+    }
+  }
+
+  return {
+    success: failedCount === 0,
+    processedCount: chunk.length,
+    successCount,
+    failedCount,
+    items,
+  }
+}
+

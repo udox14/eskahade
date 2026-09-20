@@ -22,7 +22,7 @@ export default async function UangJajanPage() {
   // 2. Ambil dataset awal
   const initialData = await getUangJajanData({
     page: 1,
-    pageSize: 20,
+    pageSize: 50,
   })
 
   return <UangJajanContent initialData={initialData} />

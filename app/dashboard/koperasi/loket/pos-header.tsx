@@ -8,7 +8,6 @@ import {
   Lock,
   PlusCircle,
   Receipt,
-  Coins,
 } from 'lucide-react'
 import type { FinanceCashSession, CashSessionTransactionSummary } from '@/lib/finance/cash-session'
 
@@ -37,15 +36,11 @@ export default function PosHeader({
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         {/* Sisi Kiri: Judul Loket & Status Operator */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
-            <Coins className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base font-bold text-slate-900 leading-tight">
-                Loket Kasir Koperasi
-              </h1>
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-tight">
+              Loket Kasir Koperasi
+            </h1>
               {isViewOnly && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
                   <ShieldCheck className="w-3 h-3" />
@@ -72,7 +67,6 @@ export default function PosHeader({
               </span>
             </div>
           </div>
-        </div>
 
         {/* Sisi Kanan: Status Sesi Kas & Aksi */}
         <div className="flex items-center flex-wrap gap-2 sm:gap-3">

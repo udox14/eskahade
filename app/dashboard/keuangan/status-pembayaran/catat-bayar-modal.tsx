@@ -12,6 +12,7 @@ import {
   Loader2,
   Check,
 } from 'lucide-react'
+import DocumentLetterhead from '@/components/print/document-letterhead'
 import {
   searchStudentsForPayment,
   getUnpaidObligationsForCashPayment,
@@ -892,25 +893,22 @@ export function CatatPembayaranModal({
                 className="p-6 border border-slate-300 rounded-2xl bg-white text-slate-900 space-y-4 shadow-sm font-sans"
               >
                 {/* Receipt Header */}
-                <div className="border-b-2 border-slate-900 pb-3 flex justify-between items-start">
-                  <div>
-                    <h2 className="text-base font-black tracking-tight uppercase text-slate-900">
-                      Pondok Pesantren Syaichona Moh. Cholil
-                    </h2>
-                    <p className="text-[11px] text-slate-600">
-                      Jl. KH. Moh. Cholil No. 1, Demangan, Bangkalan, Madura
-                    </p>
-                    <p className="text-[10px] text-slate-400 font-medium">
-                      Sistem Informasi Keuangan Santri (ESKAHADE)
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black uppercase rounded">
-                      LUNAS - TUNAI
-                    </span>
-                    <p className="text-[11px] font-mono font-bold text-slate-800 mt-1">
-                      {receiptResult.paymentNumber}
-                    </p>
+                <div>
+                  <DocumentLetterhead />
+                  <div className="flex justify-between items-center -mt-2 pb-3 border-b border-slate-200">
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                        Bukti Pembayaran Tunai (Kuitansi)
+                      </span>
+                    </div>
+                    <div className="text-right flex items-center gap-2">
+                      <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black uppercase rounded">
+                        LUNAS - TUNAI
+                      </span>
+                      <span className="text-[11px] font-mono font-bold text-slate-800">
+                        {receiptResult.paymentNumber}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
