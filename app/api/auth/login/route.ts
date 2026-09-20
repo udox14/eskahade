@@ -55,13 +55,18 @@ export async function POST(request: NextRequest) {
         status: 'failed',
         requestInfo,
       })
-      return NextResponse.json(
+      const failResponse = NextResponse.json(
         { error: 'Email atau Password salah.' },
         { status: 401 }
       )
+      failResponse.cookies.delete(SESSION_COOKIE)
+      return failResponse
     }
 
-    const valid = await verifyPassword(password, user.password_hash)
+    let valid = await verifyPassword(password, user.password_hash)
+    if (!valid && password.trim() !== password) {
+      valid = await verifyPassword(password.trim(), user.password_hash)
+    }
     if (!valid) {
       await logActivity({
         actor: { id: user.id, name: user.full_name, email: user.email },
@@ -75,10 +80,12 @@ export async function POST(request: NextRequest) {
         status: 'failed',
         requestInfo,
       })
-      return NextResponse.json(
+      const failResponse = NextResponse.json(
         { error: 'Email atau Password salah.' },
         { status: 401 }
       )
+      failResponse.cookies.delete(SESSION_COOKIE)
+      return failResponse
     }
 
     let rolesArray: string[] = []

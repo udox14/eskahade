@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { execute, queryOne } from '@/lib/db'
 import { hashPassword, verifyPassword } from '@/lib/auth/password'
-import { createPortalToken, portalCookieOptions } from '@/lib/portal/session'
-import { logActivity } from '@/lib/activity-log'
+import { createPortalToken, portalCookieOptions, PORTAL_COOKIE } from '@/lib/portal/session'
+import { logActivity } from '@/lib/activity-log'
 
 // Password default saat kredensial belum pernah dibuat: NIS itu sendiri,
 // atau tanggal lahir format DDMMYYYY (santri.tanggal_lahir = 'YYYY-MM-DD').
@@ -75,7 +75,9 @@ export async function POST(request: NextRequest) {
         status: 'failed',
         requestInfo,
       })
-      return NextResponse.json({ error: 'NIS atau password salah.' }, { status: 401 })
+      const failResponse = NextResponse.json({ error: 'NIS atau password salah.' }, { status: 401 })
+      failResponse.cookies.delete(PORTAL_COOKIE)
+      return failResponse
     }
 
     if (!santri) return fail('santri_not_found')

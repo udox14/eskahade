@@ -2,7 +2,7 @@
 
 import { queryOne } from '@/lib/db'
 import { verifyPassword } from '@/lib/auth/password'
-import { ensureUserStructuralJabatanColumn, setSession } from '@/lib/auth/session'
+import { ensureUserStructuralJabatanColumn, setSession, clearSession } from '@/lib/auth/session'
 import { getRequestAuditContext, logActivity } from '@/lib/activity-log'
 import { redirect } from 'next/navigation'
 
@@ -35,14 +35,13 @@ export async function login(formData: FormData) {
       'SELECT id, email, password_hash, full_name, role, roles, asrama_binaan, structural_jabatan FROM users WHERE email = ?',
       [normalizedEmail]
     )
-    console.log('[LOGIN] Step 2: user found=', !!user, 'role=', user?.role)
   } catch (err: any) {
-    console.error('[LOGIN] Step 2 ERROR:', err?.message)
+    console.error('[LOGIN] Database query error:', err?.message)
     return { error: 'Gagal terhubung ke database. Coba lagi nanti.' }
   }
 
   if (!user) {
-    console.log('[LOGIN] Step 2: user NOT FOUND')
+    await clearSession().catch(() => {})
     await logActivity({
       actor: { email: normalizedEmail },
       module: 'auth',
@@ -59,15 +58,17 @@ export async function login(formData: FormData) {
 
   let valid = false
   try {
-    console.log('[LOGIN] Step 3: hash preview=', user.password_hash?.substring(0, 10))
     valid = await verifyPassword(password, user.password_hash)
-    console.log('[LOGIN] Step 3: password valid=', valid)
+    if (!valid && password.trim() !== password) {
+      valid = await verifyPassword(password.trim(), user.password_hash)
+    }
   } catch (err: any) {
-    console.error('[LOGIN] Step 3 ERROR:', err?.message)
+    console.error('[LOGIN] Password verification error:', err?.message)
     return { error: 'Terjadi kesalahan saat verifikasi. Coba lagi.' }
   }
 
   if (!valid) {
+    await clearSession().catch(() => {})
     await logActivity({
       actor: { id: user.id, name: user.full_name, email: user.email, roles: [user.role] },
       module: 'auth',
