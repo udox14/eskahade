@@ -942,6 +942,14 @@ export async function syncLegacyPaymentReversal(
         amount: a.amount,
       })),
     })
+  } else {
+    // Pembayaran unallocated (misal duplicate payment yang masuk rekonsiliasi tanpa alokasi)
+    await query(
+      `UPDATE finance_payments
+       SET correction_status = 'FULLY_CORRECTED'
+       WHERE id = ?`,
+      [payment.id]
+    )
   }
 
   // 3. Batalkan rekonsiliasi yang belum terselesaikan untuk pembayaran ini
