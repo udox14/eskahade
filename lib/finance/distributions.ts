@@ -21,9 +21,16 @@ import type {
   CreateProviderAccountInput,
   UpdateProviderAccountInput,
   DistributionDetailWithItems,
+  ProviderOperationalDetailRow,
+  ProviderOperationalDetailResult,
+  ProviderOperationalDetailParams,
+  ProviderAccountTemplatePayload,
+  ValidatedImportAccountRow,
+  ProviderOperationalPaymentStatus,
 } from '@/lib/finance/distribution-types'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
 import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
+import { getActiveTariff } from '@/lib/finance/tariffs'
 
 export const BENDAHARA_ITEM_TYPES: FinanceItemType[] = [
   'SPP',
@@ -59,6 +66,25 @@ export function normalizeObligationPeriod(itemType: string, periodInput: string)
 }
 
 /**
+ * Memeriksa apakah periode memenuhi syarat untuk fallback assignment santri aktif:
+ * - Hanya periode berjalan (current) atau periode mendatang (future) yang diizinkan.
+ * - Periode historis masa lalu TIDAK BOLEH merekonstruksi provider dari assignment santri hari ini.
+ */
+export function isPeriodEligibleForCurrentAssignment(
+  period: string,
+  overrideDate?: string
+): boolean {
+  const d = overrideDate ? new Date(overrideDate) : new Date()
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+  })
+  const currentPeriod = formatter.format(d)
+  return period >= currentPeriod
+}
+
+/**
  * Mengambil ringkasan KPI Penyaluran (Dana Masuk, Disalurkan, Siap Disalurkan, dan Santri).
  */
 export async function getDistributionSummary(
@@ -66,52 +92,129 @@ export async function getDistributionSummary(
   period: string,
   providerId?: string | null
 ): Promise<DistributionKpiSummary> {
-  let itemTypes: string[] = []
   if (recipientType === 'BENDAHARA') {
-    itemTypes = BENDAHARA_ITEM_TYPES
-  } else if (recipientType === 'KATERING') {
-    itemTypes = ['UANG_MAKAN']
-  } else if (recipientType === 'LAUNDRY') {
-    itemTypes = ['UANG_NYUCI']
-  }
-
-  const inPlaceholders = itemTypes.map(() => '?').join(', ')
-  const params: unknown[] = [...itemTypes]
-
-  // Filter provider jika katering/laundry
-  let providerFilter = ''
-  if (recipientType !== 'BENDAHARA' && providerId) {
-    providerFilter = 'AND a.provider_id = ?'
-    params.push(providerId)
-  } else if (recipientType === 'BENDAHARA') {
-    providerFilter = 'AND a.provider_id IS NULL'
-  }
-
-  // Filter periode dinamis per item
-  let periodCondition = ''
-  if (recipientType === 'BENDAHARA') {
+    const itemTypes = BENDAHARA_ITEM_TYPES
+    const inPlaceholders = itemTypes.map(() => '?').join(', ')
     const yearPrefix = period.slice(0, 4)
-    periodCondition = `
-      AND (
-        (a.item_type = 'SPP' AND o.period = ?)
-        OR (a.item_type IN ('EHB', 'EKSKUL', 'KESEHATAN') AND o.period = ?)
-        OR (a.item_type = 'USPP' AND o.period = 'LIFETIME')
-      )
-    `
-    params.push(period, yearPrefix)
-  } else {
-    periodCondition = 'AND o.period = ?'
-    params.push(period)
+
+    // Agregasi dana bendahara net correction
+    const fundAgg = await queryOne<{
+      total_amount: number
+      total_disbursed: number
+    }>(
+      `
+      SELECT
+        COALESCE(SUM(
+          a.amount - COALESCE((SELECT SUM(fci.amount) FROM finance_correction_items fci WHERE fci.target_allocation_id = a.id), 0)
+        ), 0) AS total_amount,
+        COALESCE(SUM(
+          (SELECT COALESCE(SUM(di.amount), 0)
+           FROM finance_distribution_items di
+           WHERE di.allocation_id = a.id)
+        ), 0) AS total_disbursed
+      FROM finance_allocations a
+      JOIN finance_obligations o ON a.obligation_id = o.id
+      WHERE a.target_type = 'OBLIGATION'
+        AND a.item_type IN (${inPlaceholders})
+        AND a.provider_id IS NULL
+        AND (
+          (a.item_type = 'SPP' AND o.period = ?)
+          OR (a.item_type IN ('EHB', 'EKSKUL', 'KESEHATAN') AND o.period = ?)
+          OR (a.item_type = 'USPP' AND o.period = 'LIFETIME')
+        )
+      `,
+      [...itemTypes, period, yearPrefix]
+    )
+
+    const totalDanaMasuk = fundAgg?.total_amount ?? 0
+    const totalSudahDisalurkan = fundAgg?.total_disbursed ?? 0
+    const totalSiapDisalurkan = Math.max(0, totalDanaMasuk - totalSudahDisalurkan)
+
+    const santriAgg = await queryOne<{
+      total_santri: number
+      sudah_bayar: number
+      bebas: number
+    }>(
+      `
+      SELECT
+        COUNT(DISTINCT o.santri_id) AS total_santri,
+        COUNT(DISTINCT CASE 
+          WHEN (o.amount_expected - o.amount_exempted) <= (
+            CASE 
+              WHEN (COALESCE(alloc.gross_paid, 0) - COALESCE(corr.total_corr, 0)) > 0 
+              THEN (COALESCE(alloc.gross_paid, 0) - COALESCE(corr.total_corr, 0)) 
+              ELSE 0 
+            END
+          ) AND (COALESCE(alloc.gross_paid, 0) - COALESCE(corr.total_corr, 0)) > 0 
+          THEN o.santri_id 
+        END) AS sudah_bayar,
+        COUNT(DISTINCT CASE 
+          WHEN o.amount_exempted >= o.amount_expected 
+           AND (COALESCE(alloc.gross_paid, 0) - COALESCE(corr.total_corr, 0)) <= 0 
+          THEN o.santri_id 
+        END) AS bebas
+      FROM finance_obligations o
+      LEFT JOIN (
+        SELECT fa.obligation_id, SUM(fa.amount) AS gross_paid
+        FROM finance_allocations fa
+        JOIN finance_payments fp ON fp.id = fa.payment_id
+        WHERE fa.obligation_id IS NOT NULL AND fp.status IN ('PAID', 'SETTLED')
+        GROUP BY fa.obligation_id
+      ) alloc ON alloc.obligation_id = o.id
+      LEFT JOIN (
+        SELECT fci.obligation_id, SUM(fci.amount) AS total_corr
+        FROM finance_correction_items fci
+        WHERE fci.obligation_id IS NOT NULL
+        GROUP BY fci.obligation_id
+      ) corr ON corr.obligation_id = o.id
+      WHERE o.item_type IN (${inPlaceholders})
+        AND o.provider_id IS NULL
+        AND (
+          (o.item_type = 'SPP' AND o.period = ?)
+          OR (o.item_type IN ('EHB', 'EKSKUL', 'KESEHATAN') AND o.period = ?)
+          OR (o.item_type = 'USPP' AND o.period = 'LIFETIME')
+        )
+      `,
+      [...itemTypes, period, yearPrefix]
+    )
+
+    const totalSantriTerdaftar = santriAgg?.total_santri ?? 0
+    const totalSantriSudahBayar = santriAgg?.sudah_bayar ?? 0
+    const totalSantriBebas = santriAgg?.bebas ?? 0
+    const totalSantriBelumBayar = Math.max(0, totalSantriTerdaftar - totalSantriSudahBayar - totalSantriBebas)
+
+    return {
+      totalDanaMasuk,
+      totalSudahDisalurkan,
+      totalSiapDisalurkan,
+      totalSantriTerdaftar,
+      totalSantriSudahBayar,
+      totalSantriBelumBayar,
+      totalSantriBebas,
+    }
   }
 
-  // 1. Agregasi Dana Alokasi & Penyaluran
+  // KATERING atau LAUNDRY (Authoritative assignment + net allocations)
+  const targetItemType = recipientType === 'KATERING' ? 'UANG_MAKAN' : 'UANG_NYUCI'
+  const serviceCol = recipientType === 'KATERING' ? 's.tempat_makan_id' : 's.tempat_mencuci_id'
+
+  const fundParams: unknown[] = [targetItemType]
+  let fundProviderFilter = 'AND a.provider_id IS NOT NULL'
+  if (providerId) {
+    fundProviderFilter = 'AND a.provider_id = ?'
+    fundParams.push(providerId)
+  }
+  fundParams.push(period)
+
   const fundAgg = await queryOne<{
     total_amount: number
     total_disbursed: number
   }>(
     `
     SELECT
-      COALESCE(SUM(a.amount), 0) AS total_amount,
+      COALESCE(SUM(
+        a.amount - COALESCE((SELECT SUM(fci.amount) FROM finance_correction_items fci WHERE fci.target_allocation_id = a.id), 0)
+      ), 0) AS total_amount,
       COALESCE(SUM(
         (SELECT COALESCE(SUM(di.amount), 0)
          FROM finance_distribution_items di
@@ -120,62 +223,118 @@ export async function getDistributionSummary(
     FROM finance_allocations a
     JOIN finance_obligations o ON a.obligation_id = o.id
     WHERE a.target_type = 'OBLIGATION'
-      AND a.item_type IN (${inPlaceholders})
-      ${providerFilter}
-      ${periodCondition}
+      AND a.item_type = ?
+      ${fundProviderFilter}
+      AND o.period = ?
     `,
-    params
+    fundParams
   )
 
   const totalDanaMasuk = fundAgg?.total_amount ?? 0
   const totalSudahDisalurkan = fundAgg?.total_disbursed ?? 0
   const totalSiapDisalurkan = Math.max(0, totalDanaMasuk - totalSudahDisalurkan)
 
-  // 2. Agregasi Santri (Terdaftar, Sudah Bayar, Belum Bayar)
-  const santriParams: unknown[] = [...itemTypes]
-  let santriProviderFilter = ''
-  if (recipientType !== 'BENDAHARA' && providerId) {
-    santriProviderFilter = 'AND o.provider_id = ?'
-    santriParams.push(providerId)
-  } else if (recipientType === 'BENDAHARA') {
-    santriProviderFilter = 'AND o.provider_id IS NULL'
-  }
+  const allowCurrentAssignmentFallback = isPeriodEligibleForCurrentAssignment(period)
 
-  let santriPeriodCondition = ''
-  if (recipientType === 'BENDAHARA') {
-    const yearPrefix = period.slice(0, 4)
-    santriPeriodCondition = `
-      AND (
-        (o.item_type = 'SPP' AND o.period = ?)
-        OR (o.item_type IN ('EHB', 'EKSKUL', 'KESEHATAN') AND o.period = ?)
-        OR (o.item_type = 'USPP' AND o.period = 'LIFETIME')
-      )
-    `
-    santriParams.push(period, yearPrefix)
-  } else {
-    santriPeriodCondition = 'AND o.period = ?'
-    santriParams.push(period)
+  // Santri Stats via CTE (Snapshot historis + current assignment aktif)
+  const santriParams: unknown[] = [targetItemType, period]
+  let provClauseA = ''
+  let provClauseB = ''
+  if (providerId) {
+    provClauseA = 'AND o.provider_id = ?'
+    santriParams.push(providerId)
+    provClauseB = `AND ${serviceCol} = ?`
+  }
+  santriParams.push(targetItemType, period)
+  if (providerId) {
+    santriParams.push(providerId)
   }
 
   const santriAgg = await queryOne<{
     total_santri: number
     sudah_bayar: number
+    bebas: number
+    belum_bayar: number
   }>(
     `
+    WITH assigned_students AS (
+      -- A: Dari obligations yang sudah ada
+      SELECT
+        o.provider_id,
+        o.santri_id,
+        o.id AS obligation_id,
+        o.amount_expected,
+        o.amount_exempted,
+        (CASE 
+           WHEN (COALESCE(alloc.gross_paid, 0) - COALESCE(corr.total_corr, 0)) > 0 
+           THEN (COALESCE(alloc.gross_paid, 0) - COALESCE(corr.total_corr, 0)) 
+           ELSE 0 
+         END) AS effective_paid
+      FROM finance_obligations o
+      LEFT JOIN (
+        SELECT fa.obligation_id, SUM(fa.amount) AS gross_paid
+        FROM finance_allocations fa
+        JOIN finance_payments fp ON fp.id = fa.payment_id
+        WHERE fa.obligation_id IS NOT NULL AND fp.status IN ('PAID', 'SETTLED')
+        GROUP BY fa.obligation_id
+      ) alloc ON alloc.obligation_id = o.id
+      LEFT JOIN (
+        SELECT fci.obligation_id, SUM(fci.amount) AS total_corr
+        FROM finance_correction_items fci
+        WHERE fci.obligation_id IS NOT NULL
+        GROUP BY fci.obligation_id
+      ) corr ON corr.obligation_id = o.id
+      WHERE o.item_type = ? AND o.period = ? ${provClauseA}
+
+      UNION ALL
+
+      -- B: Santri aktif tanpa obligation untuk periode ini (hanya jika periode diizinkan)
+      SELECT
+        ${serviceCol} AS provider_id,
+        s.id AS santri_id,
+        NULL AS obligation_id,
+        0 AS amount_expected,
+        0 AS amount_exempted,
+        0 AS effective_paid
+      FROM santri s
+      WHERE s.status_global = 'aktif'
+        AND ${allowCurrentAssignmentFallback ? '1=1' : '1=0'}
+        AND ${serviceCol} IS NOT NULL ${provClauseB}
+        AND NOT EXISTS (
+          SELECT 1 FROM finance_obligations fo
+          WHERE fo.santri_id = s.id
+            AND fo.item_type = ?
+            AND fo.period = ?
+        )
+    )
     SELECT
-      COUNT(DISTINCT o.santri_id) AS total_santri,
-      COUNT(DISTINCT CASE WHEN o.status = 'PAID' OR o.amount_paid > 0 THEN o.santri_id END) AS sudah_bayar
-    FROM finance_obligations o
-    WHERE o.item_type IN (${inPlaceholders})
-      ${santriProviderFilter}
-      ${santriPeriodCondition}
+      COUNT(DISTINCT santri_id) AS total_santri,
+      COUNT(DISTINCT CASE 
+        WHEN obligation_id IS NOT NULL 
+         AND (amount_expected - amount_exempted) <= effective_paid 
+         AND effective_paid > 0 
+        THEN santri_id 
+      END) AS sudah_bayar,
+      COUNT(DISTINCT CASE 
+        WHEN obligation_id IS NOT NULL 
+         AND amount_exempted >= amount_expected 
+         AND effective_paid = 0 
+        THEN santri_id 
+      END) AS bebas,
+      COUNT(DISTINCT CASE 
+        WHEN obligation_id IS NULL 
+          OR (amount_expected - amount_exempted) > effective_paid 
+        THEN santri_id 
+      END) AS belum_bayar
+    FROM assigned_students
     `,
     santriParams
   )
 
   const totalSantriTerdaftar = santriAgg?.total_santri ?? 0
   const totalSantriSudahBayar = santriAgg?.sudah_bayar ?? 0
-  const totalSantriBelumBayar = Math.max(0, totalSantriTerdaftar - totalSantriSudahBayar)
+  const totalSantriBebas = santriAgg?.bebas ?? 0
+  const totalSantriBelumBayar = santriAgg?.belum_bayar ?? (totalSantriTerdaftar - totalSantriSudahBayar - totalSantriBebas)
 
   return {
     totalDanaMasuk,
@@ -184,11 +343,13 @@ export async function getDistributionSummary(
     totalSantriTerdaftar,
     totalSantriSudahBayar,
     totalSantriBelumBayar,
+    totalSantriBebas,
   }
 }
 
 /**
  * Mengambil daftar penyedia katering / laundry beserta status hak penyalurannya.
+ * Dieksekusi secara batched (0 N+1 query loop).
  */
 export async function getProviderDistributionList(
   recipientType: 'KATERING' | 'LAUNDRY',
@@ -196,6 +357,7 @@ export async function getProviderDistributionList(
 ): Promise<ProviderDistributionSummaryRow[]> {
   const providerJenis = recipientType === 'KATERING' ? 'Makan' : 'Cuci'
   const targetItemType = recipientType === 'KATERING' ? 'UANG_MAKAN' : 'UANG_NYUCI'
+  const serviceCol = recipientType === 'KATERING' ? 's.tempat_makan_id' : 's.tempat_mencuci_id'
 
   // 1. Ambil master vendor existing dari master_jasa
   const providers = await query<{
@@ -212,82 +374,193 @@ export async function getProviderDistributionList(
     [providerJenis]
   )
 
+  if (providers.length === 0) {
+    return []
+  }
+
+  // 2. Query 2: Agregasi alokasi dana snapshot vendor untuk seluruh provider pada periode ini (0 N+1)
+  const funds = await query<{
+    provider_id: string
+    total_amount: number
+    total_disbursed: number
+  }>(
+    `
+    SELECT
+      a.provider_id,
+      COALESCE(SUM(
+        a.amount - COALESCE((SELECT SUM(fci.amount) FROM finance_correction_items fci WHERE fci.target_allocation_id = a.id), 0)
+      ), 0) AS total_amount,
+      COALESCE(SUM(
+        (SELECT COALESCE(SUM(di.amount), 0)
+         FROM finance_distribution_items di
+         WHERE di.allocation_id = a.id)
+      ), 0) AS total_disbursed
+    FROM finance_allocations a
+    JOIN finance_obligations o ON a.obligation_id = o.id
+    WHERE a.target_type = 'OBLIGATION'
+      AND a.item_type = ?
+      AND o.period = ?
+      AND a.provider_id IS NOT NULL
+    GROUP BY a.provider_id
+    `,
+    [targetItemType, period]
+  )
+
+  const fundMap = new Map<string, { totalDanaMasuk: number; sudahDisalurkan: number }>()
+  for (const f of funds) {
+    fundMap.set(f.provider_id, {
+      totalDanaMasuk: f.total_amount,
+      sudahDisalurkan: f.total_disbursed,
+    })
+  }
+
+  // 3. Query 3: Agregasi santri terdaftar, sudah bayar, belum bayar, dan pembebasan seluruh provider (0 N+1)
+  const allowCurrentAssignmentFallback = isPeriodEligibleForCurrentAssignment(period)
+
+  const santriStats = await query<{
+    provider_id: string
+    total_santri: number
+    sudah_bayar: number
+    bebas: number
+    belum_bayar: number
+  }>(
+    `
+    WITH assigned_students AS (
+      -- A: Dari obligations yang sudah ada
+      SELECT
+        o.provider_id,
+        o.santri_id,
+        o.id AS obligation_id,
+        o.amount_expected,
+        o.amount_exempted,
+        (CASE 
+           WHEN (COALESCE(alloc.gross_paid, 0) - COALESCE(corr.total_corr, 0)) > 0 
+           THEN (COALESCE(alloc.gross_paid, 0) - COALESCE(corr.total_corr, 0)) 
+           ELSE 0 
+         END) AS effective_paid
+      FROM finance_obligations o
+      LEFT JOIN (
+        SELECT fa.obligation_id, SUM(fa.amount) AS gross_paid
+        FROM finance_allocations fa
+        JOIN finance_payments fp ON fp.id = fa.payment_id
+        WHERE fa.obligation_id IS NOT NULL AND fp.status IN ('PAID', 'SETTLED')
+        GROUP BY fa.obligation_id
+      ) alloc ON alloc.obligation_id = o.id
+      LEFT JOIN (
+        SELECT fci.obligation_id, SUM(fci.amount) AS total_corr
+        FROM finance_correction_items fci
+        WHERE fci.obligation_id IS NOT NULL
+        GROUP BY fci.obligation_id
+      ) corr ON corr.obligation_id = o.id
+      WHERE o.item_type = ? AND o.period = ? AND o.provider_id IS NOT NULL
+
+      UNION ALL
+
+      -- B: Dari santri aktif yang belum punya obligation untuk periode ini (hanya jika periode diizinkan)
+      SELECT
+        ${serviceCol} AS provider_id,
+        s.id AS santri_id,
+        NULL AS obligation_id,
+        0 AS amount_expected,
+        0 AS amount_exempted,
+        0 AS effective_paid
+      FROM santri s
+      WHERE s.status_global = 'aktif'
+        AND ${allowCurrentAssignmentFallback ? '1=1' : '1=0'}
+        AND ${serviceCol} IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM finance_obligations fo
+          WHERE fo.santri_id = s.id
+            AND fo.item_type = ?
+            AND fo.period = ?
+        )
+    )
+    SELECT
+      provider_id,
+      COUNT(DISTINCT santri_id) AS total_santri,
+      COUNT(DISTINCT CASE 
+        WHEN obligation_id IS NOT NULL 
+         AND (amount_expected - amount_exempted) <= effective_paid 
+         AND effective_paid > 0 
+        THEN santri_id 
+      END) AS sudah_bayar,
+      COUNT(DISTINCT CASE 
+        WHEN obligation_id IS NOT NULL 
+         AND amount_exempted >= amount_expected 
+         AND effective_paid = 0 
+        THEN santri_id 
+      END) AS bebas,
+      COUNT(DISTINCT CASE 
+        WHEN obligation_id IS NULL 
+          OR (amount_expected - amount_exempted) > effective_paid 
+        THEN santri_id 
+      END) AS belum_bayar
+    FROM assigned_students
+    GROUP BY provider_id
+    `,
+    [targetItemType, period, targetItemType, period]
+  )
+
+  const santriMap = new Map<
+    string,
+    {
+      totalSantri: number
+      sudahBayar: number
+      bebas: number
+      belumBayar: number
+    }
+  >()
+  for (const s of santriStats) {
+    santriMap.set(s.provider_id, {
+      totalSantri: s.total_santri,
+      sudahBayar: s.sudah_bayar,
+      bebas: s.bebas,
+      belumBayar: s.belum_bayar,
+    })
+  }
+
+  // 4. Query 4: Ambil seluruh rekening penyedia dalam satu batch (0 N+1)
+  const allAccounts = await query<FinanceProviderAccount>(
+    `
+    SELECT id, provider_id, bank_name, account_number, account_holder, is_primary, notes, created_at, updated_at
+    FROM finance_provider_accounts
+    ORDER BY is_primary DESC, created_at ASC
+    `
+  )
+
+  const accountMap = new Map<string, FinanceProviderAccount[]>()
+  for (const acc of allAccounts) {
+    const list = accountMap.get(acc.provider_id) || []
+    list.push(acc)
+    accountMap.set(acc.provider_id, list)
+  }
+
+  // 5. Rakit hasil agregasi
   const result: ProviderDistributionSummaryRow[] = []
 
   for (const p of providers) {
-    // 2. Ambil agregasi alokasi dana snapshot vendor ini pada periode terkait
-    const fundAgg = await queryOne<{
-      total_amount: number
-      total_disbursed: number
-    }>(
-      `
-      SELECT
-        COALESCE(SUM(a.amount), 0) AS total_amount,
-        COALESCE(SUM(
-          (SELECT COALESCE(SUM(di.amount), 0)
-           FROM finance_distribution_items di
-           WHERE di.allocation_id = a.id)
-        ), 0) AS total_disbursed
-      FROM finance_allocations a
-      JOIN finance_obligations o ON a.obligation_id = o.id
-      WHERE a.target_type = 'OBLIGATION'
-        AND a.item_type = ?
-        AND a.provider_id = ?
-        AND o.period = ?
-      `,
-      [targetItemType, p.id, period]
-    )
+    const f = fundMap.get(p.id) || { totalDanaMasuk: 0, sudahDisalurkan: 0 }
+    const s = santriMap.get(p.id) || { totalSantri: 0, sudahBayar: 0, bebas: 0, belumBayar: 0 }
+    const accs = accountMap.get(p.id) || []
+    const primaryAccount = accs.find((a) => a.is_primary === 1) || accs[0] || null
 
-    const totalDanaMasuk = fundAgg?.total_amount ?? 0
-    const sudahDisalurkan = fundAgg?.total_disbursed ?? 0
+    const totalDanaMasuk = f.totalDanaMasuk
+    const sudahDisalurkan = f.sudahDisalurkan
     const sisaSiapSalur = Math.max(0, totalDanaMasuk - sudahDisalurkan)
-
-    // 3. Ambil statistik santri terdaftar pada kewajiban periode terkait
-    const santriAgg = await queryOne<{
-      total_santri: number
-      sudah_bayar: number
-    }>(
-      `
-      SELECT
-        COUNT(DISTINCT o.santri_id) AS total_santri,
-        COUNT(DISTINCT CASE WHEN o.status = 'PAID' OR o.amount_paid > 0 THEN o.santri_id END) AS sudah_bayar
-      FROM finance_obligations o
-      WHERE o.item_type = ?
-        AND o.provider_id = ?
-        AND o.period = ?
-      `,
-      [targetItemType, p.id, period]
-    )
-
-    const santriTerdaftar = santriAgg?.total_santri ?? 0
-    const santriSudahBayar = santriAgg?.sudah_bayar ?? 0
-    const santriBelumBayar = Math.max(0, santriTerdaftar - santriSudahBayar)
-
-    // 4. Ambil rekening utama penyedia
-    const accounts = await query<FinanceProviderAccount>(
-      `
-      SELECT id, provider_id, bank_name, account_number, account_holder, is_primary, notes, created_at, updated_at
-      FROM finance_provider_accounts
-      WHERE provider_id = ?
-      ORDER BY is_primary DESC, created_at ASC
-      `,
-      [p.id]
-    )
-
-    const primaryAccount = accounts.find((acc) => acc.is_primary === 1) || accounts[0] || null
 
     result.push({
       providerId: p.id,
       providerName: p.nama_jasa,
       providerType: p.jenis as 'Makan' | 'Cuci',
-      santriTerdaftar,
-      santriSudahBayar,
-      santriBelumBayar,
+      santriTerdaftar: s.totalSantri,
+      santriSudahBayar: s.sudahBayar,
+      santriBelumBayar: s.belumBayar,
+      santriBebas: s.bebas,
       totalDanaMasuk,
       sudahDisalurkan,
       sisaSiapSalur,
       primaryAccount,
-      accountsCount: accounts.length,
+      accountsCount: accs.length,
     })
   }
 
@@ -417,13 +690,21 @@ export async function getEligibleAllocationsForDistribution(params: {
       a.payment_id,
       a.obligation_id,
       a.item_type,
-      a.amount,
+      (a.amount - COALESCE((
+        SELECT SUM(fci.amount)
+        FROM finance_correction_items fci
+        WHERE fci.target_allocation_id = a.id
+      ), 0)) AS amount,
       COALESCE((
         SELECT SUM(di.amount)
         FROM finance_distribution_items di
         WHERE di.allocation_id = a.id
       ), 0) AS disbursed_amount,
-      (a.amount - COALESCE((
+      ((a.amount - COALESCE((
+        SELECT SUM(fci.amount)
+        FROM finance_correction_items fci
+        WHERE fci.target_allocation_id = a.id
+      ), 0)) - COALESCE((
         SELECT SUM(di.amount)
         FROM finance_distribution_items di
         WHERE di.allocation_id = a.id
@@ -435,7 +716,11 @@ export async function getEligibleAllocationsForDistribution(params: {
     WHERE a.target_type = 'OBLIGATION'
       AND a.item_type = ?
       AND o.period = ?
-      AND (a.amount - COALESCE((
+      AND ((a.amount - COALESCE((
+        SELECT SUM(fci.amount)
+        FROM finance_correction_items fci
+        WHERE fci.target_allocation_id = a.id
+      ), 0)) - COALESCE((
         SELECT SUM(di.amount)
         FROM finance_distribution_items di
         WHERE di.allocation_id = a.id
@@ -1041,5 +1326,446 @@ export async function getDistributionById(
   return {
     ...dist,
     items,
+  }
+}
+
+// ─── POST-RELEASE PATCH C4: DETAIL OPERASIONAL & EXCEL IMPORT ────────────────
+
+/**
+ * Mengambil detail operasional penyaluran santri per provider untuk periode terkait.
+ * Mendukung server-side pagination (default 50), pencarian (nama & NIS), dan filter status pembayaran.
+ */
+export async function getProviderOperationalDetail(
+  params: ProviderOperationalDetailParams
+): Promise<ProviderOperationalDetailResult> {
+  const provider = await queryOne<{
+    id: string
+    nama_jasa: string
+    jenis: string
+  }>(
+    `SELECT id, nama_jasa, jenis FROM master_jasa WHERE id = ?`,
+    [params.providerId]
+  )
+
+  if (!provider) {
+    throw new Error(`Penyedia dengan ID "${params.providerId}" tidak ditemukan pada master_jasa.`)
+  }
+
+  const providerType = provider.jenis as 'Makan' | 'Cuci'
+  const itemType = providerType === 'Makan' ? 'UANG_MAKAN' : 'UANG_NYUCI'
+  const serviceCol = providerType === 'Makan' ? 's.tempat_makan_id' : 's.tempat_mencuci_id'
+  const period = params.period
+
+  const page = Math.max(1, params.page || 1)
+  const pageSize = Math.max(1, Math.min(200, params.pageSize || 50))
+  const offset = (page - 1) * pageSize
+
+  const allowCurrentAssignmentFallback = isPeriodEligibleForCurrentAssignment(period)
+
+  // Cari tarif aktif untuk default nominal kewajiban jika obligation belum dibuat
+  const tariff = await getActiveTariff(itemType, period).catch(() => null)
+  const defaultTariffNominal = tariff?.nominal ?? 0
+
+  // 1. Ambil KPI summary stats untuk provider ini
+  const statsSummary = await getDistributionSummary(
+    providerType === 'Makan' ? 'KATERING' : 'LAUNDRY',
+    period,
+    provider.id
+  )
+
+  // 2. Query Detail Items dengan Search & Status Filter
+  const baseCte = `
+    WITH assigned_students AS (
+      -- A: Santri dengan obligation
+      SELECT
+        o.provider_id,
+        o.santri_id,
+        o.id AS obligation_id,
+        o.period,
+        o.amount_expected,
+        o.amount_exempted,
+        (CASE 
+           WHEN (COALESCE(alloc.gross_paid, 0) - COALESCE(corr.total_corr, 0)) > 0 
+           THEN (COALESCE(alloc.gross_paid, 0) - COALESCE(corr.total_corr, 0)) 
+           ELSE 0 
+         END) AS effective_paid,
+        (CASE 
+           WHEN (COALESCE(alloc.gross_paid, 0) - COALESCE(corr.total_corr, 0)) > 0 
+           THEN (COALESCE(alloc.gross_paid, 0) - COALESCE(corr.total_corr, 0)) 
+           ELSE 0 
+         END) AS dana_masuk,
+        COALESCE(alloc.disbursed, 0) AS dana_disalurkan
+      FROM finance_obligations o
+      LEFT JOIN (
+        SELECT 
+          fa.obligation_id, 
+          SUM(fa.amount) AS gross_paid,
+          SUM(COALESCE((SELECT SUM(fdi.amount) FROM finance_distribution_items fdi WHERE fdi.allocation_id = fa.id), 0)) AS disbursed
+        FROM finance_allocations fa
+        JOIN finance_payments fp ON fp.id = fa.payment_id
+        WHERE fa.obligation_id IS NOT NULL AND fp.status IN ('PAID', 'SETTLED')
+        GROUP BY fa.obligation_id
+      ) alloc ON alloc.obligation_id = o.id
+      LEFT JOIN (
+        SELECT fci.obligation_id, SUM(fci.amount) AS total_corr
+        FROM finance_correction_items fci
+        WHERE fci.obligation_id IS NOT NULL
+        GROUP BY fci.obligation_id
+      ) corr ON corr.obligation_id = o.id
+      WHERE o.item_type = ? AND o.period = ? AND o.provider_id = ?
+
+      UNION ALL
+
+      -- B: Santri aktif tanpa obligation untuk periode ini (hanya jika periode diizinkan)
+      SELECT
+        ${serviceCol} AS provider_id,
+        s.id AS santri_id,
+        NULL AS obligation_id,
+        ? AS period,
+        ? AS amount_expected,
+        0 AS amount_exempted,
+        0 AS effective_paid,
+        0 AS dana_masuk,
+        0 AS dana_disalurkan
+      FROM santri s
+      WHERE s.status_global = 'aktif'
+        AND ${allowCurrentAssignmentFallback ? '1=1' : '1=0'}
+        AND ${serviceCol} = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM finance_obligations fo
+          WHERE fo.santri_id = s.id
+            AND fo.item_type = ?
+            AND fo.period = ?
+        )
+    )
+  `
+
+  const cteParams: unknown[] = [
+    itemType,
+    period,
+    provider.id,
+    period,
+    defaultTariffNominal,
+    provider.id,
+    itemType,
+    period,
+  ]
+
+  const filterConditions: string[] = ['1=1']
+  const filterParams: unknown[] = []
+
+  if (params.search && params.search.trim().length > 0) {
+    const term = `%${params.search.trim().toLowerCase()}%`
+    filterConditions.push('(LOWER(s.nama_lengkap) LIKE ? OR LOWER(s.nis) LIKE ?)')
+    filterParams.push(term, term)
+  }
+
+  if (params.statusFilter && params.statusFilter !== 'ALL') {
+    if (params.statusFilter === 'PAID') {
+      filterConditions.push(
+        'a.obligation_id IS NOT NULL AND (a.amount_expected - a.amount_exempted) <= a.effective_paid AND a.effective_paid > 0'
+      )
+    } else if (params.statusFilter === 'UNPAID') {
+      filterConditions.push(
+        '(a.obligation_id IS NULL OR (a.effective_paid = 0 AND a.amount_exempted < a.amount_expected))'
+      )
+    } else if (params.statusFilter === 'PARTIAL') {
+      filterConditions.push(
+        'a.obligation_id IS NOT NULL AND a.effective_paid > 0 AND (a.amount_expected - a.amount_exempted) > a.effective_paid'
+      )
+    } else if (params.statusFilter === 'EXEMPTED') {
+      filterConditions.push(
+        'a.obligation_id IS NOT NULL AND a.amount_exempted >= a.amount_expected AND a.effective_paid = 0'
+      )
+    }
+  }
+
+  const whereSql = filterConditions.join(' AND ')
+
+  // Count total matching items
+  const countRow = await queryOne<{ total: number }>(
+    `
+    ${baseCte}
+    SELECT COUNT(*) AS total
+    FROM assigned_students a
+    JOIN santri s ON s.id = a.santri_id
+    WHERE ${whereSql}
+    `,
+    [...cteParams, ...filterParams]
+  )
+
+  const totalItems = countRow?.total ?? 0
+  const totalPages = Math.ceil(totalItems / pageSize) || 1
+
+  // Fetch paginated rows
+  const rawRows = await query<{
+    santri_id: string
+    nis: string
+    nama_lengkap: string
+    asrama: string | null
+    kamar: string | null
+    period: string
+    obligation_id: string | null
+    amount_expected: number
+    amount_exempted: number
+    effective_paid: number
+    dana_masuk: number
+    dana_disalurkan: number
+  }>(
+    `
+    ${baseCte}
+    SELECT
+      s.id AS santri_id,
+      s.nis,
+      s.nama_lengkap,
+      s.asrama,
+      s.kamar,
+      a.period,
+      a.obligation_id,
+      a.amount_expected,
+      a.amount_exempted,
+      a.effective_paid,
+      a.dana_masuk,
+      a.dana_disalurkan
+    FROM assigned_students a
+    JOIN santri s ON s.id = a.santri_id
+    WHERE ${whereSql}
+    ORDER BY s.nama_lengkap COLLATE NOCASE ASC
+    LIMIT ? OFFSET ?
+    `,
+    [...cteParams, ...filterParams, pageSize, offset]
+  )
+
+  const items: ProviderOperationalDetailRow[] = rawRows.map((r) => {
+    let status: ProviderOperationalPaymentStatus = 'UNPAID'
+    let label = 'Belum Bayar'
+
+    const netExpected = Math.max(0, r.amount_expected - r.amount_exempted)
+    const effectivePaid = r.effective_paid
+    const sisa = Math.max(0, netExpected - effectivePaid)
+
+    if (r.obligation_id) {
+      if (r.amount_exempted >= r.amount_expected && effectivePaid === 0) {
+        status = 'EXEMPTED'
+        label = 'Pembebasan'
+      } else if (netExpected <= effectivePaid && effectivePaid > 0) {
+        status = 'PAID'
+        label = 'Lunas'
+      } else if (effectivePaid > 0 && effectivePaid < netExpected) {
+        status = 'PARTIAL'
+        label = 'Sebagian'
+      } else {
+        status = 'UNPAID'
+        label = 'Belum Bayar'
+      }
+    } else {
+      status = 'UNPAID'
+      label = 'Belum Bayar'
+    }
+
+    return {
+      santriId: r.santri_id,
+      nis: r.nis,
+      namaLengkap: r.nama_lengkap,
+      asrama: r.asrama,
+      kamar: r.kamar,
+      period: r.period,
+      nominalKewajiban: r.amount_expected,
+      terbayar: effectivePaid,
+      sisa,
+      statusPembayaran: status,
+      statusLabel: label,
+      danaMasuk: r.dana_masuk,
+      danaDisalurkan: r.dana_disalurkan,
+    }
+  })
+
+  return {
+    provider: {
+      id: provider.id,
+      name: provider.nama_jasa,
+      type: providerType,
+    },
+    period,
+    stats: {
+      totalAssigned: statsSummary.totalSantriTerdaftar,
+      totalPaid: statsSummary.totalSantriSudahBayar,
+      totalUnpaid: statsSummary.totalSantriBelumBayar,
+      totalExempted: statsSummary.totalSantriBebas ?? 0,
+      totalDanaMasuk: statsSummary.totalDanaMasuk,
+      totalSudahDisalurkan: statsSummary.totalSudahDisalurkan,
+      sisaSiapSalur: statsSummary.totalSiapDisalurkan,
+    },
+    items,
+    pagination: {
+      page,
+      pageSize,
+      totalItems,
+      totalPages,
+    },
+  }
+}
+
+/**
+ * Mengambil master provider dan rekening existing untuk pengisian template Excel rekening penyedia.
+ */
+export async function getProviderAccountTemplateData(): Promise<ProviderAccountTemplatePayload> {
+  const providers = await query<{
+    id: string
+    nama_jasa: string
+    jenis: string
+  }>(
+    `SELECT id, nama_jasa, jenis FROM master_jasa ORDER BY jenis ASC, nama_jasa ASC`
+  )
+
+  const existingAccounts = await query<{
+    provider_id: string
+    bank_name: string
+    account_number: string
+  }>(
+    `SELECT provider_id, bank_name, account_number FROM finance_provider_accounts`
+  )
+
+  return {
+    providers: providers.map((p) => ({
+      provider_id: p.id,
+      nama_penyedia: p.nama_jasa,
+      jenis_layanan: p.jenis,
+      bank: '',
+      nomor_rekening: '',
+      nama_pemilik: '',
+      rekening_utama: 'TIDAK',
+      catatan: '',
+    })),
+    existingAccounts,
+  }
+}
+
+/**
+ * Mengimpor rekening penyedia hasil parse Excel secara atomik dan aman.
+ * Menjamin:
+ * 1. provider_id valid di master_jasa.
+ * 2. SKIPPED_DUPLICATE: Rekening dengan kombinasi (provider_id + bank_name + account_number) yang sama
+ *    di-skip secara aman tanpa mengubah data existing secara diam-diam.
+ * 3. Invariant single-primary per provider jika ditandai sebagai rekening utama.
+ * 4. Mencegah partial ambiguous import jika terdapat baris INVALID.
+ * 5. Chunked atomic batch execution.
+ */
+export async function importProviderAccounts(
+  rows: ValidatedImportAccountRow[]
+): Promise<{ success: boolean; insertedCount: number; skippedCount: number; invalidCount: number }> {
+  if (!rows || rows.length === 0) {
+    throw new Error('Tidak ada data rekening yang dapat diimpor.')
+  }
+
+  // 0. Cegah partial ambiguous import jika ada baris invalid
+  const invalidRows = rows.filter((r) => r.status === 'INVALID')
+  if (invalidRows.length > 0) {
+    throw new Error(
+      `Terdapat ${invalidRows.length} baris data yang tidak valid. Perbaiki kesalahan file Excel sebelum melanjutkan untuk mencegah impor data yang ambigu.`
+    )
+  }
+
+  // 1. Ambil semua provider di master_jasa
+  const providers = await query<{ id: string; nama_jasa: string }>(`SELECT id, nama_jasa FROM master_jasa`)
+  const validProviderMap = new Map(providers.map((p) => [p.id, p.nama_jasa]))
+
+  // 2. Ambil rekening existing untuk deteksi duplikasi
+  const existingAccounts = await query<{
+    provider_id: string
+    bank_name: string
+    account_number: string
+  }>(`SELECT provider_id, bank_name, account_number FROM finance_provider_accounts`)
+
+  const existingSet = new Set(
+    existingAccounts.map(
+      (a) => `${a.provider_id}|${a.bank_name.trim().toUpperCase()}|${a.account_number.trim()}`
+    )
+  )
+
+  const statements: Array<{ sql: string; params?: unknown[] }> = []
+  let insertedCount = 0
+  let skippedCount = 0
+  const currentNow = now()
+
+  for (const row of rows) {
+    // Jika dari preview sudah ditandai SKIPPED_DUPLICATE
+    if (row.status === 'SKIPPED_DUPLICATE') {
+      skippedCount++
+      continue
+    }
+
+    if (!validProviderMap.has(row.provider_id)) {
+      throw new Error(`Penyedia dengan ID "${row.provider_id}" tidak valid pada master_jasa.`)
+    }
+
+    const bankName = row.bank.trim()
+    const accountNumber = row.nomor_rekening.trim()
+    const accountHolder = row.nama_pemilik.trim()
+
+    if (!bankName || !accountNumber || !accountHolder) {
+      throw new Error(
+        `Baris #${row.index + 1}: Nama bank, nomor rekening, dan nama pemilik rekening wajib diisi.`
+      )
+    }
+
+    const key = `${row.provider_id}|${bankName.toUpperCase()}|${accountNumber}`
+    if (existingSet.has(key)) {
+      // SKIPPED_DUPLICATE: Jangan update row existing secara diam-diam!
+      skippedCount++
+      continue
+    }
+
+    existingSet.add(key) // Cegah duplikasi dalam batch yang sama
+
+    const id = generateId()
+    const isPrimaryVal = row.is_primary ? 1 : 0
+
+    if (isPrimaryVal === 1) {
+      // Invariant: Nonaktifkan primary existing untuk provider ini
+      statements.push({
+        sql: `UPDATE finance_provider_accounts SET is_primary = 0 WHERE provider_id = ?`,
+        params: [row.provider_id],
+      })
+    }
+
+    statements.push({
+      sql: `
+        INSERT INTO finance_provider_accounts (
+          id, provider_id, bank_name, account_number, account_holder,
+          is_primary, notes, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      params: [
+        id,
+        row.provider_id,
+        bankName,
+        accountNumber,
+        accountHolder,
+        isPrimaryVal,
+        row.catatan?.trim() || null,
+        currentNow,
+        currentNow,
+      ],
+    })
+
+    insertedCount++
+  }
+
+  if (statements.length > 0) {
+    // Eksekusi dalam batch chunked (50 per batch)
+    const CHUNK_SIZE = 50
+    for (let i = 0; i < statements.length; i += CHUNK_SIZE) {
+      const chunk = statements.slice(i, i + CHUNK_SIZE)
+      await batch(chunk)
+    }
+  }
+
+  return {
+    success: true,
+    insertedCount,
+    skippedCount,
+    invalidCount: 0,
   }
 }

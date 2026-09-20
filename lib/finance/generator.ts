@@ -72,6 +72,15 @@ export async function generateMonthlyObligationsForActiveStudents(
 
   for (const student of students) {
     for (const itemType of MONTHLY_ITEM_TYPES) {
+      // POST-RELEASE PATCH C4: Hanya generate UANG_MAKAN jika santri terdaftar di katering
+      if (itemType === 'UANG_MAKAN' && !student.tempat_makan_id) {
+        continue
+      }
+      // POST-RELEASE PATCH C4: Hanya generate UANG_NYUCI jika santri terdaftar di laundry
+      if (itemType === 'UANG_NYUCI' && !student.tempat_mencuci_id) {
+        continue
+      }
+
       // Cutover / Legacy Guard
       const legacyCheck = await checkLegacySettlement(student.id, itemType, period)
       if (legacyCheck.isLegacyManaged) {

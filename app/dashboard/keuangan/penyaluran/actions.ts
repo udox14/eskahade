@@ -13,6 +13,9 @@ import {
   deleteProviderAccount,
   getDistributionHistory,
   getDistributionById,
+  getProviderOperationalDetail,
+  getProviderAccountTemplateData,
+  importProviderAccounts,
 } from '@/lib/finance/distributions'
 import type {
   FinanceDistributionRecipientType,
@@ -25,6 +28,10 @@ import type {
   CreateProviderAccountInput,
   UpdateProviderAccountInput,
   DistributionDetailWithItems,
+  ProviderOperationalDetailParams,
+  ProviderOperationalDetailResult,
+  ProviderAccountTemplatePayload,
+  ValidatedImportAccountRow,
 } from '@/lib/finance/distribution-types'
 
 export interface UserPenyaluranPermissions {
@@ -288,3 +295,30 @@ export async function getDistributionReceiptAction(
   await authorizeUser()
   return getDistributionById(id)
 }
+
+export async function getProviderOperationalDetailAction(
+  params: ProviderOperationalDetailParams
+): Promise<ProviderOperationalDetailResult> {
+  await authorizeUser()
+  return getProviderOperationalDetail(params)
+}
+
+export async function getProviderAccountTemplateDataAction(): Promise<ProviderAccountTemplatePayload> {
+  await authorizeUser()
+  return getProviderAccountTemplateData()
+}
+
+export async function importProviderAccountsAction(
+  rows: ValidatedImportAccountRow[]
+): Promise<{ success: boolean; insertedCount: number; skippedCount: number; invalidCount: number }> {
+  const { permissions } = await authorizeUser()
+
+  if (!permissions.canDisburse) {
+    throw new Error(
+      'Akses ditolak: Pimpinan dan akun peninjau hanya memiliki hak baca (view-only) dan dilarang mengimpor rekening penyedia.'
+    )
+  }
+
+  return importProviderAccounts(rows)
+}
+

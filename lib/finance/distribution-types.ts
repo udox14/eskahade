@@ -55,6 +55,7 @@ export interface DistributionKpiSummary {
   totalSantriTerdaftar: number
   totalSantriSudahBayar: number
   totalSantriBelumBayar: number
+  totalSantriBebas?: number
 }
 
 export interface ProviderDistributionSummaryRow {
@@ -64,6 +65,7 @@ export interface ProviderDistributionSummaryRow {
   santriTerdaftar: number
   santriSudahBayar: number
   santriBelumBayar: number
+  santriBebas?: number
   totalDanaMasuk: number
   sudahDisalurkan: number
   sisaSiapSalur: number
@@ -78,6 +80,7 @@ export interface BendaharaDistributionSummaryRow {
   santriTerdaftar: number
   santriSudahBayar: number
   santriBelumBayar: number
+  santriBebas?: number
   totalDanaMasuk: number
   sudahDisalurkan: number
   sisaSiapSalur: number
@@ -130,3 +133,103 @@ export interface DistributionDetailWithItems extends FinanceDistribution {
     created_at: string
   }>
 }
+
+// ─── POST-RELEASE PATCH C4: OPERATIONAL DETAIL & EXCEL IMPORT ────────────────
+
+export type ProviderOperationalPaymentStatus = 'PAID' | 'UNPAID' | 'PARTIAL' | 'EXEMPTED'
+
+export interface ProviderOperationalDetailRow {
+  santriId: string
+  nis: string
+  namaLengkap: string
+  asrama: string | null
+  kamar: string | null
+  period: string
+  nominalKewajiban: number
+  terbayar: number
+  sisa: number
+  statusPembayaran: ProviderOperationalPaymentStatus
+  statusLabel: string
+  danaMasuk: number
+  danaDisalurkan: number
+}
+
+export interface ProviderOperationalDetailResult {
+  provider: {
+    id: string
+    name: string
+    type: 'Makan' | 'Cuci'
+  }
+  period: string
+  stats: {
+    totalAssigned: number
+    totalPaid: number
+    totalUnpaid: number
+    totalExempted: number
+    totalDanaMasuk: number
+    totalSudahDisalurkan: number
+    sisaSiapSalur: number
+  }
+  items: ProviderOperationalDetailRow[]
+  pagination: {
+    page: number
+    pageSize: number
+    totalItems: number
+    totalPages: number
+  }
+}
+
+export interface ProviderOperationalDetailParams {
+  providerId: string
+  period: string
+  page?: number
+  pageSize?: number
+  search?: string
+  statusFilter?: 'ALL' | ProviderOperationalPaymentStatus
+}
+
+export interface ProviderAccountTemplateRow {
+  provider_id: string
+  nama_penyedia: string
+  jenis_layanan: string
+  bank: string
+  nomor_rekening: string
+  nama_pemilik: string
+  rekening_utama: string
+  catatan: string
+}
+
+export interface ProviderAccountTemplatePayload {
+  providers: ProviderAccountTemplateRow[]
+  existingAccounts: Array<{
+    provider_id: string
+    bank_name: string
+    account_number: string
+  }>
+}
+
+export type ImportValidationStatus = 'VALID_NEW' | 'SKIPPED_DUPLICATE' | 'INVALID'
+
+export interface ValidatedImportAccountRow {
+  index: number
+  provider_id: string
+  nama_penyedia: string
+  jenis_layanan: string
+  bank: string
+  nomor_rekening: string
+  nama_pemilik: string
+  is_primary: boolean
+  catatan: string | null
+  status: ImportValidationStatus
+  message?: string
+  warning?: string
+}
+
+export interface ProviderAccountsImportPreview {
+  totalRows: number
+  validNewCount: number
+  skippedDuplicateCount: number
+  invalidCount: number
+  rows: ValidatedImportAccountRow[]
+}
+

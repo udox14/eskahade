@@ -13,6 +13,8 @@ import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
 import CatatPenyaluranModal from './catat-penyaluran-modal'
 import RekeningModal from './rekening-modal'
 import BuktiPenyaluranModal from './bukti-penyaluran-modal'
+import ProviderDetailModal from './provider-detail-modal'
+import RekeningImportModal from './rekening-import-modal'
 import {
   Bank,
   CheckCircle,
@@ -23,6 +25,8 @@ import {
   CalendarBlank,
   MagnifyingGlass,
   ArrowRight,
+  ArrowUpRight,
+  FileXls,
 } from '@phosphor-icons/react'
 
 interface PenyaluranContentProps {
@@ -58,6 +62,8 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
   } | null>(null)
 
   const [receiptDistributionId, setReceiptDistributionId] = useState<string | null>(null)
+  const [detailModalProviderId, setDetailModalProviderId] = useState<string | null>(null)
+  const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false)
 
   const canDisburse = data.userPermissions.canDisburse
 
@@ -352,11 +358,25 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
                 Hak penyaluran dihitung dari alokasi santri aktif pada periode {selectedPeriod}.
               </p>
             </div>
+            <div className="flex items-center gap-2">
+              {canDisburse && (
+                <button
+                  type="button"
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 transition shadow-xs"
+                >
+                  <FileXls size={15} weight="bold" />
+                  Import Rekening Excel
+                </button>
+              )}
+            </div>
           </div>
 
           {data.providerRows.length === 0 ? (
             <div className="text-center py-12 text-slate-400 text-sm">
-              Tidak ada data penyedia jasa yang terdaftar di master jasa.
+              {activeTab === 'LAUNDRY'
+                ? 'Belum ada santri yang terdaftar pada layanan laundry untuk periode ini.'
+                : 'Tidak ada data penyedia jasa yang terdaftar di master jasa.'}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -376,9 +396,25 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
                 <tbody className="divide-y divide-slate-100">
                   {data.providerRows.map((p) => (
                     <tr key={p.providerId} className="hover:bg-slate-50/60 transition">
-                      <td className="py-3.5 px-4 font-bold text-slate-800">{p.providerName}</td>
-                      <td className="py-3.5 px-4 text-center font-semibold text-slate-700">
-                        {p.santriTerdaftar} santri
+                      <td className="py-3.5 px-4">
+                        <button
+                          type="button"
+                          onClick={() => setDetailModalProviderId(p.providerId)}
+                          className="text-left font-bold text-slate-800 hover:text-emerald-700 transition underline-offset-2 hover:underline"
+                        >
+                          {p.providerName}
+                        </button>
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setDetailModalProviderId(p.providerId)}
+                          className="inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-emerald-700 transition"
+                          title="Lihat rincian operasional santri"
+                        >
+                          <span>{p.santriTerdaftar} santri</span>
+                          <ArrowUpRight size={12} className="text-slate-400" />
+                        </button>
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <span className="font-bold text-emerald-700">{p.santriSudahBayar}</span>
@@ -416,6 +452,15 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setDetailModalProviderId(p.providerId)}
+                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 text-[11px] font-semibold hover:bg-slate-100 transition"
+                            title="Rincian Santri"
+                          >
+                            Rincian
+                          </button>
+
                           <button
                             type="button"
                             onClick={() =>
@@ -612,6 +657,22 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
         onClose={() => setReceiptDistributionId(null)}
         distributionId={receiptDistributionId}
       />
+
+      <ProviderDetailModal
+        isOpen={!!detailModalProviderId}
+        onClose={() => setDetailModalProviderId(null)}
+        providerId={detailModalProviderId}
+        period={selectedPeriod}
+        serviceType={activeTab === 'LAUNDRY' ? 'Cuci' : 'Makan'}
+      />
+
+      <RekeningImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => refreshData()}
+        serviceType={activeTab === 'LAUNDRY' ? 'Cuci' : 'Makan'}
+      />
     </div>
   )
 }
+
