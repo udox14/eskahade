@@ -67,9 +67,10 @@ export interface LegacyBackfillReport {
 
 function generatePaymentNumber(): string {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase()
+  const randomSuffix = crypto.randomUUID().replace(/-/g, '').substring(0, 8).toUpperCase()
   return `PAY-${datePart}-${randomSuffix}`
 }
+
 
 export function buildLegacyExternalReference(source: LegacySourceType, id: string | number): string {
   return `LEGACY_${source}:${id}`
@@ -403,7 +404,7 @@ async function materializeLegacyHistoricalObligation(
     const ta = await queryOne<{ id: number }>(`SELECT id FROM tahun_ajaran WHERE nama = ? LIMIT 1`, [taName])
     academicYearId = ta ? ta.id : null
   } else if (itemType === 'USPP') {
-    const activeTa = await queryOne<{ id: number }>(`SELECT id FROM tahun_ajaran WHERE status = 'Aktif' LIMIT 1`)
+    const activeTa = await queryOne<{ id: number }>(`SELECT id FROM tahun_ajaran WHERE is_active = 1 LIMIT 1`)
     academicYearId = activeTa ? activeTa.id : null
   } else {
     // EHB, EKSKUL, KESEHATAN (period = YYYY)
@@ -417,52 +418,54 @@ async function materializeLegacyHistoricalObligation(
   let amountExpected = 0
   let tariffId: string | null = null
 
-  // Cek tabel finance_tariffs jika sudah terkonfigurasi
-  const existingTariff = await queryOne<{ id: string; nominal: number }>(
+  // Cek tabel finance_tariffs jika sudah terkonfigurasi untuk TA spesifik atau global
+  let existingTariff = await queryOne<{ id: string; nominal: number }>(
     `SELECT id, nominal FROM finance_tariffs
      WHERE item_type = ? AND (academic_year_id = ? OR academic_year_id IS NULL)
      ORDER BY academic_year_id DESC, effective_from DESC LIMIT 1`,
     [itemType, academicYearId]
   )
 
-  if (existingTariff && existingTariff.nominal > 0) {
-    amountExpected = existingTariff.nominal
-    tariffId = existingTariff.id
-  } else {
-    // Authoritative fallback dari biaya_settings / aturan resmi
-    const angkatan = santri.tahun_masuk || (santri.created_at ? new Date(santri.created_at).getFullYear() : 2026)
-    if (itemType === 'SPP') {
-      amountExpected = 70000
-      tariffId = 'trf-spp-bridge-fallback'
-    } else if (itemType === 'USPP') {
-      const bs = await queryOne<{ nominal: number }>(
-        `SELECT nominal FROM biaya_settings WHERE jenis_biaya = 'BANGUNAN' AND (tahun_angkatan = ? OR tahun_angkatan IS NULL) ORDER BY tahun_angkatan DESC LIMIT 1`,
-        [angkatan]
-      )
-      amountExpected = bs?.nominal && bs.nominal > 0 ? bs.nominal : 1000000
-      tariffId = 'trf-uspp-bridge-fallback'
-    } else if (itemType === 'EHB') {
-      const bs = await queryOne<{ nominal: number }>(
-        `SELECT nominal FROM biaya_settings WHERE jenis_biaya = 'EHB' AND (tahun_angkatan = ? OR tahun_angkatan IS NULL) ORDER BY tahun_angkatan DESC LIMIT 1`,
-        [angkatan]
-      )
-      amountExpected = bs?.nominal && bs.nominal > 0 ? bs.nominal : 100000
-      tariffId = 'trf-ehb-bridge-fallback'
-    } else if (itemType === 'EKSKUL') {
-      const bs = await queryOne<{ nominal: number }>(
-        `SELECT nominal FROM biaya_settings WHERE jenis_biaya = 'EKSKUL' AND (tahun_angkatan = ? OR tahun_angkatan IS NULL) ORDER BY tahun_angkatan DESC LIMIT 1`,
-        [angkatan]
-      )
-      amountExpected = bs?.nominal && bs.nominal > 0 ? bs.nominal : 50000
-      tariffId = 'trf-ekskul-bridge-fallback'
-    } else if (itemType === 'KESEHATAN') {
-      const bs = await queryOne<{ nominal: number }>(
-        `SELECT nominal FROM biaya_settings WHERE jenis_biaya = 'KESEHATAN' AND (tahun_angkatan = ? OR tahun_angkatan IS NULL) ORDER BY tahun_angkatan DESC LIMIT 1`,
-        [angkatan]
-      )
-      amountExpected = bs?.nominal && bs.nominal > 0 ? bs.nominal : 200000
-      tariffId = 'trf-kesehatan-bridge-fallback'
-    }
+  if (!existingTariff) {
+    // Fallback cari tarif umum per item_type di finance_tariffs agar foreign key valid
+    existingTariff = await queryOne<{ id: string; nominal: number }>(
+      `SELECT id, nominal FROM finance_tariffs
+       WHERE item_type = ?
+       ORDER BY effective_from DESC LIMIT 1`,
+      [itemType]
+    )
+  }
+
+  tariffId = existingTariff ? existingTariff.id : null
+
+  // Resolusi nilai tagihan otoritatif (Authoritative Billing Rules)
+  const angkatan = santri.tahun_masuk || (santri.created_at ? new Date(santri.created_at).getFullYear() : 2026)
+  if (itemType === 'SPP') {
+    amountExpected = existingTariff?.nominal || 70000
+  } else if (itemType === 'USPP') {
+    const bs = await queryOne<{ nominal: number }>(
+      `SELECT nominal FROM biaya_settings WHERE jenis_biaya = 'BANGUNAN' AND (tahun_angkatan = ? OR tahun_angkatan IS NULL) ORDER BY tahun_angkatan DESC LIMIT 1`,
+      [angkatan]
+    )
+    amountExpected = bs?.nominal && bs.nominal > 0 ? bs.nominal : (existingTariff?.nominal || 1000000)
+  } else if (itemType === 'EHB') {
+    const bs = await queryOne<{ nominal: number }>(
+      `SELECT nominal FROM biaya_settings WHERE jenis_biaya = 'EHB' AND (tahun_angkatan = ? OR tahun_angkatan IS NULL) ORDER BY tahun_angkatan DESC LIMIT 1`,
+      [angkatan]
+    )
+    amountExpected = bs?.nominal && bs.nominal > 0 ? bs.nominal : (existingTariff?.nominal || 100000)
+  } else if (itemType === 'EKSKUL') {
+    const bs = await queryOne<{ nominal: number }>(
+      `SELECT nominal FROM biaya_settings WHERE jenis_biaya = 'EKSKUL' AND (tahun_angkatan = ? OR tahun_angkatan IS NULL) ORDER BY tahun_angkatan DESC LIMIT 1`,
+      [angkatan]
+    )
+    amountExpected = bs?.nominal && bs.nominal > 0 ? bs.nominal : (existingTariff?.nominal || 50000)
+  } else if (itemType === 'KESEHATAN') {
+    const bs = await queryOne<{ nominal: number }>(
+      `SELECT nominal FROM biaya_settings WHERE jenis_biaya = 'KESEHATAN' AND (tahun_angkatan = ? OR tahun_angkatan IS NULL) ORDER BY tahun_angkatan DESC LIMIT 1`,
+      [angkatan]
+    )
+    amountExpected = bs?.nominal && bs.nominal > 0 ? bs.nominal : (existingTariff?.nominal || 200000)
   }
 
   const id = generateId()
@@ -847,6 +850,7 @@ export async function syncLegacyPayment(
     await batch(statements)
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err)
+    // Idempotency fallback jika race condition pada external_reference
     if (
       errMsg.includes('uq_finance_payments_channel_ext_ref') ||
       (errMsg.includes('UNIQUE') && (errMsg.includes('external_reference') || errMsg.includes('channel')))
@@ -861,6 +865,25 @@ export async function syncLegacyPayment(
           paymentNumber: fallbackExisting.payment_number,
           status: 'ALREADY_SYNCED',
         }
+      }
+    }
+
+    // Fallback jika terjadi benturan payment_number: regenerate dan coba sekali lagi
+    if (errMsg.includes('finance_payments.payment_number')) {
+      const retryPaymentNumber = generatePaymentNumber()
+      statements[0].params[1] = retryPaymentNumber
+      try {
+        await batch(statements)
+        return {
+          success: true,
+          source,
+          sourceId: strId,
+          paymentId,
+          paymentNumber: retryPaymentNumber,
+          status: 'SYNCED',
+        }
+      } catch (retryErr: unknown) {
+        // Jika retry kedua masih bentur, biarkan mengalir ke error handler logging di bawah
       }
     }
     // Catat log kegagalan jika batch error
