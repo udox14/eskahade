@@ -97,6 +97,7 @@ def setup_test_db() -> sqlite3.Connection:
             status_global TEXT NOT NULL DEFAULT 'aktif',
             asrama TEXT,
             kamar TEXT,
+            kelas_sekolah TEXT,
             tempat_makan_id TEXT REFERENCES master_jasa(id),
             tempat_mencuci_id TEXT REFERENCES master_jasa(id),
             tahun_masuk INTEGER DEFAULT 2026,
@@ -205,33 +206,29 @@ def test_limit_jajan_pagination_and_search(conn: sqlite3.Connection):
     """Test 1: Limit Uang Jajan Server-Side Pagination, Filtering, and Search."""
     print("Running Test 1: Limit Uang Jajan Server-Side Pagination & Search...")
 
-    # Seed 125 active students across 2 asramas and 2 classes
-    conn.execute("INSERT INTO kelas (id, nama_kelas) VALUES ('k-1', '7A'), ('k-2', '7B');")
+    # Strict contract: santri table must NOT have kelas_id, must have kelas_sekolah
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(santri);")
+    cols = [col[1] for col in cur.fetchall()]
+    assert "kelas_id" not in cols, "Regression invariant failed: santri must NOT have kelas_id"
+    assert "kelas_sekolah" in cols, "Contract failed: santri must have kelas_sekolah"
 
+    # Seed 125 active students across 2 asramas and 2 kelas_sekolah ('7A' and '7B')
     students = []
     for i in range(1, 126):
         sid = f"san-{i:03d}"
         nis = f"2026{i:03d}"
         asrama = "Asrama Abu Bakar" if i % 2 == 1 else "Asrama Umar"
+        kelas_sekolah = "7A" if i <= 60 else "7B"
         name = f"Santri Angkatan {i}"
-        students.append((sid, nis, name, "L", "aktif", asrama, f"Kamar {((i % 5) + 1):02d}"))
+        students.append((sid, nis, name, "L", "aktif", asrama, f"Kamar {((i % 5) + 1):02d}", kelas_sekolah))
 
     conn.executemany(
         """
-        INSERT INTO santri (id, nis, nama_lengkap, jenis_kelamin, status_global, asrama, kamar)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO santri (id, nis, nama_lengkap, jenis_kelamin, status_global, asrama, kamar, kelas_sekolah)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         students,
-    )
-
-    # Assign classes
-    class_assignments = []
-    for i in range(1, 126):
-        cid = "k-1" if i <= 60 else "k-2"
-        class_assignments.append((f"sk-{i}", f"san-{i:03d}", cid))
-    conn.executemany(
-        "INSERT INTO santri_kelas (id, santri_id, kelas_id) VALUES (?, ?, ?)",
-        class_assignments,
     )
 
     # Set parent limit for only the first 20 students (remaining 105 students have NO record in finance_wallet_limits)
@@ -245,7 +242,7 @@ def test_limit_jajan_pagination_and_search(conn: sqlite3.Connection):
         )
     conn.commit()
 
-    # Query helper matching getStudentWalletLimitsAction
+    # Query helper matching getStudentWalletLimitsAction (no join to nonexistent kelas_id)
     def query_limits(page=1, page_size=50, search="", asrama="", kelas=""):
         where_clauses = ["s.status_global = 'aktif'"]
         params = []
@@ -256,7 +253,7 @@ def test_limit_jajan_pagination_and_search(conn: sqlite3.Connection):
             where_clauses.append("s.asrama = ?")
             params.append(asrama)
         if kelas:
-            where_clauses.append("k.nama_kelas = ?")
+            where_clauses.append("s.kelas_sekolah = ?")
             params.append(kelas)
 
         where_sql = " AND ".join(where_clauses)
@@ -265,8 +262,6 @@ def test_limit_jajan_pagination_and_search(conn: sqlite3.Connection):
         count_sql = f"""
             SELECT COUNT(*)
             FROM santri s
-            LEFT JOIN santri_kelas sk ON sk.santri_id = s.id AND sk.is_active = 1
-            LEFT JOIN kelas k ON k.id = sk.kelas_id
             WHERE {where_sql}
         """
         cur = conn.cursor()
@@ -276,11 +271,9 @@ def test_limit_jajan_pagination_and_search(conn: sqlite3.Connection):
         # Data with LIMIT and OFFSET
         offset = (page - 1) * page_size
         data_sql = f"""
-            SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, k.nama_kelas,
+            SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.kelas_sekolah,
                    wl.parent_daily_limit, wl.parent_weekly_limit, wl.parent_monthly_limit
             FROM santri s
-            LEFT JOIN santri_kelas sk ON sk.santri_id = s.id AND sk.is_active = 1
-            LEFT JOIN kelas k ON k.id = sk.kelas_id
             LEFT JOIN finance_wallet_limits wl ON wl.santri_id = s.id
             WHERE {where_sql}
             ORDER BY s.nama_lengkap ASC
@@ -299,6 +292,7 @@ def test_limit_jajan_pagination_and_search(conn: sqlite3.Connection):
                 "nis": r[1],
                 "nama": r[2],
                 "asrama": r[3],
+                "kelas": r[5],
                 "parent_daily_limit": parent_daily,
                 "effective_daily_limit": effective,
             })
@@ -338,7 +332,18 @@ def test_limit_jajan_pagination_and_search(conn: sqlite3.Connection):
     for it in abu_items:
         assert it["asrama"] == "Asrama Abu Bakar"
 
-    # 7. Parent limit update
+    # 7. Kelas filter using actual production schema (s.kelas_sekolah)
+    total_7a, items_7a = query_limits(page=1, page_size=50, kelas="7A")
+    assert total_7a == 60, f"Expected 60 students in Kelas 7A, got {total_7a}"
+    for it in items_7a:
+        assert it["kelas"] == "7A"
+
+    total_7b, items_7b = query_limits(page=1, page_size=50, kelas="7B")
+    assert total_7b == 65, f"Expected 65 students in Kelas 7B, got {total_7b}"
+    for it in items_7b:
+        assert it["kelas"] == "7B"
+
+    # 8. Parent limit update
     # Update student 115's parent limit to Rp20,000
     conn.execute(
         """
@@ -352,7 +357,7 @@ def test_limit_jajan_pagination_and_search(conn: sqlite3.Connection):
     assert updated_115[0]["parent_daily_limit"] == 20000
     assert updated_115[0]["effective_daily_limit"] == 20000
 
-    print("[OK] Test 1 Passed: Limit Uang Jajan pagination, search, and effective limits work properly.")
+    print("[OK] Test 1 Passed: Limit Uang Jajan pagination, search, asrama & kelas_sekolah filters work properly.")
 
 
 

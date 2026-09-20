@@ -528,17 +528,16 @@ export async function getStudentWalletLimitsAction(
        WHERE status_global = 'aktif' AND asrama IS NOT NULL AND TRIM(asrama) != ''
        ORDER BY asrama ASC`
     ).catch(() => []),
-    query<{ nama_kelas: string }>(
-      `SELECT DISTINCT k.nama_kelas
-       FROM santri s
-       JOIN kelas k ON k.id = s.kelas_id
-       WHERE s.status_global = 'aktif' AND k.nama_kelas IS NOT NULL AND TRIM(k.nama_kelas) != ''
-       ORDER BY k.nama_kelas ASC`
+    query<{ kelas_sekolah: string }>(
+      `SELECT DISTINCT kelas_sekolah
+       FROM santri
+       WHERE status_global = 'aktif' AND kelas_sekolah IS NOT NULL AND TRIM(kelas_sekolah) != ''
+       ORDER BY CAST(kelas_sekolah AS INTEGER), kelas_sekolah ASC`
     ).catch(() => []),
   ])
 
   const asramaList = asramaRows.map(r => r.asrama)
-  const kelasList = kelasRows.map(r => r.nama_kelas)
+  const kelasList = kelasRows.map(r => r.kelas_sekolah)
 
   // Filter conditions
   const conditions: string[] = ["s.status_global = 'aktif'"]
@@ -555,7 +554,7 @@ export async function getStudentWalletLimitsAction(
   }
 
   if (kelasFilter && kelasFilter !== 'ALL') {
-    conditions.push('k.nama_kelas = ?')
+    conditions.push('s.kelas_sekolah = ?')
     queryParams.push(kelasFilter)
   }
 
@@ -565,7 +564,6 @@ export async function getStudentWalletLimitsAction(
   const countRow = await queryOne<{ total: number }>(
     `SELECT COUNT(*) AS total
      FROM santri s
-     LEFT JOIN kelas k ON k.id = s.kelas_id
      ${whereClause}`,
     queryParams
   )
@@ -591,14 +589,13 @@ export async function getStudentWalletLimitsAction(
        s.nama_lengkap,
        s.asrama,
        s.kamar,
-       k.nama_kelas AS kelas,
+       s.kelas_sekolah AS kelas,
        s.saldo_uang_jajan,
        wl.parent_daily_limit,
        wl.parent_weekly_limit,
        wl.parent_monthly_limit
      FROM santri s
      LEFT JOIN finance_wallet_limits wl ON wl.santri_id = s.id
-     LEFT JOIN kelas k ON k.id = s.kelas_id
      ${whereClause}
      ORDER BY s.nama_lengkap ASC
      LIMIT ? OFFSET ?`,
