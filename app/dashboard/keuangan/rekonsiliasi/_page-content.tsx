@@ -14,6 +14,8 @@ import {
   PlusCircle,
   ArrowRight,
   ShieldWarning,
+  ArrowsClockwise,
+  Info,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -24,6 +26,7 @@ import RecoveryCaseModal from './recovery-case-modal'
 import {
   getReconciliationPageData,
   findPaymentForCorrection,
+  executeLegacyBackfillAction,
   type ReconciliationPageData,
   type PeriodOption,
 } from './actions'
@@ -74,6 +77,32 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
 
   // Filter State Riwayat Koreksi
   const [correctionTypeFilter, setCorrectionTypeFilter] = useState('ALL')
+
+  // State Sinkronisasi Modul Lama
+  const [isSyncingLegacy, setIsSyncingLegacy] = useState(false)
+
+  const handleRunLegacySync = async () => {
+    if (isSyncingLegacy) return
+    setIsSyncingLegacy(true)
+    const toastId = toast.loading('Menyinkronkan pembayaran modul lama...')
+    try {
+      const res = await executeLegacyBackfillAction({ limit: 500 })
+      if (!res.success) {
+        toast.error(res.error || 'Gagal menyinkronkan data.', { id: toastId })
+      } else {
+        const r = res.report!
+        toast.success(
+          `Sinkronisasi selesai: ${r.synced} data baru disinkronkan, ${r.alreadySynced} sudah sinkron, ${r.excluded} dikecualikan.`,
+          { id: toastId }
+        )
+        handleRefresh('LEGACY_BRIDGE', selectedPeriod)
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Terjadi kesalahan saat sinkronisasi.', { id: toastId })
+    } finally {
+      setIsSyncingLegacy(false)
+    }
+  }
 
   const handleRefresh = (newTab?: ReconciliationPageData['activeTab'], newPeriod?: string) => {
     startTransition(async () => {
@@ -230,6 +259,15 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
               badge: kpi.unallocatedCount + kpi.recoveryPendingCount,
             },
             { id: 'KOREKSI' as const, label: 'Riwayat Koreksi', icon: ArrowCounterClockwise },
+            {
+              id: 'LEGACY_BRIDGE' as const,
+              label: 'Sinkronisasi Modul Lama',
+              icon: ArrowsClockwise,
+              badge:
+                data.legacyBridgeData?.preview?.toSyncCount && data.legacyBridgeData.preview.toSyncCount > 0
+                  ? data.legacyBridgeData.preview.toSyncCount
+                  : undefined,
+            },
           ].map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
@@ -689,6 +727,182 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                             {c.reason}
                           </td>
                           <td className="px-5 py-3 text-xs text-slate-500">{c.creator_name || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── TAB 5: SINKRONISASI MODUL LAMA ─── */}
+        {activeTab === 'LEGACY_BRIDGE' && (
+          <div className="space-y-6">
+            {/* Action Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">Sinkronisasi Pembayaran Modul Lama</h3>
+                <p className="text-xs text-slate-500">
+                  Menjembatani pembayaran dari modul lama (SPP, USPP, EHB, dll.) agar tercatat aman di Sistem Keuangan Baru tanpa duplikasi.
+                </p>
+              </div>
+              {userPermissions.canMutate && (
+                <button
+                  type="button"
+                  onClick={handleRunLegacySync}
+                  disabled={isSyncingLegacy || !data.legacyBridgeData?.preview?.toSyncCount}
+                  className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  <ArrowsClockwise size={16} className={isSyncingLegacy ? 'animate-spin' : ''} />
+                  <span>
+                    {isSyncingLegacy
+                      ? 'Menyinkronkan...'
+                      : `Sinkronkan Data (${data.legacyBridgeData?.preview?.toSyncCount || 0})`}
+                  </span>
+                </button>
+              )}
+            </div>
+
+            {/* Banner Pemisahan Pengelolaan Dana (UI Tenang) */}
+            <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 text-xs text-blue-900">
+              <Info size={20} className="shrink-0 text-blue-600 mt-0.5" />
+              <div>
+                <span className="font-semibold">Pemisahan Pengelolaan Dana (Pra-Koperasi):</span>
+                <span className="text-blue-800 ml-1">
+                  Seluruh pembayaran yang berasal dari modul lama secara permanen ditandai sebagai dana <strong>Pra-Koperasi</strong>. Kewajiban santri otomatis lunas, namun dana ini tidak dihitung dalam kas laci fisik loket Koperasi.
+                </span>
+              </div>
+            </div>
+
+            {/* KPI Cards Ringkasan Status Bridge */}
+            {data.legacyBridgeData?.preview && (
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
+                  <span className="text-xs font-medium text-slate-500">Total Transaksi Lama</span>
+                  <div className="mt-1.5 text-base font-bold text-slate-800">
+                    Rp {data.legacyBridgeData.preview.totalLegacyAmount.toLocaleString('id-ID')}
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {data.legacyBridgeData.preview.totalLegacyRecords} total data terdeteksi
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/30 p-4 shadow-2xs">
+                  <span className="text-xs font-medium text-emerald-700">Sudah Tersinkronkan</span>
+                  <div className="mt-1.5 text-base font-bold text-emerald-800">
+                    Rp {data.legacyBridgeData.preview.alreadySyncedAmount.toLocaleString('id-ID')}
+                  </div>
+                  <p className="mt-0.5 text-xs text-emerald-600">
+                    {data.legacyBridgeData.preview.alreadySyncedCount} pembayaran diakui sistem baru
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-amber-100 bg-amber-50/30 p-4 shadow-2xs">
+                  <span className="text-xs font-medium text-amber-700">Belum Tersinkronkan</span>
+                  <div className="mt-1.5 text-base font-bold text-amber-800">
+                    Rp {data.legacyBridgeData.preview.toSyncAmount.toLocaleString('id-ID')}
+                  </div>
+                  <p className="mt-0.5 text-xs text-amber-600">
+                    {data.legacyBridgeData.preview.toSyncCount} pembayaran siap diproses
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 shadow-2xs">
+                  <span className="text-xs font-medium text-slate-500">Dikecualikan (VOID/Nol)</span>
+                  <div className="mt-1.5 text-base font-bold text-slate-700">
+                    Rp {data.legacyBridgeData.preview.excludedAmount.toLocaleString('id-ID')}
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {data.legacyBridgeData.preview.excludedCount} data aman diabaikan
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Ringkasan per Pos Tagihan */}
+            {data.legacyBridgeData?.preview && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
+                <h4 className="text-xs font-semibold text-slate-700">Rincian Berdasarkan Jenis Pembayaran</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  {Object.entries(data.legacyBridgeData.preview.byItemType).map(([key, item]) => (
+                    <div key={key} className="rounded-xl border border-slate-100 bg-slate-50/50 p-3">
+                      <div className="text-xs font-bold text-slate-700">{key}</div>
+                      <div className="text-xs text-slate-500 mt-1">Total: {item.count} data</div>
+                      <div className="text-xs font-semibold text-slate-800">Rp {item.amount.toLocaleString('id-ID')}</div>
+                      {item.toSyncCount > 0 && (
+                        <div className="mt-1 text-[11px] font-medium text-amber-600">
+                          {item.toSyncCount} belum sinkron
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Pratinjau Sampel Data */}
+            <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-2xs">
+              <div className="border-b border-slate-100 px-5 py-3.5 bg-slate-50/50 flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700">Sampel Transaksi Modul Lama</span>
+                <span className="text-xs text-slate-500">
+                  {data.legacyBridgeData?.preview?.sampleCandidates.length || 0} sampel ditampilkan
+                </span>
+              </div>
+
+              {!data.legacyBridgeData?.preview?.sampleCandidates.length ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  Tidak ada data modul lama yang perlu ditampilkan.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold text-slate-600">
+                      <tr>
+                        <th className="px-5 py-3">Sumber & ID</th>
+                        <th className="px-5 py-3">Santri</th>
+                        <th className="px-5 py-3">Jenis Tagihan</th>
+                        <th className="px-5 py-3">Periode</th>
+                        <th className="px-5 py-3 text-right">Nominal</th>
+                        <th className="px-5 py-3">Tanggal Bayar</th>
+                        <th className="px-5 py-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {data.legacyBridgeData.preview.sampleCandidates.map((c, idx) => (
+                        <tr key={`${c.source}-${c.sourceId}-${idx}`} className="hover:bg-slate-50/60">
+                          <td className="px-5 py-3">
+                            <div className="font-semibold text-slate-800">{c.source}</div>
+                            <div className="text-xs text-slate-500">#{c.sourceId}</div>
+                          </td>
+                          <td className="px-5 py-3">
+                            <div className="font-semibold text-slate-800">{c.santriName || '-'}</div>
+                            <div className="text-xs text-slate-500">NIS: {c.santriNis || '-'}</div>
+                          </td>
+                          <td className="px-5 py-3 font-medium text-slate-700">{c.itemType}</td>
+                          <td className="px-5 py-3 text-slate-600">{c.period}</td>
+                          <td className="px-5 py-3 text-right font-bold text-slate-800">
+                            Rp {c.amount.toLocaleString('id-ID')}
+                          </td>
+                          <td className="px-5 py-3 text-slate-500">
+                            {c.paidAt.slice(0, 16).replace('T', ' ')}
+                          </td>
+                          <td className="px-5 py-3 text-center">
+                            {c.isAlreadySynced ? (
+                              <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                                Sudah Sinkron
+                              </span>
+                            ) : c.isExcluded ? (
+                              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                                Dikecualikan
+                              </span>
+                            ) : (
+                              <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                                Belum Sinkron
+                              </span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

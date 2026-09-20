@@ -8,6 +8,7 @@ import { getSppScope, isSadesaCategory, SADESA_CATEGORY } from '@/lib/spp/unit-s
 import { namaBulanId } from '@/lib/portal/format'
 import type { SppDetailItem } from '@/app/portal-ortu/(app)/tagihan/actions'
 import { getTujuanSetoranSpp } from '@/lib/spp/tujuan-setoran'
+import { syncLegacyPayment, syncLegacyPaymentReversal } from '@/lib/finance/bridge'
 
 const PATH = '/dashboard/asrama/spp/konfirmasi-portal'
 const REVALIDATE_PATHS = [
@@ -176,13 +177,18 @@ export async function approveSubmissionSpp(submissionId: string): Promise<{ succ
     const tujuanBerjalan = await Promise.all(berjalan.map(item =>
       getTujuanSetoranSpp(submission.santri_id, item.tahun, item.bulan)
     ))
+    const insertedLogIds: string[] = []
     const statements = [
-      ...berjalan.map((item, index) => ({
-        sql: `INSERT INTO spp_log
-                (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, portal_submission_id, tujuan_setoran)
-              VALUES (?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?)`,
-        params: [generateId(), submission.santri_id, item.tahun, item.bulan, item.nominal, session?.id ?? null, keterangan, submission.id, tujuanBerjalan[index]],
-      })),
+      ...berjalan.map((item, index) => {
+        const logId = generateId()
+        insertedLogIds.push(logId)
+        return {
+          sql: `INSERT INTO spp_log
+                  (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, portal_submission_id, tujuan_setoran)
+                VALUES (?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?)`,
+          params: [logId, submission.santri_id, item.tahun, item.bulan, item.nominal, session?.id ?? null, keterangan, submission.id, tujuanBerjalan[index]],
+        }
+      }),
       ...historis.map(item => ({
         sql: `UPDATE spp_tunggakan_historis
               SET status = 'LUNAS', tanggal_lunas = date('now'), penerima_id = ?, updated_at = datetime('now')
@@ -197,6 +203,20 @@ export async function approveSubmissionSpp(submissionId: string): Promise<{ succ
       },
     ]
     await batch(statements)
+
+    // Sync ke Sistem Keuangan Baru (Bridge)
+    for (const logId of insertedLogIds) {
+      await syncLegacyPayment('SPP_LOG', logId).catch((err) => {
+        console.error('[LegacyBridge] Gagal sinkronisasi SPP konfirmasi portal:', logId, err)
+      })
+    }
+    for (const item of historis) {
+      if (item.historis_id) {
+        await syncLegacyPayment('SPP_TUNGGAKAN_HISTORIS', item.historis_id).catch((err) => {
+          console.error('[LegacyBridge] Gagal sinkronisasi tunggakan historis portal:', item.historis_id, err)
+        })
+      }
+    }
 
     await logActivity({
       actor: actorFromSession(session),
@@ -273,6 +293,36 @@ export async function undoApprovalSpp(submissionId: string, reason: string): Pro
     const historisIds = detail
       .filter(item => item.source === 'HISTORIS' && item.historis_id)
       .map(item => item.historis_id as string)
+
+    // Reversal non-destruktif di Sistem Keuangan Baru (Bridge) sebelum record di spp_log dihapus
+    try {
+      const existingLogs = await query<{ id: string }>(
+        `SELECT id FROM spp_log WHERE portal_submission_id = ?`,
+        [submission.id]
+      )
+      for (const log of existingLogs) {
+        await syncLegacyPaymentReversal(
+          'SPP_LOG',
+          log.id,
+          `Pembatalan konfirmasi SPP portal: ${alasan}`,
+          session?.id ?? undefined
+        ).catch((err) => {
+          console.error('[LegacyBridge] Gagal membalikkan SPP log konfirmasi portal:', log.id, err)
+        })
+      }
+      for (const hId of historisIds) {
+        await syncLegacyPaymentReversal(
+          'SPP_TUNGGAKAN_HISTORIS',
+          hId,
+          `Pembatalan konfirmasi SPP portal (historis): ${alasan}`,
+          session?.id ?? undefined
+        ).catch((err) => {
+          console.error('[LegacyBridge] Gagal membalikkan tunggakan historis konfirmasi portal:', hId, err)
+        })
+      }
+    } catch (bridgeErr) {
+      console.error('[LegacyBridge] Error saat reversal SPP portal:', bridgeErr)
+    }
 
     await batch([
       {

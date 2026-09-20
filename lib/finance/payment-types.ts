@@ -13,6 +13,10 @@ export type FinanceOrderStatus = 'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED'
 
 export type FinancePaymentChannel = 'DUITKU' | 'CASH'
 
+export type FinancePaymentSource = 'NEW_FINANCE' | 'LEGACY'
+
+export type FinanceFundManagement = 'PRE_KOPERASI' | 'KOPERASI'
+
 export type FinancePaymentStatus = 'PAID' | 'SETTLED'
 
 export type FinanceCorrectionStatus = 'NONE' | 'PARTIALLY_CORRECTED' | 'FULLY_CORRECTED'
@@ -86,6 +90,8 @@ export interface FinancePayment {
   correction_status: FinanceCorrectionStatus
   allocation_status: FinanceAllocationStatus
   paid_at: string
+  source: FinancePaymentSource
+  fund_management: FinanceFundManagement
   external_reference: string | null
   cash_session_id: string | null
   received_by: string | null
@@ -159,6 +165,8 @@ export interface RecordOrderPaymentInput {
   orderId: string
   channel: FinancePaymentChannel
   method: string
+  source?: FinancePaymentSource
+  fundManagement?: FinanceFundManagement
   externalReference?: string | null
   gatewayFee?: number
   cashSessionId?: string | null
@@ -171,6 +179,8 @@ export interface RecordUnallocatedPaymentInput {
   amount: number
   channel: FinancePaymentChannel
   method: string
+  source?: FinancePaymentSource
+  fundManagement?: FinanceFundManagement
   externalReference?: string | null
   gatewayFee?: number
   cashSessionId?: string | null

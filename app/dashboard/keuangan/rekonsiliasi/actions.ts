@@ -25,6 +25,13 @@ import {
   getCorrectionDetail,
   resolveRecoveryCase,
 } from '@/lib/finance/corrections'
+import {
+  previewLegacySync,
+  executeBackfillLegacyPayments,
+  type LegacySyncPreviewSummary,
+  type LegacyBackfillReport,
+  type LegacySourceType,
+} from '@/lib/finance/bridge'
 import type {
   ReconciliationKpiOverview,
   UnallocatedReconciliationRow,
@@ -50,7 +57,7 @@ export interface PeriodOption {
 }
 
 export interface ReconciliationPageData {
-  activeTab: 'SETTLEMENT' | 'KAS_LOKET' | 'UNALLOCATED' | 'KOREKSI'
+  activeTab: 'SETTLEMENT' | 'KAS_LOKET' | 'UNALLOCATED' | 'KOREKSI' | 'LEGACY_BRIDGE'
   selectedPeriod: string
   kpi: ReconciliationKpiOverview
   settlementData?: {
@@ -98,6 +105,9 @@ export interface ReconciliationPageData {
     totalPages: number
     page: number
     pageSize: number
+  }
+  legacyBridgeData?: {
+    preview: LegacySyncPreviewSummary
   }
   periodOptions: PeriodOption[]
   userPermissions: UserReconciliationPermissions
@@ -184,7 +194,7 @@ async function checkUserPermissions(): Promise<{
  * Mengambil data halaman Rekonsiliasi & Koreksi sesuai tab aktif dan filter.
  */
 export async function getReconciliationPageData(params?: {
-  tab?: 'SETTLEMENT' | 'KAS_LOKET' | 'UNALLOCATED' | 'KOREKSI'
+  tab?: 'SETTLEMENT' | 'KAS_LOKET' | 'UNALLOCATED' | 'KOREKSI' | 'LEGACY_BRIDGE'
   period?: string
   page?: number
   search?: string
@@ -201,6 +211,7 @@ export async function getReconciliationPageData(params?: {
   let cashData
   let unallocatedData
   let correctionData
+  let legacyBridgeData
 
   if (activeTab === 'SETTLEMENT') {
     const candidates = await getCandidatePaymentsForSettlement(selectedPeriod)
@@ -243,6 +254,9 @@ export async function getReconciliationPageData(params?: {
       page: params?.page ?? 1,
       pageSize: 10,
     })
+  } else if (activeTab === 'LEGACY_BRIDGE') {
+    const preview = await previewLegacySync()
+    legacyBridgeData = { preview }
   }
 
   return {
@@ -253,6 +267,7 @@ export async function getReconciliationPageData(params?: {
     cashData,
     unallocatedData,
     correctionData,
+    legacyBridgeData,
     periodOptions,
     userPermissions: perms,
   }
@@ -542,5 +557,48 @@ export async function findPaymentForCorrection(paymentNumber: string): Promise<{
       santri_name: p.santri_name,
       cash_session_id: p.cash_session_id,
     },
+  }
+}
+
+/**
+ * Server Action: Ambil pratinjau data sinkronisasi modul lama
+ */
+export async function getLegacySyncPreviewAction(): Promise<{
+  success: boolean
+  preview?: LegacySyncPreviewSummary
+  error?: string
+}> {
+  const { perms } = await checkUserPermissions()
+  if (!perms.canView) {
+    return { success: false, error: 'Akses ditolak.' }
+  }
+  try {
+    const preview = await previewLegacySync()
+    return { success: true, preview }
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Gagal mengambil pratinjau sinkronisasi modul lama.' }
+  }
+}
+
+/**
+ * Server Action: Eksekusi batch sinkronisasi modul lama (idempoten & non-destruktif)
+ */
+export async function executeLegacyBackfillAction(options?: {
+  limit?: number
+  source?: LegacySourceType
+}): Promise<{
+  success: boolean
+  report?: LegacyBackfillReport
+  error?: string
+}> {
+  const { session, perms } = await checkUserPermissions()
+  if (!perms.canMutate || !session) {
+    return { success: false, error: 'Anda tidak memiliki izin untuk mengeksekusi sinkronisasi modul lama.' }
+  }
+  try {
+    const report = await executeBackfillLegacyPayments(options)
+    return { success: true, report }
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Gagal mengeksekusi sinkronisasi modul lama.' }
   }
 }

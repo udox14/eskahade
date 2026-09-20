@@ -230,6 +230,7 @@ export async function ensureObligation(
 
   // 5. Resolusi tarif aktif (Snapshot Tarif) - Ketat pada TA yang ditentukan
   const tariff = await getActiveTariff(itemType, period, academicYearId)
+
   if (!tariff) {
     throw new Error(
       `Tarif untuk item "${itemType}" periode "${period}" (Tahun Ajaran ID: ${academicYearId ?? 'Global'}) belum dikonfigurasi.`

@@ -4,6 +4,7 @@
 
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
 import { getPaymentOrderById } from '@/lib/finance/orders'
+import { resolveFundManagement } from '@/lib/finance/fund-management'
 import type {
   FinancePayment,
   FinanceAllocation,
@@ -57,6 +58,8 @@ export async function recordOrderPayment(
   const netAmount = Math.max(0, grossAmount - gatewayFee)
   const cashSessionId = input.cashSessionId ?? order.cash_session_id ?? null
   const receivedBy = input.receivedBy ?? null
+  const paymentSource = input.source ?? 'NEW_FINANCE'
+  const fundManagement = await resolveFundManagement(paidAt, paymentSource, input.fundManagement)
 
   // 2. Evaluasi status order:
   // - Jika order sudah PAID, EXPIRED, atau CANCELLED:
@@ -76,8 +79,8 @@ export async function recordOrderPayment(
             id, payment_number, order_id, santri_id, channel, method,
             gross_amount, gateway_fee, net_amount, status, correction_status,
             allocation_status, paid_at, external_reference, cash_session_id,
-            received_by, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', 'UNALLOCATED', ?, ?, ?, ?, ?)
+            received_by, source, fund_management, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', 'UNALLOCATED', ?, ?, ?, ?, ?, ?, ?)
         `,
         params: [
           paymentId,
@@ -93,6 +96,8 @@ export async function recordOrderPayment(
           externalRef,
           cashSessionId,
           receivedBy,
+          paymentSource,
+          fundManagement,
           paidAt,
         ],
       },
@@ -268,8 +273,8 @@ export async function recordOrderPayment(
         id, payment_number, order_id, santri_id, channel, method,
         gross_amount, gateway_fee, net_amount, status, correction_status,
         allocation_status, paid_at, external_reference, cash_session_id,
-        received_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', ?, ?, ?, ?, ?, ?)
+        received_by, source, fund_management, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     params: [
       paymentId,
@@ -286,6 +291,8 @@ export async function recordOrderPayment(
       externalRef,
       cashSessionId,
       receivedBy,
+      paymentSource,
+      fundManagement,
       paidAt,
     ],
   })
@@ -420,8 +427,8 @@ export async function recordOrderPayment(
               id, payment_number, order_id, santri_id, channel, method,
               gross_amount, gateway_fee, net_amount, status, correction_status,
               allocation_status, paid_at, external_reference, cash_session_id,
-              received_by, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', 'UNALLOCATED', ?, ?, ?, ?, ?)
+              received_by, source, fund_management, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', 'UNALLOCATED', ?, ?, ?, ?, ?, ?, ?)
           `,
           params: [
             paymentId,
@@ -437,6 +444,8 @@ export async function recordOrderPayment(
             externalRef,
             cashSessionId,
             receivedBy,
+            paymentSource,
+            fundManagement,
             paidAt,
           ],
         },
@@ -520,6 +529,8 @@ export async function recordUnallocatedPayment(
   const netAmount = Math.max(0, amount - gatewayFee)
   const cashSessionId = input.cashSessionId ?? null
   const receivedBy = input.receivedBy ?? null
+  const paymentSource = input.source ?? 'NEW_FINANCE'
+  const fundManagement = await resolveFundManagement(paidAt, paymentSource, input.fundManagement)
 
   const statements: Array<{ sql: string; params: unknown[] }> = []
 
@@ -530,8 +541,8 @@ export async function recordUnallocatedPayment(
         id, payment_number, order_id, santri_id, channel, method,
         gross_amount, gateway_fee, net_amount, status, correction_status,
         allocation_status, paid_at, external_reference, cash_session_id,
-        received_by, created_at
-      ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', 'UNALLOCATED', ?, ?, ?, ?, ?)
+        received_by, source, fund_management, created_at
+      ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', 'UNALLOCATED', ?, ?, ?, ?, ?, ?, ?)
     `,
     params: [
       paymentId,
@@ -546,6 +557,8 @@ export async function recordUnallocatedPayment(
       externalRef,
       cashSessionId,
       receivedBy,
+      paymentSource,
+      fundManagement,
       paidAt,
     ],
   })
@@ -615,7 +628,7 @@ export async function getPaymentById(
     `SELECT id, payment_number, order_id, santri_id, channel, method,
             gross_amount, gateway_fee, net_amount, status, correction_status,
             allocation_status, paid_at, external_reference, cash_session_id,
-            received_by, created_at
+            received_by, source, fund_management, created_at
      FROM finance_payments
      WHERE id = ?`,
     [paymentId]
@@ -648,7 +661,7 @@ export async function getPaymentByNumber(
     `SELECT id, payment_number, order_id, santri_id, channel, method,
             gross_amount, gateway_fee, net_amount, status, correction_status,
             allocation_status, paid_at, external_reference, cash_session_id,
-            received_by, created_at
+            received_by, source, fund_management, created_at
      FROM finance_payments
      WHERE payment_number = ?`,
     [paymentNumber]
@@ -681,7 +694,7 @@ export async function getPaymentByOrderId(
     `SELECT id, payment_number, order_id, santri_id, channel, method,
             gross_amount, gateway_fee, net_amount, status, correction_status,
             allocation_status, paid_at, external_reference, cash_session_id,
-            received_by, created_at
+            received_by, source, fund_management, created_at
      FROM finance_payments
      WHERE order_id = ?
      ORDER BY created_at ASC`,
@@ -715,7 +728,7 @@ export async function getPaymentsByOrderId(
     `SELECT id, payment_number, order_id, santri_id, channel, method,
             gross_amount, gateway_fee, net_amount, status, correction_status,
             allocation_status, paid_at, external_reference, cash_session_id,
-            received_by, created_at
+            received_by, source, fund_management, created_at
      FROM finance_payments
      WHERE order_id = ?
      ORDER BY created_at ASC`,
@@ -751,7 +764,7 @@ export async function listPaymentsByStudent(
     `SELECT id, payment_number, order_id, santri_id, channel, method,
             gross_amount, gateway_fee, net_amount, status, correction_status,
             allocation_status, paid_at, external_reference, cash_session_id,
-            received_by, created_at
+            received_by, source, fund_management, created_at
      FROM finance_payments
      WHERE santri_id = ?
      ORDER BY paid_at DESC`,
@@ -789,7 +802,7 @@ export async function getPaymentByExternalReference(
     `SELECT id, payment_number, order_id, santri_id, channel, method,
             gross_amount, gateway_fee, net_amount, status, correction_status,
             allocation_status, paid_at, external_reference, cash_session_id,
-            received_by, created_at
+            received_by, source, fund_management, created_at
      FROM finance_payments
      WHERE channel = ? AND external_reference = ?`,
     [channel, externalReference]

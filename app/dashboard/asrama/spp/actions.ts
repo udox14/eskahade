@@ -18,6 +18,7 @@ import {
   periodKey,
 } from '@/lib/spp/tunggakan'
 import { getTujuanSetoranSpp, tujuanSetoranSql } from '@/lib/spp/tujuan-setoran'
+import { syncLegacyPayment, syncLegacyPaymentReversal } from '@/lib/finance/bridge'
 
 function isPsbJuliSpecial(bulan: number, tujuanSetoran: string | null | undefined) {
   return Number(bulan) === 7 && tujuanSetoran === 'BENDAHARA_PUSAT'
@@ -900,6 +901,11 @@ export async function bayarTunggakanHistorisSPP(id: string): Promise<{ success: 
       [session?.id ?? null, id]
     )
 
+    // Sync ke Sistem Keuangan Baru (Bridge)
+    await syncLegacyPayment('SPP_TUNGGAKAN_HISTORIS', id).catch((err) => {
+      console.error('[LegacyBridge] Gagal sinkronisasi tunggakan historis SPP:', err)
+    })
+
     await logActivity({
       actor: actorFromSession(session),
       module: 'spp',
@@ -956,11 +962,23 @@ export async function bayarSPP(santriId: string, tahun: number, bulans: number[]
     )
     if (exist.length > 0) return { error: 'Beberapa bulan sudah dibayar sebelumnya.' }
 
-    await batch(bulans.map(b => ({
-      sql: `INSERT INTO spp_log (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, tujuan_setoran)
-            VALUES (?, ?, ?, ?, ?, ?, 'Pembayaran Manual', date('now'), ?)`,
-      params: [generateId(), santriId, tahun, b, nominalPerBulan, session?.id ?? null, tujuanByBulan.get(b)],
-    })))
+    const insertedLogIds: string[] = []
+    await batch(bulans.map(b => {
+      const logId = generateId()
+      insertedLogIds.push(logId)
+      return {
+        sql: `INSERT INTO spp_log (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, tujuan_setoran)
+              VALUES (?, ?, ?, ?, ?, ?, 'Pembayaran Manual', date('now'), ?)`,
+        params: [logId, santriId, tahun, b, nominalPerBulan, session?.id ?? null, tujuanByBulan.get(b)],
+      }
+    }))
+
+    // Sync ke Sistem Keuangan Baru (Bridge)
+    for (const logId of insertedLogIds) {
+      await syncLegacyPayment('SPP_LOG', logId).catch((err) => {
+        console.error('[LegacyBridge] Gagal sinkronisasi pembayaran SPP:', logId, err)
+      })
+    }
 
     await logActivity({
       actor: actorFromSession(session),
@@ -1054,6 +1072,22 @@ export async function bayarSemuaSantriAsrama(
          )`,
       [tahun, bulan, nominalPerBulan, session?.id ?? null, tahun, bulan, ...unitParams, tahun, bulan, tahun, bulan]
     )
+
+    // Sync ke Sistem Keuangan Baru (Bridge)
+    try {
+      const newlyCreated = await query<{ id: string }>(
+        `SELECT id FROM spp_log
+         WHERE tahun = ? AND bulan = ? AND keterangan = 'Bayar Semua' AND tanggal_bayar = date('now') AND penerima_id = ?`,
+        [tahun, bulan, session?.id ?? null]
+      )
+      for (const item of newlyCreated) {
+        await syncLegacyPayment('SPP_LOG', item.id).catch((err) => {
+          console.error('[LegacyBridge] Gagal sinkronisasi massal SPP:', item.id, err)
+        })
+      }
+    } catch (bridgeErr) {
+      console.error('[LegacyBridge] Error query newly created bulk SPP logs:', bridgeErr)
+    }
 
     await logActivity({
       actor: actorFromSession(session),
@@ -1367,6 +1401,17 @@ export async function batalkanPembayaranSPP(logId: string): Promise<{ success: b
       LIMIT 1
     `, [collectionYear, collectionMonth, current.tujuan_setoran, current.asrama ?? ''])
     if (confirmed) return { error: 'Pembayaran tidak dapat dibatalkan karena setoran terkait sudah dikonfirmasi. Batalkan konfirmasi setoran terlebih dahulu.' }
+
+    // Reversal non-destruktif di Sistem Keuangan Baru (Bridge) sebelum record di spp_log dihapus
+    await syncLegacyPaymentReversal(
+      'SPP_LOG',
+      logId,
+      `Pembatalan pembayaran SPP ${current.nama_lengkap || current.santri_id} bulan ${current.bulan}/${current.tahun}`,
+      session?.id ?? undefined
+    ).catch((err) => {
+      console.error('[LegacyBridge] Gagal membalikkan pembayaran SPP di Sistem Keuangan Baru:', err)
+    })
+
     await execute(`DELETE FROM spp_log WHERE id = ?`, [logId])
     await logActivity({
       actor: actorFromSession(session),

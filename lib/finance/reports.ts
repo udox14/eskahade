@@ -50,6 +50,8 @@ export interface ReceiptsReportFilter extends BaseReportFilter {
   channel?: 'ALL' | 'DUITKU' | 'CASH'
   method?: string
   itemType?: string
+  source?: 'ALL' | 'LEGACY' | 'NEW_FINANCE'
+  fundManagement?: 'ALL' | 'PRE_KOPERASI' | 'KOPERASI'
 }
 
 export interface ReceiptItemRow {
@@ -71,6 +73,8 @@ export interface ReceiptItemRow {
   status: 'PAID' | 'SETTLED'
   correctionStatus: string
   cashierName: string | null
+  source: 'LEGACY' | 'NEW_FINANCE'
+  fundManagement: 'PRE_KOPERASI' | 'KOPERASI'
 }
 
 export interface ReceiptsReportResponse {
@@ -82,6 +86,8 @@ export interface ReceiptsReportResponse {
     totalTransactions: number
     onlineGross: number
     cashGross: number
+    preKoperasiGross: number
+    koperasiGross: number
   }
   pagination: {
     currentPage: number
@@ -245,6 +251,8 @@ export interface StudentDetailPaymentRow {
   netAmount: number
   allocationsSummary: string
   status: string
+  source?: 'LEGACY' | 'NEW_FINANCE'
+  fundManagement?: 'PRE_KOPERASI' | 'KOPERASI'
 }
 
 export interface StudentDetailWalletRow {
@@ -577,6 +585,14 @@ export async function getReceiptsReport(
     conditions.push('fp.method = ?')
     params.push(filters.method)
   }
+  if (filters.source && filters.source !== 'ALL') {
+    conditions.push('fp.source = ?')
+    params.push(filters.source)
+  }
+  if (filters.fundManagement && filters.fundManagement !== 'ALL') {
+    conditions.push('fp.fund_management = ?')
+    params.push(filters.fundManagement)
+  }
   if (filters.asrama && filters.asrama !== 'ALL') {
     conditions.push('s.asrama = ?')
     params.push(filters.asrama)
@@ -618,6 +634,8 @@ export async function getReceiptsReport(
     total_count: number
     online_gross: number
     cash_gross: number
+    pre_koperasi_gross: number
+    koperasi_gross: number
   }>(
     `SELECT
        COALESCE(SUM(fp.gross_amount), 0) AS total_gross,
@@ -625,7 +643,9 @@ export async function getReceiptsReport(
        COALESCE(SUM(fp.net_amount), 0) AS total_net,
        COUNT(*) AS total_count,
        COALESCE(SUM(CASE WHEN fp.channel = 'DUITKU' THEN fp.gross_amount ELSE 0 END), 0) AS online_gross,
-       COALESCE(SUM(CASE WHEN fp.channel = 'CASH' THEN fp.gross_amount ELSE 0 END), 0) AS cash_gross
+       COALESCE(SUM(CASE WHEN fp.channel = 'CASH' THEN fp.gross_amount ELSE 0 END), 0) AS cash_gross,
+       COALESCE(SUM(CASE WHEN fp.fund_management = 'PRE_KOPERASI' THEN fp.gross_amount ELSE 0 END), 0) AS pre_koperasi_gross,
+       COALESCE(SUM(CASE WHEN fp.fund_management = 'KOPERASI' THEN fp.gross_amount ELSE 0 END), 0) AS koperasi_gross
      FROM finance_payments fp
      LEFT JOIN finance_payment_orders fpo ON fpo.id = fp.order_id
      JOIN santri s ON s.id = fp.santri_id
@@ -655,6 +675,8 @@ export async function getReceiptsReport(
     correction_status: string
     cashier_name: string | null
     allocations_summary: string | null
+    source: string | null
+    fund_management: string | null
   }>(
     `SELECT
        fp.id,
@@ -678,7 +700,9 @@ export async function getReceiptsReport(
          SELECT GROUP_CONCAT(fa.item_type || ': Rp' || fa.amount, ', ')
          FROM finance_allocations fa
          WHERE fa.payment_id = fp.id
-       ) AS allocations_summary
+       ) AS allocations_summary,
+       fp.source,
+       fp.fund_management
      FROM finance_payments fp
      LEFT JOIN finance_payment_orders fpo ON fpo.id = fp.order_id
      JOIN santri s ON s.id = fp.santri_id
@@ -710,6 +734,8 @@ export async function getReceiptsReport(
     status: r.status,
     correctionStatus: r.correction_status,
     cashierName: r.cashier_name,
+    source: (r.source || 'NEW_FINANCE') as 'LEGACY' | 'NEW_FINANCE',
+    fundManagement: (r.fund_management || 'PRE_KOPERASI') as 'PRE_KOPERASI' | 'KOPERASI',
   }))
 
   const totalRecords = kpiRow?.total_count || 0
@@ -723,6 +749,8 @@ export async function getReceiptsReport(
       totalTransactions: totalRecords,
       onlineGross: kpiRow?.online_gross || 0,
       cashGross: kpiRow?.cash_gross || 0,
+      preKoperasiGross: kpiRow?.pre_koperasi_gross || 0,
+      koperasiGross: kpiRow?.koperasi_gross || 0,
     },
     pagination: {
       currentPage: page,
@@ -1413,6 +1441,8 @@ export async function getStudentDetailReport(
     net_amount: number
     status: string
     allocations_summary: string | null
+    source: string | null
+    fund_management: string | null
   }>(
     `SELECT
        fp.id,
@@ -1426,7 +1456,9 @@ export async function getStudentDetailReport(
          SELECT GROUP_CONCAT(fa.item_type || ': Rp' || fa.amount, ', ')
          FROM finance_allocations fa
          WHERE fa.payment_id = fp.id
-       ) AS allocations_summary
+       ) AS allocations_summary,
+       fp.source,
+       fp.fund_management
      FROM finance_payments fp
      WHERE fp.santri_id = ?
      ORDER BY fp.paid_at DESC
@@ -1443,6 +1475,8 @@ export async function getStudentDetailReport(
     netAmount: r.net_amount,
     allocationsSummary: r.allocations_summary || 'Uang Jajan / Standalone',
     status: r.status,
+    source: (r.source || 'NEW_FINANCE') as 'LEGACY' | 'NEW_FINANCE',
+    fundManagement: (r.fund_management || 'PRE_KOPERASI') as 'PRE_KOPERASI' | 'KOPERASI',
   }))
 
   // 4. Data Mutasi Uang Jajan & Authoritative Balance (SUM IN - SUM OUT)

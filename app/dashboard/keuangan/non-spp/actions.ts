@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
+import { syncLegacyPayment, syncLegacyPaymentReversal } from '@/lib/finance/bridge'
 
 const PATH = '/dashboard/keuangan/non-spp'
 const JENIS_TAHUNAN = ['KESEHATAN', 'EHB', 'EKSKUL'] as const
@@ -575,6 +576,11 @@ export async function bayarInlineNonSpp(input: {
     details: { santri_id: santri.id, tahun_ajaran_id: tahunAjaran.id, jenis_biaya: input.jenis, nominal },
   })
 
+  // Sync ke Sistem Keuangan Baru (Bridge)
+  await syncLegacyPayment('PEMBAYARAN_TAHUNAN', id).catch((err) => {
+    console.error('[LegacyBridge] Gagal sinkronisasi pembayaran Non-SPP:', id, err)
+  })
+
   revalidatePath(PATH)
   return { success: true, id }
 }
@@ -602,6 +608,7 @@ export async function bulkBayarNonSpp(input: {
   })
   const rowMap = new Map(allRows.map((row: any) => [row.id, row]))
   const batchId = generateId()
+  const insertedIds: string[] = []
   let inserted = 0
   let skipped = 0
   let total = 0
@@ -634,9 +641,17 @@ export async function bulkBayarNonSpp(input: {
         session?.id ?? null,
         `Bulk Non-SPP ${tahunAjaran.nama}`,
       ])
+      insertedIds.push(id)
       inserted += 1
       total += sisa
     }
+  }
+
+  // Sync ke Sistem Keuangan Baru (Bridge)
+  for (const newId of insertedIds) {
+    await syncLegacyPayment('PEMBAYARAN_TAHUNAN', newId).catch((err) => {
+      console.error('[LegacyBridge] Gagal sinkronisasi bulk Non-SPP:', newId, err)
+    })
   }
 
   await logActivity({
@@ -678,6 +693,18 @@ export async function voidPembayaranNonSpp(input: {
 
   const rows = await query<PaymentRow>(`SELECT p.* FROM pembayaran_tahunan p WHERE ${where}`, params)
   if (!rows.length) return { error: 'Transaksi aktif tidak ditemukan atau sudah di-void.' }
+
+  // Reversal non-destruktif di Sistem Keuangan Baru (Bridge)
+  for (const r of rows) {
+    await syncLegacyPaymentReversal(
+      'PEMBAYARAN_TAHUNAN',
+      r.id,
+      `Void pembayaran Non-SPP (${r.jenis_biaya}): ${alasan}`,
+      session?.id ?? undefined
+    ).catch((err) => {
+      console.error('[LegacyBridge] Gagal membalikkan pembayaran Non-SPP di Sistem Keuangan Baru:', r.id, err)
+    })
+  }
 
   const stamp = now()
   if (input.paymentId) {

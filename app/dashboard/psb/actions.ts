@@ -18,6 +18,7 @@ import {
 } from '@/lib/santri/kategori'
 import { getNominalSppForYear, getSppBillingStartSetting } from '@/lib/spp/tunggakan'
 import { getTujuanSetoranSpp } from '@/lib/spp/tujuan-setoran'
+import { syncLegacyPayment, syncLegacyPaymentReversal } from '@/lib/finance/bridge'
 
 const PSB_PATH = '/dashboard/psb'
 const MONITORING_PATH = '/dashboard/psb/monitoring'
@@ -840,24 +841,36 @@ export async function bayarPsbBatch(input: {
     ? await getTujuanSetoranSpp(input.santriId, tahunTagihan, SPP_JULI_BULAN)
     : 'DEWAN_SANTRI'
   const db = await getDB()
+
+  const insertedTahunanIds: string[] = []
+  const tahunanStatements = normalized.map((item) => {
+    const ptId = generateId()
+    insertedTahunanIds.push(ptId)
+    return db.prepare(`
+      INSERT INTO pembayaran_tahunan (
+        id, santri_id, jenis_biaya, tahun_tagihan, nominal_bayar, tanggal_bayar, penerima_id, keterangan, psb_receipt_id
+      ) VALUES (?, ?, ?, ?, ?, date('now'), ?, ?, ?)
+    `).bind(ptId, input.santriId, item.jenis, item.tahunTagihan, item.nominal, access.id, item.keterangan, receiptId)
+  })
+
+  let sppLogId: string | null = null
+  if (wantSppJuli) {
+    sppLogId = generateId()
+  }
+  const sppStatements = (wantSppJuli && sppLogId) ? [
+    db.prepare(`
+      INSERT INTO spp_log (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, psb_receipt_id, tujuan_setoran)
+      VALUES (?, ?, ?, ?, ?, ?, 'Pembayaran PSB - SPP Juli', date('now'), ?, ?)
+    `).bind(sppLogId, input.santriId, tahunTagihan, SPP_JULI_BULAN, sppJuliNominal, access.id, receiptId, tujuanSppJuli),
+  ] : []
+
   await db.batch([
     db.prepare(`
       INSERT INTO psb_payment_receipt (id, receipt_no, santri_id, tahun_tagihan, total, metode, created_by, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).bind(receiptId, receiptNo, input.santriId, tahunTagihan, total, metode, access.id),
-    ...normalized.map((item) =>
-      db.prepare(`
-        INSERT INTO pembayaran_tahunan (
-          id, santri_id, jenis_biaya, tahun_tagihan, nominal_bayar, tanggal_bayar, penerima_id, keterangan, psb_receipt_id
-        ) VALUES (?, ?, ?, ?, ?, date('now'), ?, ?, ?)
-      `).bind(generateId(), input.santriId, item.jenis, item.tahunTagihan, item.nominal, access.id, item.keterangan, receiptId)
-    ),
-    ...(wantSppJuli ? [
-      db.prepare(`
-        INSERT INTO spp_log (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, psb_receipt_id, tujuan_setoran)
-        VALUES (?, ?, ?, ?, ?, ?, 'Pembayaran PSB - SPP Juli', date('now'), ?, ?)
-      `).bind(generateId(), input.santriId, tahunTagihan, SPP_JULI_BULAN, sppJuliNominal, access.id, receiptId, tujuanSppJuli),
-    ] : []),
+    ...tahunanStatements,
+    ...sppStatements,
     ...preJulyWaiveMonths.map((mo) =>
       db.prepare(`
         INSERT INTO spp_tagihan_ditiadakan (id, santri_id, tahun, bulan, alasan, is_active, created_by, created_at, updated_by, updated_at)
@@ -880,6 +893,18 @@ export async function bayarPsbBatch(input: {
         updated_at = excluded.updated_at
     `).bind(generateId(), input.santriId, access.id, access.id),
   ])
+
+  // Sync ke Sistem Keuangan Baru (Bridge)
+  for (const ptId of insertedTahunanIds) {
+    await syncLegacyPayment('PEMBAYARAN_TAHUNAN', ptId).catch((err) => {
+      console.error('[LegacyBridge] Gagal sinkronisasi pembayaran PSB (tahunan):', ptId, err)
+    })
+  }
+  if (sppLogId) {
+    await syncLegacyPayment('SPP_LOG', sppLogId).catch((err) => {
+      console.error('[LegacyBridge] Gagal sinkronisasi pembayaran PSB (SPP Juli):', sppLogId, err)
+    })
+  }
 
   try {
     await logActivity({
@@ -1129,6 +1154,32 @@ export async function voidPsbReceipt(input: { receiptId: string; santriId: strin
   }
 
   const stamp = new Date().toISOString()
+
+  // Reversal non-destruktif di Sistem Keuangan Baru (Bridge) sebelum record di-void / spp_log di-delete
+  try {
+    const tahRows = await query<{ id: string }>(
+      `SELECT id FROM pembayaran_tahunan WHERE psb_receipt_id = ? AND COALESCE(status, 'AKTIF') != 'VOID'`,
+      [input.receiptId]
+    )
+    for (const t of tahRows) {
+      await syncLegacyPaymentReversal('PEMBAYARAN_TAHUNAN', t.id, `Void kuitansi PSB: ${input.alasan}`, access.id).catch(err => {
+        console.error('[LegacyBridge] Gagal membalikkan pembayaran tahunan PSB:', t.id, err)
+      })
+    }
+
+    const sppRows = await query<{ id: string }>(
+      `SELECT id FROM spp_log WHERE psb_receipt_id = ?`,
+      [input.receiptId]
+    )
+    for (const s of sppRows) {
+      await syncLegacyPaymentReversal('SPP_LOG', s.id, `Void kuitansi PSB: ${input.alasan}`, access.id).catch(err => {
+        console.error('[LegacyBridge] Gagal membalikkan SPP Juli PSB:', s.id, err)
+      })
+    }
+  } catch (bridgeErr) {
+    console.error('[LegacyBridge] Error saat reversal pembayaran PSB:', bridgeErr)
+  }
+
   await execute('UPDATE pembayaran_tahunan SET status = ?, void_reason = ?, voided_by = ?, voided_at = ? WHERE psb_receipt_id = ?', ['VOID', input.alasan, access.id, stamp, input.receiptId])
   // spp_log tidak punya status VOID: pembayaran SPP Juli-nya dihapus, sama
   // seperti batalkan pembayaran di modul Pembayaran SPP.

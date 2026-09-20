@@ -5,6 +5,7 @@ import { batch, execute, generateId, now, query, queryOne } from '@/lib/db'
 import { getSession, hasAnyRole, type SessionUser } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { getNonSppOutstandingSantri } from '@/lib/keuangan/non-spp-outstanding'
+import { syncLegacyPayment, syncLegacyPaymentReversal } from '@/lib/finance/bridge'
 import type { NonSppDetailItem } from '@/app/portal-ortu/(app)/tagihan/actions'
 
 const PATH = '/dashboard/keuangan/non-spp/konfirmasi-portal'
@@ -102,25 +103,30 @@ export async function approveSubmissionNonSpp(submissionId: string): Promise<{ s
     }
 
     const keterangan = `Portal Ortu - ${submission.metode}`
+    const insertedIds: string[] = []
     await batch([
-      ...detail.map(item => ({
-        sql: `INSERT INTO pembayaran_tahunan
-                (id, santri_id, jenis_biaya, tahun_tagihan, tahun_ajaran_id, batch_id, nominal_bayar,
-                 penerima_id, keterangan, tanggal_bayar, status, portal_submission_id)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), 'AKTIF', ?)`,
-        params: [
-          generateId(),
-          submission.santri_id,
-          item.jenis_biaya,
-          item.jenis_biaya === 'BANGUNAN' ? null : item.tahun_tagihan,
-          item.tahun_ajaran_id,
-          submission.id, // batch_id = submission id → void by batch langsung jalan
-          item.nominal,
-          session?.id ?? null,
-          keterangan,
-          submission.id,
-        ],
-      })),
+      ...detail.map(item => {
+        const newId = generateId()
+        insertedIds.push(newId)
+        return {
+          sql: `INSERT INTO pembayaran_tahunan
+                  (id, santri_id, jenis_biaya, tahun_tagihan, tahun_ajaran_id, batch_id, nominal_bayar,
+                   penerima_id, keterangan, tanggal_bayar, status, portal_submission_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), 'AKTIF', ?)`,
+          params: [
+            newId,
+            submission.santri_id,
+            item.jenis_biaya,
+            item.jenis_biaya === 'BANGUNAN' ? null : item.tahun_tagihan,
+            item.tahun_ajaran_id,
+            submission.id, // batch_id = submission id → void by batch langsung jalan
+            item.nominal,
+            session?.id ?? null,
+            keterangan,
+            submission.id,
+          ],
+        }
+      }),
       {
         sql: `UPDATE portal_payment_submission
               SET status = 'terkonfirmasi', confirmed_by = ?, confirmed_at = datetime('now'), updated_at = datetime('now')
@@ -128,6 +134,13 @@ export async function approveSubmissionNonSpp(submissionId: string): Promise<{ s
         params: [session?.id ?? null, submission.id],
       },
     ])
+
+    // Sync ke Sistem Keuangan Baru (Bridge)
+    for (const newId of insertedIds) {
+      await syncLegacyPayment('PEMBAYARAN_TAHUNAN', newId).catch(err => {
+        console.error('[LegacyBridge] Gagal sinkronisasi Non-SPP konfirmasi portal:', newId, err)
+      })
+    }
 
     await logActivity({
       actor: actorFromSession(session),
@@ -195,6 +208,26 @@ export async function undoApprovalNonSpp(submissionId: string, reason: string): 
     const alasan = String(reason || '').trim()
     if (alasan.length < 5) return { error: 'Alasan pembatalan minimal 5 karakter.' }
     if (submission.status !== 'terkonfirmasi') return { error: 'Hanya pengajuan terkonfirmasi yang bisa dibatalkan.' }
+
+    // Reversal non-destruktif di Sistem Keuangan Baru (Bridge) sebelum di-void
+    try {
+      const existingRows = await query<{ id: string; jenis_biaya: string }>(
+        `SELECT id, jenis_biaya FROM pembayaran_tahunan WHERE batch_id = ? AND COALESCE(status, 'AKTIF') != 'VOID'`,
+        [submission.id]
+      )
+      for (const r of existingRows) {
+        await syncLegacyPaymentReversal(
+          'PEMBAYARAN_TAHUNAN',
+          r.id,
+          `Pembatalan konfirmasi portal: ${alasan}`,
+          session?.id ?? undefined
+        ).catch(err => {
+          console.error('[LegacyBridge] Gagal membalikkan pembayaran Non-SPP portal:', r.id, err)
+        })
+      }
+    } catch (bridgeErr) {
+      console.error('[LegacyBridge] Error saat reversal Non-SPP portal:', bridgeErr)
+    }
 
     const stamp = now()
     await batch([

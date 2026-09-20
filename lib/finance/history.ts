@@ -48,6 +48,8 @@ export interface GlobalTransactionRow {
   externalReference: string | null
   notes: string | null
   createdAt: string
+  source?: 'LEGACY' | 'NEW_FINANCE'
+  fundManagement?: 'PRE_KOPERASI' | 'KOPERASI'
 }
 
 export interface GlobalTransactionQueryParams {
@@ -59,6 +61,8 @@ export interface GlobalTransactionQueryParams {
   channel?: string
   status?: string
   asrama?: string
+  paymentSource?: string
+  fundManagement?: string
   sortBy?: 'createdAt' | 'amount' | 'transactionNumber'
   sortDirection?: 'asc' | 'desc'
   page?: number
@@ -162,6 +166,18 @@ export async function getGlobalTransactionHistory(
     queryParams.push(params.asrama)
   }
 
+  // 8. Filter Payment Source (LEGACY vs NEW_FINANCE)
+  if (params.paymentSource && params.paymentSource !== 'ALL') {
+    whereClauses.push(`t.payment_source = ?`)
+    queryParams.push(params.paymentSource)
+  }
+
+  // 9. Filter Fund Management (PRE_KOPERASI vs KOPERASI)
+  if (params.fundManagement && params.fundManagement !== 'ALL') {
+    whereClauses.push(`t.fund_management = ?`)
+    queryParams.push(params.fundManagement)
+  }
+
   const whereSql = whereClauses.join(' AND ')
 
   // Kolom pengurutan SQL
@@ -206,7 +222,9 @@ export async function getGlobalTransactionHistory(
         u.full_name AS operator_name,
         p.external_reference,
         NULL AS notes,
-        p.paid_at AS created_at
+        p.paid_at AS created_at,
+        p.source AS payment_source,
+        p.fund_management
       FROM finance_payments p
       LEFT JOIN santri s ON s.id = p.santri_id
       LEFT JOIN users u ON u.id = p.received_by
@@ -245,7 +263,9 @@ export async function getGlobalTransactionHistory(
         u.full_name AS operator_name,
         wl.reference_id AS external_reference,
         wl.notes,
-        wl.created_at
+        wl.created_at,
+        'NEW_FINANCE' AS payment_source,
+        'KOPERASI' AS fund_management
       FROM finance_wallet_ledger wl
       LEFT JOIN santri s ON s.id = wl.santri_id
       LEFT JOIN users u ON u.id = wl.operator_id
@@ -285,7 +305,9 @@ export async function getGlobalTransactionHistory(
         u.full_name AS operator_name,
         d.destination_account AS external_reference,
         d.notes,
-        d.transferred_at AS created_at
+        d.transferred_at AS created_at,
+        'NEW_FINANCE' AS payment_source,
+        'KOPERASI' AS fund_management
       FROM finance_distributions d
       LEFT JOIN master_jasa j ON j.id = d.recipient_id
       LEFT JOIN users u ON u.id = d.transferred_by
@@ -317,7 +339,9 @@ export async function getGlobalTransactionHistory(
         u.full_name AS operator_name,
         p.payment_number AS external_reference,
         c.reason AS notes,
-        c.created_at
+        c.created_at,
+        p.source AS payment_source,
+        p.fund_management
       FROM finance_corrections c
       JOIN finance_payments p ON p.id = c.target_payment_id
       LEFT JOIN santri s ON s.id = p.santri_id
@@ -376,6 +400,8 @@ export async function getGlobalTransactionHistory(
     external_reference: string | null
     notes: string | null
     created_at: string
+    payment_source: string | null
+    fund_management: string | null
   }>(
     `
     ${baseUnionSql}
@@ -417,6 +443,8 @@ export async function getGlobalTransactionHistory(
     externalReference: r.external_reference,
     notes: r.notes,
     createdAt: r.created_at,
+    source: r.payment_source ? (r.payment_source as 'LEGACY' | 'NEW_FINANCE') : undefined,
+    fundManagement: r.fund_management ? (r.fund_management as 'PRE_KOPERASI' | 'KOPERASI') : undefined,
   }))
 
   return {
@@ -590,6 +618,8 @@ export async function getTransactionDetail(
         externalReference: p.external_reference,
         notes: null,
         createdAt: p.paid_at,
+        source: (p as any).source,
+        fundManagement: (p as any).fund_management,
       },
       allocations: allocations.map((a) => ({
         id: a.id,
