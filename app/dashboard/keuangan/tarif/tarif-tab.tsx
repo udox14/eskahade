@@ -775,11 +775,13 @@ export default function TarifTab({
                   onChange={(e) => setOverrideItemType(e.target.value as FinanceItemType)}
                   className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
                 >
-                  {Object.entries(ITEM_TYPE_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
-                    </option>
-                  ))}
+                  {Object.entries(ITEM_TYPE_LABELS)
+                    .filter(([k]) => ['SPP', 'UANG_MAKAN', 'UANG_NYUCI'].includes(k))
+                    .map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v}
+                      </option>
+                    ))}
                 </select>
               </div>
 
