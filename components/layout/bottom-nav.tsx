@@ -48,6 +48,7 @@ export function BottomNav({ fiturAkses, globalEnabled, userShowBottomNav }: Bott
       <Link
         key={item.href}
         href={item.href}
+        prefetch={true}
         className="flex flex-col items-center justify-center gap-1 w-full h-full text-slate-500 transition-all duration-200 group active:scale-95"
       >
         <div className={cn(
@@ -86,6 +87,7 @@ export function BottomNav({ fiturAkses, globalEnabled, userShowBottomNav }: Bott
           <div className="flex flex-col items-center justify-end h-full pb-1.5 relative w-full">
             <Link
               href="/dashboard"
+              prefetch={true}
               className={cn(
                 "absolute -top-4 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 active:scale-90 shadow-md",
                 menuActive

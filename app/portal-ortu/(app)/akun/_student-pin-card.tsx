@@ -131,7 +131,7 @@ export function StudentPinCard({
       {/* Form Ubah PIN */}
       <form onSubmit={handleSubmit} className="space-y-3 pt-1">
         <div>
-          <label className="block text-xs font-semibold text-slate-700">
+          <label className="block text-xs font-bold text-slate-700">
             Password Akun Portal Orang Tua
           </label>
           <input
@@ -140,10 +140,10 @@ export function StudentPinCard({
             value={passwordPortal}
             onChange={e => setPasswordPortal(e.target.value)}
             placeholder="Masukkan password login Anda untuk konfirmasi"
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
             required
           />
-          <p className="mt-0.5 text-[11px] text-slate-400">
+          <p className="mt-1 text-[11px] text-slate-400">
             Verifikasi identitas orang tua diperlukan demi keamanan rekening uang jajan.
           </p>
         </div>
@@ -151,13 +151,13 @@ export function StudentPinCard({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-slate-700">
+              <label className="block text-xs font-bold text-slate-700">
                 PIN Baru Santri (6 Digit)
               </label>
               <button
                 type="button"
                 onClick={() => setShowPin(!showPin)}
-                className="text-[11px] text-slate-500 hover:text-slate-800 flex items-center gap-1"
+                className="text-[11px] font-semibold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 cursor-pointer"
               >
                 {showPin ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                 <span>{showPin ? 'Sembunyikan' : 'Lihat'}</span>
@@ -173,14 +173,14 @@ export function StudentPinCard({
                 const val = e.target.value.replace(/\D/g, '').slice(0, 6)
                 setPinBaru(val)
               }}
-              placeholder="6 digit angka (misal: 123456)"
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold font-mono tracking-widest text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+              placeholder="6 digit angka"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-black font-mono tracking-widest text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
               required
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700">
+            <label className="block text-xs font-bold text-slate-700">
               Ulangi PIN Baru
             </label>
             <input
@@ -194,7 +194,7 @@ export function StudentPinCard({
                 setKonfirmasiPin(val)
               }}
               placeholder="Ketik ulang 6 digit"
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold font-mono tracking-widest text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-black font-mono tracking-widest text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
               required
             />
           </div>
@@ -208,9 +208,9 @@ export function StudentPinCard({
         <button
           type="submit"
           disabled={isSaving}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 py-2.5 text-xs font-semibold text-white shadow-xs disabled:opacity-50 transition"
+          className="inline-flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#064e3b] hover:bg-[#047857] py-2.5 text-xs font-bold text-[#bef264] shadow-xs disabled:opacity-50 active:scale-95 transition cursor-pointer"
         >
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin text-[#bef264]" /> : null}
           <span>{isSaving ? 'Memverifikasi & Menyimpan…' : 'Simpan PIN Baru Santri'}</span>
         </button>
       </form>

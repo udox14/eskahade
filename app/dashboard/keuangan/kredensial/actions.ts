@@ -198,20 +198,33 @@ export async function getKredensialData(
   const pageSize = Math.max(1, Math.min(100, params.pageSize || 50))
   const offset = (page - 1) * pageSize
 
-  // 1. KPI Global
-  const kpiSantriAktif = await queryOne<{ total: number }>(
-    `SELECT COUNT(*) AS total FROM santri WHERE status_global = 'aktif'`
-  )
-  const kpiKartuAktif = await queryOne<{ total: number }>(
-    `SELECT COUNT(*) AS total FROM finance_credentials WHERE status = 'ACTIVE'`
-  )
-  const kpiKartuHilang = await queryOne<{ total: number }>(
-    `SELECT COUNT(*) AS total FROM finance_credentials WHERE status = 'LOST'`
-  )
-  const kpiPinTerkunci = await queryOne<{ total: number }>(
-    `SELECT COUNT(*) AS total FROM finance_student_pins
-     WHERE locked_until IS NOT NULL AND datetime(locked_until) > datetime('now')`
-  )
+  // 1. KPI Global & 2. Daftar Asrama (Paralel)
+  const [
+    kpiSantriAktif,
+    kpiKartuAktif,
+    kpiKartuHilang,
+    kpiPinTerkunci,
+    asramaRows,
+  ] = await Promise.all([
+    queryOne<{ total: number }>(
+      `SELECT COUNT(*) AS total FROM santri WHERE status_global = 'aktif'`
+    ),
+    queryOne<{ total: number }>(
+      `SELECT COUNT(*) AS total FROM finance_credentials WHERE status = 'ACTIVE'`
+    ),
+    queryOne<{ total: number }>(
+      `SELECT COUNT(*) AS total FROM finance_credentials WHERE status = 'LOST'`
+    ),
+    queryOne<{ total: number }>(
+      `SELECT COUNT(*) AS total FROM finance_student_pins
+       WHERE locked_until IS NOT NULL AND datetime(locked_until) > datetime('now')`
+    ),
+    query<{ asrama: string }>(
+      `SELECT DISTINCT asrama FROM santri
+       WHERE status_global = 'aktif' AND asrama IS NOT NULL AND TRIM(asrama) != ''
+       ORDER BY asrama ASC`
+    ),
+  ])
 
   const kpi: KredensialKpi = {
     totalSantriAktif: kpiSantriAktif?.total ?? 0,
@@ -220,12 +233,6 @@ export async function getKredensialData(
     totalPinTerkunci: kpiPinTerkunci?.total ?? 0,
   }
 
-  // 2. Daftar Asrama
-  const asramaRows = await query<{ asrama: string }>(
-    `SELECT DISTINCT asrama FROM santri
-     WHERE status_global = 'aktif' AND asrama IS NOT NULL AND TRIM(asrama) != ''
-     ORDER BY asrama ASC`
-  )
   const asramaList = asramaRows.map(r => r.asrama)
 
   // 3. Bangun query filter
@@ -264,8 +271,8 @@ export async function getKredensialData(
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
-  // 4. Hitung total items
-  const countRow = await queryOne<{ total: number }>(
+  // 4. Hitung total items & 5. Query data santri & kredensial secara paralel
+  const countPromise = queryOne<{ total: number }>(
     `SELECT COUNT(*) AS total
      FROM santri s
      LEFT JOIN (
@@ -275,11 +282,8 @@ export async function getKredensialData(
      ${whereClause}`,
     queryParams
   )
-  const totalItems = countRow?.total ?? 0
-  const totalPages = Math.ceil(totalItems / pageSize) || 1
 
-  // 5. Query data santri & kredensial
-  const rows = await query<{
+  const rowsPromise = query<{
     id: string
     nis: string
     nama_lengkap: string
@@ -320,6 +324,10 @@ export async function getKredensialData(
      LIMIT ? OFFSET ?`,
     [...queryParams, pageSize, offset]
   )
+
+  const [countRow, rows] = await Promise.all([countPromise, rowsPromise])
+  const totalItems = countRow?.total ?? 0
+  const totalPages = Math.ceil(totalItems / pageSize) || 1
 
   const nowMs = Date.now()
   const items: StudentCredentialRow[] = rows.map(r => {

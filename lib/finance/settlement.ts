@@ -255,14 +255,12 @@ export async function getSettlementsList(filters?: {
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
-  const countRow = await queryOne<{ total: number }>(
+  const countPromise = queryOne<{ total: number }>(
     `SELECT COUNT(*) AS total FROM finance_settlements s ${whereClause}`,
     params
   )
-  const totalCount = countRow?.total ?? 0
-  const totalPages = Math.ceil(totalCount / pageSize)
 
-  const rows = await query<FinanceSettlement & { verifier_name: string | null }>(
+  const rowsPromise = query<FinanceSettlement & { verifier_name: string | null }>(
     `SELECT s.*, u.full_name AS verifier_name
      FROM finance_settlements s
      LEFT JOIN users u ON u.id = s.verified_by
@@ -271,6 +269,10 @@ export async function getSettlementsList(filters?: {
      LIMIT ? OFFSET ?`,
     [...params, pageSize, offset]
   )
+
+  const [countRow, rows] = await Promise.all([countPromise, rowsPromise])
+  const totalCount = countRow?.total ?? 0
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   return {
     settlements: rows || [],

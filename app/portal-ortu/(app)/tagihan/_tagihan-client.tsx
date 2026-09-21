@@ -8,7 +8,6 @@ import {
   Copy,
   CheckCircle2,
   Clock,
-  X,
   ArrowRight,
   Loader2,
   AlertCircle,
@@ -19,6 +18,7 @@ import type {
   PortalCheckoutResponse,
 } from '@/lib/portal/finance'
 import { createPortalCheckoutAction } from './actions'
+import { BottomSheet } from '../../_components/bottom-sheet'
 
 function formatRupiah(amount: number): string {
   if (!Number.isFinite(amount) || amount <= 0) return 'Rp0'
@@ -698,103 +698,100 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
       )}
 
       {/* 8. MODAL INSTRUKSI PEMBAYARAN DUITKU */}
-      {isModalOpen && checkoutResult && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 p-0 sm:p-4 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-t-[24px] sm:rounded-[22px] bg-white shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                <h3 className="text-base font-bold text-slate-900">Petunjuk Pembayaran</h3>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition active:scale-95 cursor-pointer"
-                aria-label="Tutup"
-              >
-                <X className="h-5 w-5" />
-              </button>
+      <BottomSheet
+        open={Boolean(isModalOpen && checkoutResult)}
+        onClose={() => setIsModalOpen(false)}
+        title="Petunjuk Pembayaran"
+        subtitle="Selesaikan pembayaran sesuai instruksi di bawah"
+        icon={<CheckCircle2 className="h-5 w-5 text-emerald-600" />}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setIsModalOpen(false)
+                router.push('/portal-ortu/riwayat')
+              }}
+              className="flex-1 min-h-[44px] rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer active:scale-95 transition"
+            >
+              Lihat di Riwayat
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="flex-1 min-h-[44px] rounded-xl bg-[#064e3b] hover:bg-[#047857] py-2.5 px-3 text-xs font-bold text-[#bef264] shadow-xs cursor-pointer active:scale-95 transition"
+            >
+              Selesai
+            </button>
+          </>
+        }
+      >
+        {checkoutResult && (
+          <div className="space-y-4">
+            {/* Kartu Total Transfer */}
+            <div className="rounded-2xl bg-slate-50/90 p-4 border border-slate-200/80 text-center space-y-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Total yang Harus Ditransfer
+              </p>
+              <p className="text-2xl font-black text-slate-950 font-mono tracking-tight">
+                {formatRupiah(checkoutResult.order.totalCharged)}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Termasuk biaya admin {formatRupiah(checkoutResult.order.gatewayFee)}
+              </p>
             </div>
 
-            <div className="p-6 space-y-4 overflow-y-auto flex-1">
-              <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 text-center space-y-1">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Total yang Harus Ditransfer
-                </p>
-                <p className="text-2xl font-black text-slate-900 font-mono">
-                  {formatRupiah(checkoutResult.order.totalCharged)}
-                </p>
-                <p className="text-[11px] text-slate-500">
-                  Termasuk biaya admin {formatRupiah(checkoutResult.order.gatewayFee)}
-                </p>
-              </div>
-
-              {/* Virtual Account / Payment Link */}
-              {checkoutResult.checkout.vaNumber ? (
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 text-center space-y-2">
-                  <span className="text-xs font-bold text-emerald-900">Nomor Virtual Account</span>
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="font-mono text-xl font-black text-emerald-950 tracking-wider">
-                      {checkoutResult.checkout.vaNumber}
-                    </span>
-                    <button
-                      onClick={() => handleCopyVa(checkoutResult.checkout.vaNumber!)}
-                      className="rounded-lg bg-white p-1.5 border border-emerald-200 text-emerald-700 hover:bg-emerald-50 shadow-2xs cursor-pointer active:scale-95 transition"
-                    >
-                      {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-emerald-700">
-                    Berlaku 24 jam (sampai {new Date(checkoutResult.order.expiresAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB)
-                  </p>
-                </div>
-              ) : checkoutResult.checkout.paymentUrl ? (
-                <div className="text-center py-2">
-                  <a
-                    href={checkoutResult.checkout.paymentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center w-full rounded-xl bg-[#064e3b] py-3 text-sm font-bold text-[#bef264] shadow-xs hover:bg-[#047857]"
+            {/* Virtual Account / Payment Link */}
+            {checkoutResult.checkout.vaNumber ? (
+              <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-center space-y-2">
+                <span className="text-xs font-bold text-emerald-950">Nomor Virtual Account</span>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="font-mono text-xl font-black text-emerald-950 tracking-wider">
+                    {checkoutResult.checkout.vaNumber}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyVa(checkoutResult.checkout.vaNumber!)}
+                    className="rounded-lg bg-white p-1.5 border border-emerald-200 text-emerald-700 hover:bg-emerald-50 shadow-2xs cursor-pointer active:scale-95 transition"
+                    aria-label="Salin nomor Virtual Account"
                   >
-                    Buka Halaman Pembayaran Duitku
-                  </a>
+                    {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                  </button>
                 </div>
-              ) : null}
-
-              {/* Petunjuk Pembayaran */}
-              <div className="text-xs text-slate-600 space-y-1 border-t border-slate-100 pt-3">
-                <p className="font-bold text-slate-800">Langkah Pembayaran:</p>
-                <ul className="list-disc pl-4 space-y-1 text-slate-500">
-                  <li>Buka aplikasi m-Banking atau ATM bank Anda.</li>
-                  <li>Pilih menu Transfer Virtual Account / Bayar Tagihan.</li>
-                  <li>Masukkan nomor Virtual Account di atas.</li>
-                  <li>Pastikan nominal transfer sama persis dengan total tagihan.</li>
-                  <li>Status pembayaran akan terupdate otomatis dalam 1-2 menit.</li>
-                </ul>
+                <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-800 font-medium">
+                  <Clock className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    Berlaku 24 jam (sampai {new Date(checkoutResult.order.expiresAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB)
+                  </span>
+                </div>
               </div>
-            </div>
+            ) : checkoutResult.checkout.paymentUrl ? (
+              <div className="text-center py-1">
+                <a
+                  href={checkoutResult.checkout.paymentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center w-full min-h-[44px] rounded-xl bg-[#064e3b] py-3 text-xs font-bold text-[#bef264] shadow-xs hover:bg-[#047857] active:scale-[0.98] transition"
+                >
+                  Buka Halaman Pembayaran Duitku
+                </a>
+              </div>
+            ) : null}
 
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-2 shrink-0 pb-[max(env(safe-area-inset-bottom),1rem)]">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsModalOpen(false)
-                  router.push('/portal-ortu/riwayat')
-                }}
-                className="flex-1 min-h-[44px] rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer active:scale-95 transition"
-              >
-                Lihat di Riwayat
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="flex-1 min-h-[44px] rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white hover:bg-slate-800 cursor-pointer active:scale-95 transition"
-              >
-                Selesai
-              </button>
+            {/* Petunjuk Pembayaran */}
+            <div className="text-xs text-slate-600 space-y-2 border-t border-slate-100 pt-3.5">
+              <p className="font-bold text-slate-900">Langkah Pembayaran:</p>
+              <ul className="list-disc pl-4 space-y-1.5 text-slate-600 leading-relaxed">
+                <li>Buka aplikasi m-Banking atau ATM bank Anda.</li>
+                <li>Pilih menu Transfer Virtual Account / Bayar Tagihan.</li>
+                <li>Masukkan nomor Virtual Account di atas.</li>
+                <li>Pastikan nominal transfer sama persis dengan total tagihan.</li>
+                <li>Status pembayaran akan terupdate otomatis dalam 1-2 menit.</li>
+              </ul>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </BottomSheet>
     </div>
   )
 }

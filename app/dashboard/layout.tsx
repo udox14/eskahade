@@ -5,7 +5,6 @@ import { queryOne } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { getFiturForRoles, getBottomNavGlobalEnabled, type FiturAkses } from "@/lib/cache/fitur-akses";
 import { getSidebarGroups, type SidebarGroupConfig } from "@/lib/menu/groups";
-import { ensureOperasionalSchema } from '@/lib/operasional'
 
 import { capitalizeEachWord } from '@/lib/utils';
 
@@ -68,12 +67,6 @@ export default async function DashboardLayout({
   }
 
   console.log('[layout] accessRoles:', accessRoles)
-
-  try {
-    await ensureOperasionalSchema()
-  } catch (err: unknown) {
-    console.error('[layout] ensureOperasionalSchema ERROR:', err instanceof Error ? err.message : err)
-  }
 
   // Ambil fitur, setting bottomnav, dan konfigurasi grup sidebar secara paralel
   let fiturAkses: FiturAkses[] = []

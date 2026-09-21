@@ -236,6 +236,8 @@ export function AkunClient({
         open={activeSheet === 'LIMIT'}
         onClose={() => setActiveSheet(null)}
         title="Batas Limit Uang Jajan"
+        subtitle="Atur batas belanja & penarikan di koperasi"
+        icon={<Wallet className="h-5 w-5 text-emerald-600" />}
       >
         <WalletLimitCard
           initialDaily={parentLimits?.parent_daily_limit ?? null}
@@ -252,6 +254,8 @@ export function AkunClient({
         open={activeSheet === 'PIN'}
         onClose={() => setActiveSheet(null)}
         title="PIN Transaksi Santri"
+        subtitle="Keamanan transaksi loket santri di koperasi"
+        icon={<KeyRound className="h-5 w-5 text-emerald-600" />}
       >
         <StudentPinCard
           hasPin={pinStatus?.hasPin ?? false}
@@ -268,42 +272,44 @@ export function AkunClient({
         open={activeSheet === 'PASSWORD'}
         onClose={() => setActiveSheet(null)}
         title="Ganti Password Portal"
+        subtitle="Perbarui kata sandi akun demi keamanan"
+        icon={<Lock className="h-5 w-5 text-emerald-600" />}
       >
-        <form onSubmit={handleGantiPassword} className="space-y-3 pt-1">
+        <form onSubmit={handleGantiPassword} className="space-y-3.5 pt-1">
           <div>
-            <label className="block text-xs font-semibold text-slate-700">Password Lama</label>
+            <label className="block text-xs font-bold text-slate-700">Password Lama</label>
             <input
               type="password"
               autoComplete="current-password"
               value={passwordLama}
               onChange={e => setPasswordLama(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
               required
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700">Password Baru</label>
+            <label className="block text-xs font-bold text-slate-700">Password Baru</label>
             <input
               type="password"
               autoComplete="new-password"
               value={passwordBaru}
               onChange={e => setPasswordBaru(e.target.value)}
               minLength={6}
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
               required
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700">Ulangi Password Baru</label>
+            <label className="block text-xs font-bold text-slate-700">Ulangi Password Baru</label>
             <input
               type="password"
               autoComplete="new-password"
               value={konfirmasi}
               onChange={e => setKonfirmasi(e.target.value)}
               minLength={6}
-              className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden"
+              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
               required
             />
           </div>
@@ -324,12 +330,10 @@ export function AkunClient({
         open={activeSheet === 'LOGOUT'}
         onClose={() => setActiveSheet(null)}
         title="Keluar dari Portal"
-      >
-        <div className="space-y-4 pt-1">
-          <p className="text-xs text-slate-600 leading-relaxed">
-            Apakah Anda yakin ingin mengakhiri sesi login Portal Orang Tua untuk santri ini?
-          </p>
-          <div className="flex gap-2">
+        subtitle="Konfirmasi pengakhiran sesi"
+        icon={<LogOut className="h-5 w-5 text-rose-600" />}
+        footer={
+          <>
             <button
               type="button"
               onClick={() => setActiveSheet(null)}
@@ -343,10 +347,16 @@ export function AkunClient({
               disabled={loggingOut}
               className="flex-1 min-h-[44px] rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-bold text-white shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer active:scale-95 transition"
             >
-              {loggingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {loggingOut ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : null}
               <span>Keluar</span>
             </button>
-          </div>
+          </>
+        }
+      >
+        <div className="space-y-3 pt-1">
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Apakah Anda yakin ingin mengakhiri sesi login Portal Orang Tua untuk santri ini? Anda dapat masuk kembali kapan saja menggunakan NIS dan password Anda.
+          </p>
         </div>
       </BottomSheet>
     </div>

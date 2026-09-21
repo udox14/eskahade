@@ -35,6 +35,7 @@ export function BottomNav() {
             <Link
               key={tab.href}
               href={tab.href}
+              prefetch={true}
               className={`relative flex min-h-[54px] flex-col items-center justify-center gap-0.5 py-1 transition-transform duration-150 active:scale-[0.92] ${
                 active ? 'text-emerald-950' : 'text-slate-400 hover:text-slate-600'
               }`}

@@ -14,6 +14,17 @@ import {
   Info,
   ChevronRight,
   Filter,
+  GraduationCap,
+  Utensils,
+  Shirt,
+  FileText,
+  Activity,
+  HeartPulse,
+  Building2,
+  TrendingUp,
+  History,
+  Calendar,
+  ShieldCheck,
 } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
@@ -386,14 +397,15 @@ export default function StatusPembayaranContent({
         </div>
       )}
 
-      {/* 5. 4 SUMMARY KPI CARDS */}
+      {/* 5. SUMMARY KPI CARDS SESUAI TAB AKTIF */}
       {isPending ? (
         <StatCardSkeleton count={4} />
-      ) : (
+      ) : activeTab === 'RINGKASAN' ? (
+        /* TAB RINGKASAN: 4 MACRO CARDS */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Santri Aktif</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Santri Terdaftar</span>
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-slate-500">
                 <Users className="h-4 w-4" />
               </div>
@@ -455,6 +467,440 @@ export default function StatusPembayaranContent({
             </div>
             <p className="mt-1 text-xs text-slate-500">Kewajiban terlambat bayar</p>
           </div>
+        </div>
+      ) : activeTab === 'BULANAN' ? (
+        /* TAB BULANAN: 4 MACRO CARDS + 3 POS BREAKDOWN CARDS */
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Tagihan Bulanan</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                  <Wallet className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline">
+                <span className="text-2xl font-bold tracking-tight text-slate-900 font-mono">
+                  {formatRupiah(data.tabKpi?.bulanan?.totalTagihanNominal ?? 0)}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {data.tabKpi?.bulanan?.totalTagihanCount ?? 0} kewajiban terbit
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Sudah Terbayar</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline">
+                <span className="text-2xl font-bold tracking-tight text-emerald-700 font-mono">
+                  {formatRupiah(data.tabKpi?.bulanan?.sudahTerbayarNominal ?? 0)}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {data.tabKpi?.bulanan?.lunasCount ?? 0} tagihan berstatus lunas
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Sisa Tagihan</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                  <Clock className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline">
+                <span className="text-2xl font-bold tracking-tight text-amber-700 font-mono">
+                  {formatRupiah(data.tabKpi?.bulanan?.sisaTagihanNominal ?? 0)}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {Math.max(0, (data.tabKpi?.bulanan?.totalTagihanCount ?? 0) - (data.tabKpi?.bulanan?.lunasCount ?? 0))} belum lunas
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Tingkat Kelunasan</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                  <TrendingUp className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold tracking-tight text-slate-900 font-mono">
+                  {data.tabKpi?.bulanan?.totalTagihanNominal
+                    ? Math.round(((data.tabKpi.bulanan.sudahTerbayarNominal || 0) / data.tabKpi.bulanan.totalTagihanNominal) * 100)
+                    : 0}%
+                </span>
+                <span className="text-xs text-slate-400">terkumpul</span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {data.tabKpi?.bulanan?.lunasCount ?? 0} dari {data.tabKpi?.bulanan?.totalTagihanCount ?? 0} tagihan
+              </p>
+            </div>
+          </div>
+
+          {/* Breakdown Per Pos Bulanan */}
+          {data.tabKpi?.bulanan?.itemBreakdown && data.tabKpi.bulanan.itemBreakdown.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {data.tabKpi.bulanan.itemBreakdown.map((item) => {
+                const itemPercent = item.targetNominal > 0
+                  ? Math.round((item.paidNominal / item.targetNominal) * 100)
+                  : 0
+                const isSpp = item.itemType === 'SPP'
+                const isMakan = item.itemType === 'UANG_MAKAN'
+                const IconComponent = isSpp ? GraduationCap : isMakan ? Utensils : Shirt
+
+                return (
+                  <div
+                    key={item.itemType}
+                    className="flex flex-col justify-between rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 transition hover:bg-white hover:shadow-xs"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-2xs">
+                            <IconComponent className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="text-xs font-bold text-slate-800">{item.itemLabel}</span>
+                        </div>
+                        <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[11px] font-semibold text-slate-700 font-mono">
+                          {itemPercent}%
+                        </span>
+                      </div>
+                      <div className="mt-3 flex items-baseline justify-between">
+                        <div>
+                          <span className="text-xs text-slate-500 block">Terbayar</span>
+                          <span className="text-base font-bold text-slate-900 font-mono">
+                            {formatRupiah(item.paidNominal)}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs text-slate-500 block">Sisa</span>
+                          <span className="text-sm font-semibold text-amber-700 font-mono">
+                            {formatRupiah(item.remainingNominal)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-2.5 border-t border-slate-200/60 flex items-center justify-between text-xs text-slate-500">
+                      <span>Lunas: <strong className="text-slate-700 font-mono">{item.lunasCount}</strong>/{item.totalCount}</span>
+                      <span>Target: <strong className="text-slate-700 font-mono">{formatRupiah(item.targetNominal)}</strong></span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      ) : activeTab === 'TAHUNAN' ? (
+        /* TAB TAHUNAN: 4 MACRO CARDS + 3 POS BREAKDOWN CARDS */
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Tagihan Tahunan</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                  <Calendar className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline">
+                <span className="text-2xl font-bold tracking-tight text-slate-900 font-mono">
+                  {formatRupiah(data.tabKpi?.tahunan?.totalTagihanNominal ?? 0)}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {data.tabKpi?.tahunan?.totalTagihanCount ?? 0} kewajiban tahunan
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Sudah Terbayar</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline">
+                <span className="text-2xl font-bold tracking-tight text-emerald-700 font-mono">
+                  {formatRupiah(data.tabKpi?.tahunan?.sudahTerbayarNominal ?? 0)}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {data.tabKpi?.tahunan?.lunasCount ?? 0} tagihan berstatus lunas
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Sisa Tagihan</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                  <Clock className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline">
+                <span className="text-2xl font-bold tracking-tight text-amber-700 font-mono">
+                  {formatRupiah(data.tabKpi?.tahunan?.sisaTagihanNominal ?? 0)}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                {Math.max(0, (data.tabKpi?.tahunan?.totalTagihanCount ?? 0) - (data.tabKpi?.tahunan?.lunasCount ?? 0) - (data.tabKpi?.tahunan?.bebasCount ?? 0))} belum lunas
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Bebas / Keringanan</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-teal-600">
+                  <ShieldCheck className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold tracking-tight text-slate-900 font-mono">
+                  {data.tabKpi?.tahunan?.bebasCount ?? 0}
+                </span>
+                <span className="text-xs text-slate-400">Tagihan</span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">Penerima pembebasan pos</p>
+            </div>
+          </div>
+
+          {/* Breakdown Per Pos Tahunan */}
+          {data.tabKpi?.tahunan?.itemBreakdown && data.tabKpi.tahunan.itemBreakdown.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {data.tabKpi.tahunan.itemBreakdown.map((item) => {
+                const itemPercent = item.targetNominal > 0
+                  ? Math.round((item.paidNominal / item.targetNominal) * 100)
+                  : 0
+                const isEhb = item.itemType === 'EHB'
+                const isEkskul = item.itemType === 'EKSKUL'
+                const IconComponent = isEhb ? FileText : isEkskul ? Activity : HeartPulse
+
+                return (
+                  <div
+                    key={item.itemType}
+                    className="flex flex-col justify-between rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 transition hover:bg-white hover:shadow-xs"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-2xs">
+                            <IconComponent className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="text-xs font-bold text-slate-800">{item.itemLabel}</span>
+                        </div>
+                        <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[11px] font-semibold text-slate-700 font-mono">
+                          {itemPercent}%
+                        </span>
+                      </div>
+                      <div className="mt-3 flex items-baseline justify-between">
+                        <div>
+                          <span className="text-xs text-slate-500 block">Terbayar</span>
+                          <span className="text-base font-bold text-slate-900 font-mono">
+                            {formatRupiah(item.paidNominal)}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs text-slate-500 block">Sisa</span>
+                          <span className="text-sm font-semibold text-amber-700 font-mono">
+                            {formatRupiah(item.remainingNominal)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-2.5 border-t border-slate-200/60 flex items-center justify-between text-xs text-slate-500">
+                      <span>Lunas: <strong className="text-slate-700 font-mono">{item.lunasCount}</strong>/{item.totalCount}</span>
+                      <span>Target: <strong className="text-slate-700 font-mono">{formatRupiah(item.targetNominal)}</strong></span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      ) : activeTab === 'USPP' ? (
+        /* TAB USPP: 4 MACRO CARDS */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Komitmen USPP</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                <Building2 className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-baseline">
+              <span className="text-2xl font-bold tracking-tight text-slate-900 font-mono">
+                {formatRupiah(data.tabKpi?.uspp?.totalKomitmenNominal ?? 0)}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">Akumulasi komitmen uang pangkal</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Terkumpul (Masuk)</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                <CheckCircle2 className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-2xl font-bold tracking-tight text-emerald-700 font-mono">
+                {formatRupiah(data.tabKpi?.uspp?.terkumpulNominal ?? 0)}
+              </span>
+              <span className="text-xs font-medium text-emerald-600">
+                {data.tabKpi?.uspp?.totalKomitmenNominal
+                  ? Math.round(((data.tabKpi.uspp.terkumpulNominal || 0) / data.tabKpi.uspp.totalKomitmenNominal) * 100)
+                  : 0}%
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">Dana pembangunan terealisasi</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Sisa Piutang USPP</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                <Clock className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-baseline">
+              <span className="text-2xl font-bold tracking-tight text-amber-700 font-mono">
+                {formatRupiah(data.tabKpi?.uspp?.sisaPiutangNominal ?? 0)}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">Belum terbayar / dalam cicilan</p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Status Santri</span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-slate-500">
+                <Users className="h-4 w-4" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="text-2xl font-bold tracking-tight text-slate-900 font-mono">
+                {data.tabKpi?.uspp?.santriLunasCount ?? 0}
+              </span>
+              <span className="text-xs font-semibold text-emerald-700">Lunas</span>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              {data.tabKpi?.uspp?.santriMencicilCount ?? 0} mencicil, {data.tabKpi?.uspp?.santriBelumBayarCount ?? 0} belum bayar
+            </p>
+          </div>
+        </div>
+      ) : (
+        /* TAB TUNGGAKAN: 4 MACRO CARDS + 3 POS BREAKDOWN CARDS */
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Nominal Tunggakan</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
+                  <CreditCard className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline">
+                <span className="text-2xl font-bold tracking-tight text-rose-700 font-mono">
+                  {formatRupiah(data.tabKpi?.tunggakan?.totalTunggakanNominal ?? 0)}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">Kewajiban lewat jatuh tempo</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Tagihan Menunggak</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                  <AlertCircle className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold tracking-tight text-slate-900 font-mono">
+                  {data.tabKpi?.tunggakan?.totalTagihanMenunggak ?? 0}
+                </span>
+                <span className="text-xs text-slate-400">Tagihan</span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">Total item bulan lalu belum lunas</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Santri Menunggak</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                  <Users className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold tracking-tight text-slate-900 font-mono">
+                  {data.tabKpi?.tunggakan?.totalSantriMenunggak ?? 0}
+                </span>
+                <span className="text-xs text-slate-400">Santri</span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">Memiliki minimal 1 tunggakan</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Keterlambatan Terlama</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                  <History className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mt-2 flex items-baseline">
+                <span className="text-lg font-bold tracking-tight text-slate-900 font-mono truncate">
+                  {data.tabKpi?.tunggakan?.tunggakanTertuaLabel || '-'}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">Periode tunggakan paling awal</p>
+            </div>
+          </div>
+
+          {/* Breakdown Per Pos Tunggakan */}
+          {data.tabKpi?.tunggakan?.itemBreakdown && data.tabKpi.tunggakan.itemBreakdown.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {data.tabKpi.tunggakan.itemBreakdown.map((item) => {
+                const isSpp = item.itemType === 'SPP'
+                const isMakan = item.itemType === 'UANG_MAKAN'
+                const IconComponent = isSpp ? GraduationCap : isMakan ? Utensils : Shirt
+
+                return (
+                  <div
+                    key={item.itemType}
+                    className="flex flex-col justify-between rounded-xl border border-rose-200/70 bg-rose-50/30 p-4 transition hover:bg-white hover:shadow-xs"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-700 shadow-2xs">
+                            <IconComponent className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="text-xs font-bold text-slate-800">{item.itemLabel}</span>
+                        </div>
+                        <span className="rounded-full bg-rose-100/80 px-2 py-0.5 text-[11px] font-semibold text-rose-700 font-mono">
+                          {item.countTagihan} item
+                        </span>
+                      </div>
+                      <div className="mt-3">
+                        <span className="text-xs text-slate-500 block">Sisa Tunggakan</span>
+                        <span className="text-lg font-bold text-rose-700 font-mono">
+                          {formatRupiah(item.nominalTunggakan)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-2.5 border-t border-rose-200/50 flex items-center justify-between text-xs text-slate-500">
+                      <span>Tagihan: <strong className="text-slate-700 font-mono">{item.countTagihan}</strong></span>
+                      <span>Target: <strong className="text-slate-700 font-mono">{formatRupiah(item.targetNominal)}</strong></span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 

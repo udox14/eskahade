@@ -349,8 +349,8 @@ export async function getGlobalTransactionHistory(
     )
   `
 
-  // Hitung Total Records & Summary Agregat
-  const countRow = await queryOne<{
+  // Hitung Total Records & Ambil Data Halaman Ini secara paralel
+  const countPromise = queryOne<{
     total_count: number
     in_pesantren: number
     in_titipan: number
@@ -371,11 +371,7 @@ export async function getGlobalTransactionHistory(
     queryParams
   )
 
-  const totalRecords = countRow?.total_count ?? 0
-  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
-
-  // Ambil Data Halaman Ini
-  const rows = await query<{
+  const rowsPromise = query<{
     id: string
     source_table: 'PAYMENT' | 'WALLET' | 'DISTRIBUTION' | 'CORRECTION'
     transaction_number: string
@@ -413,6 +409,10 @@ export async function getGlobalTransactionHistory(
     `,
     [...queryParams, pageSize, offset]
   )
+
+  const [countRow, rows] = await Promise.all([countPromise, rowsPromise])
+  const totalRecords = countRow?.total_count ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
 
   const items: GlobalTransactionRow[] = rows.map((r) => ({
     id: r.id,

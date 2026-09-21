@@ -145,41 +145,7 @@ export async function getUangJajanData(
   const pageSize = Math.max(1, Math.min(100, params.pageSize || 50))
   const offset = (page - 1) * pageSize
 
-  // 1. KPI Global Seluruh Santri Aktif
-  const kpiTotalSaldoRow = await queryOne<{ total: number; count_bersaldo: number }>(
-    `SELECT
-       COALESCE(SUM(saldo_uang_jajan), 0) AS total,
-       COALESCE(SUM(CASE WHEN saldo_uang_jajan > 0 THEN 1 ELSE 0 END), 0) AS count_bersaldo
-     FROM santri
-     WHERE status_global = 'aktif'`
-  )
-
-  const currentMonthPrefix = new Date().toISOString().slice(0, 7) // YYYY-MM
-  const kpiMutasiBulanIniRow = await queryOne<{ total_in: number; total_out: number }>(
-    `SELECT
-       COALESCE(SUM(CASE WHEN direction = 'IN' THEN amount ELSE 0 END), 0) AS total_in,
-       COALESCE(SUM(CASE WHEN direction = 'OUT' THEN amount ELSE 0 END), 0) AS total_out
-     FROM finance_wallet_ledger
-     WHERE strftime('%Y-%m', created_at) = ?`,
-    [currentMonthPrefix]
-  )
-
-  const kpi: UangJajanKpi = {
-    totalSaldoTitipan: kpiTotalSaldoRow?.total ?? 0,
-    santriBersaldoCount: kpiTotalSaldoRow?.count_bersaldo ?? 0,
-    mutasiInBulanIniNominal: kpiMutasiBulanIniRow?.total_in ?? 0,
-    mutasiOutBulanIniNominal: kpiMutasiBulanIniRow?.total_out ?? 0,
-  }
-
-  // 2. Daftar Asrama unik santri aktif
-  const asramaRows = await query<{ asrama: string }>(
-    `SELECT DISTINCT asrama FROM santri
-     WHERE status_global = 'aktif' AND asrama IS NOT NULL AND TRIM(asrama) != ''
-     ORDER BY asrama ASC`
-  )
-  const asramaList = asramaRows.map(r => r.asrama)
-
-  // 3. Bangun query filter
+  // 1. Bangun query filter untuk count & paginasi
   const conditions: string[] = ["s.status_global = 'aktif'"]
   const queryParams: unknown[] = []
 
@@ -200,19 +166,55 @@ export async function getUangJajanData(
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const currentMonthPrefix = new Date().toISOString().slice(0, 7) // YYYY-MM
 
-  // 4. Hitung total rows
-  const countRow = await queryOne<{ total: number }>(
-    `SELECT COUNT(*) AS total FROM santri s ${whereClause}`,
-    queryParams
-  )
+  // 2. Eksekusi KPI global, daftar asrama, total rows, dan setting limit secara paralel
+  const [
+    kpiTotalSaldoRow,
+    kpiMutasiBulanIniRow,
+    asramaRows,
+    countRow,
+    globalDailyLimitRow,
+  ] = await Promise.all([
+    queryOne<{ total: number; count_bersaldo: number }>(
+      `SELECT
+         COALESCE(SUM(saldo_uang_jajan), 0) AS total,
+         COALESCE(SUM(CASE WHEN saldo_uang_jajan > 0 THEN 1 ELSE 0 END), 0) AS count_bersaldo
+       FROM santri
+       WHERE status_global = 'aktif'`
+    ),
+    queryOne<{ total_in: number; total_out: number }>(
+      `SELECT
+         COALESCE(SUM(CASE WHEN direction = 'IN' THEN amount ELSE 0 END), 0) AS total_in,
+         COALESCE(SUM(CASE WHEN direction = 'OUT' THEN amount ELSE 0 END), 0) AS total_out
+       FROM finance_wallet_ledger
+       WHERE strftime('%Y-%m', created_at) = ?`,
+      [currentMonthPrefix]
+    ),
+    query<{ asrama: string }>(
+      `SELECT DISTINCT asrama FROM santri
+       WHERE status_global = 'aktif' AND asrama IS NOT NULL AND TRIM(asrama) != ''
+       ORDER BY asrama ASC`
+    ),
+    queryOne<{ total: number }>(
+      `SELECT COUNT(*) AS total FROM santri s ${whereClause}`,
+      queryParams
+    ),
+    queryOne<{ value: string }>(
+      `SELECT value FROM app_settings WHERE key = 'uang_jajan_global_daily_limit'`
+    ),
+  ])
+
+  const kpi: UangJajanKpi = {
+    totalSaldoTitipan: kpiTotalSaldoRow?.total ?? 0,
+    santriBersaldoCount: kpiTotalSaldoRow?.count_bersaldo ?? 0,
+    mutasiInBulanIniNominal: kpiMutasiBulanIniRow?.total_in ?? 0,
+    mutasiOutBulanIniNominal: kpiMutasiBulanIniRow?.total_out ?? 0,
+  }
+
+  const asramaList = asramaRows.map(r => r.asrama)
   const totalItems = countRow?.total ?? 0
   const totalPages = Math.ceil(totalItems / pageSize) || 1
-
-  // 5. Query data santri dengan limit & mutasi terakhir
-  const globalDailyLimitRow = await queryOne<{ value: string }>(
-    `SELECT value FROM app_settings WHERE key = 'uang_jajan_global_daily_limit'`
-  )
   const globalDailyLimit = globalDailyLimitRow?.value ? parseInt(globalDailyLimitRow.value, 10) : 100000
 
   const studentRows = await query<{

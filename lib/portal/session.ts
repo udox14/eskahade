@@ -11,6 +11,7 @@
 // hidrasi di getPortalSession() gagal → ortu di-bounce ke halaman login.
 // Kegagalan aman, bukan kebocoran data.
 
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { queryOne } from '@/lib/db'
@@ -54,7 +55,7 @@ export function portalCookieOptions() {
   }
 }
 
-export async function getPortalSession(): Promise<PortalSession | null> {
+export const getPortalSession = cache(async function getPortalSession(): Promise<PortalSession | null> {
   try {
     const cookieStore = await cookies()
     const token = cookieStore.get(PORTAL_COOKIE)?.value
@@ -105,7 +106,7 @@ export async function getPortalSession(): Promise<PortalSession | null> {
   } catch {
     return null
   }
-}
+})
 
 // Guard untuk page.tsx portal (Server Component)
 export async function requirePortalSession(): Promise<PortalSession> {

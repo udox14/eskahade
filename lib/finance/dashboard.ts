@@ -167,162 +167,173 @@ export async function getExecutiveFinanceKpi(periodInput?: string): Promise<Fina
   const periodPrefix = `${period}%`
   const todayPrefix = `${new Date().toISOString().slice(0, 10)}%`
 
-  // 1. KAS PESANTREN: Penerimaan (Online vs Tunai, Settled vs Pending Settlement)
-  // Authoritative Settlement: Ditentukan dari linkage finance_settlement_items, bukan p.status
-  const pesantrenRow = await queryOne<{
-    total_penerimaan: number
-    online_penerimaan: number
-    cash_penerimaan: number
-    settled_amount: number
-    pending_settlement_amount: number
-    pending_settlement_count: number
-  }>(
-    `SELECT
-       COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' THEN a.amount ELSE 0 END), 0) AS total_penerimaan,
-       COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'DUITKU' THEN a.amount ELSE 0 END), 0) AS online_penerimaan,
-       COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'CASH' THEN a.amount ELSE 0 END), 0) AS cash_penerimaan,
-       COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'DUITKU' AND EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN a.amount ELSE 0 END), 0) AS settled_amount,
-       COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'DUITKU' AND NOT EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN a.amount ELSE 0 END), 0) AS pending_settlement_amount,
-       COALESCE(COUNT(DISTINCT CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'DUITKU' AND NOT EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN p.id ELSE NULL END), 0) AS pending_settlement_count
-     FROM finance_allocations a
-     JOIN finance_payments p ON a.payment_id = p.id
-     WHERE a.target_type = 'OBLIGATION'
-       AND p.correction_status != 'FULLY_CORRECTED'
-       AND p.paid_at LIKE ?`,
-    [periodPrefix]
-  )
+  // Eksekusi seluruh KPI Kas Pesantren, Uang Jajan, Kasir, dan Mismatch secara paralel
+  const [
+    pesantrenRow,
+    disbursedRow,
+    readyDisburseRow,
+    arrearsRow,
+    walletBalanceRow,
+    walletActivityRow,
+    activeWalletStudentsRow,
+    openSessionsRow,
+    todayCashRow,
+    mismatchRow,
+  ] = await Promise.all([
+    // 1. KAS PESANTREN: Penerimaan (Online vs Tunai, Settled vs Pending Settlement)
+    queryOne<{
+      total_penerimaan: number
+      online_penerimaan: number
+      cash_penerimaan: number
+      settled_amount: number
+      pending_settlement_amount: number
+      pending_settlement_count: number
+    }>(
+      `SELECT
+         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' THEN a.amount ELSE 0 END), 0) AS total_penerimaan,
+         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'DUITKU' THEN a.amount ELSE 0 END), 0) AS online_penerimaan,
+         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'CASH' THEN a.amount ELSE 0 END), 0) AS cash_penerimaan,
+         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'DUITKU' AND EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN a.amount ELSE 0 END), 0) AS settled_amount,
+         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'DUITKU' AND NOT EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN a.amount ELSE 0 END), 0) AS pending_settlement_amount,
+         COALESCE(COUNT(DISTINCT CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'DUITKU' AND NOT EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN p.id ELSE NULL END), 0) AS pending_settlement_count
+       FROM finance_allocations a
+       JOIN finance_payments p ON a.payment_id = p.id
+       WHERE a.target_type = 'OBLIGATION'
+         AND p.correction_status != 'FULLY_CORRECTED'
+         AND p.paid_at LIKE ?`,
+      [periodPrefix]
+    ),
 
-  // 2. KAS PESANTREN: Penyaluran (Dana Sudah Disalurkan vs Dana Siap Disalurkan di Pool)
-  // Authoritative Disbursed & Ready to Disburse: Dihitung langsung dari finance_distribution_items, bukan cache disbursed_amount
-  const disbursedRow = await queryOne<{ total_disbursed: number }>(
-    `SELECT COALESCE(SUM(di.amount), 0) AS total_disbursed
-     FROM finance_distribution_items di
-     JOIN finance_distributions d ON d.id = di.distribution_id
-     WHERE d.transferred_at LIKE ?`,
-    [periodPrefix]
-  )
+    // 2. KAS PESANTREN: Penyaluran (Dana Sudah Disalurkan vs Dana Siap Disalurkan di Pool)
+    queryOne<{ total_disbursed: number }>(
+      `SELECT COALESCE(SUM(di.amount), 0) AS total_disbursed
+       FROM finance_distribution_items di
+       JOIN finance_distributions d ON d.id = di.distribution_id
+       WHERE d.transferred_at LIKE ?`,
+      [periodPrefix]
+    ),
 
-  const readyDisburseRow = await queryOne<{ ready_to_disburse: number }>(
-    `SELECT COALESCE(SUM(
-       a.amount - COALESCE((
-         SELECT SUM(di.amount)
-         FROM finance_distribution_items di
-         WHERE di.allocation_id = a.id
-       ), 0)
-     ), 0) AS ready_to_disburse
-     FROM finance_allocations a
-     JOIN finance_payments p ON a.payment_id = p.id
-     WHERE a.target_type = 'OBLIGATION'
-       AND p.correction_status != 'FULLY_CORRECTED'
-       AND p.fund_management = 'KOPERASI'
-       AND a.amount > COALESCE((
-         SELECT SUM(di.amount)
-         FROM finance_distribution_items di
-         WHERE di.allocation_id = a.id
-       ), 0)`,
-    []
-  )
+    queryOne<{ ready_to_disburse: number }>(
+      `SELECT COALESCE(SUM(
+         a.amount - COALESCE((
+           SELECT SUM(di.amount)
+           FROM finance_distribution_items di
+           WHERE di.allocation_id = a.id
+         ), 0)
+       ), 0) AS ready_to_disburse
+       FROM finance_allocations a
+       JOIN finance_payments p ON a.payment_id = p.id
+       WHERE a.target_type = 'OBLIGATION'
+         AND p.correction_status != 'FULLY_CORRECTED'
+         AND p.fund_management = 'KOPERASI'
+         AND a.amount > COALESCE((
+           SELECT SUM(di.amount)
+           FROM finance_distribution_items di
+           WHERE di.allocation_id = a.id
+         ), 0)`,
+      []
+    ),
 
-  // 3. KAS PESANTREN: Tunggakan Kewajiban & Jumlah Santri Menunggak
-  const arrearsRow = await queryOne<{
-    total_tunggakan: number
-    santri_menunggak_count: number
-  }>(
-    `SELECT
-       COALESCE(SUM(amount_expected - amount_exempted - amount_paid), 0) AS total_tunggakan,
-       COUNT(DISTINCT santri_id) AS santri_menunggak_count
-     FROM finance_obligations
-     WHERE status IN ('UNPAID', 'PARTIALLY_PAID')
-       AND (period <= ? OR period = 'LIFETIME')`,
-    [period]
-  )
+    // 3. KAS PESANTREN: Tunggakan Kewajiban & Jumlah Santri Menunggak
+    queryOne<{
+      total_tunggakan: number
+      santri_menunggak_count: number
+    }>(
+      `SELECT
+         COALESCE(SUM(amount_expected - amount_exempted - amount_paid), 0) AS total_tunggakan,
+         COUNT(DISTINCT santri_id) AS santri_menunggak_count
+       FROM finance_obligations
+       WHERE status IN ('UNPAID', 'PARTIALLY_PAID')
+         AND (period <= ? OR period = 'LIFETIME')`,
+      [period]
+    ),
 
-  // 4. DANA TITIPAN SANTRI (UANG JAJAN) — TERPISAH DARI KAS PESANTREN
-  // Authoritative Ledger: Top-up hanya menghitung movement_type TOPUP_ONLINE dan TOPUP_CASH
-  const walletBalanceRow = await queryOne<{ total_balance: number }>(
-    `SELECT COALESCE(SUM(CASE WHEN direction = 'IN' THEN amount ELSE -amount END), 0) AS total_balance
-     FROM finance_wallet_ledger`,
-    []
-  )
+    // 4. DANA TITIPAN SANTRI (UANG JAJAN) — TERPISAH DARI KAS PESANTREN
+    queryOne<{ total_balance: number }>(
+      `SELECT COALESCE(SUM(CASE WHEN direction = 'IN' THEN amount ELSE -amount END), 0) AS total_balance
+       FROM finance_wallet_ledger`,
+      []
+    ),
 
-  const walletActivityRow = await queryOne<{
-    topup_period: number
-    topup_online: number
-    topup_cash: number
-    withdrawal_period: number
-  }>(
-    `SELECT
-       COALESCE(SUM(CASE WHEN direction = 'IN' AND movement_type IN ('TOPUP_ONLINE', 'TOPUP_CASH') THEN amount ELSE 0 END), 0) AS topup_period,
-       COALESCE(SUM(CASE WHEN direction = 'IN' AND movement_type = 'TOPUP_ONLINE' THEN amount ELSE 0 END), 0) AS topup_online,
-       COALESCE(SUM(CASE WHEN direction = 'IN' AND movement_type = 'TOPUP_CASH' THEN amount ELSE 0 END), 0) AS topup_cash,
-       COALESCE(SUM(CASE WHEN direction = 'OUT' AND movement_type = 'WITHDRAWAL_LOKET' THEN amount ELSE 0 END), 0) AS withdrawal_period
-     FROM finance_wallet_ledger
-     WHERE created_at LIKE ?`,
-    [periodPrefix]
-  )
+    queryOne<{
+      topup_period: number
+      topup_online: number
+      topup_cash: number
+      withdrawal_period: number
+    }>(
+      `SELECT
+         COALESCE(SUM(CASE WHEN direction = 'IN' AND movement_type IN ('TOPUP_ONLINE', 'TOPUP_CASH') THEN amount ELSE 0 END), 0) AS topup_period,
+         COALESCE(SUM(CASE WHEN direction = 'IN' AND movement_type = 'TOPUP_ONLINE' THEN amount ELSE 0 END), 0) AS topup_online,
+         COALESCE(SUM(CASE WHEN direction = 'IN' AND movement_type = 'TOPUP_CASH' THEN amount ELSE 0 END), 0) AS topup_cash,
+         COALESCE(SUM(CASE WHEN direction = 'OUT' AND movement_type = 'WITHDRAWAL_LOKET' THEN amount ELSE 0 END), 0) AS withdrawal_period
+       FROM finance_wallet_ledger
+       WHERE created_at LIKE ?`,
+      [periodPrefix]
+    ),
 
-  const activeWalletStudentsRow = await queryOne<{ active_count: number }>(
-    `SELECT COUNT(DISTINCT santri_id) AS active_count
-     FROM finance_wallet_ledger`,
-    []
-  )
+    queryOne<{ active_count: number }>(
+      `SELECT COUNT(DISTINCT santri_id) AS active_count
+       FROM finance_wallet_ledger`,
+      []
+    ),
 
-  // 5. AKTIVITAS LOKET KASIR (Hari ini & Sesi Terbuka)
-  const openSessionsRow = await queryOne<{
-    open_count: number
-    expected_drawer: number
-  }>(
-    `SELECT
-       COUNT(*) AS open_count,
-       COALESCE(SUM(expected_closing_balance), 0) AS expected_drawer
-     FROM finance_cash_sessions
-     WHERE status = 'OPEN'`,
-    []
-  )
+    // 5. AKTIVITAS LOKET KASIR (Hari ini & Sesi Terbuka)
+    queryOne<{
+      open_count: number
+      expected_drawer: number
+    }>(
+      `SELECT
+         COUNT(*) AS open_count,
+         COALESCE(SUM(expected_closing_balance), 0) AS expected_drawer
+       FROM finance_cash_sessions
+       WHERE status = 'OPEN'`,
+      []
+    ),
 
-  const todayCashRow = await queryOne<{
-    today_in: number
-    today_out: number
-  }>(
-    `SELECT
-       COALESCE(SUM(CASE WHEN direction = 'IN' THEN amount ELSE 0 END), 0) AS today_in,
-       COALESCE(SUM(CASE WHEN direction = 'OUT' THEN amount ELSE 0 END), 0) AS today_out
-     FROM (
-       SELECT 'IN' AS direction, p.gross_amount AS amount
-       FROM finance_payments p
-       WHERE p.channel = 'CASH' AND p.paid_at LIKE ?
-       UNION ALL
-       SELECT wl.direction, wl.amount
-       FROM finance_wallet_ledger wl
-       WHERE wl.cash_session_id IS NOT NULL AND wl.created_at LIKE ?
-         AND (
-           (wl.direction = 'IN' AND wl.movement_type = 'TOPUP_CASH'
-            AND NOT EXISTS (SELECT 1 FROM finance_payments p WHERE p.id = wl.reference_id OR p.payment_number = wl.reference_id))
-           OR
-           (wl.direction = 'OUT' AND wl.movement_type = 'WITHDRAWAL_LOKET')
-         )
-     )`,
-    [todayPrefix, todayPrefix]
-  )
+    queryOne<{
+      today_in: number
+      today_out: number
+    }>(
+      `SELECT
+         COALESCE(SUM(CASE WHEN direction = 'IN' THEN amount ELSE 0 END), 0) AS today_in,
+         COALESCE(SUM(CASE WHEN direction = 'OUT' THEN amount ELSE 0 END), 0) AS today_out
+       FROM (
+         SELECT 'IN' AS direction, p.gross_amount AS amount
+         FROM finance_payments p
+         WHERE p.channel = 'CASH' AND p.paid_at LIKE ?
+         UNION ALL
+         SELECT wl.direction, wl.amount
+         FROM finance_wallet_ledger wl
+         WHERE wl.cash_session_id IS NOT NULL AND wl.created_at LIKE ?
+           AND (
+             (wl.direction = 'IN' AND wl.movement_type = 'TOPUP_CASH'
+              AND NOT EXISTS (SELECT 1 FROM finance_payments p WHERE p.id = wl.reference_id OR p.payment_number = wl.reference_id))
+             OR
+             (wl.direction = 'OUT' AND wl.movement_type = 'WITHDRAWAL_LOKET')
+           )
+       )`,
+      [todayPrefix, todayPrefix]
+    ),
 
-  // 6. INDIKATOR SELISIH & REKONSILIASI (Mismatch Detection)
-  const mismatchRow = await queryOne<{
-    unallocated_count: number
-    unallocated_amount: number
-    amount_mismatch_count: number
-    cash_discrepancies: number
-    settlement_discrepancies: number
-    pending_recovery_cases: number
-  }>(
-    `SELECT
-       (SELECT COUNT(*) FROM finance_reconciliation_items WHERE resolution_action = 'NONE' AND match_status = 'UNALLOCATED_TRANSFER') AS unallocated_count,
-       (SELECT COALESCE(SUM(discrepancy_amount), 0) FROM finance_reconciliation_items WHERE resolution_action = 'NONE' AND match_status = 'UNALLOCATED_TRANSFER') AS unallocated_amount,
-       (SELECT COUNT(*) FROM finance_reconciliation_items WHERE resolution_action = 'NONE' AND match_status IN ('AMOUNT_MISMATCH', 'UNMATCHED_INTERNAL', 'UNMATCHED_EXTERNAL')) AS amount_mismatch_count,
-       (SELECT COUNT(*) FROM finance_cash_sessions WHERE difference != 0 AND difference IS NOT NULL) AS cash_discrepancies,
-       (SELECT COUNT(*) FROM finance_settlements WHERE status = 'DISCREPANCY') AS settlement_discrepancies,
-       (SELECT COUNT(*) FROM finance_corrections WHERE is_recovery_case = 1 AND recovery_status = 'PENDING_RECOVERY') AS pending_recovery_cases`,
-    []
-  )
+    // 6. INDIKATOR SELISIH & REKONSILIASI (Mismatch Detection)
+    queryOne<{
+      unallocated_count: number
+      unallocated_amount: number
+      amount_mismatch_count: number
+      cash_discrepancies: number
+      settlement_discrepancies: number
+      pending_recovery_cases: number
+    }>(
+      `SELECT
+         (SELECT COUNT(*) FROM finance_reconciliation_items WHERE resolution_action = 'NONE' AND match_status = 'UNALLOCATED_TRANSFER') AS unallocated_count,
+         (SELECT COALESCE(SUM(discrepancy_amount), 0) FROM finance_reconciliation_items WHERE resolution_action = 'NONE' AND match_status = 'UNALLOCATED_TRANSFER') AS unallocated_amount,
+         (SELECT COUNT(*) FROM finance_reconciliation_items WHERE resolution_action = 'NONE' AND match_status IN ('AMOUNT_MISMATCH', 'UNMATCHED_INTERNAL', 'UNMATCHED_EXTERNAL')) AS amount_mismatch_count,
+         (SELECT COUNT(*) FROM finance_cash_sessions WHERE difference != 0 AND difference IS NOT NULL) AS cash_discrepancies,
+         (SELECT COUNT(*) FROM finance_settlements WHERE status = 'DISCREPANCY') AS settlement_discrepancies,
+         (SELECT COUNT(*) FROM finance_corrections WHERE is_recovery_case = 1 AND recovery_status = 'PENDING_RECOVERY') AS pending_recovery_cases`,
+      []
+    ),
+  ])
 
   const unallocatedCount = mismatchRow?.unallocated_count ?? 0
   const amountMismatchCount = mismatchRow?.amount_mismatch_count ?? 0
@@ -403,8 +414,8 @@ export async function getDashboardChartsData(periodInput?: string): Promise<{
     monthList.push(`${y}-${m}`)
   }
 
-  const trends: MonthlyTrendItem[] = []
-  for (const m of monthList) {
+  // Eksekusi tren 6 bulan, komposisi kanal, dan komposisi item secara paralel
+  const trendPromises = monthList.map(async (m) => {
     const mPrefix = `${m}%`
     const row = await queryOne<{
       penerimaan: number
@@ -431,17 +442,16 @@ export async function getDashboardChartsData(periodInput?: string): Promise<{
       [mPrefix, mPrefix, mPrefix]
     )
 
-    trends.push({
+    return {
       month: m,
       monthLabel: formatPeriodLabel(m),
       penerimaanPesantren: row?.penerimaan ?? 0,
       penyaluranDana: row?.disbursed ?? 0,
       uangJajanIn: row?.uang_jajan_in ?? 0,
-    })
-  }
+    }
+  })
 
-  // 2. Komposisi Kanal (Online Duitku vs Tunai Loket) pada periode terpilih
-  const channelRow = await queryOne<{
+  const channelPromise = queryOne<{
     online_sum: number
     cash_sum: number
   }>(
@@ -456,19 +466,7 @@ export async function getDashboardChartsData(periodInput?: string): Promise<{
     [periodPrefix]
   )
 
-  const onlineAmount = channelRow?.online_sum ?? 0
-  const cashAmount = channelRow?.cash_sum ?? 0
-  const totalChannel = onlineAmount + cashAmount
-  const channelComposition: ChannelComposition = {
-    onlineAmount,
-    onlinePercentage: totalChannel > 0 ? Math.round((onlineAmount / totalChannel) * 100) : 0,
-    cashAmount,
-    cashPercentage: totalChannel > 0 ? Math.round((cashAmount / totalChannel) * 100) : 0,
-    total: totalChannel,
-  }
-
-  // 3. Komposisi Pos Pembayaran (SPP, Uang Makan, dll.)
-  const itemRows = await query<{
+  const itemPromise = query<{
     item_type: string
     total_amount: number
   }>(
@@ -485,6 +483,23 @@ export async function getDashboardChartsData(periodInput?: string): Promise<{
      ORDER BY total_amount DESC`,
     [periodPrefix]
   )
+
+  const [trends, channelRow, itemRows] = await Promise.all([
+    Promise.all(trendPromises),
+    channelPromise,
+    itemPromise,
+  ])
+
+  const onlineAmount = channelRow?.online_sum ?? 0
+  const cashAmount = channelRow?.cash_sum ?? 0
+  const totalChannel = onlineAmount + cashAmount
+  const channelComposition: ChannelComposition = {
+    onlineAmount,
+    onlinePercentage: totalChannel > 0 ? Math.round((onlineAmount / totalChannel) * 100) : 0,
+    cashAmount,
+    cashPercentage: totalChannel > 0 ? Math.round((cashAmount / totalChannel) * 100) : 0,
+    total: totalChannel,
+  }
 
   const totalItemAmount = itemRows.reduce((acc, r) => acc + r.total_amount, 0)
   const itemComposition: ItemComposition[] = itemRows.map((r) => ({

@@ -22,7 +22,7 @@ export async function getReconciliationOverview(
   const periodPrefix = period ? `${period}%` : '%'
 
   // 1. Data Online Payment & Settlement
-  const onlineRow = await queryOne<{
+  const onlinePromise = queryOne<{
     total_gross: number
     settled_gross: number
     pending_net: number
@@ -39,7 +39,7 @@ export async function getReconciliationOverview(
   )
 
   // 2. Transaksi Unallocated / Ambigu
-  const unallocRow = await queryOne<{
+  const unallocPromise = queryOne<{
     total_amount: number
     count_items: number
   }>(
@@ -54,7 +54,7 @@ export async function getReconciliationOverview(
   )
 
   // 3. Selisih Kas Sesi Loket
-  const cashRow = await queryOne<{
+  const cashPromise = queryOne<{
     total_diff: number
     discrepancy_count: number
   }>(
@@ -70,7 +70,7 @@ export async function getReconciliationOverview(
   )
 
   // 4. Kasus Pemulihan Dana (Recovery Cases) Pending
-  const recoveryRow = await queryOne<{
+  const recoveryPromise = queryOne<{
     total_recovery: number
     recovery_count: number
   }>(
@@ -83,6 +83,13 @@ export async function getReconciliationOverview(
        AND created_at LIKE ?`,
     [periodPrefix]
   )
+
+  const [onlineRow, unallocRow, cashRow, recoveryRow] = await Promise.all([
+    onlinePromise,
+    unallocPromise,
+    cashPromise,
+    recoveryPromise,
+  ])
 
   return {
     totalOnlinePaidAmount: onlineRow?.total_gross ?? 0,
@@ -141,7 +148,7 @@ export async function getUnallocatedReconciliationItems(filters?: {
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
-  const countRow = await queryOne<{ total: number }>(
+  const countPromise = queryOne<{ total: number }>(
     `SELECT COUNT(*) AS total
      FROM finance_reconciliation_items ri
      LEFT JOIN finance_payments p ON p.id = ri.payment_id
@@ -149,10 +156,8 @@ export async function getUnallocatedReconciliationItems(filters?: {
      ${whereClause}`,
     params
   )
-  const totalCount = countRow?.total ?? 0
-  const totalPages = Math.ceil(totalCount / pageSize)
 
-  const rows = await query<UnallocatedReconciliationRow>(
+  const rowsPromise = query<UnallocatedReconciliationRow>(
     `SELECT
        ri.id,
        COALESCE(p.id, '') AS payment_id,
@@ -185,6 +190,10 @@ export async function getUnallocatedReconciliationItems(filters?: {
      LIMIT ? OFFSET ?`,
     [...params, pageSize, offset]
   )
+
+  const [countRow, rows] = await Promise.all([countPromise, rowsPromise])
+  const totalCount = countRow?.total ?? 0
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   return {
     items: rows || [],
@@ -510,14 +519,12 @@ export async function getCashSessionReconciliationList(filters?: {
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
-  const countRow = await queryOne<{ total: number }>(
+  const countPromise = queryOne<{ total: number }>(
     `SELECT COUNT(*) AS total FROM finance_cash_sessions s ${whereClause}`,
     params
   )
-  const totalCount = countRow?.total ?? 0
-  const totalPages = Math.ceil(totalCount / pageSize)
 
-  const rows = await query<{
+  const rowsPromise = query<{
     id: string
     session_code: string
     operator_id: string
@@ -555,6 +562,10 @@ export async function getCashSessionReconciliationList(filters?: {
      LIMIT ? OFFSET ?`,
     [...params, pageSize, offset]
   )
+
+  const [countRow, rows] = await Promise.all([countPromise, rowsPromise])
+  const totalCount = countRow?.total ?? 0
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   const mapped: CashSessionReconciliationSummary[] = (rows || []).map((r) => {
     let recStatus: 'SEIMBANG' | 'SELISIH' | 'BELUM_DITUTUP' = 'BELUM_DITUTUP'

@@ -241,52 +241,13 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
   const userRole = roles.includes('admin') ? 'admin' : roles.includes('bendahara') ? 'bendahara' : roles[0] || 'viewer'
   const fullName = session?.full_name || 'Pengguna'
 
-  // 1. Data Tarif Terversi (immutable)
-  const tariffs = await listTariffs().catch(() => [])
-
-  // 2. Tahun Ajaran
-  const academicYears = await query<AcademicYearOption>(
-    `SELECT id, nama, is_active FROM tahun_ajaran ORDER BY is_active DESC, nama DESC`
-  ).catch(() => [])
-
-  // 3. Pembebasan Biaya + Join Santri & Tahun Ajaran
-  const exemptions = await query<ExemptionWithStudent>(
-    `SELECT
-       e.id, e.santri_id, e.item_type, e.academic_year_id,
-       e.period_start, e.period_end, e.reason, e.notes,
-       e.status, e.revoked_at, e.revoked_by, e.revocation_reason,
-       e.created_by, e.created_at,
-       s.nama_lengkap AS santri_nama,
-       s.nis AS santri_nis,
-       s.asrama AS santri_asrama,
-       s.kamar AS santri_kamar,
-       ta.nama AS academic_year_nama
-     FROM finance_exemptions e
-     JOIN santri s ON s.id = e.santri_id
-     LEFT JOIN tahun_ajaran ta ON ta.id = e.academic_year_id
-     ORDER BY e.created_at DESC`
-  ).catch(() => [])
-
-  // 4. Limit Uang Jajan Global & Dataset Terpaginasi Awal
-  const globalDailyLimit = await getGlobalDailyLimit().catch(() => DEFAULT_GLOBAL_DAILY_LIMIT)
-  const initialLimitsRes = await getStudentWalletLimitsAction({
-    page: 1,
-    pageSize: DEFAULT_FINANCE_PAGE_SIZE,
-  }).catch(() => ({
-    items: [],
-    globalDailyLimit,
-    pagination: {
-      currentPage: 1,
-      pageSize: DEFAULT_FINANCE_PAGE_SIZE,
-      totalItems: 0,
-      totalPages: 1,
-    },
-    asramaList: [],
-    kelasList: [],
-  }))
-
-  // 5. Konfigurasi Gateway & Fixed VA Ter-Masking + Kop/Print Settings + Overrides & Cutover
+  // Konfigurasi Gateway & Fixed VA + Kop/Print Settings + Tariffs & Overrides + Cutover
   const [
+    tariffs,
+    academicYears,
+    exemptions,
+    globalDailyLimit,
+    initialLimitsRes,
     duitkuV2,
     snapConfig,
     settingsRows,
@@ -298,6 +259,42 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
     legacySppRow,
     koperasiPaymentsRow,
   ] = await Promise.all([
+    listTariffs().catch(() => []),
+    query<AcademicYearOption>(
+      `SELECT id, nama, is_active FROM tahun_ajaran ORDER BY is_active DESC, nama DESC`
+    ).catch(() => []),
+    query<ExemptionWithStudent>(
+      `SELECT
+         e.id, e.santri_id, e.item_type, e.academic_year_id,
+         e.period_start, e.period_end, e.reason, e.notes,
+         e.status, e.revoked_at, e.revoked_by, e.revocation_reason,
+         e.created_by, e.created_at,
+         s.nama_lengkap AS santri_nama,
+         s.nis AS santri_nis,
+         s.asrama AS santri_asrama,
+         s.kamar AS santri_kamar,
+         ta.nama AS academic_year_nama
+       FROM finance_exemptions e
+       JOIN santri s ON s.id = e.santri_id
+       LEFT JOIN tahun_ajaran ta ON ta.id = e.academic_year_id
+       ORDER BY e.created_at DESC`
+    ).catch(() => []),
+    getGlobalDailyLimit().catch(() => DEFAULT_GLOBAL_DAILY_LIMIT),
+    getStudentWalletLimitsAction({
+      page: 1,
+      pageSize: DEFAULT_FINANCE_PAGE_SIZE,
+    }).catch(() => ({
+      items: [],
+      globalDailyLimit: DEFAULT_GLOBAL_DAILY_LIMIT,
+      pagination: {
+        currentPage: 1,
+        pageSize: DEFAULT_FINANCE_PAGE_SIZE,
+        totalItems: 0,
+        totalPages: 1,
+      },
+      asramaList: [],
+      kelasList: [],
+    })),
     getDuitkuV2Config().catch(() => ({
       merchantCode: '',
       apiKey: '',
@@ -564,10 +561,9 @@ export async function getStudentWalletLimitsAction(
   const asramaFilter = (params?.asrama || 'ALL').trim()
   const kelasFilter = (params?.kelas || 'ALL').trim()
 
-  const globalDailyLimit = await getGlobalDailyLimit().catch(() => DEFAULT_GLOBAL_DAILY_LIMIT)
-
-  // Ambil daftar filter Asrama & Kelas unik untuk dropdown
-  const [asramaRows, kelasRows] = await Promise.all([
+  // Ambil limit global & daftar filter Asrama & Kelas unik untuk dropdown secara paralel
+  const [globalDailyLimit, asramaRows, kelasRows] = await Promise.all([
+    getGlobalDailyLimit().catch(() => DEFAULT_GLOBAL_DAILY_LIMIT),
     query<{ asrama: string }>(
       `SELECT DISTINCT asrama FROM santri
        WHERE status_global = 'aktif' AND asrama IS NOT NULL AND TRIM(asrama) != ''
@@ -605,18 +601,15 @@ export async function getStudentWalletLimitsAction(
 
   const whereClause = `WHERE ${conditions.join(' AND ')}`
 
-  // Hitung total data terfilter sebelum LIMIT/OFFSET
-  const countRow = await queryOne<{ total: number }>(
+  // Hitung total data & ambil halaman secara paralel
+  const countPromise = queryOne<{ total: number }>(
     `SELECT COUNT(*) AS total
      FROM santri s
      ${whereClause}`,
     queryParams
   )
-  const totalItems = countRow?.total ?? 0
-  const totalPages = Math.ceil(totalItems / pageSize) || 1
 
-  // Ambil data halaman dengan LIMIT/OFFSET
-  const rows = await query<{
+  const rowsPromise = query<{
     santri_id: string
     nis: string
     nama_lengkap: string
@@ -646,6 +639,10 @@ export async function getStudentWalletLimitsAction(
      LIMIT ? OFFSET ?`,
     [...queryParams, pageSize, offset]
   ).catch(() => [])
+
+  const [countRow, rows] = await Promise.all([countPromise, rowsPromise])
+  const totalItems = countRow?.total ?? 0
+  const totalPages = Math.ceil(totalItems / pageSize) || 1
 
   const items: StudentWalletLimitRow[] = rows.map((s) => {
     const parentDaily = s.parent_daily_limit !== null ? Number(s.parent_daily_limit) : null

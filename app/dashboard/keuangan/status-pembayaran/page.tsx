@@ -12,13 +12,14 @@ export default async function StatusPembayaranPage() {
     await guardRole(['admin', 'bendahara', 'pimpinan'])
   }
 
-  // 2. Ambil opsi filter awal dan dataset default
-  const filterOptions = await getStatusPembayaranFilterOptions()
-  const initialData = await getStatusPembayaranData({
-    period: filterOptions.currentPeriod,
-    pageSize: 50,
-    page: 1,
-  })
+  // 2. Ambil opsi filter awal dan dataset default secara paralel
+  const [filterOptions, initialData] = await Promise.all([
+    getStatusPembayaranFilterOptions(),
+    getStatusPembayaranData({
+      pageSize: 50,
+      page: 1,
+    }),
+  ])
 
   return (
     <StatusPembayaranContent

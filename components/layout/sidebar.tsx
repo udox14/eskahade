@@ -458,6 +458,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
                   <div key={fitur.href} className="animate-in fade-in slide-in-from-left-2 duration-500">
                     <Link
                       href={fitur.href}
+                      prefetch={true}
                       onClick={mobile ? onMobileClose : undefined}
                       className={cn(
                         "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl overflow-hidden",
@@ -545,6 +546,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
                             <Link
                               key={fitur.href}
                               href={fitur.href}
+                              prefetch={true}
                               onClick={mobile ? onMobileClose : undefined}
                               className={cn(
                                 "flex items-center pl-6 pr-2 py-1.5 rounded-r-xl text-xs transition-all duration-300 relative group overflow-hidden",

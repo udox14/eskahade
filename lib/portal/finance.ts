@@ -4,6 +4,7 @@
 // pembuatan payment order Duitku (payer_type = 'PORTAL_ORTU'),
 // top-up uang jajan, batas limit dompet, dan riwayat transaksi terpadu.
 
+import { cache } from 'react'
 import { query, queryOne } from '@/lib/db'
 import { createPaymentOrder, getPaymentOrderById } from '@/lib/finance/orders'
 import { getStudentFixedVa } from '@/lib/finance/va'
@@ -167,7 +168,7 @@ function formatPeriodLabel(period: string, itemType?: string): string {
  * Mengambil tagihan aktif dan status finansial santri untuk Portal Orang Tua.
  * Menjamin kewajiban bulan berjalan dan tahun berjalan termaterialisasi on-demand.
  */
-export async function getPortalStudentBilling(santriId: string): Promise<PortalStudentBillingData> {
+export const getPortalStudentBilling = cache(async function getPortalStudentBilling(santriId: string): Promise<PortalStudentBillingData> {
   // 1. Ambil data santri aktif
   const santri = await queryOne<{
     id: string
@@ -228,35 +229,48 @@ export async function getPortalStudentBilling(santriId: string): Promise<PortalS
   }
   candidatePeriods.sort()
 
-  // Materialisasi bulanan menggunakan locked engine (idempotent, no duplicate, canonical tariff & provider snapshot)
+  // Ambil record kewajiban santri yang sudah ada secara batch (1 query)
+  // untuk menghindari 58 query berurutan yang memicu latensi tinggi.
+  const existingRecords = await query<{ item_type: string; period: string }>(
+    `SELECT item_type, period FROM finance_obligations WHERE santri_id = ?`,
+    [santriId]
+  )
+  const existingSet = new Set(existingRecords.map(r => `${r.item_type}:${r.period}`))
+
+  const missingTasks: Array<Promise<unknown>> = []
+
+  // Hanya jalankan ensureObligation untuk kewajiban yang BELUM ada di database
   for (const p of candidatePeriods) {
-    try {
-      await ensureObligation(santriId, 'SPP', p).catch(() => null)
-      if (santri.tempat_makan_id) {
-        await ensureObligation(santriId, 'UANG_MAKAN', p).catch(() => null)
-      }
-      if (santri.tempat_mencuci_id) {
-        await ensureObligation(santriId, 'UANG_NYUCI', p).catch(() => null)
-      }
-    } catch {
-      // Abaikan kegagalan materialisasi jika tarif belum diset atau periode di luar cakupan
+    if (!existingSet.has(`SPP:${p}`)) {
+      missingTasks.push(ensureObligation(santriId, 'SPP', p).catch(() => null))
+    }
+    if (santri.tempat_makan_id && !existingSet.has(`UANG_MAKAN:${p}`)) {
+      missingTasks.push(ensureObligation(santriId, 'UANG_MAKAN', p).catch(() => null))
+    }
+    if (santri.tempat_mencuci_id && !existingSet.has(`UANG_NYUCI:${p}`)) {
+      missingTasks.push(ensureObligation(santriId, 'UANG_NYUCI', p).catch(() => null))
     }
   }
 
-  // Materialisasi tahunan periode berjalan
-  try {
-    await ensureObligation(santriId, 'EHB', currentAnnualPeriod).catch(() => null)
-    await ensureObligation(santriId, 'EKSKUL', currentAnnualPeriod).catch(() => null)
-    await ensureObligation(santriId, 'KESEHATAN', currentAnnualPeriod).catch(() => null)
-  } catch {
-    // Abaikan jika tarif belum diset
+  // Materialisasi tahunan periode berjalan jika belum ada
+  if (!existingSet.has(`EHB:${currentAnnualPeriod}`)) {
+    missingTasks.push(ensureObligation(santriId, 'EHB', currentAnnualPeriod).catch(() => null))
+  }
+  if (!existingSet.has(`EKSKUL:${currentAnnualPeriod}`)) {
+    missingTasks.push(ensureObligation(santriId, 'EKSKUL', currentAnnualPeriod).catch(() => null))
+  }
+  if (!existingSet.has(`KESEHATAN:${currentAnnualPeriod}`)) {
+    missingTasks.push(ensureObligation(santriId, 'KESEHATAN', currentAnnualPeriod).catch(() => null))
   }
 
-  // Materialisasi USPP (Lifetime)
-  try {
-    await ensureObligation(santriId, 'USPP', 'LIFETIME').catch(() => null)
-  } catch {
-    // Abaikan jika tarif belum diset
+  // Materialisasi USPP (Lifetime) jika belum ada
+  if (!existingSet.has('USPP:LIFETIME')) {
+    missingTasks.push(ensureObligation(santriId, 'USPP', 'LIFETIME').catch(() => null))
+  }
+
+  // Eksekusi pembuatan kewajiban yang belum ada secara paralel (bukan sekuensial)
+  if (missingTasks.length > 0) {
+    await Promise.all(missingTasks)
   }
 
   // 3. Query seluruh kewajiban aktif santri yang belum lunas
@@ -402,25 +416,46 @@ export async function getPortalStudentBilling(santriId: string): Promise<PortalS
     [santriId]
   )
 
-  const pendingWithItems = await Promise.all(
-    pendingOrders.map(async po => {
-      const items = await query<{ item_type: string; amount: number }>(
-        `SELECT item_type, amount FROM finance_order_items WHERE order_id = ?`,
-        [po.id]
-      )
-      return {
-        id: po.id,
-        orderNumber: po.order_number,
-        grossAmount: po.gross_amount,
-        gatewayFee: po.gateway_fee,
-        totalCharged: po.total_charged,
-        paymentMethod: po.payment_method,
-        expiresAt: po.expires_at,
-        createdAt: po.created_at,
-        items: items.map(i => ({ itemType: i.item_type, amount: i.amount })),
+  let pendingWithItems: Array<{
+    id: string
+    orderNumber: string
+    grossAmount: number
+    gatewayFee: number
+    totalCharged: number
+    paymentMethod: string | null
+    expiresAt: string
+    createdAt: string
+    items: Array<{ itemType: string; amount: number }>
+  }> = []
+
+  if (pendingOrders.length > 0) {
+    const orderIds = pendingOrders.map(po => po.id)
+    const placeholders = orderIds.map(() => '?').join(',')
+    const allOrderItems = await query<{ order_id: string; item_type: string; amount: number }>(
+      `SELECT order_id, item_type, amount FROM finance_order_items WHERE order_id IN (${placeholders})`,
+      orderIds
+    )
+    const itemsMap = new Map<string, Array<{ itemType: string; amount: number }>>()
+    for (const oi of allOrderItems) {
+      let list = itemsMap.get(oi.order_id)
+      if (!list) {
+        list = []
+        itemsMap.set(oi.order_id, list)
       }
-    })
-  )
+      list.push({ itemType: oi.item_type, amount: oi.amount })
+    }
+    pendingWithItems = pendingOrders.map(po => ({
+      id: po.id,
+      orderNumber: po.order_number,
+      grossAmount: po.gross_amount,
+      gatewayFee: po.gateway_fee,
+      totalCharged: po.total_charged,
+      paymentMethod: po.payment_method,
+      expiresAt: po.expires_at,
+      createdAt: po.created_at,
+      items: itemsMap.get(po.id) || [],
+    }))
+  }
 
   return {
     santri: {
@@ -463,7 +498,7 @@ export async function getPortalStudentBilling(santriId: string): Promise<PortalS
       defaultQrisFeePercent: (await getGatewayFeeSettings().catch(() => ({ defaultQrisFeePercent: 0.7 }))).defaultQrisFeePercent,
     },
   }
-}
+})
 
 /**
  * Membuat Payment Order Duitku dari Portal Orang Tua.
@@ -774,18 +809,40 @@ export async function getPortalFinancialHistory(
       [santriId]
     )
 
-    for (const p of payments) {
-      const allocations = await query<{
+    const paymentIds = payments.map(p => p.id)
+    const allocationsMap = new Map<string, Array<{ item_type: string; amount: number; period: string | null }>>()
+
+    if (paymentIds.length > 0) {
+      const placeholders = paymentIds.map(() => '?').join(',')
+      const allAllocations = await query<{
+        payment_id: string
         item_type: string
         amount: number
         period: string | null
       }>(
-        `SELECT a.item_type, a.amount, o.period
+        `SELECT a.payment_id, a.item_type, a.amount, o.period
          FROM finance_allocations a
          LEFT JOIN finance_obligations o ON a.obligation_id = o.id
-         WHERE a.payment_id = ?`,
-        [p.id]
+         WHERE a.payment_id IN (${placeholders})`,
+        paymentIds
       )
+
+      for (const a of allAllocations) {
+        let list = allocationsMap.get(a.payment_id)
+        if (!list) {
+          list = []
+          allocationsMap.set(a.payment_id, list)
+        }
+        list.push({
+          item_type: a.item_type,
+          amount: a.amount,
+          period: a.period,
+        })
+      }
+    }
+
+    for (const p of payments) {
+      const allocations = allocationsMap.get(p.id) || []
 
       history.push({
         id: p.id,

@@ -98,7 +98,7 @@ export async function getDistributionSummary(
     const yearPrefix = period.slice(0, 4)
 
     // Agregasi dana bendahara net correction
-    const fundAgg = await queryOne<{
+    const fundAggPromise = queryOne<{
       total_amount: number
       total_disbursed: number
     }>(
@@ -129,11 +129,7 @@ export async function getDistributionSummary(
       [...itemTypes, period, yearPrefix]
     )
 
-    const totalDanaMasuk = fundAgg?.total_amount ?? 0
-    const totalSudahDisalurkan = fundAgg?.total_disbursed ?? 0
-    const totalSiapDisalurkan = Math.max(0, totalDanaMasuk - totalSudahDisalurkan)
-
-    const santriAgg = await queryOne<{
+    const santriAggPromise = queryOne<{
       total_santri: number
       sudah_bayar: number
       bebas: number
@@ -181,6 +177,12 @@ export async function getDistributionSummary(
       [...itemTypes, period, yearPrefix]
     )
 
+    const [fundAgg, santriAgg] = await Promise.all([fundAggPromise, santriAggPromise])
+
+    const totalDanaMasuk = fundAgg?.total_amount ?? 0
+    const totalSudahDisalurkan = fundAgg?.total_disbursed ?? 0
+    const totalSiapDisalurkan = Math.max(0, totalDanaMasuk - totalSudahDisalurkan)
+
     const totalSantriTerdaftar = santriAgg?.total_santri ?? 0
     const totalSantriSudahBayar = santriAgg?.sudah_bayar ?? 0
     const totalSantriBebas = santriAgg?.bebas ?? 0
@@ -209,7 +211,7 @@ export async function getDistributionSummary(
   }
   fundParams.push(period)
 
-  const fundAgg = await queryOne<{
+  const fundAggPromise = queryOne<{
     total_amount: number
     total_disbursed: number
   }>(
@@ -236,10 +238,6 @@ export async function getDistributionSummary(
     fundParams
   )
 
-  const totalDanaMasuk = fundAgg?.total_amount ?? 0
-  const totalSudahDisalurkan = fundAgg?.total_disbursed ?? 0
-  const totalSiapDisalurkan = Math.max(0, totalDanaMasuk - totalSudahDisalurkan)
-
   const allowCurrentAssignmentFallback = isPeriodEligibleForCurrentAssignment(period)
 
   // Santri Stats via CTE (Snapshot historis + current assignment aktif)
@@ -256,7 +254,7 @@ export async function getDistributionSummary(
     santriParams.push(providerId)
   }
 
-  const santriAgg = await queryOne<{
+  const santriAggPromise = queryOne<{
     total_santri: number
     sudah_bayar: number
     bebas: number
@@ -336,6 +334,12 @@ export async function getDistributionSummary(
     `,
     santriParams
   )
+
+  const [fundAgg, santriAgg] = await Promise.all([fundAggPromise, santriAggPromise])
+
+  const totalDanaMasuk = fundAgg?.total_amount ?? 0
+  const totalSudahDisalurkan = fundAgg?.total_disbursed ?? 0
+  const totalSiapDisalurkan = Math.max(0, totalDanaMasuk - totalSudahDisalurkan)
 
   const totalSantriTerdaftar = santriAgg?.total_santri ?? 0
   const totalSantriSudahBayar = santriAgg?.sudah_bayar ?? 0

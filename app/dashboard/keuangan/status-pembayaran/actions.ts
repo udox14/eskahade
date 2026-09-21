@@ -29,6 +29,75 @@ export interface StatusPembayaranKpi {
   totalTunggakanNominal: number
 }
 
+export interface ItemBreakdownKpi {
+  itemType: string
+  itemLabel: string
+  targetNominal: number
+  paidNominal: number
+  remainingNominal: number
+  totalCount: number
+  lunasCount: number
+}
+
+export interface RingkasanKpi {
+  totalSantri: number
+  totalLunas: number
+  totalBelumLunas: number
+  totalTunggakanNominal: number
+}
+
+export interface BulananKpi {
+  totalTagihanNominal: number
+  sudahTerbayarNominal: number
+  sisaTagihanNominal: number
+  totalTagihanCount: number
+  lunasCount: number
+  itemBreakdown: ItemBreakdownKpi[]
+}
+
+export interface TahunanKpi {
+  totalTagihanNominal: number
+  sudahTerbayarNominal: number
+  sisaTagihanNominal: number
+  totalTagihanCount: number
+  lunasCount: number
+  bebasCount: number
+  itemBreakdown: ItemBreakdownKpi[]
+}
+
+export interface UsppKpi {
+  totalKomitmenNominal: number
+  terkumpulNominal: number
+  sisaPiutangNominal: number
+  santriLunasCount: number
+  santriMencicilCount: number
+  santriBelumBayarCount: number
+}
+
+export interface TunggakanItemBreakdownKpi {
+  itemType: string
+  itemLabel: string
+  nominalTunggakan: number
+  countTagihan: number
+  targetNominal: number
+}
+
+export interface TunggakanKpi {
+  totalTunggakanNominal: number
+  totalTagihanMenunggak: number
+  totalSantriMenunggak: number
+  tunggakanTertuaLabel: string
+  itemBreakdown: TunggakanItemBreakdownKpi[]
+}
+
+export interface TabKpiContainer {
+  ringkasan?: RingkasanKpi
+  bulanan?: BulananKpi
+  tahunan?: TahunanKpi
+  uspp?: UsppKpi
+  tunggakan?: TunggakanKpi
+}
+
 export interface UserFinancePermissions {
   canView: boolean
   canRecordPayment: boolean
@@ -177,6 +246,7 @@ export interface StatusPembayaranResponse {
   usppItems?: UsppRowItem[]
   tunggakanItems?: TunggakanRowItem[]
   kpi: StatusPembayaranKpi
+  tabKpi?: TabKpiContainer
   pagination: {
     currentPage: number
     pageSize: number
@@ -509,30 +579,38 @@ async function fetchLegacySppArrears(santriIds: string[]): Promise<Map<string, {
   const map = new Map<string, { total: number; count: number }>()
   if (santriIds.length === 0) return map
 
-  const CHUNK_SIZE = 60
+  const CHUNK_SIZE = 80
+  const chunks: string[][] = []
   for (let i = 0; i < santriIds.length; i += CHUNK_SIZE) {
-    const chunk = santriIds.slice(i, i + CHUNK_SIZE)
-    const placeholders = chunk.map(() => '?').join(',')
+    chunks.push(santriIds.slice(i, i + CHUNK_SIZE))
+  }
 
-    try {
-      const rows = await query<{ santri_id: string; nominal_tagihan: number }>(
-        `SELECT santri_id, nominal_tagihan
-         FROM spp_tunggakan_historis
-         WHERE santri_id IN (${placeholders})
-           AND status = 'BELUM_LUNAS'
-           AND (tahun * 100 + bulan) < 202607`,
-        chunk
-      )
-
-      for (const r of rows) {
-        const prev = map.get(r.santri_id) ?? { total: 0, count: 0 }
-        map.set(r.santri_id, {
-          total: prev.total + (r.nominal_tagihan ?? 0),
-          count: prev.count + 1,
-        })
+  const chunkResults = await Promise.all(
+    chunks.map(async (chunk) => {
+      const placeholders = chunk.map(() => '?').join(',')
+      try {
+        return await query<{ santri_id: string; nominal_tagihan: number }>(
+          `SELECT santri_id, nominal_tagihan
+           FROM spp_tunggakan_historis
+           WHERE santri_id IN (${placeholders})
+             AND status = 'BELUM_LUNAS'
+             AND (tahun * 100 + bulan) < 202607`,
+          chunk
+        )
+      } catch (err: unknown) {
+        console.error('[status-pembayaran] Gagal membaca spp_tunggakan_historis:', err instanceof Error ? err.message : err)
+        return []
       }
-    } catch (err: unknown) {
-      console.error('[status-pembayaran] Gagal membaca spp_tunggakan_historis:', err instanceof Error ? err.message : err)
+    })
+  )
+
+  for (const rows of chunkResults) {
+    for (const r of rows) {
+      const prev = map.get(r.santri_id) ?? { total: 0, count: 0 }
+      map.set(r.santri_id, {
+        total: prev.total + (r.nominal_tagihan ?? 0),
+        count: prev.count + 1,
+      })
     }
   }
 
@@ -548,44 +626,52 @@ async function fetchLatestPaymentsForObligations(
   const map = new Map<string, { paidAt: string; method: string; amount: number }>()
   if (obligationIds.length === 0) return map
 
-  const CHUNK_SIZE = 60
+  const CHUNK_SIZE = 80
+  const chunks: string[][] = []
   for (let i = 0; i < obligationIds.length; i += CHUNK_SIZE) {
-    const chunk = obligationIds.slice(i, i + CHUNK_SIZE)
-    const ph = chunk.map(() => '?').join(',')
+    chunks.push(obligationIds.slice(i, i + CHUNK_SIZE))
+  }
 
-    try {
-      const rows = await query<{
-        obligation_id: string
-        paid_at: string
-        channel: string
-        method: string
-        net_alloc: number
-      }>(
-        `SELECT
-           a.obligation_id,
-           p.paid_at,
-           p.channel,
-           p.method,
-           (a.amount - COALESCE((SELECT SUM(ci.amount) FROM finance_correction_items ci WHERE ci.target_allocation_id = a.id), 0)) as net_alloc
-         FROM finance_allocations a
-         JOIN finance_payments p ON a.payment_id = p.id
-         WHERE a.obligation_id IN (${ph})
-         ORDER BY p.paid_at DESC, p.created_at DESC`,
-        chunk
-      )
-
-      for (const r of rows) {
-        if ((r.net_alloc ?? 0) <= 0) continue // Abaikan alokasi yang telah void/refund penuh
-        if (!map.has(r.obligation_id)) {
-          map.set(r.obligation_id, {
-            paidAt: r.paid_at,
-            method: normalizePaymentMethod(r.channel, r.method),
-            amount: r.net_alloc,
-          })
-        }
+  const chunkResults = await Promise.all(
+    chunks.map(async (chunk) => {
+      const ph = chunk.map(() => '?').join(',')
+      try {
+        return await query<{
+          obligation_id: string
+          paid_at: string
+          channel: string
+          method: string
+          net_alloc: number
+        }>(
+          `SELECT
+             a.obligation_id,
+             p.paid_at,
+             p.channel,
+             p.method,
+             (a.amount - COALESCE((SELECT SUM(ci.amount) FROM finance_correction_items ci WHERE ci.target_allocation_id = a.id), 0)) as net_alloc
+           FROM finance_allocations a
+           JOIN finance_payments p ON a.payment_id = p.id
+           WHERE a.obligation_id IN (${ph})
+           ORDER BY p.paid_at DESC, p.created_at DESC`,
+          chunk
+        )
+      } catch (err: unknown) {
+        console.error('[status-pembayaran] Gagal mengambil latest payments:', err)
+        return []
       }
-    } catch (err: unknown) {
-      console.error('[status-pembayaran] Gagal mengambil latest payments:', err)
+    })
+  )
+
+  for (const rows of chunkResults) {
+    for (const r of rows) {
+      if ((r.net_alloc ?? 0) <= 0) continue // Abaikan alokasi yang telah void/refund penuh
+      if (!map.has(r.obligation_id)) {
+        map.set(r.obligation_id, {
+          paidAt: r.paid_at,
+          method: normalizePaymentMethod(r.channel, r.method),
+          amount: r.net_alloc,
+        })
+      }
     }
   }
 
@@ -601,49 +687,57 @@ async function fetchUsppInstallmentStats(
   const map = new Map<string, { count: number; lastAmount: number | null; lastPaidAt: string | null; lastMethod: string | null }>()
   if (santriIds.length === 0) return map
 
-  const CHUNK_SIZE = 60
+  const CHUNK_SIZE = 80
+  const chunks: string[][] = []
   for (let i = 0; i < santriIds.length; i += CHUNK_SIZE) {
-    const chunk = santriIds.slice(i, i + CHUNK_SIZE)
-    const ph = chunk.map(() => '?').join(',')
+    chunks.push(santriIds.slice(i, i + CHUNK_SIZE))
+  }
 
-    try {
-      const rows = await query<{
-        santri_id: string
-        paid_at: string
-        channel: string
-        method: string
-        net_alloc: number
-      }>(
-        `SELECT
-           p.santri_id,
-           p.paid_at,
-           p.channel,
-           p.method,
-           (a.amount - COALESCE((SELECT SUM(ci.amount) FROM finance_correction_items ci WHERE ci.target_allocation_id = a.id), 0)) as net_alloc
-         FROM finance_allocations a
-         JOIN finance_payments p ON a.payment_id = p.id
-         WHERE a.item_type = 'USPP'
-           AND p.santri_id IN (${ph})
-         ORDER BY p.paid_at DESC, p.created_at DESC`,
-        chunk
-      )
-
-      for (const r of rows) {
-        if ((r.net_alloc ?? 0) <= 0) continue
-        const prev = map.get(r.santri_id)
-        if (!prev) {
-          map.set(r.santri_id, {
-            count: 1,
-            lastAmount: r.net_alloc,
-            lastPaidAt: r.paid_at,
-            lastMethod: normalizePaymentMethod(r.channel, r.method),
-          })
-        } else {
-          prev.count += 1
-        }
+  const chunkResults = await Promise.all(
+    chunks.map(async (chunk) => {
+      const ph = chunk.map(() => '?').join(',')
+      try {
+        return await query<{
+          santri_id: string
+          paid_at: string
+          channel: string
+          method: string
+          net_alloc: number
+        }>(
+          `SELECT
+             p.santri_id,
+             p.paid_at,
+             p.channel,
+             p.method,
+             (a.amount - COALESCE((SELECT SUM(ci.amount) FROM finance_correction_items ci WHERE ci.target_allocation_id = a.id), 0)) as net_alloc
+           FROM finance_allocations a
+           JOIN finance_payments p ON a.payment_id = p.id
+           WHERE a.item_type = 'USPP'
+             AND p.santri_id IN (${ph})
+           ORDER BY p.paid_at DESC, p.created_at DESC`,
+          chunk
+        )
+      } catch (err: unknown) {
+        console.error('[status-pembayaran] Gagal membaca statistik cicilan USPP:', err)
+        return []
       }
-    } catch (err: unknown) {
-      console.error('[status-pembayaran] Gagal membaca statistik cicilan USPP:', err)
+    })
+  )
+
+  for (const rows of chunkResults) {
+    for (const r of rows) {
+      if ((r.net_alloc ?? 0) <= 0) continue
+      const prev = map.get(r.santri_id)
+      if (!prev) {
+        map.set(r.santri_id, {
+          count: 1,
+          lastAmount: r.net_alloc,
+          lastPaidAt: r.paid_at,
+          lastMethod: normalizePaymentMethod(r.channel, r.method),
+        })
+      } else {
+        prev.count += 1
+      }
     }
   }
 
@@ -901,7 +995,7 @@ async function fetchBulananData(options: {
   searchFilter?: string
   page: number
   pageSize: number
-}): Promise<{ items: BulananRowItem[]; totalCount: number }> {
+}): Promise<{ items: BulananRowItem[]; totalCount: number; kpi: BulananKpi }> {
   const whereClauses: string[] = [
     "s.status_global = 'aktif'",
     "o.item_type IN ('SPP', 'UANG_MAKAN', 'UANG_NYUCI')",
@@ -947,19 +1041,40 @@ async function fetchBulananData(options: {
 
   const whereSql = whereClauses.join(' AND ')
 
-  const countRes = await queryOne<{ total: number }>(
+  const countPromise = queryOne<{ total: number }>(
     `SELECT COUNT(*) as total
      FROM finance_obligations o
      JOIN santri s ON o.santri_id = s.id
      WHERE ${whereSql}`,
     params
   )
-  const totalCount = countRes?.total ?? 0
+
+  const aggPromise = query<{
+    item_type: string
+    total_count: number
+    target_nominal: number
+    paid_nominal: number
+    remaining_nominal: number
+    lunas_count: number
+  }>(
+    `SELECT
+       o.item_type,
+       COUNT(*) as total_count,
+       COALESCE(SUM(o.amount_expected - o.amount_exempted), 0) as target_nominal,
+       COALESCE(SUM(${netPaidSql}), 0) as paid_nominal,
+       COALESCE(SUM(${remainingSql}), 0) as remaining_nominal,
+       COALESCE(SUM(CASE WHEN ${remainingSql} = 0 AND o.amount_expected > 0 THEN 1 ELSE 0 END), 0) as lunas_count
+     FROM finance_obligations o
+     JOIN santri s ON o.santri_id = s.id
+     WHERE ${whereSql}
+     GROUP BY o.item_type`,
+    params
+  )
 
   const limit = options.pageSize > 0 ? options.pageSize : 50
   const offset = (Math.max(1, options.page) - 1) * limit
 
-  const rows = await query<{
+  const rowsPromise = query<{
     id: string
     santri_id: string
     nis: string
@@ -1000,6 +1115,54 @@ async function fetchBulananData(options: {
      LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   )
+
+  const [countRes, aggRows, rows] = await Promise.all([
+    countPromise,
+    aggPromise,
+    rowsPromise,
+  ])
+  const totalCount = countRes?.total ?? 0
+
+  let totalTagihanNominal = 0
+  let sudahTerbayarNominal = 0
+  let sisaTagihanNominal = 0
+  let totalTagihanCount = 0
+  let lunasCount = 0
+
+  const monthlyTypes: Array<'SPP' | 'UANG_MAKAN' | 'UANG_NYUCI'> = ['SPP', 'UANG_MAKAN', 'UANG_NYUCI']
+  const itemBreakdown: ItemBreakdownKpi[] = monthlyTypes.map((type) => {
+    const r = aggRows.find((row) => row.item_type === type)
+    const target = r?.target_nominal ?? 0
+    const paid = r?.paid_nominal ?? 0
+    const remaining = r?.remaining_nominal ?? 0
+    const count = r?.total_count ?? 0
+    const lunas = r?.lunas_count ?? 0
+
+    totalTagihanNominal += target
+    sudahTerbayarNominal += paid
+    sisaTagihanNominal += remaining
+    totalTagihanCount += count
+    lunasCount += lunas
+
+    return {
+      itemType: type,
+      itemLabel: FINANCE_ITEM_LABELS[type as keyof typeof FINANCE_ITEM_LABELS] || type,
+      targetNominal: target,
+      paidNominal: paid,
+      remainingNominal: remaining,
+      totalCount: count,
+      lunasCount: lunas,
+    }
+  })
+
+  const bulananKpi: BulananKpi = {
+    totalTagihanNominal,
+    sudahTerbayarNominal,
+    sisaTagihanNominal,
+    totalTagihanCount,
+    lunasCount,
+    itemBreakdown,
+  }
 
   const obligationIds = rows.map(r => r.id)
   const paymentsMap = await fetchLatestPaymentsForObligations(obligationIds)
@@ -1049,7 +1212,7 @@ async function fetchBulananData(options: {
     }
   })
 
-  return { items, totalCount }
+  return { items, totalCount, kpi: bulananKpi }
 }
 
 async function fetchTahunanData(options: {
@@ -1061,7 +1224,7 @@ async function fetchTahunanData(options: {
   searchFilter?: string
   page: number
   pageSize: number
-}): Promise<{ items: TahunanRowItem[]; totalCount: number }> {
+}): Promise<{ items: TahunanRowItem[]; totalCount: number; kpi: TahunanKpi }> {
   const annualPeriod = options.academicYear ? options.academicYear.split('/')[0] : '2026'
 
   const whereClauses: string[] = [
@@ -1108,19 +1271,42 @@ async function fetchTahunanData(options: {
 
   const whereSql = whereClauses.join(' AND ')
 
-  const countRes = await queryOne<{ total: number }>(
+  const countPromise = queryOne<{ total: number }>(
     `SELECT COUNT(*) as total
      FROM finance_obligations o
      JOIN santri s ON o.santri_id = s.id
      WHERE ${whereSql}`,
     params
   )
-  const totalCount = countRes?.total ?? 0
+
+  const aggPromise = query<{
+    item_type: string
+    total_count: number
+    target_nominal: number
+    paid_nominal: number
+    remaining_nominal: number
+    lunas_count: number
+    bebas_count: number
+  }>(
+    `SELECT
+       o.item_type,
+       COUNT(*) as total_count,
+       COALESCE(SUM(o.amount_expected - o.amount_exempted), 0) as target_nominal,
+       COALESCE(SUM(${netPaidSql}), 0) as paid_nominal,
+       COALESCE(SUM(${remainingSql}), 0) as remaining_nominal,
+       COALESCE(SUM(CASE WHEN ${remainingSql} = 0 AND o.amount_expected > 0 THEN 1 ELSE 0 END), 0) as lunas_count,
+       COALESCE(SUM(CASE WHEN o.status = 'EXEMPTED' OR (o.amount_expected > 0 AND o.amount_exempted >= o.amount_expected) THEN 1 ELSE 0 END), 0) as bebas_count
+     FROM finance_obligations o
+     JOIN santri s ON o.santri_id = s.id
+     WHERE ${whereSql}
+     GROUP BY o.item_type`,
+    params
+  )
 
   const limit = options.pageSize > 0 ? options.pageSize : 50
   const offset = (Math.max(1, options.page) - 1) * limit
 
-  const rows = await query<{
+  const rowsPromise = query<{
     id: string
     santri_id: string
     nis: string
@@ -1158,6 +1344,58 @@ async function fetchTahunanData(options: {
      LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   )
+
+  const [countRes, aggRows, rows] = await Promise.all([
+    countPromise,
+    aggPromise,
+    rowsPromise,
+  ])
+  const totalCount = countRes?.total ?? 0
+
+  let totalTagihanNominal = 0
+  let sudahTerbayarNominal = 0
+  let sisaTagihanNominal = 0
+  let totalTagihanCount = 0
+  let lunasCount = 0
+  let bebasCount = 0
+
+  const annualTypes: Array<'EHB' | 'EKSKUL' | 'KESEHATAN'> = ['EHB', 'EKSKUL', 'KESEHATAN']
+  const itemBreakdown: ItemBreakdownKpi[] = annualTypes.map((type) => {
+    const r = aggRows.find((row) => row.item_type === type)
+    const target = r?.target_nominal ?? 0
+    const paid = r?.paid_nominal ?? 0
+    const remaining = r?.remaining_nominal ?? 0
+    const count = r?.total_count ?? 0
+    const lunas = r?.lunas_count ?? 0
+    const bebas = r?.bebas_count ?? 0
+
+    totalTagihanNominal += target
+    sudahTerbayarNominal += paid
+    sisaTagihanNominal += remaining
+    totalTagihanCount += count
+    lunasCount += lunas
+    bebasCount += bebas
+
+    return {
+      itemType: type,
+      itemLabel: FINANCE_ITEM_LABELS[type as keyof typeof FINANCE_ITEM_LABELS] || type,
+      targetNominal: target,
+      paidNominal: paid,
+      remainingNominal: remaining,
+      totalCount: count,
+      lunasCount: lunas,
+    }
+  })
+
+  const tahunanKpi: TahunanKpi = {
+    totalTagihanNominal,
+    sudahTerbayarNominal,
+    sisaTagihanNominal,
+    totalTagihanCount,
+    lunasCount,
+    bebasCount,
+    itemBreakdown,
+  }
 
   const obligationIds = rows.map(r => r.id)
   const paymentsMap = await fetchLatestPaymentsForObligations(obligationIds)
@@ -1209,7 +1447,7 @@ async function fetchTahunanData(options: {
     }
   })
 
-  return { items, totalCount }
+  return { items, totalCount, kpi: tahunanKpi }
 }
 
 async function fetchUsppData(options: {
@@ -1219,7 +1457,7 @@ async function fetchUsppData(options: {
   searchFilter?: string
   page: number
   pageSize: number
-}): Promise<{ items: UsppRowItem[]; totalCount: number }> {
+}): Promise<{ items: UsppRowItem[]; totalCount: number; kpi: UsppKpi }> {
   const whereClauses: string[] = ["s.status_global = 'aktif'"]
   const params: unknown[] = []
 
@@ -1256,19 +1494,48 @@ async function fetchUsppData(options: {
 
   const whereSql = whereClauses.join(' AND ')
 
-  const countRes = await queryOne<{ total: number }>(
+  const countPromise = queryOne<{ total: number }>(
     `SELECT COUNT(*) as total
      FROM santri s
      LEFT JOIN finance_obligations o ON s.id = o.santri_id AND o.item_type = 'USPP' AND o.period = 'LIFETIME'
      WHERE ${whereSql}`,
     params
   )
-  const totalCount = countRes?.total ?? 0
+
+  const aggPromise = queryOne<{
+    total_komitmen: number
+    total_terkumpul: number
+    sisa_piutang: number
+    lunas_count: number
+    mencicil_count: number
+    belum_bayar_count: number
+  }>(
+    `SELECT
+       COALESCE(SUM(calc.amount_expected), 0) as total_komitmen,
+       COALESCE(SUM(calc.net_paid), 0) as total_terkumpul,
+       COALESCE(SUM(calc.remaining), 0) as sisa_piutang,
+       COUNT(CASE WHEN calc.id IS NOT NULL AND (calc.remaining <= 0 OR calc.status = 'EXEMPTED' OR (calc.amount_expected > 0 AND calc.amount_exempted >= calc.amount_expected)) AND calc.amount_expected > 0 THEN 1 END) as lunas_count,
+       COUNT(CASE WHEN calc.id IS NOT NULL AND calc.net_paid > 0 AND calc.remaining > 0 THEN 1 END) as mencicil_count,
+       COUNT(CASE WHEN calc.id IS NULL OR (calc.net_paid = 0 AND calc.remaining > 0) THEN 1 END) as belum_bayar_count
+     FROM (
+       SELECT
+         o.id,
+         o.amount_expected,
+         o.amount_exempted,
+         o.status,
+         ${netPaidSql} as net_paid,
+         ${remainingSql} as remaining
+       FROM santri s
+       LEFT JOIN finance_obligations o ON s.id = o.santri_id AND o.item_type = 'USPP' AND o.period = 'LIFETIME'
+       WHERE ${whereSql}
+     ) calc`,
+    params
+  )
 
   const limit = options.pageSize > 0 ? options.pageSize : 50
   const offset = (Math.max(1, options.page) - 1) * limit
 
-  const rows = await query<{
+  const rowsPromise = query<{
     id: string | null
     santri_id: string
     nis: string
@@ -1302,6 +1569,22 @@ async function fetchUsppData(options: {
      LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   )
+
+  const [countRes, aggRes, rows] = await Promise.all([
+    countPromise,
+    aggPromise,
+    rowsPromise,
+  ])
+  const totalCount = countRes?.total ?? 0
+
+  const usppKpi: UsppKpi = {
+    totalKomitmenNominal: aggRes?.total_komitmen ?? 0,
+    terkumpulNominal: aggRes?.total_terkumpul ?? 0,
+    sisaPiutangNominal: aggRes?.sisa_piutang ?? 0,
+    santriLunasCount: aggRes?.lunas_count ?? 0,
+    santriMencicilCount: aggRes?.mencicil_count ?? 0,
+    santriBelumBayarCount: aggRes?.belum_bayar_count ?? 0,
+  }
 
   const santriIds = rows.map(r => r.santri_id)
   const installmentStats = await fetchUsppInstallmentStats(santriIds)
@@ -1350,7 +1633,7 @@ async function fetchUsppData(options: {
     }
   })
 
-  return { items, totalCount }
+  return { items, totalCount, kpi: usppKpi }
 }
 
 async function fetchTunggakanData(options: {
@@ -1362,9 +1645,23 @@ async function fetchTunggakanData(options: {
   searchFilter?: string
   page: number
   pageSize: number
-}): Promise<{ items: TunggakanRowItem[]; totalCount: number }> {
+}): Promise<{ items: TunggakanRowItem[]; totalCount: number; kpi: TunggakanKpi }> {
   // Aturan kaku: Tunggakan hanya mencakup SPP, Uang Makan, dan Uang Nyuci
   // yang periodenya < currentPeriodJakarta DAN memiliki sisa > 0.
+  const emptyKpi: TunggakanKpi = {
+    totalTunggakanNominal: 0,
+    totalTagihanMenunggak: 0,
+    totalSantriMenunggak: 0,
+    tunggakanTertuaLabel: '-',
+    itemBreakdown: ['SPP', 'UANG_MAKAN', 'UANG_NYUCI'].map(t => ({
+      itemType: t,
+      itemLabel: FINANCE_ITEM_LABELS[t as keyof typeof FINANCE_ITEM_LABELS] || t,
+      nominalTunggakan: 0,
+      countTagihan: 0,
+      targetNominal: 0,
+    })),
+  }
+
   const whereClauses: string[] = [
     "s.status_global = 'aktif'",
     "o.item_type IN ('SPP', 'UANG_MAKAN', 'UANG_NYUCI')",
@@ -1375,7 +1672,7 @@ async function fetchTunggakanData(options: {
   if (options.periodFilter && options.periodFilter !== 'ALL') {
     // Validasi: jika filter periode >= currentPeriod, periode tersebut bukan tunggakan
     if (options.periodFilter >= options.currentPeriod) {
-      return { items: [], totalCount: 0 }
+      return { items: [], totalCount: 0, kpi: emptyKpi }
     }
     whereClauses.push('o.period = ?')
     params.push(options.periodFilter)
@@ -1387,7 +1684,7 @@ async function fetchTunggakanData(options: {
       params.push(options.itemFilter)
     } else {
       // Item selain SPP/Makan/Cuci (misal Tahunan/USPP) tidak punya due date authoritative -> 0 rows
-      return { items: [], totalCount: 0 }
+      return { items: [], totalCount: 0, kpi: emptyKpi }
     }
   }
 
@@ -1416,19 +1713,51 @@ async function fetchTunggakanData(options: {
 
   const whereSql = whereClauses.join(' AND ')
 
-  const countRes = await queryOne<{ total: number }>(
+  const countPromise = queryOne<{ total: number }>(
     `SELECT COUNT(*) as total
      FROM finance_obligations o
      JOIN santri s ON o.santri_id = s.id
      WHERE ${whereSql}`,
     params
   )
-  const totalCount = countRes?.total ?? 0
+
+  const aggPromise = query<{
+    item_type: string
+    total_count: number
+    target_nominal: number
+    paid_nominal: number
+    remaining_nominal: number
+  }>(
+    `SELECT
+       o.item_type,
+       COUNT(*) as total_count,
+       COALESCE(SUM(o.amount_expected), 0) as target_nominal,
+       COALESCE(SUM(${netPaidSql}), 0) as paid_nominal,
+       COALESCE(SUM(${remainingSql}), 0) as remaining_nominal
+     FROM finance_obligations o
+     JOIN santri s ON o.santri_id = s.id
+     WHERE ${whereSql}
+     GROUP BY o.item_type`,
+    params
+  )
+
+  const santriPromise = queryOne<{
+    total_santri: number
+    oldest_period: string | null
+  }>(
+    `SELECT
+       COUNT(DISTINCT o.santri_id) as total_santri,
+       MIN(o.period) as oldest_period
+     FROM finance_obligations o
+     JOIN santri s ON o.santri_id = s.id
+     WHERE ${whereSql}`,
+    params
+  )
 
   const limit = options.pageSize > 0 ? options.pageSize : 50
   const offset = (Math.max(1, options.page) - 1) * limit
 
-  const rows = await query<{
+  const rowsPromise = query<{
     id: string
     santri_id: string
     nis: string
@@ -1464,6 +1793,49 @@ async function fetchTunggakanData(options: {
      LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   )
+
+  const [countRes, aggRows, santriRes, rows] = await Promise.all([
+    countPromise,
+    aggPromise,
+    santriPromise,
+    rowsPromise,
+  ])
+  const totalCount = countRes?.total ?? 0
+
+  let totalTunggakanNominal = 0
+  const monthlyTypes: Array<'SPP' | 'UANG_MAKAN' | 'UANG_NYUCI'> = ['SPP', 'UANG_MAKAN', 'UANG_NYUCI']
+  const itemBreakdown: TunggakanItemBreakdownKpi[] = monthlyTypes.map((type) => {
+    const r = aggRows.find((row) => row.item_type === type)
+    const target = r?.target_nominal ?? 0
+    const remaining = r?.remaining_nominal ?? 0
+    const count = r?.total_count ?? 0
+
+    totalTunggakanNominal += remaining
+
+    return {
+      itemType: type,
+      itemLabel: FINANCE_ITEM_LABELS[type as keyof typeof FINANCE_ITEM_LABELS] || type,
+      nominalTunggakan: remaining,
+      countTagihan: count,
+      targetNominal: target,
+    }
+  })
+
+  let tunggakanTertuaLabel = '-'
+  if (santriRes?.oldest_period) {
+    const { overdueDuration } = calculateOverdueAge(santriRes.oldest_period, options.currentPeriod)
+    tunggakanTertuaLabel = overdueDuration
+      ? `${formatPeriodLabel(santriRes.oldest_period)} (${overdueDuration})`
+      : formatPeriodLabel(santriRes.oldest_period)
+  }
+
+  const tunggakanKpi: TunggakanKpi = {
+    totalTunggakanNominal,
+    totalTagihanMenunggak: totalCount,
+    totalSantriMenunggak: santriRes?.total_santri ?? 0,
+    tunggakanTertuaLabel,
+    itemBreakdown,
+  }
 
   const obligationIds = rows.map(r => r.id)
   const paymentsMap = await fetchLatestPaymentsForObligations(obligationIds)
@@ -1501,7 +1873,7 @@ async function fetchTunggakanData(options: {
     }
   })
 
-  return { items, totalCount }
+  return { items, totalCount, kpi: tunggakanKpi }
 }
 
 /**
@@ -1525,127 +1897,139 @@ export async function getStatusPembayaranData(
   const pageSize = params?.pageSize !== undefined ? params.pageSize : 50
   const activeTab: TabType = params?.tab || 'RINGKASAN'
 
-  // 1. Ambil matriks kewajiban dari finance engine (untuk kompatibilitas KPI & legacy)
-  const rawMatrix = await getStudentsObligationMatrix(selectedPeriod, {
-    asrama: asramaFilter,
-    search: searchFilter,
-  })
+  // 1 & 2. Hitung matriks & KPI secara paralel dengan query data tab aktif
+  const matrixAndKpiPromise = (async () => {
+    const rawMatrix = await getStudentsObligationMatrix(selectedPeriod, {
+      asrama: asramaFilter,
+      search: searchFilter,
+    })
 
-  const santriIds = rawMatrix.map(item => item.santriId)
-  const legacyArrearsMap = await fetchLegacySppArrears(santriIds)
+    const santriIds = rawMatrix.map(item => item.santriId)
+    const legacyArrearsMap = await fetchLegacySppArrears(santriIds)
 
-  const enrichedList: EnrichedStudentObligationMatrixItem[] = rawMatrix.map(item => {
-    const legacyInfo = legacyArrearsMap.get(item.santriId) ?? { total: 0, count: 0 }
-    const legacyTunggakanSpp = legacyInfo.total
-    const hasLegacyTunggakan = legacyTunggakanSpp > 0
-    const adjustedTotalRemaining = item.totalRemaining + legacyTunggakanSpp
+    const enrichedList: EnrichedStudentObligationMatrixItem[] = rawMatrix.map(item => {
+      const legacyInfo = legacyArrearsMap.get(item.santriId) ?? { total: 0, count: 0 }
+      const legacyTunggakanSpp = legacyInfo.total
+      const hasLegacyTunggakan = legacyTunggakanSpp > 0
+      const adjustedTotalRemaining = item.totalRemaining + legacyTunggakanSpp
 
-    return {
-      ...item,
-      legacyTunggakanSpp,
-      hasLegacyTunggakan,
-      legacyTunggakanCount: legacyInfo.count,
-      adjustedTotalRemaining,
-      isPreCutoverPeriod,
+      return {
+        ...item,
+        legacyTunggakanSpp,
+        hasLegacyTunggakan,
+        legacyTunggakanCount: legacyInfo.count,
+        adjustedTotalRemaining,
+        isPreCutoverPeriod,
+      }
+    })
+
+    const totalSantri = enrichedList.length
+    let totalLunas = 0
+    let totalBelumLunas = 0
+    let totalTunggakanNominal = 0
+
+    for (const item of enrichedList) {
+      const isFullySettled = (item.overallStatus === 'LUNAS' || item.overallStatus === 'BEBAS') && !item.hasLegacyTunggakan
+      if (isFullySettled) {
+        totalLunas += 1
+      } else {
+        totalBelumLunas += 1
+      }
+      totalTunggakanNominal += item.adjustedTotalRemaining
     }
-  })
 
-  // 2. Hitung 4 Summary KPI Cards dari SELURUH dataset terfilter sebelum pemotongan paginasi
-  const totalSantri = enrichedList.length
-  let totalLunas = 0
-  let totalBelumLunas = 0
-  let totalTunggakanNominal = 0
+    const kpi: StatusPembayaranKpi = {
+      totalSantri,
+      totalLunas,
+      totalBelumLunas,
+      totalTunggakanNominal,
+    }
 
-  for (const item of enrichedList) {
-    const isFullySettled = (item.overallStatus === 'LUNAS' || item.overallStatus === 'BEBAS') && !item.hasLegacyTunggakan
-    if (isFullySettled) {
-      totalLunas += 1
+    return { enrichedList, kpi }
+  })()
+
+  // 3. Eksekusi query spesifik sesuai tab aktif secara paralel
+  const tabPromise = (async () => {
+    if (activeTab === 'RINGKASAN') {
+      const res = await fetchRingkasanData({
+        selectedPeriod,
+        currentPeriod,
+        asramaFilter,
+        kelasFilter,
+        searchFilter,
+        statusFilter,
+        page,
+        pageSize,
+      })
+      return { ringkasanItems: res.items, totalCount: res.totalCount }
+    } else if (activeTab === 'BULANAN') {
+      const res = await fetchBulananData({
+        selectedPeriod,
+        currentPeriod,
+        asramaFilter,
+        kelasFilter,
+        itemFilter,
+        statusFilter,
+        searchFilter,
+        page,
+        pageSize,
+      })
+      return { bulananItems: res.items, totalCount: res.totalCount, bulananKpi: res.kpi }
+    } else if (activeTab === 'TAHUNAN') {
+      const res = await fetchTahunanData({
+        academicYear: params?.academicYear,
+        asramaFilter,
+        kelasFilter,
+        itemFilter,
+        statusFilter,
+        searchFilter,
+        page,
+        pageSize,
+      })
+      return { tahunanItems: res.items, totalCount: res.totalCount, tahunanKpi: res.kpi }
+    } else if (activeTab === 'USPP') {
+      const res = await fetchUsppData({
+        asramaFilter,
+        kelasFilter,
+        statusFilter,
+        searchFilter,
+        page,
+        pageSize,
+      })
+      return { usppItems: res.items, totalCount: res.totalCount, usppKpi: res.kpi }
     } else {
-      totalBelumLunas += 1
+      const res = await fetchTunggakanData({
+        currentPeriod,
+        periodFilter: params?.period,
+        asramaFilter,
+        kelasFilter,
+        itemFilter,
+        searchFilter,
+        page,
+        pageSize,
+      })
+      return { tunggakanItems: res.items, totalCount: res.totalCount, tunggakanKpi: res.kpi }
     }
-    totalTunggakanNominal += item.adjustedTotalRemaining
-  }
+  })()
 
-  const kpi: StatusPembayaranKpi = {
-    totalSantri,
-    totalLunas,
-    totalBelumLunas,
-    totalTunggakanNominal,
-  }
+  const [{ enrichedList, kpi }, tabResult] = await Promise.all([
+    matrixAndKpiPromise,
+    tabPromise,
+  ])
 
-  // 3. Eksekusi query spesifik sesuai tab aktif
-  let ringkasanItems: RingkasanRowItem[] | undefined
-  let bulananItems: BulananRowItem[] | undefined
-  let tahunanItems: TahunanRowItem[] | undefined
-  let usppItems: UsppRowItem[] | undefined
-  let tunggakanItems: TunggakanRowItem[] | undefined
+  const ringkasanItems = tabResult.ringkasanItems
+  const bulananItems = tabResult.bulananItems
+  const tahunanItems = tabResult.tahunanItems
+  const usppItems = tabResult.usppItems
+  const tunggakanItems = tabResult.tunggakanItems
+  const totalTabItems = tabResult.totalCount
 
-  let totalTabItems = enrichedList.length
-
-  if (activeTab === 'RINGKASAN') {
-    const ringkasanRes = await fetchRingkasanData({
-      selectedPeriod,
-      currentPeriod,
-      asramaFilter,
-      kelasFilter,
-      searchFilter,
-      statusFilter,
-      page,
-      pageSize,
-    })
-    ringkasanItems = ringkasanRes.items
-    totalTabItems = ringkasanRes.totalCount
-  } else if (activeTab === 'BULANAN') {
-    const bulananRes = await fetchBulananData({
-      selectedPeriod,
-      currentPeriod,
-      asramaFilter,
-      kelasFilter,
-      itemFilter,
-      statusFilter,
-      searchFilter,
-      page,
-      pageSize,
-    })
-    bulananItems = bulananRes.items
-    totalTabItems = bulananRes.totalCount
-  } else if (activeTab === 'TAHUNAN') {
-    const tahunanRes = await fetchTahunanData({
-      academicYear: params?.academicYear,
-      asramaFilter,
-      kelasFilter,
-      itemFilter,
-      statusFilter,
-      searchFilter,
-      page,
-      pageSize,
-    })
-    tahunanItems = tahunanRes.items
-    totalTabItems = tahunanRes.totalCount
-  } else if (activeTab === 'USPP') {
-    const usppRes = await fetchUsppData({
-      asramaFilter,
-      kelasFilter,
-      statusFilter,
-      searchFilter,
-      page,
-      pageSize,
-    })
-    usppItems = usppRes.items
-    totalTabItems = usppRes.totalCount
-  } else if (activeTab === 'TUNGGAKAN') {
-    const tunggakanRes = await fetchTunggakanData({
-      currentPeriod,
-      periodFilter: params?.period,
-      asramaFilter,
-      kelasFilter,
-      itemFilter,
-      searchFilter,
-      page,
-      pageSize,
-    })
-    tunggakanItems = tunggakanRes.items
-    totalTabItems = tunggakanRes.totalCount
+  const tabKpi: TabKpiContainer = {
+    ringkasan: kpi,
+    bulanan: tabResult.bulananKpi,
+    tahunan: tabResult.tahunanKpi,
+    uspp: tabResult.usppKpi,
+    tunggakan: tabResult.tunggakanKpi,
   }
 
   // Paginasi aman
@@ -1678,6 +2062,7 @@ export async function getStatusPembayaranData(
     usppItems,
     tunggakanItems,
     kpi,
+    tabKpi,
     pagination: {
       currentPage: safePage,
       pageSize,
@@ -1697,35 +2082,29 @@ export async function getStatusPembayaranData(
 export async function getStatusPembayaranFilterOptions(): Promise<FilterOptionsResponse> {
   const { permissions } = await authorizeUser()
 
-  // 1. Ambil daftar asrama aktif
-  let asramaList: string[] = []
-  try {
-    const rows = await query<{ asrama: string }>(
+  // Ambil daftar asrama, kelas, dan tahun ajaran secara paralel
+  const [asramaRows, kRows, taRows] = await Promise.all([
+    query<{ asrama: string }>(
       `SELECT DISTINCT asrama
        FROM santri
        WHERE status_global = 'aktif' AND asrama IS NOT NULL AND TRIM(asrama) != ''
        ORDER BY asrama ASC`
-    )
-    asramaList = rows.map(r => r.asrama)
-  } catch {
-    asramaList = []
-  }
-
-  // 2. Ambil daftar kelas aktif
-  let kelasList: string[] = []
-  try {
-    const kRows = await query<{ kelas_sekolah: string }>(
+    ).catch(() => []),
+    query<{ kelas_sekolah: string }>(
       `SELECT DISTINCT kelas_sekolah
        FROM santri
        WHERE status_global = 'aktif' AND kelas_sekolah IS NOT NULL AND TRIM(kelas_sekolah) != ''
        ORDER BY kelas_sekolah ASC`
-    )
-    kelasList = kRows.map(r => r.kelas_sekolah)
-  } catch {
-    kelasList = []
-  }
+    ).catch(() => []),
+    query<{ id: number; nama: string; is_active: number }>(
+      `SELECT id, nama, is_active FROM tahun_ajaran ORDER BY nama DESC`
+    ).catch(() => []),
+  ])
 
-  // 3. Susun daftar periode (12 bulan ke belakang hingga 6 bulan ke depan)
+  const asramaList = asramaRows.map(r => r.asrama)
+  const kelasList = kRows.map(r => r.kelas_sekolah)
+
+  // Susun daftar periode (12 bulan ke belakang hingga 6 bulan ke depan)
   const periodList: FilterOptionsResponse['periodList'] = []
   const currentPeriod = getDefaultPeriod()
 
@@ -1746,22 +2125,10 @@ export async function getStatusPembayaranFilterOptions(): Promise<FilterOptionsR
     })
   }
 
-  // 4. Susun daftar tahun ajaran
-  let academicYearList: FilterOptionsResponse['academicYearList'] = []
-  try {
-    const taRows = await query<{ id: number; nama: string; is_active: number }>(
-      `SELECT id, nama, is_active FROM tahun_ajaran ORDER BY nama DESC`
-    )
-    academicYearList = taRows.map(r => ({
-      value: r.nama.split('/')[0] || r.nama,
-      label: r.nama,
-    }))
-  } catch {
-    academicYearList = [
-      { value: '2026', label: '2026/2027' },
-      { value: '2025', label: '2025/2026' },
-    ]
-  }
+  let academicYearList: FilterOptionsResponse['academicYearList'] = taRows.map(r => ({
+    value: r.nama.split('/')[0] || r.nama,
+    label: r.nama,
+  }))
 
   if (academicYearList.length === 0) {
     academicYearList = [

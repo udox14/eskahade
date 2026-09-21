@@ -453,7 +453,7 @@ export async function getCorrectionHistory(filters?: {
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
-  const countRow = await queryOne<{ total: number }>(
+  const countPromise = queryOne<{ total: number }>(
     `SELECT COUNT(*) AS total
      FROM finance_corrections c
      JOIN finance_payments p ON p.id = c.target_payment_id
@@ -461,10 +461,8 @@ export async function getCorrectionHistory(filters?: {
      ${whereClause}`,
     params
   )
-  const totalCount = countRow?.total ?? 0
-  const totalPages = Math.ceil(totalCount / pageSize)
 
-  const rows = await query<
+  const rowsPromise = query<
     FinanceCorrection & {
       creator_name: string | null
       payment_number: string
@@ -487,6 +485,10 @@ export async function getCorrectionHistory(filters?: {
      LIMIT ? OFFSET ?`,
     [...params, pageSize, offset]
   )
+
+  const [countRow, rows] = await Promise.all([countPromise, rowsPromise])
+  const totalCount = countRow?.total ?? 0
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   return {
     corrections: rows || [],

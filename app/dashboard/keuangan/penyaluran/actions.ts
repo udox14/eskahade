@@ -178,21 +178,7 @@ export async function getPenyaluranPageData(params?: {
   let bendaharaRows: BendaharaDistributionSummaryRow[] = []
   let providerRows: ProviderDistributionSummaryRow[] = []
 
-  if (activeTab === 'BENDAHARA') {
-    summary = await getDistributionSummary('BENDAHARA', selectedPeriod)
-    bendaharaRows = await getBendaharaDistributionList(selectedPeriod)
-  } else if (activeTab === 'KATERING') {
-    summary = await getDistributionSummary('KATERING', selectedPeriod)
-    providerRows = await getProviderDistributionList('KATERING', selectedPeriod)
-  } else if (activeTab === 'LAUNDRY') {
-    summary = await getDistributionSummary('LAUNDRY', selectedPeriod)
-    providerRows = await getProviderDistributionList('LAUNDRY', selectedPeriod)
-  } else if (activeTab === 'RIWAYAT') {
-    summary = await getDistributionSummary('BENDAHARA', selectedPeriod)
-  }
-
-  // Riwayat Penyaluran
-  const history = await getDistributionHistory({
+  const historyPromise = getDistributionHistory({
     page: params?.historyPage || 1,
     pageSize: params?.historyPageSize || 50,
     search: params?.historySearch || undefined,
@@ -202,6 +188,50 @@ export async function getPenyaluranPageData(params?: {
         : undefined,
     itemType: params?.historyItemType && params.historyItemType !== 'ALL' ? params.historyItemType : undefined,
   })
+
+  let history: {
+    items: Array<FinanceDistribution & { recipient_name: string; operator_name: string }>
+    totalItems: number
+    totalPages: number
+    page: number
+    pageSize: number
+  }
+
+  if (activeTab === 'BENDAHARA') {
+    const [summaryRes, rowsRes, historyRes] = await Promise.all([
+      getDistributionSummary('BENDAHARA', selectedPeriod),
+      getBendaharaDistributionList(selectedPeriod),
+      historyPromise,
+    ])
+    summary = summaryRes
+    bendaharaRows = rowsRes
+    history = historyRes
+  } else if (activeTab === 'KATERING') {
+    const [summaryRes, rowsRes, historyRes] = await Promise.all([
+      getDistributionSummary('KATERING', selectedPeriod),
+      getProviderDistributionList('KATERING', selectedPeriod),
+      historyPromise,
+    ])
+    summary = summaryRes
+    providerRows = rowsRes
+    history = historyRes
+  } else if (activeTab === 'LAUNDRY') {
+    const [summaryRes, rowsRes, historyRes] = await Promise.all([
+      getDistributionSummary('LAUNDRY', selectedPeriod),
+      getProviderDistributionList('LAUNDRY', selectedPeriod),
+      historyPromise,
+    ])
+    summary = summaryRes
+    providerRows = rowsRes
+    history = historyRes
+  } else {
+    const [summaryRes, historyRes] = await Promise.all([
+      getDistributionSummary('BENDAHARA', selectedPeriod),
+      historyPromise,
+    ])
+    summary = summaryRes
+    history = historyRes
+  }
 
   return {
     activeTab,

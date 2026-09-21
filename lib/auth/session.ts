@@ -1,6 +1,7 @@
 // lib/auth/session.ts
 
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 import { execute, queryOne } from '@/lib/db'
 
 export const SESSION_COOKIE = 'eskahade_session'
@@ -175,7 +176,7 @@ export async function setSession(user: SessionUser): Promise<void> {
   })
 }
 
-export async function getSession(): Promise<SessionUser | null> {
+export const getSession = cache(async function getSession(): Promise<SessionUser | null> {
   try {
     const cookieStore = await cookies()
     const token = cookieStore.get(SESSION_COOKIE)?.value
@@ -186,7 +187,7 @@ export async function getSession(): Promise<SessionUser | null> {
   } catch {
     return null
   }
-}
+})
 
 export async function clearSession(): Promise<void> {
   const cookieStore = await cookies()
@@ -198,7 +199,6 @@ export async function getSessionFromCookieString(cookieString: string): Promise<
   if (!match) return null
   return await verifyJWT(match[1])
 }
-
 // ── Multi-role helpers ────────────────────────────────────────
 // Backward-compatible: jika session.roles belum ada (JWT lama),
 // fallback ke [session.role].

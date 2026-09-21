@@ -626,8 +626,8 @@ export async function getReceiptsReport(
 
   const whereSql = conditions.join(' AND ')
 
-  // Total KPI Calculation
-  const kpiRow = await queryOne<{
+  // Total KPI Calculation & Fetch Page Items (Paralel)
+  const kpiPromise = queryOne<{
     total_gross: number
     total_fee: number
     total_net: number
@@ -655,8 +655,7 @@ export async function getReceiptsReport(
     params
   )
 
-  // Fetch Page Items
-  const rows = await query<{
+  const rowsPromise = query<{
     id: string
     payment_number: string
     order_number: string | null
@@ -714,6 +713,8 @@ export async function getReceiptsReport(
      LIMIT ? OFFSET ?`,
     [...params, pageSize, offset]
   )
+
+  const [kpiRow, rows] = await Promise.all([kpiPromise, rowsPromise])
 
   const items: ReceiptItemRow[] = rows.map((r) => ({
     id: r.id,

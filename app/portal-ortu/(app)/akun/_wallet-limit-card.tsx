@@ -77,23 +77,23 @@ export function WalletLimitCard({
         </div>
       )}
 
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
-        <div className="flex items-center gap-1.5 font-semibold text-slate-800">
-          <ShieldCheck className="h-4 w-4 text-emerald-600" />
+      <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/60 p-3.5 text-xs text-slate-700 space-y-1.5">
+        <div className="flex items-center gap-1.5 font-bold text-emerald-950">
+          <ShieldCheck className="h-4 w-4 text-emerald-700" />
           <span>Aturan Limit Efektif</span>
         </div>
-        <p className="text-slate-600">
+        <p className="text-slate-600 leading-relaxed">
           Pesantren memberlakukan batas maksimal harian <strong className="text-slate-900">{formatRupiah(globalDailyLimit)}</strong>.
           Sistem akan menggunakan batas terkecil antara limit Anda dan limit pesantren.
         </p>
-        <p className="pt-1 font-semibold text-emerald-800">
+        <p className="pt-0.5 font-bold text-emerald-800">
           Limit Harian Efektif Saat Ini: {formatRupiah(effectiveDaily)}/hari
         </p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-3 pt-1">
         <div>
-          <label className="block text-xs font-semibold text-slate-700">
+          <label className="block text-xs font-bold text-slate-700">
             Batas Penarikan Harian (Rp)
           </label>
           <input
@@ -103,13 +103,13 @@ export function WalletLimitCard({
             value={daily}
             onChange={e => setDaily(e.target.value)}
             placeholder={`Kosongkan untuk ikut limit pesantren (${formatRupiah(globalDailyLimit)})`}
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
           />
-          <p className="mt-0.5 text-[11px] text-slate-400">Contoh: 30000 untuk maksimal Rp30.000/hari</p>
+          <p className="mt-1 text-[11px] text-slate-400">Contoh: 30000 untuk maksimal Rp30.000/hari</p>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700">
+          <label className="block text-xs font-bold text-slate-700">
             Batas Penarikan Mingguan (Rp) — Opsional
           </label>
           <input
@@ -119,12 +119,12 @@ export function WalletLimitCard({
             value={weekly}
             onChange={e => setWeekly(e.target.value)}
             placeholder="Tidak dibatasi mingguan"
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700">
+          <label className="block text-xs font-bold text-slate-700">
             Batas Penarikan Bulanan (Rp) — Opsional
           </label>
           <input
@@ -134,16 +134,16 @@ export function WalletLimitCard({
             value={monthly}
             onChange={e => setMonthly(e.target.value)}
             placeholder="Tidak dibatasi bulanan"
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
           />
         </div>
 
         <button
           type="submit"
           disabled={isSaving}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 py-2.5 text-xs font-semibold text-white shadow-xs disabled:opacity-50 transition"
+          className="inline-flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#064e3b] hover:bg-[#047857] py-2.5 text-xs font-bold text-[#bef264] shadow-xs disabled:opacity-50 active:scale-95 transition cursor-pointer"
         >
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin text-[#bef264]" /> : null}
           <span>Simpan Batas Limit</span>
         </button>
       </form>

@@ -205,7 +205,7 @@ export async function getReconciliationPageData(params?: {
   const selectedPeriod = params?.period || getDefaultPeriod()
   const periodOptions = generatePeriodOptions()
 
-  const kpi = await getReconciliationOverview(selectedPeriod)
+  const kpiPromise = getReconciliationOverview(selectedPeriod)
 
   let settlementData
   let cashData
@@ -214,12 +214,14 @@ export async function getReconciliationPageData(params?: {
   let legacyBridgeData
 
   if (activeTab === 'SETTLEMENT') {
-    const candidates = await getCandidatePaymentsForSettlement(selectedPeriod)
-    const history = await getSettlementsList({
-      period: selectedPeriod,
-      page: params?.page ?? 1,
-      pageSize: 10,
-    })
+    const [candidates, history] = await Promise.all([
+      getCandidatePaymentsForSettlement(selectedPeriod),
+      getSettlementsList({
+        period: selectedPeriod,
+        page: params?.page ?? 1,
+        pageSize: 10,
+      }),
+    ])
     settlementData = { candidates, history }
   } else if (activeTab === 'KAS_LOKET') {
     cashData = await getCashSessionReconciliationList({
@@ -229,16 +231,18 @@ export async function getReconciliationPageData(params?: {
       pageSize: 10,
     })
   } else if (activeTab === 'UNALLOCATED') {
-    const itemsRes = await getUnallocatedReconciliationItems({
-      period: selectedPeriod,
-      resolved: params?.status === 'ALL' || params?.status === 'RESOLVED' ? params.status : 'UNRESOLVED',
-      search: params?.search,
-      page: params?.page ?? 1,
-      pageSize: 10,
-    })
-    const recoveryCases = await getPendingRecoveryCases({
-      period: selectedPeriod,
-    })
+    const [itemsRes, recoveryCases] = await Promise.all([
+      getUnallocatedReconciliationItems({
+        period: selectedPeriod,
+        resolved: params?.status === 'ALL' || params?.status === 'RESOLVED' ? params.status : 'UNRESOLVED',
+        search: params?.search,
+        page: params?.page ?? 1,
+        pageSize: 10,
+      }),
+      getPendingRecoveryCases({
+        period: selectedPeriod,
+      }),
+    ])
     unallocatedData = {
       items: itemsRes.items,
       totalCount: itemsRes.totalCount,
@@ -258,6 +262,8 @@ export async function getReconciliationPageData(params?: {
     const preview = await previewLegacySync()
     legacyBridgeData = { preview }
   }
+
+  const kpi = await kpiPromise
 
   return {
     activeTab,
