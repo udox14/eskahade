@@ -15,9 +15,6 @@ export default async function TagihanPage() {
       {/* Header Halaman Bersih */}
       <div>
         <h1 className="text-xl font-bold tracking-tight text-slate-950">Tagihan</h1>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Pilih tagihan santri dan selesaikan pembayaran online otomatis.
-        </p>
       </div>
 
       <TagihanClient billingData={billingData} />

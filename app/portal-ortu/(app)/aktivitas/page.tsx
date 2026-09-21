@@ -42,9 +42,6 @@ export default async function AktivitasPage({
       {/* Header Halaman Bersih */}
       <div>
         <h1 className="text-xl font-bold tracking-tight text-slate-950">Aktivitas</h1>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Pantau kehadiran pengajian dan catatan kedisiplinan {session.nama}.
-        </p>
       </div>
 
       <AktivitasClient

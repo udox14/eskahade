@@ -1,9 +1,8 @@
 'use server'
 
-import { query, execute } from '@/lib/db'
-import { getSession } from '@/lib/auth/session'
+import { query, queryOne, execute, generateId, now } from '@/lib/db'
+import { getSession, hasRole } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
-import { generateId, now } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList } from '@/lib/cache/master'
 
@@ -114,12 +113,17 @@ type VonisItem = {
 }
 
 const VALID_SESI = ['shubuh', 'ashar', 'maghrib'] as const
+export type SesiPengajian = typeof VALID_SESI[number]
+function isSesiPengajian(s: string): s is SesiPengajian {
+  return (VALID_SESI as readonly string[]).includes(s)
+}
+
 function getVerifColumn(sesi: string): string {
-  if (!VALID_SESI.includes(sesi as any)) throw new Error(`Sesi tidak valid: ${sesi}`)
+  if (!isSesiPengajian(sesi)) throw new Error(`Sesi tidak valid: ${sesi}`)
   return `verif_${sesi}`
 }
 function getSesiColumn(sesi: string): string {
-  if (!VALID_SESI.includes(sesi as any)) throw new Error(`Sesi tidak valid: ${sesi}`)
+  if (!isSesiPengajian(sesi)) throw new Error(`Sesi tidak valid: ${sesi}`)
   return sesi
 }
 
@@ -240,4 +244,212 @@ export async function getAsramaList() {
 
 export async function getMarhalahList() {
   return getCachedMarhalahList()
+}
+
+// ─── Period-Level Finalization & Reopen Model ──────────────────────────────
+// Semantics:
+// 1. Sekretaris kelas mencatat absensi santri secara manual di blanko.
+// 2. Setiap malam Selasa, Seksi Pengajaran menginput absensi ke Modul ABSENSI PENGAJIAN.
+// 3. Yang diinput ke sistem HANYA santri yang tidak hadir (Sakit, Izin, Alfa).
+// 4. Santri yang Hadir TIDAK diinput / tidak memiliki exception row.
+// 5. Setelah input selesai, Seksi Pengajaran melakukan VERIFIKASI ABSENSI.
+// 6. Action "Selesaikan Verifikasi" memastikan seluruh Alfa pada periode tersebut
+//    telah diputus (tidak ada lagi yang verif NULL atau BELUM).
+// 7. Periode yang berstatus 'FINAL' menjadi sumber penentu data kehadiran sah di Portal Orang Tua.
+// 8. Ketiadaan row pada periode yang FINAL berarti HADIR.
+// 9. Action "Buka Kembali" mengubah status menjadi 'REOPENED' sehingga Portal Orang Tua
+//    tidak menghitung periode tersebut hingga difinalisasi kembali.
+
+export type PeriodeVerifikasiItem = {
+  tanggalMulai: string
+  tanggalSelesai: string
+  status: 'FINAL' | 'REOPENED' | 'BELUM'
+  unresolvedAlfaCount: number
+  verifiedBy: string | null
+  verifiedAt: string | null
+  reopenedBy: string | null
+  reopenedAt: string | null
+  reopenReason: string | null
+}
+
+export async function ensureAbsensiVerifikasiPeriodeTable() {
+  try {
+    await execute(`
+      CREATE TABLE IF NOT EXISTS absensi_verifikasi_periode (
+        id TEXT PRIMARY KEY,
+        tanggal_mulai TEXT NOT NULL,
+        tanggal_selesai TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'FINAL' CHECK(status IN ('FINAL', 'REOPENED')),
+        verified_by TEXT REFERENCES users(id),
+        verified_at TEXT NOT NULL,
+        reopened_by TEXT REFERENCES users(id),
+        reopened_at TEXT,
+        reopen_reason TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(tanggal_mulai, tanggal_selesai)
+      )
+    `)
+    await execute(`CREATE INDEX IF NOT EXISTS idx_absensi_verif_periode_lookup ON absensi_verifikasi_periode(tanggal_mulai, tanggal_selesai, status)`)
+    await execute(`CREATE INDEX IF NOT EXISTS idx_absensi_verif_periode_status ON absensi_verifikasi_periode(status, tanggal_mulai)`)
+  } catch {
+    // noop
+  }
+}
+
+export async function getUnresolvedAlfaCount(tanggalMulai: string, tanggalSelesai: string): Promise<number> {
+  const row = await queryOne<{ count: number }>(`
+    SELECT
+      COALESCE(SUM(
+        (CASE WHEN ah.shubuh = 'A' AND (ah.verif_shubuh IS NULL OR ah.verif_shubuh = 'BELUM') THEN 1 ELSE 0 END) +
+        (CASE WHEN ah.ashar = 'A' AND (ah.verif_ashar IS NULL OR ah.verif_ashar = 'BELUM') THEN 1 ELSE 0 END) +
+        (CASE WHEN ah.maghrib = 'A' AND (ah.verif_maghrib IS NULL OR ah.verif_maghrib = 'BELUM') THEN 1 ELSE 0 END)
+      ), 0) as count
+    FROM absensi_harian ah
+    INNER JOIN riwayat_pendidikan rp ON rp.id = ah.riwayat_pendidikan_id AND rp.status_riwayat = 'aktif'
+    INNER JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
+    WHERE ah.tanggal >= ? AND ah.tanggal <= ?
+  `, [tanggalMulai, tanggalSelesai])
+  return Number(row?.count || 0)
+}
+
+export async function getStatusVerifikasiPeriode(tanggalRef?: string): Promise<PeriodeVerifikasiItem> {
+  await ensureAbsensiVerifikasiPeriodeTable()
+  const d = tanggalRef ? new Date(tanggalRef) : new Date()
+  const { start, end } = getWeekRange(d)
+  const startStr = start.toISOString().split('T')[0]
+  const endStr = end.toISOString().split('T')[0]
+
+  type PeriodeRow = {
+    status: 'FINAL' | 'REOPENED'
+    verified_by: string | null
+    verified_at: string | null
+    reopened_by: string | null
+    reopened_at: string | null
+    reopen_reason: string | null
+  }
+  const row = await queryOne<PeriodeRow>(`
+    SELECT status, verified_by, verified_at, reopened_by, reopened_at, reopen_reason
+    FROM absensi_verifikasi_periode
+    WHERE tanggal_mulai = ? AND tanggal_selesai = ?
+  `, [startStr, endStr]).catch(() => null)
+
+  const unresolved = await getUnresolvedAlfaCount(startStr, endStr)
+
+  return {
+    tanggalMulai: startStr,
+    tanggalSelesai: endStr,
+    status: row ? row.status : 'BELUM',
+    unresolvedAlfaCount: unresolved,
+    verifiedBy: row?.verified_by ?? null,
+    verifiedAt: row?.verified_at ?? null,
+    reopenedBy: row?.reopened_by ?? null,
+    reopenedAt: row?.reopened_at ?? null,
+    reopenReason: row?.reopen_reason ?? null,
+  }
+}
+
+export async function selesaikanVerifikasiPeriode(tanggalMulai: string, tanggalSelesai: string) {
+  await ensureAbsensiVerifikasiPeriodeTable()
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+  if (!hasRole(session, 'admin') && !hasRole(session, 'sekpen')) {
+    return { error: 'Hanya Sekpen atau Admin yang memiliki wewenang menyelesaikan verifikasi absensi.' }
+  }
+
+  const unresolved = await getUnresolvedAlfaCount(tanggalMulai, tanggalSelesai)
+  if (unresolved > 0) {
+    return { error: `Masih ada ${unresolved} absensi Alfa yang perlu diverifikasi.` }
+  }
+
+  const recordId = generateId()
+  const timestamp = now()
+
+  await execute(`
+    INSERT INTO absensi_verifikasi_periode
+      (id, tanggal_mulai, tanggal_selesai, status, verified_by, verified_at, updated_at)
+    VALUES (?, ?, ?, 'FINAL', ?, ?, ?)
+    ON CONFLICT(tanggal_mulai, tanggal_selesai) DO UPDATE SET
+      status = 'FINAL',
+      verified_by = excluded.verified_by,
+      verified_at = excluded.verified_at,
+      reopened_by = NULL,
+      reopened_at = NULL,
+      reopen_reason = NULL,
+      updated_at = excluded.updated_at
+  `, [recordId, tanggalMulai, tanggalSelesai, session.id, timestamp, timestamp])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_absensi_verifikasi',
+    action: 'approval',
+    fiturHref: '/dashboard/akademik/absensi/verifikasi',
+    logKind: 'update',
+    entityType: 'absensi_verifikasi_periode',
+    entityId: `${tanggalMulai}:${tanggalSelesai}`,
+    entityLabel: `Finalisasi periode ${tanggalMulai} - ${tanggalSelesai}`,
+    summary: `Menyelesaikan verifikasi pengajian periode ${tanggalMulai} s/d ${tanggalSelesai}`,
+  })
+
+  revalidatePath('/dashboard/akademik/absensi/verifikasi')
+  revalidatePath('/dashboard/akademik/absensi')
+  revalidatePath('/dashboard/akademik/absensi/rekap')
+  revalidatePath('/portal-ortu/aktivitas')
+  revalidatePath('/portal-ortu/beranda')
+
+  return { success: true }
+}
+
+export async function bukaKembaliVerifikasiPeriode(tanggalMulai: string, tanggalSelesai: string, alasan: string) {
+  await ensureAbsensiVerifikasiPeriodeTable()
+  const session = await getSession()
+  if (!session) return { error: 'Unauthorized' }
+  if (!hasRole(session, 'admin') && !hasRole(session, 'sekpen')) {
+    return { error: 'Hanya Sekpen atau Admin yang berwenang membuka kembali sesi verifikasi.' }
+  }
+
+  const cleanReason = (alasan || '').trim()
+  if (!cleanReason) {
+    return { error: 'Alasan pembukaan kembali wajib diisi.' }
+  }
+
+  const existing = await queryOne<{ status: string }>(`
+    SELECT status FROM absensi_verifikasi_periode
+    WHERE tanggal_mulai = ? AND tanggal_selesai = ?
+  `, [tanggalMulai, tanggalSelesai])
+
+  if (!existing || existing.status !== 'FINAL') {
+    return { error: 'Periode ini belum berstatus final.' }
+  }
+
+  const timestamp = now()
+  await execute(`
+    UPDATE absensi_verifikasi_periode SET
+      status = 'REOPENED',
+      reopened_by = ?,
+      reopened_at = ?,
+      reopen_reason = ?,
+      updated_at = ?
+    WHERE tanggal_mulai = ? AND tanggal_selesai = ?
+  `, [session.id, timestamp, cleanReason, timestamp, tanggalMulai, tanggalSelesai])
+
+  await logActivity({
+    actor: actorFromSession(session),
+    module: 'akademik_absensi_verifikasi',
+    action: 'update',
+    fiturHref: '/dashboard/akademik/absensi/verifikasi',
+    logKind: 'update',
+    entityType: 'absensi_verifikasi_periode',
+    entityId: `${tanggalMulai}:${tanggalSelesai}`,
+    entityLabel: `Buka kembali periode ${tanggalMulai} - ${tanggalSelesai}`,
+    summary: `Membuka kembali verifikasi pengajian periode ${tanggalMulai} s/d ${tanggalSelesai}: ${cleanReason}`,
+  })
+
+  revalidatePath('/dashboard/akademik/absensi/verifikasi')
+  revalidatePath('/dashboard/akademik/absensi')
+  revalidatePath('/dashboard/akademik/absensi/rekap')
+  revalidatePath('/portal-ortu/aktivitas')
+  revalidatePath('/portal-ortu/beranda')
+
+  return { success: true }
 }

@@ -25,6 +25,22 @@ function formatRupiah(amount: number): string {
   return `Rp${Math.round(amount).toLocaleString('id-ID')}`
 }
 
+function formatExpiryShort(isoString: string): string {
+  try {
+    const d = new Date(isoString)
+    const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+    return `Batas ${timeStr} WIB`
+  } catch {
+    return 'Batas pembayaran aktif'
+  }
+}
+
+function formatPaymentMethodLabel(method: string | null): string {
+  if (method === 'DUITKU_VA') return 'Virtual Account'
+  if (method === 'DUITKU_QRIS') return 'QRIS'
+  return method || 'Pembayaran Online'
+}
+
 interface TagihanClientProps {
   billingData: PortalStudentBillingData
 }
@@ -229,7 +245,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
         <div className="relative z-10 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-[#bef264]">
-              {isSelectionActive ? 'Total Dipilih' : 'Yang Perlu Dibayar'}
+              {isSelectionActive ? 'Total Dipilih' : 'Total Belum Dibayar'}
             </span>
             {activeObligations.length > 0 && (
               <button
@@ -248,35 +264,46 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
             </p>
             <p className="text-xs text-emerald-100/80 font-medium">
               {isSelectionActive
-                ? `${selectedItemsSummary.count} item dipilih untuk dibayar`
-                : billingData.obligations.totalRemaining > 0
-                ? `${activeObligations.length} tagihan aktif menunggu penyelesaian`
-                : 'Alhamdulillah, seluruh tagihan telah lunas'}
+                ? `${selectedItemsSummary.count} item dipilih`
+                : 'Pilih tagihan yang ingin dibayar'}
             </p>
           </div>
         </div>
       </div>
 
-      {/* 2. BANNER PESANAN MENUNGGU PEMBAYARAN (Jika Ada) */}
-      {billingData.pendingOrders.length > 0 && (
-        <div className="rounded-[20px] bg-amber-500/10 p-4 border border-amber-500/20 space-y-2">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-0.5 min-w-0">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
-                <Clock className="w-4 h-4 text-amber-700 shrink-0" />
-                <span>Pesanan Menunggu Pembayaran</span>
-              </div>
-              <p className="text-base font-black font-mono text-amber-950">
-                {formatRupiah(billingData.pendingOrders[0].totalCharged)}
+      {/* 2. COMPACT STACKED PENDING PAYMENT SURFACE (Jika Ada) */}
+      {billingData.pendingOrders.length > 0 && (() => {
+        const po = billingData.pendingOrders[0]
+        const expiryLabel = formatExpiryShort(po.expiresAt)
+        const methodLabel = formatPaymentMethodLabel(po.paymentMethod)
+
+        return (
+          <div className="rounded-[22px] bg-amber-50/90 p-4 border border-amber-200/80 shadow-2xs space-y-3">
+            {/* Baris 1: Status & Expiry */}
+            <div className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100/90 px-2.5 py-0.5 text-xs font-bold text-amber-950 shrink-0 whitespace-nowrap">
+                <Clock className="w-3.5 h-3.5 text-amber-700" />
+                <span>Menunggu Pembayaran</span>
+              </span>
+              <span className="text-[11px] font-semibold text-amber-800 shrink-0 whitespace-nowrap">
+                {expiryLabel}
+              </span>
+            </div>
+
+            {/* Baris 2: Nominal & Metode */}
+            <div className="space-y-0.5">
+              <p className="text-2xl font-black font-mono tracking-tight text-amber-950">
+                {formatRupiah(po.totalCharged)}
               </p>
-              <p className="text-[11px] text-amber-800 truncate">
-                No. Pesanan: #{billingData.pendingOrders[0].orderNumber}
+              <p className="text-xs text-amber-800 font-medium">
+                {methodLabel}
               </p>
             </div>
+
+            {/* Baris 3: Primary Action Full Width */}
             <button
               type="button"
               onClick={() => {
-                const po = billingData.pendingOrders[0]
                 setCheckoutResult({
                   success: true,
                   order: {
@@ -299,13 +326,13 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
                 })
                 setIsModalOpen(true)
               }}
-              className="shrink-0 rounded-xl bg-amber-700 px-3 py-2 text-xs font-bold text-white hover:bg-amber-800 transition active:scale-95 cursor-pointer shadow-xs"
+              className="w-full min-h-[44px] flex items-center justify-center gap-2 rounded-xl bg-amber-800 hover:bg-amber-900 py-2.5 px-4 text-xs font-bold text-white transition active:scale-[0.98] cursor-pointer shadow-xs"
             >
-              Lihat Petunjuk Bayar
+              <span>Lihat Petunjuk Pembayaran</span>
             </button>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* 3. GROUP 1: PERLU SEGERA DIBAYAR (Tunggakan Periode Sebelumnya) */}
       {pastObligations.length > 0 && (
@@ -573,171 +600,194 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
         )}
       </div>
 
-      {/* 7. STICKY PAYMENT CTA BAR (Hasil Eksplisit & Native Touch Target) */}
-      <div className="fixed bottom-[calc(60px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-3 pb-2">
-        <div className="rounded-[22px] bg-white/95 backdrop-blur-lg border border-slate-200/70 p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.12)] space-y-2.5">
-          {/* Pemilih Metode Pembayaran */}
-          <div className="flex items-center justify-between text-xs border-b border-slate-100 pb-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-500 font-medium">Metode:</span>
-              {isVaEnabled && (
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('DUITKU_VA')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer active:scale-95 ${
-                    paymentMethod === 'DUITKU_VA'
-                      ? 'bg-[#064e3b] text-white shadow-2xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Virtual Account
-                </button>
-              )}
-              {isQrisEnabled && (
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('DUITKU_QRIS')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer active:scale-95 ${
-                    paymentMethod === 'DUITKU_QRIS'
-                      ? 'bg-[#064e3b] text-white shadow-2xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  QRIS
-                </button>
-              )}
+      {/* 7. STICKY PAYMENT CTA BAR (Hanya tampil jika selection > 0) */}
+      {selectedItemsSummary.count > 0 && (
+        <div className="fixed bottom-[calc(60px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-3 pb-2 animate-in slide-in-from-bottom-2 duration-200">
+          <div className="rounded-[22px] bg-white/95 backdrop-blur-md border border-slate-200/80 p-3.5 shadow-[0_8px_32px_rgba(0,0,0,0.14)] space-y-2.5">
+            {/* Tier 1: Method Selector & Bank Chips */}
+            <div className="space-y-2 border-b border-slate-100 pb-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Metode Pembayaran
+                </span>
+                <span className="text-[11px] font-semibold text-emerald-800">
+                  {selectedItemsSummary.count} item dipilih
+                </span>
+              </div>
+
+              {/* Segmented Toggle: VA vs QRIS */}
+              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-100/90 text-xs font-bold">
+                {isVaEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('DUITKU_VA')}
+                    className={`min-h-[38px] rounded-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center ${
+                      paymentMethod === 'DUITKU_VA'
+                        ? 'bg-white text-slate-950 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Virtual Account
+                  </button>
+                )}
+                {isQrisEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('DUITKU_QRIS')}
+                    className={`min-h-[38px] rounded-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center ${
+                      paymentMethod === 'DUITKU_QRIS'
+                        ? 'bg-white text-slate-950 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    QRIS
+                  </button>
+                )}
+              </div>
+
+              {/* Bank Selector (if VA): horizontal selector chips */}
               {isVaEnabled && paymentMethod === 'DUITKU_VA' && (
-                <select
-                  value={vaBank}
-                  onChange={e => setVaBank(e.target.value)}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-700 outline-hidden focus:border-emerald-500 cursor-pointer"
-                >
-                  <option value="BR">BRI</option>
-                  <option value="NC">BNI</option>
-                  <option value="M2">Mandiri</option>
-                  <option value="BT">Permata</option>
-                  <option value="BC">BCA</option>
-                </select>
+                <div className="pt-0.5">
+                  <div className="grid grid-cols-5 gap-1.5 text-xs font-bold font-mono">
+                    {[
+                      { code: 'BR', label: 'BRI' },
+                      { code: 'NC', label: 'BNI' },
+                      { code: 'M2', label: 'Mandiri' },
+                      { code: 'BT', label: 'Permata' },
+                      { code: 'BC', label: 'BCA' },
+                    ].map(b => (
+                      <button
+                        key={b.code}
+                        type="button"
+                        onClick={() => setVaBank(b.code)}
+                        className={`min-h-[34px] py-1 px-1 rounded-lg border text-center transition active:scale-95 cursor-pointer ${
+                          vaBank === b.code
+                            ? 'bg-emerald-800 text-white border-emerald-800 shadow-2xs'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
-            <span className="text-[11px] font-semibold text-slate-500">
-              {selectedItemsSummary.count} item dipilih
-            </span>
+            {/* Tier 2: Primary Payment CTA Button */}
+            <button
+              type="button"
+              disabled={isCheckingOut}
+              onClick={handleProceedCheckout}
+              className="w-full min-h-[48px] flex items-center justify-center gap-2 rounded-xl bg-[#064e3b] hover:bg-[#047857] py-3 text-sm font-bold text-[#bef264] shadow-xs active:scale-[0.98] transition cursor-pointer"
+            >
+              {isCheckingOut ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-[#bef264]" />
+                  <span>Memproses Pembayaran…</span>
+                </>
+              ) : (
+                <>
+                  <span>Bayar {formatRupiah(selectedItemsSummary.totalCharged)}</span>
+                  <ArrowRight className="h-4 w-4 text-[#bef264]" />
+                </>
+              )}
+            </button>
           </div>
-
-          {/* Primary Payment CTA Button */}
-          <button
-            type="button"
-            disabled={selectedItemsSummary.count === 0 || isCheckingOut}
-            onClick={handleProceedCheckout}
-            className="w-full min-h-[48px] flex items-center justify-center gap-2 rounded-xl bg-[#064e3b] hover:bg-[#047857] py-3 text-sm font-bold text-[#bef264] shadow-xs active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-          >
-            {isCheckingOut ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin text-[#bef264]" />
-                <span>Memproses Pembayaran…</span>
-              </>
-            ) : selectedItemsSummary.count > 0 ? (
-              <>
-                <span>Bayar {formatRupiah(selectedItemsSummary.totalCharged)}</span>
-                <ArrowRight className="h-4 w-4 text-[#bef264]" />
-              </>
-            ) : (
-              <span>Pilih Tagihan Terlebih Dahulu</span>
-            )}
-          </button>
         </div>
-      </div>
+      )}
 
       {/* 8. MODAL INSTRUKSI PEMBAYARAN DUITKU */}
       {isModalOpen && checkoutResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-[22px] bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 p-0 sm:p-4 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-t-[24px] sm:rounded-[22px] bg-white shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                 <h3 className="text-base font-bold text-slate-900">Petunjuk Pembayaran</h3>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition active:scale-95 cursor-pointer"
+                aria-label="Tutup"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 text-center space-y-1">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Total yang Harus Ditransfer
-              </p>
-              <p className="text-2xl font-black text-slate-900 font-mono">
-                {formatRupiah(checkoutResult.order.totalCharged)}
-              </p>
-              <p className="text-[11px] text-slate-500">
-                Termasuk biaya admin {formatRupiah(checkoutResult.order.gatewayFee)}
-              </p>
-            </div>
-
-            {/* Virtual Account / Payment Link */}
-            {checkoutResult.checkout.vaNumber ? (
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 text-center space-y-2">
-                <span className="text-xs font-bold text-emerald-900">Nomor Virtual Account</span>
-                <div className="flex items-center justify-center gap-2">
-                  <span className="font-mono text-xl font-black text-emerald-950 tracking-wider">
-                    {checkoutResult.checkout.vaNumber}
-                  </span>
-                  <button
-                    onClick={() => handleCopyVa(checkoutResult.checkout.vaNumber!)}
-                    className="rounded-lg bg-white p-1.5 border border-emerald-200 text-emerald-700 hover:bg-emerald-50 shadow-2xs cursor-pointer active:scale-95 transition"
-                  >
-                    {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                  </button>
-                </div>
-                <p className="text-[11px] text-emerald-700">
-                  Berlaku 24 jam (sampai {new Date(checkoutResult.order.expiresAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB)
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 text-center space-y-1">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Total yang Harus Ditransfer
+                </p>
+                <p className="text-2xl font-black text-slate-900 font-mono">
+                  {formatRupiah(checkoutResult.order.totalCharged)}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Termasuk biaya admin {formatRupiah(checkoutResult.order.gatewayFee)}
                 </p>
               </div>
-            ) : checkoutResult.checkout.paymentUrl ? (
-              <div className="text-center py-2">
-                <a
-                  href={checkoutResult.checkout.paymentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center w-full rounded-xl bg-[#064e3b] py-3 text-sm font-bold text-[#bef264] shadow-xs hover:bg-[#047857]"
-                >
-                  Buka Halaman Pembayaran Duitku
-                </a>
-              </div>
-            ) : null}
 
-            {/* Petunjuk Pembayaran */}
-            <div className="text-xs text-slate-600 space-y-1 border-t border-slate-100 pt-3">
-              <p className="font-bold text-slate-800">Langkah Pembayaran:</p>
-              <ul className="list-disc pl-4 space-y-1 text-slate-500">
-                <li>Buka aplikasi m-Banking atau ATM bank Anda.</li>
-                <li>Pilih menu Transfer Virtual Account / Bayar Tagihan.</li>
-                <li>Masukkan nomor Virtual Account di atas.</li>
-                <li>Pastikan nominal transfer sama persis dengan total tagihan.</li>
-                <li>Status pembayaran akan terupdate otomatis dalam 1-2 menit.</li>
-              </ul>
+              {/* Virtual Account / Payment Link */}
+              {checkoutResult.checkout.vaNumber ? (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 text-center space-y-2">
+                  <span className="text-xs font-bold text-emerald-900">Nomor Virtual Account</span>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="font-mono text-xl font-black text-emerald-950 tracking-wider">
+                      {checkoutResult.checkout.vaNumber}
+                    </span>
+                    <button
+                      onClick={() => handleCopyVa(checkoutResult.checkout.vaNumber!)}
+                      className="rounded-lg bg-white p-1.5 border border-emerald-200 text-emerald-700 hover:bg-emerald-50 shadow-2xs cursor-pointer active:scale-95 transition"
+                    >
+                      {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-emerald-700">
+                    Berlaku 24 jam (sampai {new Date(checkoutResult.order.expiresAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB)
+                  </p>
+                </div>
+              ) : checkoutResult.checkout.paymentUrl ? (
+                <div className="text-center py-2">
+                  <a
+                    href={checkoutResult.checkout.paymentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center w-full rounded-xl bg-[#064e3b] py-3 text-sm font-bold text-[#bef264] shadow-xs hover:bg-[#047857]"
+                  >
+                    Buka Halaman Pembayaran Duitku
+                  </a>
+                </div>
+              ) : null}
+
+              {/* Petunjuk Pembayaran */}
+              <div className="text-xs text-slate-600 space-y-1 border-t border-slate-100 pt-3">
+                <p className="font-bold text-slate-800">Langkah Pembayaran:</p>
+                <ul className="list-disc pl-4 space-y-1 text-slate-500">
+                  <li>Buka aplikasi m-Banking atau ATM bank Anda.</li>
+                  <li>Pilih menu Transfer Virtual Account / Bayar Tagihan.</li>
+                  <li>Masukkan nomor Virtual Account di atas.</li>
+                  <li>Pastikan nominal transfer sama persis dengan total tagihan.</li>
+                  <li>Status pembayaran akan terupdate otomatis dalam 1-2 menit.</li>
+                </ul>
+              </div>
             </div>
 
-            <div className="pt-2 flex gap-2">
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-2 shrink-0 pb-[max(env(safe-area-inset-bottom),1rem)]">
               <button
                 type="button"
                 onClick={() => {
                   setIsModalOpen(false)
                   router.push('/portal-ortu/riwayat')
                 }}
-                className="w-full rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer active:scale-95 transition"
+                className="flex-1 min-h-[44px] rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer active:scale-95 transition"
               >
                 Lihat di Riwayat
               </button>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="w-full rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white hover:bg-slate-800 cursor-pointer active:scale-95 transition"
+                className="flex-1 min-h-[44px] rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white hover:bg-slate-800 cursor-pointer active:scale-95 transition"
               >
                 Selesai
               </button>

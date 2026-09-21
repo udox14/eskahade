@@ -17,10 +17,7 @@ export default async function AkunPage() {
   return (
     <div className="px-5 pt-5 pb-32 space-y-5">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-950">Pengaturan</h1>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Atur limit uang jajan, PIN transaksi, dan keamanan akun portal.
-        </p>
+        <h1 className="text-xl font-bold tracking-tight text-slate-950">Akun</h1>
       </div>
 
       <AkunClient

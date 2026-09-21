@@ -114,6 +114,36 @@ export async function simpanAbsensi(
   if (!session) return { error: 'Unauthorized' }
   if (!dataInput.length && !liburInput.length) return { success: true }
 
+  // Locking guard: Periode berstatus FINAL tidak boleh diubah lewat input normal pengajar/ustadz.
+  const allDates = Array.from(new Set([
+    ...dataInput.map((d) => String(d.tanggal || '')),
+    ...liburInput.map((l) => String(l.tanggal || ''))
+  ])).filter(Boolean)
+
+  if (allDates.length > 0) {
+    try {
+      const minDate = allDates.reduce((a, b) => a < b ? a : b)
+      const maxDate = allDates.reduce((a, b) => a > b ? a : b)
+      const activeFinalPeriods = await query<{ tanggal_mulai: string; tanggal_selesai: string }>(`
+        SELECT tanggal_mulai, tanggal_selesai
+        FROM absensi_verifikasi_periode
+        WHERE status = 'FINAL'
+          AND tanggal_mulai <= ? AND tanggal_selesai >= ?
+      `, [maxDate, minDate])
+
+      if (activeFinalPeriods.length > 0) {
+        const isAnyLocked = allDates.some(d =>
+          activeFinalPeriods.some(p => d >= p.tanggal_mulai && d <= p.tanggal_selesai)
+        )
+        if (isAnyLocked) {
+          return { error: 'Absensi sesi ini sudah selesai diverifikasi.' }
+        }
+      }
+    } catch {
+      // Graceful fallback jika tabel absensi_verifikasi_periode belum ada
+    }
+  }
+
   const statements: { sql: string; params: any[] }[] = []
 
   for (const item of dataInput) {

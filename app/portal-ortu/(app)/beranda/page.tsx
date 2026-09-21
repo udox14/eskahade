@@ -111,8 +111,8 @@ export default async function BerandaPage() {
                   : 'Catatan Kedisiplinan'}
               </span>
               {hasPendingOrder && (
-                <span className="inline-flex items-center rounded-full bg-amber-400/25 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-                  Pending Duitku
+                <span className="inline-flex items-center rounded-full bg-amber-400/25 px-2.5 py-0.5 text-[10px] font-bold text-amber-300 whitespace-nowrap shrink-0">
+                  Menunggu Bayar
                 </span>
               )}
             </div>

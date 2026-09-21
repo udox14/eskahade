@@ -58,6 +58,22 @@ const LEGACY_STATUS_META = {
   },
 } as const
 
+function formatPortalStatus(status: string): string {
+  switch (status) {
+    case 'PAID':
+    case 'COMPLETED':
+      return 'Lunas'
+    case 'PENDING':
+      return 'Menunggu Bayar'
+    case 'EXPIRED':
+      return 'Kedaluwarsa'
+    case 'CANCELLED':
+      return 'Dibatalkan'
+    default:
+      return status
+  }
+}
+
 interface RiwayatClientProps {
   history: PortalTransactionHistoryItem[]
   santri: {
@@ -253,8 +269,8 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
                             <ChevronRight className="w-3 h-3" />
                           </Link>
                         ) : (
-                          <span className="text-[10px] font-bold text-slate-400">
-                            {item.status}
+                          <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap shrink-0">
+                            {formatPortalStatus(item.status)}
                           </span>
                         )}
                       </div>

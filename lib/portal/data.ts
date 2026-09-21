@@ -3,7 +3,7 @@
 // Semua fungsi menerima santriId dari session portal — bukan dari input client.
 
 import { query, queryOne } from '@/lib/db'
-import { countActiveSessions, getDateRange, type SessionType } from '@/lib/absensi/pengajian'
+import { getDateRange, isHoliday, type SessionType } from '@/lib/absensi/pengajian'
 import { toWibDateInputValue } from '@/lib/date/wib'
 
 // ── Absensi pengajian ────────────────────────────────────────
@@ -19,43 +19,133 @@ export type RekapAbsensiAnak = {
   detail: { tanggal: string; shubuh: string | null; ashar: string | null; maghrib: string | null }[]
 }
 
-// Versi satu-santri dari getRekapAbsensi (app/dashboard/akademik/absensi/rekap/actions.ts):
-// hanya baris non-Hadir yang tersimpan; Hadir = total sesi aktif − (S+I+A).
+// Rekap absensi authoritative untuk Portal Orang Tua:
+// Menggunakan tabel absensi_verifikasi_periode (status = 'FINAL') sebagai satu-satunya
+// penentu periode verifikasi resmi Sekpen.
+// Periode yang berstatus FINAL merepresentasikan bahwa Sekpen telah mengesahkan kehadiran seluruh santri:
+// - Status Sakit (S) dan Izin (I) pada periode tersebut dianggap sah/final.
+// - Status Alfa (A) dengan verif = 'OK' dianggap Alfa final.
+// - Santri aktif yang tidak memiliki exception row dihitung HADIR.
+// - Hadir = totalSesi - sakit - izin - alfa.
+// - Jika belum ada periode yang FINAL (totalSesi === 0), Portal Orang Tua menampilkan neutral state.
 export async function getRekapAbsensiAnak(
   santriId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
 ): Promise<RekapAbsensiAnak> {
-  const range = getDateRange(startDate, endDate)
   const empty: RekapAbsensiAnak = {
-    punyaKelas: false, namaKelas: null, totalSesi: 0,
-    hadir: 0, sakit: 0, izin: 0, alfa: 0, detail: [],
+    punyaKelas: false,
+    namaKelas: null,
+    totalSesi: 0,
+    hadir: 0,
+    sakit: 0,
+    izin: 0,
+    alfa: 0,
+    detail: [],
   }
+
+  const range = getDateRange(startDate, endDate)
   if (!range.start || !range.end) return empty
 
-  // Tanggal yang belum terjadi tidak dihitung (batasi sampai hari ini WIB).
   const todayStr = toWibDateInputValue()
   const effectiveRange = {
     start: range.start,
     end: range.end > todayStr ? todayStr : range.end,
   }
+  if (effectiveRange.start > effectiveRange.end) return empty
 
-  const riwayat = await queryOne<{ id: string; nama_kelas: string | null }>(`
-    SELECT rp.id, k.nama_kelas
+  const riwayat = await queryOne<{ id: string; nama_kelas: string | null; created_at: string }>(`
+    SELECT rp.id, k.nama_kelas, rp.created_at
     FROM riwayat_pendidikan rp
+    JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
     LEFT JOIN kelas k ON k.id = rp.kelas_id
     WHERE rp.santri_id = ? AND rp.status_riwayat = 'aktif'
     LIMIT 1
   `, [santriId])
   if (!riwayat) return empty
 
-  // Alfa mentah belum tentu final: baru dihitung/ditampilkan ke ortu setelah
-  // lolos salah satu jalur verifikasi (Verifikasi Absensi ATAU tahap akhir
-  // Verifikasi Panggilan/Vonis Final Pengajian) — keduanya bermuara ke
-  // verif_<sesi>='OK' pada absensi_harian (lihat app/dashboard/akademik/absensi/verifikasi/actions.ts
-  // dan app/dashboard/keamanan/verifikasi-panggilan/final-vonis.ts). Sakit/izin
-  // sudah final sejak diinput, tidak melalui alur verifikasi ini.
-  const rawDetail = await query<{
+  // Applicability rule: Sesi sebelum santri terdaftar/aktif tidak dihitung
+  const enrollmentDate = (riwayat.created_at || '').slice(0, 10)
+  const applicableStart = enrollmentDate && enrollmentDate > effectiveRange.start
+    ? enrollmentDate
+    : effectiveRange.start
+
+  // Query seluruh periode yang telah berstatus FINAL oleh Sekpen dalam rentang applicable
+  let finalPeriods: { tanggal_mulai: string; tanggal_selesai: string }[] = []
+  try {
+    finalPeriods = await query<{ tanggal_mulai: string; tanggal_selesai: string }>(`
+      SELECT tanggal_mulai, tanggal_selesai
+      FROM absensi_verifikasi_periode
+      WHERE status = 'FINAL'
+        AND tanggal_mulai <= ? AND tanggal_selesai >= ?
+      ORDER BY tanggal_mulai ASC
+    `, [effectiveRange.end, applicableStart])
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err)
+    if (errMsg.includes('no such table: absensi_verifikasi_periode')) {
+      // Graceful fallback jika tabel absensi_verifikasi_periode belum ada
+      return empty
+    }
+    throw err
+  }
+
+  // Jika belum ada periode yang difinalisasi oleh Sekpen, tampilkan neutral state (totalSesi = 0)
+  if (!finalPeriods.length) {
+    return {
+      punyaKelas: true,
+      namaKelas: riwayat.nama_kelas,
+      totalSesi: 0,
+      hadir: 0,
+      sakit: 0,
+      izin: 0,
+      alfa: 0,
+      detail: [],
+    }
+  }
+
+  // Kumpulkan tanggal-tanggal unik yang masuk ke dalam periode FINAL
+  const validDates = new Set<string>()
+  for (const p of finalPeriods) {
+    const curDateStr = p.tanggal_mulai < applicableStart ? applicableStart : p.tanggal_mulai
+    const endDateStr = p.tanggal_selesai > effectiveRange.end ? effectiveRange.end : p.tanggal_selesai
+
+    const cur = new Date(`${curDateStr}T12:00:00Z`)
+    const end = new Date(`${endDateStr}T12:00:00Z`)
+    while (cur <= end) {
+      validDates.add(cur.toISOString().split('T')[0])
+      cur.setUTCDate(cur.getUTCDate() + 1)
+    }
+  }
+
+  if (validDates.size === 0) {
+    return {
+      punyaKelas: true,
+      namaKelas: riwayat.nama_kelas,
+      totalSesi: 0,
+      hadir: 0,
+      sakit: 0,
+      izin: 0,
+      alfa: 0,
+      detail: [],
+    }
+  }
+
+  const liburList = await query<{ tanggal: string; sesi: SessionType }>(`
+    SELECT tanggal, sesi FROM pengajian_libur_sesi WHERE tanggal >= ? AND tanggal <= ?
+  `, [applicableStart, effectiveRange.end]).catch(() => [] as { tanggal: string; sesi: SessionType }[])
+  const liburSet = new Set(liburList.map(item => `${item.tanggal}-${item.sesi}`))
+
+  let totalSesi = 0
+  for (const d of validDates) {
+    for (const s of ['shubuh', 'ashar', 'maghrib'] as const) {
+      if (!isHoliday(d, s) && !liburSet.has(`${d}-${s}`)) {
+        totalSesi++
+      }
+    }
+  }
+
+  // Ambil data pengecualian (S, I, A) hanya pada rentang tanggal yang difinalisasi
+  const rawAbsen = await query<{
     tanggal: string
     shubuh: string | null; ashar: string | null; maghrib: string | null
     verif_shubuh: string | null; verif_ashar: string | null; verif_maghrib: string | null
@@ -64,53 +154,59 @@ export async function getRekapAbsensiAnak(
     FROM absensi_harian
     WHERE riwayat_pendidikan_id = ?
       AND tanggal >= ? AND tanggal <= ?
-      AND (
-        shubuh IN ('S','I') OR (shubuh = 'A' AND verif_shubuh = 'OK')
-        OR ashar IN ('S','I') OR (ashar = 'A' AND verif_ashar = 'OK')
-        OR maghrib IN ('S','I') OR (maghrib = 'A' AND verif_maghrib = 'OK')
-      )
     ORDER BY tanggal DESC
-  `, [riwayat.id, effectiveRange.start, effectiveRange.end])
-
-  function statusFinal(status: string | null, verif: string | null) {
-    if (status === 'S' || status === 'I') return status
-    if (status === 'A' && verif === 'OK') return 'A'
-    return null
-  }
-
-  const detail = rawDetail
-    .map(row => ({
-      tanggal: row.tanggal,
-      shubuh: statusFinal(row.shubuh, row.verif_shubuh),
-      ashar: statusFinal(row.ashar, row.verif_ashar),
-      maghrib: statusFinal(row.maghrib, row.verif_maghrib),
-    }))
-    .filter(row => row.shubuh || row.ashar || row.maghrib)
+  `, [riwayat.id, applicableStart, effectiveRange.end])
 
   let sakit = 0, izin = 0, alfa = 0
-  detail.forEach(row => {
-    for (const sesi of [row.shubuh, row.ashar, row.maghrib]) {
-      if (sesi === 'S') sakit++
-      else if (sesi === 'I') izin++
-      else if (sesi === 'A') alfa++
+  const detail: { tanggal: string; shubuh: string | null; ashar: string | null; maghrib: string | null }[] = []
+
+  rawAbsen.forEach(row => {
+    if (!validDates.has(row.tanggal)) return
+
+    let hasAbsence = false
+    const rowDetail = {
+      tanggal: row.tanggal,
+      shubuh: null as string | null,
+      ashar: null as string | null,
+      maghrib: null as string | null,
+    }
+
+    const sessions = ['shubuh', 'ashar', 'maghrib'] as const
+    for (const s of sessions) {
+      if (isHoliday(row.tanggal, s) || liburSet.has(`${row.tanggal}-${s}`)) continue
+
+      const status = row[s]
+      const verif = row[`verif_${s}`]
+
+      if (status === 'S') {
+        sakit++
+        rowDetail[s] = 'S'
+        hasAbsence = true
+      } else if (status === 'I') {
+        izin++
+        rowDetail[s] = 'I'
+        hasAbsence = true
+      } else if (status === 'A' && verif === 'OK') {
+        alfa++
+        rowDetail[s] = 'A'
+        hasAbsence = true
+      }
+    }
+
+    if (hasAbsence) {
+      detail.push(rowDetail)
     }
   })
 
-  const liburList = await query<{ tanggal: string; sesi: SessionType }>(`
-    SELECT tanggal, sesi FROM pengajian_libur_sesi WHERE tanggal >= ? AND tanggal <= ?
-  `, [effectiveRange.start, effectiveRange.end]).catch(() => [] as { tanggal: string; sesi: SessionType }[])
-
-  const totalSesi = countActiveSessions(
-    effectiveRange.start,
-    effectiveRange.end,
-    new Set(liburList.map(item => `${item.tanggal}-${item.sesi}`))
-  )
+  // Santri yang Hadir tidak diinput / tidak memiliki exception row.
+  // Hadir authoritative dihitung dari selisih total sesi final dengan seluruh exception final.
+  const hadir = Math.max(totalSesi - sakit - izin - alfa, 0)
 
   return {
     punyaKelas: true,
     namaKelas: riwayat.nama_kelas,
     totalSesi,
-    hadir: totalSesi > 0 ? Math.max(totalSesi - sakit - izin - alfa, 0) : 0,
+    hadir,
     sakit,
     izin,
     alfa,

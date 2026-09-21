@@ -1,10 +1,21 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { getAntrianVerifikasi, simpanVerifikasiMassal, getKelasList, getAsramaList, getMarhalahList } from './actions'
+import {
+  getAntrianVerifikasi,
+  simpanVerifikasiMassal,
+  getKelasList,
+  getAsramaList,
+  getMarhalahList,
+  getStatusVerifikasiPeriode,
+  selesaikanVerifikasiPeriode,
+  bukaKembaliVerifikasiPeriode,
+  type PeriodeVerifikasiItem,
+} from './actions'
 import {
   Gavel, CheckCircle, Loader2, AlertTriangle,
-  Save, ChevronLeft, ChevronRight, RefreshCw, Search, Filter, ChevronDown, Calendar, Users
+  Save, ChevronLeft, ChevronRight, RefreshCw, Search, Filter, ChevronDown, Users,
+  CalendarCheck
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -16,13 +27,6 @@ type AbsenItem = {
 }
 
 const PAGE_SIZE = 20
-
-const SESI_LABEL: Record<string, string> = { shubuh: 'Shubuh', ashar: 'Ashar', maghrib: 'Maghrib' }
-const SESI_COLOR: Record<string, string> = {
-  shubuh:  'bg-indigo-50 text-indigo-700 border-indigo-100',
-  ashar:   'bg-orange-50 text-orange-700 border-orange-100',
-  maghrib: 'bg-slate-100 text-slate-600 border-slate-200',
-}
 
 function fmtTgl(s: string) {
   try { return new Date(s).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) }
@@ -171,6 +175,82 @@ export default function VerifikasiAbsenPage() {
     setDrafts(prev => ({ ...prev, ...next }))
   }
 
+  const [periodeData, setPeriodeData] = useState<PeriodeVerifikasiItem | null>(null)
+  const [loadingPeriode, setLoadingPeriode] = useState(false)
+  const [isProcessingPeriode, setIsProcessingPeriode] = useState(false)
+
+  const loadPeriodeData = useCallback(async () => {
+    setLoadingPeriode(true)
+    try {
+      const data = await getStatusVerifikasiPeriode(selectedDate || undefined)
+      setPeriodeData(data)
+    } catch {
+      // noop
+    } finally {
+      setLoadingPeriode(false)
+    }
+  }, [selectedDate])
+
+  useEffect(() => {
+    loadPeriodeData()
+  }, [selectedDate, loadPeriodeData])
+
+  const handleFinalizePeriode = async () => {
+    if (!periodeData) return
+    if (periodeData.unresolvedAlfaCount > 0) {
+      toast.error('Gagal menyelesaikan verifikasi', {
+        description: `Masih ada ${periodeData.unresolvedAlfaCount} absensi Alfa yang perlu diverifikasi.`
+      })
+      return
+    }
+    if (!await confirm(`Selesaikan verifikasi untuk periode ${fmtTgl(periodeData.tanggalMulai)} — ${fmtTgl(periodeData.tanggalSelesai)}?`)) return
+    setIsProcessingPeriode(true)
+    try {
+      const res = await selesaikanVerifikasiPeriode(periodeData.tanggalMulai, periodeData.tanggalSelesai)
+      if (res?.error) {
+        toast.error('Gagal menyelesaikan verifikasi', { description: res.error })
+        return
+      }
+      toast.success('Verifikasi Diselesaikan', {
+        description: `Periode ${fmtTgl(periodeData.tanggalMulai)} — ${fmtTgl(periodeData.tanggalSelesai)} kini berstatus sah dan final.`
+      })
+      await Promise.all([loadPeriodeData(), loadData()])
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Terjadi kesalahan sistem'
+      toast.error('Gagal', { description: msg })
+    } finally {
+      setIsProcessingPeriode(false)
+    }
+  }
+
+  const handleReopenPeriode = async () => {
+    if (!periodeData) return
+    const reason = window.prompt(`Alasan pembukaan kembali verifikasi periode ${fmtTgl(periodeData.tanggalMulai)} — ${fmtTgl(periodeData.tanggalSelesai)}:`)
+    if (reason === null) return
+    const cleanReason = reason.trim()
+    if (!cleanReason) {
+      toast.error('Alasan wajib diisi untuk membuka kembali periode.')
+      return
+    }
+    setIsProcessingPeriode(true)
+    try {
+      const res = await bukaKembaliVerifikasiPeriode(periodeData.tanggalMulai, periodeData.tanggalSelesai, cleanReason)
+      if (res?.error) {
+        toast.error('Gagal membuka kembali', { description: res.error })
+        return
+      }
+      toast.success('Verifikasi Dibuka Kembali', {
+        description: `Periode ${fmtTgl(periodeData.tanggalMulai)} — ${fmtTgl(periodeData.tanggalSelesai)} kini dapat disesuaikan kembali.`
+      })
+      await Promise.all([loadPeriodeData(), loadData()])
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Terjadi kesalahan sistem'
+      toast.error('Gagal', { description: msg })
+    } finally {
+      setIsProcessingPeriode(false)
+    }
+  }
+
   const handleSimpan = async () => {
     const ids = Object.keys(drafts)
     if (!ids.length) return
@@ -187,6 +267,7 @@ export default function VerifikasiAbsenPage() {
     toast.success('Tersimpan', { description: `${ids.length} santri berhasil diproses.` })
     setList(prev => prev.filter(i => !drafts[i.santri_id]))
     setDrafts({}); setPage(1)
+    await loadPeriodeData()
   }
 
 
@@ -312,6 +393,89 @@ export default function VerifikasiAbsenPage() {
         </div>
       </div>
 
+      {/* Panel Penyelesaian Verifikasi Periode */}
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <CalendarCheck className="w-4 h-4 text-emerald-600" />
+              <span>Verifikasi Periode Pengajian</span>
+            </h2>
+            <p className="text-xs text-slate-500">
+              {periodeData
+                ? `Pekan: ${fmtTgl(periodeData.tanggalMulai)} — ${fmtTgl(periodeData.tanggalSelesai)}.`
+                : 'Memuat data periode...'}
+              {' '}Hasil verifikasi yang telah diselesaikan menjadi dasar resmi data kehadiran santri di Portal Orang Tua.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            {loadingPeriode ? (
+              <span className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" /> Memeriksa status...
+              </span>
+            ) : periodeData ? (
+              <>
+                {/* Status Badge */}
+                {periodeData.status === 'FINAL' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <CheckCircle className="w-3.5 h-3.5" /> Selesai Diverifikasi
+                  </span>
+                ) : periodeData.status === 'REOPENED' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Dibuka Kembali
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                    Belum Selesai
+                  </span>
+                )}
+
+                {/* Sisa Alfa info */}
+                {periodeData.status !== 'FINAL' && (
+                  <span className={`text-xs font-semibold ${periodeData.unresolvedAlfaCount > 0 ? 'text-rose-600 font-bold' : 'text-slate-500'}`}>
+                    {periodeData.unresolvedAlfaCount > 0
+                      ? `${periodeData.unresolvedAlfaCount} Alfa belum diputus`
+                      : 'Seluruh Alfa tuntas'}
+                  </span>
+                )}
+
+                {/* Action button */}
+                {periodeData.status === 'FINAL' ? (
+                  <button
+                    type="button"
+                    onClick={handleReopenPeriode}
+                    disabled={isProcessingPeriode}
+                    className="px-4 py-2 bg-amber-50 border border-amber-300 text-amber-800 rounded-lg text-xs font-bold hover:bg-amber-100 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                  >
+                    {isProcessingPeriode ? 'Memproses...' : 'Buka Kembali'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleFinalizePeriode}
+                    disabled={isProcessingPeriode}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer disabled:opacity-50 ${
+                      periodeData.unresolvedAlfaCount > 0
+                        ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                        : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'
+                    }`}
+                  >
+                    {isProcessingPeriode ? 'Menyimpan...' : 'Selesaikan Verifikasi'}
+                  </button>
+                )}
+              </>
+            ) : null}
+          </div>
+        </div>
+
+        {periodeData?.status === 'REOPENED' && periodeData.reopenReason && (
+          <div className="rounded-lg bg-amber-50/70 border border-amber-200/80 p-2.5 text-xs text-amber-800">
+            <span className="font-bold">Alasan dibuka kembali:</span> {periodeData.reopenReason}
+          </div>
+        )}
+      </div>
+
       {/* Main Content Area */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm">
@@ -387,7 +551,7 @@ export default function VerifikasiAbsenPage() {
 
             {/* Mobile cards */}
             <div className="sm:hidden p-4 space-y-4">
-              {paged.map((item, i) => (
+              {paged.map((item) => (
                 <BarisAbsen key={item.santri_id} item={item}
                   no={-1}
                   vonis={drafts[item.santri_id]}

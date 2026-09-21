@@ -65,9 +65,6 @@ export default async function RiwayatPage() {
     <div className="px-5 pt-5 pb-32 space-y-4">
       <div>
         <h1 className="text-xl font-bold tracking-tight text-slate-950">Riwayat</h1>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Arsip pembayaran tagihan, uang jajan &amp; kuitansi resmi.
-        </p>
       </div>
 
       <RiwayatClient
