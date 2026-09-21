@@ -1,6 +1,5 @@
 import { requirePortalSessionStrict } from '@/lib/portal/session'
 import { getPortalStudentBilling } from '@/lib/portal/finance'
-import { PortalPageHeader } from '../../_components/page-header'
 import { TagihanClient } from './_tagihan-client'
 
 export const dynamic = 'force-dynamic'
@@ -12,15 +11,16 @@ export default async function TagihanPage() {
   const billingData = await getPortalStudentBilling(session.santri_id)
 
   return (
-    <div>
-      <PortalPageHeader
-        kicker="Keuangan Santri"
-        title="Tagihan & Pembayaran"
-        subtitle="Pilih tagihan, cicil USPP, isi uang jajan, dan bayar online otomatis via Virtual Account & QRIS."
-      />
-      <div className="px-4 pt-4 sm:px-5 pb-36">
-        <TagihanClient billingData={billingData} />
+    <div className="px-5 pt-5 pb-40 space-y-4">
+      {/* Header Halaman Bersih */}
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-slate-950">Tagihan</h1>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Pilih tagihan santri dan selesaikan pembayaran online otomatis.
+        </p>
       </div>
+
+      <TagihanClient billingData={billingData} />
     </div>
   )
 }

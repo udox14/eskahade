@@ -1,10 +1,7 @@
 import { requirePortalSession } from '@/lib/portal/session'
 import { getParentWalletLimits, getGlobalDailyLimit } from '@/lib/finance/wallet'
 import { getStudentPinStatus } from '@/lib/finance/pins'
-import { PortalPageHeader } from '../../_components/page-header'
 import { AkunClient } from './_akun-client'
-import { WalletLimitCard } from './_wallet-limit-card'
-import { StudentPinCard } from './_student-pin-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,33 +15,22 @@ export default async function AkunPage() {
   ])
 
   return (
-    <div>
-      <PortalPageHeader
-        kicker="Pengaturan Akun"
-        title={session.nama}
-        subtitle={`NIS ${session.nis}${session.asrama ? ` • Asrama ${session.asrama}` : ''}${session.kamar ? ` • Kamar ${session.kamar}` : ''}`}
-      />
-      <div className="px-4 pt-4 sm:px-5 pb-24 space-y-4">
-        {/* Kartu Limit Penarikan Uang Jajan */}
-        <WalletLimitCard
-          initialDaily={parentLimits?.parent_daily_limit ?? null}
-          initialWeekly={parentLimits?.parent_weekly_limit ?? null}
-          initialMonthly={parentLimits?.parent_monthly_limit ?? null}
-          globalDailyLimit={globalDailyLimit}
-        />
-
-        {/* Kartu Ubah PIN Transaksi Santri */}
-        <StudentPinCard
-          hasPin={pinStatus?.hasPin ?? false}
-          isLocked={pinStatus?.isLocked ?? false}
-          santriNama={session.nama}
-          nis={session.nis}
-        />
-
-        {/* Kartu Ganti Password */}
-        <AkunClient mustChangePassword={session.must_change_password} nis={session.nis} />
+    <div className="px-5 pt-5 pb-32 space-y-5">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-slate-950">Pengaturan</h1>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Atur limit uang jajan, PIN transaksi, dan keamanan akun portal.
+        </p>
       </div>
+
+      <AkunClient
+        mustChangePassword={session.must_change_password}
+        nis={session.nis}
+        session={session}
+        parentLimits={parentLimits}
+        globalDailyLimit={globalDailyLimit}
+        pinStatus={pinStatus}
+      />
     </div>
   )
 }
-

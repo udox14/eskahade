@@ -37,23 +37,23 @@ export type LegacyRiwayatItem = {
 
 const LEGACY_STATUS_META = {
   menunggu_konfirmasi: {
-    label: 'Menunggu Konfirmasi',
-    cls: 'bg-amber-100 text-amber-800 border-amber-200',
+    label: 'Menunggu',
+    cls: 'bg-amber-100 text-amber-800',
     icon: Clock3,
   },
   terkonfirmasi: {
     label: 'Terkonfirmasi',
-    cls: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    cls: 'bg-emerald-100 text-emerald-800',
     icon: CheckCircle2,
   },
   ditolak: {
     label: 'Ditolak',
-    cls: 'bg-rose-100 text-rose-800 border-rose-200',
+    cls: 'bg-rose-100 text-rose-800',
     icon: XCircle,
   },
   dibatalkan: {
     label: 'Dibatalkan',
-    cls: 'bg-slate-100 text-slate-600 border-slate-200',
+    cls: 'bg-slate-100 text-slate-600',
     icon: XCircle,
   },
 } as const
@@ -90,7 +90,6 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
     router.refresh()
   }
 
-  // Filter history
   const filteredHistory = history.filter(item => {
     if (filter === 'ALL') return true
     if (filter === 'TAGIHAN') return item.category === 'TAGIHAN'
@@ -100,45 +99,49 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
 
   return (
     <div className="space-y-4">
-      {/* Tab Filter */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+      {/* 1. Filter Pills Native (Compact) */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs font-bold">
         <button
+          type="button"
           onClick={() => setFilter('ALL')}
-          className={`shrink-0 rounded-lg px-3.5 py-1.5 transition ${
+          className={`shrink-0 rounded-full px-3.5 py-1.5 transition active:scale-95 cursor-pointer ${
             filter === 'ALL'
-              ? 'bg-emerald-600 text-white shadow-xs font-semibold'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium'
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
           }`}
         >
-          Semua Riwayat
+          Semua
         </button>
         <button
+          type="button"
           onClick={() => setFilter('TAGIHAN')}
-          className={`shrink-0 rounded-lg px-3.5 py-1.5 transition ${
+          className={`shrink-0 rounded-full px-3.5 py-1.5 transition active:scale-95 cursor-pointer ${
             filter === 'TAGIHAN'
-              ? 'bg-emerald-600 text-white shadow-xs font-semibold'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium'
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
           }`}
         >
-          Tagihan & USPP
+          Tagihan &amp; USPP
         </button>
         <button
+          type="button"
           onClick={() => setFilter('UANG_JAJAN')}
-          className={`shrink-0 rounded-lg px-3.5 py-1.5 transition ${
+          className={`shrink-0 rounded-full px-3.5 py-1.5 transition active:scale-95 cursor-pointer ${
             filter === 'UANG_JAJAN'
-              ? 'bg-emerald-600 text-white shadow-xs font-semibold'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium'
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
           }`}
         >
           Uang Jajan
         </button>
         {legacyItems.length > 0 && (
           <button
+            type="button"
             onClick={() => setFilter('LEGACY')}
-            className={`shrink-0 rounded-lg px-3.5 py-1.5 transition ${
+            className={`shrink-0 rounded-full px-3.5 py-1.5 transition active:scale-95 cursor-pointer ${
               filter === 'LEGACY'
-                ? 'bg-emerald-600 text-white shadow-xs font-semibold'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
             }`}
           >
             Pengajuan Manual ({legacyItems.length})
@@ -146,25 +149,27 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
         )}
       </div>
 
-      {/* Konten History Finansial Terpadu */}
+      {/* 2. Native Transaction List: Flat List (Tanpa Card Pembungkus Per Transaksi) */}
       {filter !== 'LEGACY' && (
         <>
           {filteredHistory.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-8 shadow-xs text-center">
-              <FileQuestion className="w-8 h-8 text-slate-400" />
-              <p className="text-xs font-medium text-slate-500">
-                Belum ada catatan transaksi pada filter ini.
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center">
+                <FileQuestion className="w-6 h-6" />
+              </div>
+              <p className="text-xs font-semibold text-slate-600">
+                Belum ada transaksi pada kategori ini.
               </p>
               <Link
                 href="/portal-ortu/tagihan"
-                className="mt-1 text-xs font-semibold text-emerald-700 hover:underline"
+                className="mt-1 text-xs font-bold text-emerald-700 hover:underline"
               >
-                Buka Menu Pembayaran Tagihan
+                Buka Tagihan
               </Link>
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredHistory.map((item) => {
+            <div className="divide-y divide-slate-100">
+              {filteredHistory.map(item => {
                 const isPaid = item.status === 'PAID' || item.status === 'COMPLETED'
                 const isPending = item.status === 'PENDING'
                 const isTopUp = item.type === 'TOPUP'
@@ -173,122 +178,87 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
                 return (
                   <div
                     key={item.id}
-                    className="rounded-xl bg-white border border-slate-200 p-4 sm:p-5 shadow-xs transition hover:border-slate-300"
+                    className="flex items-center justify-between py-3.5 active:bg-slate-50/80 transition cursor-pointer"
+                    onClick={() => {
+                      if (isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP')) {
+                        setSelectedReceipt(item)
+                      }
+                    }}
                   >
-                    {/* Header item */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        {isTopUp ? (
-                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-                            <ArrowDownLeft className="h-4 w-4" />
-                          </div>
-                        ) : isWithdrawal ? (
-                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-                            <ArrowUpRight className="h-4 w-4" />
-                          </div>
-                        ) : (
-                          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-                            <Receipt className="h-4 w-4" />
-                          </div>
-                        )}
-                        <div>
-                          <span className="text-xs font-semibold text-slate-900 leading-tight block">
-                            {item.title}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {item.referenceNumber}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Badge status */}
-                      <span
-                        className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${
-                          isPaid
-                            ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+                    {/* Sisi Kiri: Icon Tile Color-Role & Detail */}
+                    <div className="flex items-center gap-3 min-w-0 pr-2">
+                      <div
+                        className={`w-10 h-10 shrink-0 rounded-2xl flex items-center justify-center ${
+                          isTopUp
+                            ? 'bg-cyan-50 text-cyan-700'
+                            : isWithdrawal
+                            ? 'bg-slate-100 text-slate-700'
                             : isPending
-                            ? 'bg-amber-50 text-amber-700 ring-amber-600/20'
-                            : 'bg-slate-50 text-slate-700 ring-slate-600/20'
+                            ? 'bg-amber-50 text-amber-700'
+                            : 'bg-emerald-50 text-emerald-700'
                         }`}
                       >
-                        {isPaid ? (
-                          <>
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            Lunas
-                          </>
+                        {isTopUp ? (
+                          <ArrowDownLeft className="h-5 w-5" />
+                        ) : isWithdrawal ? (
+                          <ArrowUpRight className="h-5 w-5" />
                         ) : isPending ? (
-                          <>
-                            <Clock3 className="w-3 h-3 text-amber-600" />
-                            Menunggu Bayar
-                          </>
+                          <Clock3 className="h-5 w-5" />
                         ) : (
-                          item.status
+                          <Receipt className="h-5 w-5" />
                         )}
-                      </span>
-                    </div>
+                      </div>
 
-                    {/* Nominal */}
-                    <div className="mt-3 flex items-baseline justify-between">
-                      <div>
-                        <p className={`text-lg font-bold leading-none ${isTopUp ? 'text-emerald-700' : 'text-slate-900'}`}>
-                          {isTopUp ? `+ ${formatRupiah(item.amount)}` : formatRupiah(item.amount)}
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900 truncate leading-snug">
+                          {item.title}
                         </p>
-                        <p className="mt-1 text-[11px] text-slate-400">
+                        <p className="text-xs text-slate-400 truncate mt-0.5 font-medium">
                           {formatTanggalId(item.createdAt)}
-                          {item.channel ? ` • ${item.channel}` : ''}
-                          {item.method ? ` (${item.method})` : ''}
+                          {item.method ? ` · ${item.method}` : ''}
                         </p>
                       </div>
-
-                      {/* Action Cetak Bukti untuk transaksi yang lunas */}
-                      {isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP') && (
-                        <button
-                          onClick={() => setSelectedReceipt(item)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 active:scale-95 transition"
-                        >
-                          <Printer className="h-3.5 w-3.5 text-slate-500" />
-                          <span>Kuitansi</span>
-                        </button>
-                      )}
                     </div>
 
-                    {/* Item Allocations Breakdown */}
-                    {item.items && item.items.length > 0 && item.type === 'PAYMENT' && (
-                      <div className="mt-3 rounded-lg bg-slate-50 border border-slate-100 p-3 space-y-1.5 text-xs">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          Alokasi Pembayaran:
-                        </p>
-                        {item.items.map((sub, sIdx) => (
-                          <div key={sIdx} className="flex justify-between items-center text-slate-700">
-                            <div>
-                              <span className="font-semibold">{sub.itemLabel}</span>
-                              {sub.period && (
-                                <span className="text-[10px] text-slate-400 ml-1.5">
-                                  ({sub.period})
-                                </span>
-                              )}
-                            </div>
-                            <span className="font-mono font-medium">{formatRupiah(sub.amount)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    {/* Sisi Kanan: Nominal & Kuitansi / Status */}
+                    <div className="text-right shrink-0 flex flex-col items-end">
+                      <p
+                        className={`text-sm font-black font-mono leading-none ${
+                          isTopUp ? 'text-cyan-800' : 'text-slate-900'
+                        }`}
+                      >
+                        {isTopUp ? `+${formatRupiah(item.amount)}` : formatRupiah(item.amount)}
+                      </p>
 
-                    {/* Pending Order Quick Link */}
-                    {isPending && (
-                      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
-                        <span className="text-xs text-amber-700 font-medium">
-                          Segera selesaikan sebelum kedaluwarsa
-                        </span>
-                        <Link
-                          href="/portal-ortu/tagihan"
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline"
-                        >
-                          <span>Instruksi Bayar</span>
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        </Link>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        {isPaid ? (
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation()
+                              setSelectedReceipt(item)
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer active:scale-95 transition"
+                          >
+                            <Printer className="w-3 h-3" />
+                            <span>Kuitansi</span>
+                          </button>
+                        ) : isPending ? (
+                          <Link
+                            href="/portal-ortu/tagihan"
+                            onClick={e => e.stopPropagation()}
+                            className="inline-flex items-center gap-0.5 text-[11px] font-bold text-amber-700 hover:underline"
+                          >
+                            <span>Bayar</span>
+                            <ChevronRight className="w-3 h-3" />
+                          </Link>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400">
+                            {item.status}
+                          </span>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 )
               })}
@@ -297,111 +267,110 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
         </>
       )}
 
-      {/* Konten Riwayat Pengajuan Bukti Lama (Legacy Manual Upload) */}
+      {/* 3. Pengajuan Bukti Transfer Manual (Legacy Section) */}
       {filter === 'LEGACY' && (
-        <div className="space-y-3">
-          <div className="rounded-xl bg-amber-50 border border-amber-200/70 p-3.5 text-xs text-amber-800">
-            <p className="font-bold">Arsip Pengajuan Manual Transfer</p>
-            <p className="mt-0.5 text-xs text-amber-700/90">
-              Pengajuan manual dengan upload slip transfer bank dari periode transisi sebelum checkout otomatis diaktifkan.
+        <div className="space-y-3 pt-1">
+          <div className="rounded-2xl bg-amber-50/70 p-3.5 text-xs text-amber-900 border border-amber-200/50">
+            <p className="font-bold">Arsip Pengajuan Manual</p>
+            <p className="mt-0.5 text-[11px] text-amber-800 leading-relaxed">
+              Daftar pengajuan bukti transfer bank dari periode sebelum pembayaran otomatis diaktifkan.
             </p>
           </div>
 
-          {legacyItems.map((item) => {
-            const meta = LEGACY_STATUS_META[item.status]
-            const StatusIcon = meta.icon
-            const bisaBatal = item.status === 'menunggu_konfirmasi' || item.status === 'ditolak'
-            const bisaUpload =
-              item.status === 'ditolak' || (item.status === 'menunggu_konfirmasi' && !item.buktiUrl)
+          <div className="divide-y divide-slate-100">
+            {legacyItems.map(item => {
+              const meta = LEGACY_STATUS_META[item.status]
+              const StatusIcon = meta.icon
+              const bisaBatal = item.status === 'menunggu_konfirmasi' || item.status === 'ditolak'
+              const bisaUpload =
+                item.status === 'ditolak' || (item.status === 'menunggu_konfirmasi' && !item.buktiUrl)
 
-            return (
-              <div
-                key={item.id}
-                className="rounded-xl bg-white border border-slate-200 p-4 sm:p-5 shadow-xs"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                    {item.kategori === 'SPP' ? 'SPP Bulanan' : 'Non-SPP'}
-                  </span>
-                  <span
-                    className={`flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold ${meta.cls}`}
-                  >
-                    <StatusIcon className="w-3 h-3" />
-                    {meta.label}
-                  </span>
-                </div>
-
-                <p className="mt-3 text-lg font-bold leading-none text-slate-900">
-                  {formatRupiah(item.jumlah)}
-                </p>
-                <p className="mt-1 text-xs text-slate-600">{item.rincian.join(', ')}</p>
-                <p className="mt-1.5 text-[11px] text-slate-400">
-                  {item.metode === 'TRANSFER'
-                    ? item.bank
-                      ? `Transfer • ${item.bank}`
-                      : 'Transfer bank'
-                    : 'QRIS'}
-                  {' • '}Diajukan {formatTanggalId(item.createdAt)}
-                </p>
-
-                {item.status === 'ditolak' && item.rejectReason && (
-                  <p className="mt-2.5 rounded-xl bg-rose-50 border border-rose-200 px-3.5 py-2.5 text-xs leading-relaxed text-rose-800">
-                    <span className="font-bold">Alasan ditolak:</span> {item.rejectReason}
-                  </p>
-                )}
-
-                {item.status === 'menunggu_konfirmasi' && !item.buktiUrl && (
-                  <p className="mt-2.5 rounded-xl bg-amber-50 border border-amber-200 px-3.5 py-2.5 text-xs leading-relaxed text-amber-800">
-                    Bukti pembayaran belum diunggah. Petugas baru bisa memeriksa setelah bukti dikirim.
-                  </p>
-                )}
-
-                {(bisaUpload || bisaBatal) && (
-                  <div className="mt-3.5 space-y-2.5">
-                    {bisaUpload && uploadFor === item.id ? (
-                      <UploadBukti
-                        submissionId={item.id}
-                        buttonLabel={
-                          item.status === 'ditolak' ? 'Kirim Ulang Bukti' : 'Kirim Bukti Pembayaran'
-                        }
-                        onDone={() => {
-                          setUploadFor(null)
-                          router.refresh()
-                        }}
-                      />
-                    ) : (
-                      <div className="flex gap-2">
-                        {bisaUpload && (
-                          <button
-                            onClick={() => setUploadFor(item.id)}
-                            className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 py-2.5 text-xs font-semibold text-white active:scale-[0.98] transition shadow-xs"
-                          >
-                            {item.status === 'ditolak' ? 'Upload Ulang Bukti' : 'Upload Bukti'}
-                          </button>
-                        )}
-                        {bisaBatal && (
-                          <button
-                            onClick={() => handleCancelLegacy(item.id)}
-                            disabled={cancelling === item.id}
-                            className="flex-1 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 py-2.5 text-xs font-semibold text-rose-700 active:scale-[0.98] transition disabled:opacity-60 flex items-center justify-center gap-1.5"
-                          >
-                            {cancelling === item.id && (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            )}
-                            Batalkan
-                          </button>
-                        )}
-                      </div>
-                    )}
+              return (
+                <div key={item.id} className="py-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">
+                      {item.kategori === 'SPP' ? 'SPP Bulanan' : 'Non-SPP'}
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${meta.cls}`}
+                    >
+                      <StatusIcon className="w-3 h-3" />
+                      {meta.label}
+                    </span>
                   </div>
-                )}
-              </div>
-            )
-          })}
+
+                  <p className="text-base font-black font-mono text-slate-900">
+                    {formatRupiah(item.jumlah)}
+                  </p>
+                  <p className="text-xs text-slate-600">{item.rincian.join(', ')}</p>
+                  <p className="text-[11px] text-slate-400">
+                    {item.metode === 'TRANSFER'
+                      ? item.bank
+                        ? `Transfer · ${item.bank}`
+                        : 'Transfer bank'
+                      : 'QRIS'}
+                    {' · '}Diajukan {formatTanggalId(item.createdAt)}
+                  </p>
+
+                  {item.status === 'ditolak' && item.rejectReason && (
+                    <p className="rounded-xl bg-rose-50 p-2.5 text-xs text-rose-800">
+                      <span className="font-bold">Alasan:</span> {item.rejectReason}
+                    </p>
+                  )}
+
+                  {item.status === 'menunggu_konfirmasi' && !item.buktiUrl && (
+                    <p className="rounded-xl bg-amber-50 p-2.5 text-xs text-amber-800">
+                      Bukti transfer belum diunggah.
+                    </p>
+                  )}
+
+                  {(bisaUpload || bisaBatal) && (
+                    <div className="pt-1">
+                      {bisaUpload && uploadFor === item.id ? (
+                        <UploadBukti
+                          submissionId={item.id}
+                          buttonLabel={
+                            item.status === 'ditolak' ? 'Kirim Ulang Bukti' : 'Kirim Bukti Pembayaran'
+                          }
+                          onDone={() => {
+                            setUploadFor(null)
+                            router.refresh()
+                          }}
+                        />
+                      ) : (
+                        <div className="flex gap-2">
+                          {bisaUpload && (
+                            <button
+                              type="button"
+                              onClick={() => setUploadFor(item.id)}
+                              className="flex-1 rounded-xl bg-[#064e3b] hover:bg-[#047857] py-2 text-xs font-bold text-[#bef264] active:scale-95 transition cursor-pointer"
+                            >
+                              {item.status === 'ditolak' ? 'Upload Ulang Bukti' : 'Upload Bukti'}
+                            </button>
+                          )}
+                          {bisaBatal && (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelLegacy(item.id)}
+                              disabled={cancelling === item.id}
+                              className="flex-1 rounded-xl bg-rose-50 hover:bg-rose-100 py-2 text-xs font-bold text-rose-700 disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition"
+                            >
+                              {cancelling === item.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                              Batalkan
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
-      {/* Modal Kuitansi Resmi */}
+      {/* 4. Modal Kuitansi Resmi Sah Pesantren */}
       {selectedReceipt && (
         <ReceiptModal
           item={selectedReceipt}

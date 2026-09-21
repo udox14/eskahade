@@ -11,14 +11,12 @@ import {
   X,
   ArrowRight,
   Loader2,
-  AlertTriangle,
-  Calendar,
-  Sparkles,
+  AlertCircle,
+  Building2,
 } from 'lucide-react'
 import type {
   PortalStudentBillingData,
   PortalCheckoutResponse,
-  PortalObligationItem,
 } from '@/lib/portal/finance'
 import { createPortalCheckoutAction } from './actions'
 
@@ -31,12 +29,15 @@ interface TagihanClientProps {
   billingData: PortalStudentBillingData
 }
 
-type PeriodFilterTab = 'ALL' | 'PAST' | 'CURRENT' | 'UPCOMING' | 'ANNUAL'
-
 export function TagihanClient({ billingData }: TagihanClientProps) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<PeriodFilterTab>('ALL')
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
+    // Default: pilih seluruh tagihan yang perlu segera dibayar (tunggakan) dan bulan ini
+    const initial = new Set<string>()
+    billingData.obligations.past.forEach(ob => initial.add(ob.id))
+    billingData.obligations.current.forEach(ob => initial.add(ob.id))
+    return initial
+  })
 
   // USPP (Cicilan)
   const [usppAmount, setUsppAmount] = useState<number>(
@@ -67,15 +68,16 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
   const [copied, setCopied] = useState<boolean>(false)
 
-  // Ambil semua daftar kewajiban
-  const allObligations = useMemo(() => {
+  // Daftar seluruh kewajiban standar yang aktif (past, current, annual)
+  // CATATAN: upcoming/bayar di muka sengaja TIDAK diikutkan di portal ortu sesuai aturan.
+  const activeObligations = useMemo(() => {
     return [
-      ...billingData.obligations.monthly,
+      ...billingData.obligations.past,
+      ...billingData.obligations.current,
       ...billingData.obligations.annual,
     ]
   }, [billingData.obligations])
 
-  // Toggle selection kewajiban biasa
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds)
     if (next.has(id)) {
@@ -86,25 +88,15 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
     setSelectedIds(next)
   }
 
-  // Pilih semua item dalam kelompok tertentu
-  const selectGroup = (items: PortalObligationItem[]) => {
+  const selectAllActive = () => {
+    const allSelected = activeObligations.every(ob => selectedIds.has(ob.id))
     const next = new Set(selectedIds)
-    const allGroupSelected = items.every(it => next.has(it.id))
-    if (allGroupSelected) {
-      items.forEach(it => next.delete(it.id))
+    if (allSelected) {
+      activeObligations.forEach(ob => next.delete(ob.id))
     } else {
-      items.forEach(it => next.add(it.id))
+      activeObligations.forEach(ob => next.add(ob.id))
     }
     setSelectedIds(next)
-  }
-
-  // Pilih semua / batal pilih semua
-  const selectAll = () => {
-    if (selectedIds.size === allObligations.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(allObligations.map(o => o.id)))
-    }
   }
 
   // Hitung subtotal & total
@@ -115,25 +107,17 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
       period?: string | null
       label: string
       periodLabel: string
-      periodType?: 'PAST' | 'CURRENT' | 'UPCOMING'
       amount: number
     }> = []
 
-    let countPast = 0
-    let countUpcoming = 0
-
-    for (const ob of allObligations) {
+    for (const ob of activeObligations) {
       if (selectedIds.has(ob.id)) {
-        if (ob.periodType === 'PAST') countPast++
-        if (ob.periodType === 'UPCOMING') countUpcoming++
-
         items.push({
           obligationId: ob.id,
           itemType: ob.itemType,
           period: ob.period,
           label: ob.itemLabel,
           periodLabel: ob.periodLabel,
-          periodType: ob.periodType,
           amount: ob.remaining,
         })
       }
@@ -143,7 +127,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
       items.push({
         obligationId: billingData.obligations.uspp.id,
         itemType: 'USPP',
-        label: 'Cicilan USPP / Bangunan',
+        label: 'Cicilan USPP / Uang Bangunan',
         periodLabel: 'Sekali Masuk',
         amount: Math.min(usppAmount, billingData.obligations.uspp.remaining),
       })
@@ -166,14 +150,12 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
     return {
       items,
       count: items.length,
-      countPast,
-      countUpcoming,
       grossAmount,
       gatewayFee,
       totalCharged,
     }
   }, [
-    allObligations,
+    activeObligations,
     selectedIds,
     isUsppSelected,
     usppAmount,
@@ -183,18 +165,16 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
     paymentMethod,
   ])
 
-  // Salin nomor VA
   const handleCopyVa = (vaText: string) => {
     navigator.clipboard.writeText(vaText)
     setCopied(true)
-    toast.success('Nomor Virtual Account disalin ke clipboard!')
+    toast.success('Nomor Virtual Account disalin!')
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // Handle Checkout submission
   const handleProceedCheckout = async () => {
     if (selectedItemsSummary.count === 0) {
-      toast.error('Pilih minimal satu item tagihan atau masukkan top-up uang jajan.')
+      toast.error('Pilih minimal satu tagihan untuk melanjutkan.')
       return
     }
 
@@ -234,250 +214,146 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
 
   const pastObligations = billingData.obligations.past
   const currentObligations = billingData.obligations.current
-  const upcomingObligations = billingData.obligations.upcoming
   const annualObligations = billingData.obligations.annual
 
-  const pastAllSelected =
-    pastObligations.length > 0 && pastObligations.every(it => selectedIds.has(it.id))
+  const allActiveSelected =
+    activeObligations.length > 0 && activeObligations.every(it => selectedIds.has(it.id))
+
+  const isSelectionActive = selectedItemsSummary.count > 0
 
   return (
-    <div className="space-y-4 pb-44">
-      {/* 1. Header Identitas & Dompet Uang Jajan */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* Ringkasan Santri */}
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Profil Santri
-          </span>
-          <h2 className="portal-display mt-0.5 text-xl font-bold text-slate-900">
-            {billingData.santri.nama}
-          </h2>
-          <p className="mt-1 text-xs text-slate-500 font-medium">
-            NIS: {billingData.santri.nis}
-            {billingData.santri.asrama ? ` · Asrama ${billingData.santri.asrama}` : ''}
-            {billingData.santri.kamar ? ` (Kamar ${billingData.santri.kamar})` : ''}
-          </p>
-          <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs text-slate-600">
-            <span>Katering: {billingData.santri.tempatMakan || '—'}</span>
-            <span>Laundry: {billingData.santri.tempatMencuci || '—'}</span>
-          </div>
-        </div>
-
-        {/* Status Dompet & Fixed VA */}
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col justify-between">
+    <div className="space-y-6">
+      {/* 1. TOP FEATURE SURFACE: HERO TOTAL / STATUS PEMILIHAN (Color-Blocked Surface) */}
+      <div className="rounded-[22px] bg-[#064e3b] p-5 text-white shadow-[0_8px_24px_rgba(6,78,59,0.16)] relative overflow-hidden">
+        <div className="absolute -right-6 -bottom-6 w-28 h-28 rounded-full bg-emerald-500/15 blur-xl pointer-events-none" />
+        <div className="relative z-10 space-y-3">
           <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Saldo Uang Jajan (Titipan)
-              </span>
-              <p className="portal-display text-2xl font-bold text-slate-900 font-mono">
-                {formatRupiah(billingData.wallet.balance)}
-              </p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Limit harian: {formatRupiah(billingData.wallet.effectiveDailyLimit)}
-              </p>
-            </div>
-            {billingData.fixedVa && (
+            <span className="text-xs font-bold uppercase tracking-wider text-[#bef264]">
+              {isSelectionActive ? 'Total Dipilih' : 'Yang Perlu Dibayar'}
+            </span>
+            {activeObligations.length > 0 && (
               <button
                 type="button"
-                onClick={() => handleCopyVa(billingData.fixedVa!.vaNumber)}
-                className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 shadow-2xs hover:bg-emerald-100 cursor-pointer"
+                onClick={selectAllActive}
+                className="text-xs font-bold text-white/90 hover:text-white bg-white/15 hover:bg-white/20 px-2.5 py-1 rounded-lg transition active:scale-95 cursor-pointer"
               >
-                {copied ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                <span>{copied ? 'Tersalin' : 'Salin VA'}</span>
+                {allActiveSelected ? 'Batal Semua' : 'Pilih Semua'}
               </button>
             )}
           </div>
-          <p className="mt-3 border-t border-slate-100 pt-2 text-xs text-slate-500">
-            Nomor VA santri permanen dapat disimpan di m-Banking Anda.
-          </p>
+
+          <div className="space-y-0.5">
+            <p className="text-3xl font-black font-mono tracking-tight text-white">
+              {formatRupiah(isSelectionActive ? selectedItemsSummary.totalCharged : billingData.obligations.totalRemaining)}
+            </p>
+            <p className="text-xs text-emerald-100/80 font-medium">
+              {isSelectionActive
+                ? `${selectedItemsSummary.count} item dipilih untuk dibayar`
+                : billingData.obligations.totalRemaining > 0
+                ? `${activeObligations.length} tagihan aktif menunggu penyelesaian`
+                : 'Alhamdulillah, seluruh tagihan telah lunas'}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* 2. Banner Pesanan Menunggu Pembayaran (Jika Ada) */}
+      {/* 2. BANNER PESANAN MENUNGGU PEMBAYARAN (Jika Ada) */}
       {billingData.pendingOrders.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-4 shadow-xs">
-          <div className="flex items-start gap-3">
-            <Clock className="h-5 w-5 text-amber-700 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h4 className="text-sm font-bold text-amber-900">
-                Ada {billingData.pendingOrders.length} Pesanan Menunggu Pembayaran
-              </h4>
-              <p className="mt-0.5 text-xs text-amber-800">
-                Pesanan #{billingData.pendingOrders[0].orderNumber} sebesar{' '}
-                <strong className="font-bold">{formatRupiah(billingData.pendingOrders[0].totalCharged)}</strong>.
-              </p>
-              <div className="mt-2.5 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const po = billingData.pendingOrders[0]
-                    setCheckoutResult({
-                      success: true,
-                      order: {
-                        id: po.id,
-                        orderNumber: po.orderNumber,
-                        grossAmount: po.grossAmount,
-                        gatewayFee: po.gatewayFee,
-                        totalCharged: po.totalCharged,
-                        paymentMethod: po.paymentMethod,
-                        expiresAt: po.expiresAt,
-                        fixedVaNumber: billingData.fixedVa?.vaNumber || null,
-                      },
-                      checkout: {
-                        vaNumber: billingData.fixedVa?.vaNumber || null,
-                        instructions: [
-                          'Selesaikan pembayaran sebelum batas waktu berakhir.',
-                          'Transfer sesuai nominal yang tertera agar terverifikasi otomatis.',
-                        ],
-                      },
-                    })
-                    setIsModalOpen(true)
-                  }}
-                  className="rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800 transition-colors cursor-pointer"
-                >
-                  Lihat Petunjuk Bayar
-                </button>
+        <div className="rounded-[20px] bg-amber-500/10 p-4 border border-amber-500/20 space-y-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
+                <Clock className="w-4 h-4 text-amber-700 shrink-0" />
+                <span>Pesanan Menunggu Pembayaran</span>
               </div>
+              <p className="text-base font-black font-mono text-amber-950">
+                {formatRupiah(billingData.pendingOrders[0].totalCharged)}
+              </p>
+              <p className="text-[11px] text-amber-800 truncate">
+                No. Pesanan: #{billingData.pendingOrders[0].orderNumber}
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                const po = billingData.pendingOrders[0]
+                setCheckoutResult({
+                  success: true,
+                  order: {
+                    id: po.id,
+                    orderNumber: po.orderNumber,
+                    grossAmount: po.grossAmount,
+                    gatewayFee: po.gatewayFee,
+                    totalCharged: po.totalCharged,
+                    paymentMethod: po.paymentMethod,
+                    expiresAt: po.expiresAt,
+                    fixedVaNumber: billingData.fixedVa?.vaNumber || null,
+                  },
+                  checkout: {
+                    vaNumber: billingData.fixedVa?.vaNumber || null,
+                    instructions: [
+                      'Selesaikan pembayaran sebelum batas waktu berakhir.',
+                      'Transfer sesuai nominal yang tertera agar terverifikasi otomatis.',
+                    ],
+                  },
+                })
+                setIsModalOpen(true)
+              }}
+              className="shrink-0 rounded-xl bg-amber-700 px-3 py-2 text-xs font-bold text-white hover:bg-amber-800 transition active:scale-95 cursor-pointer shadow-xs"
+            >
+              Lihat Petunjuk Bayar
+            </button>
           </div>
         </div>
       )}
 
-      {/* 3. Filter Tab Periode Tagihan */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-semibold no-scrollbar">
-        <button
-          type="button"
-          onClick={() => setActiveTab('ALL')}
-          className={`shrink-0 rounded-lg px-3 py-1.5 transition cursor-pointer ${
-            activeTab === 'ALL'
-              ? 'bg-emerald-600 text-white shadow-2xs'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          Semua ({allObligations.length})
-        </button>
-
-        {pastObligations.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('PAST')}
-            className={`shrink-0 rounded-lg px-3 py-1.5 transition flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'PAST'
-                ? 'bg-rose-600 text-white shadow-2xs'
-                : 'bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100'
-            }`}
-          >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Tunggakan ({pastObligations.length})</span>
-          </button>
-        )}
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('CURRENT')}
-          className={`shrink-0 rounded-lg px-3 py-1.5 transition flex items-center gap-1.5 cursor-pointer ${
-            activeTab === 'CURRENT'
-              ? 'bg-emerald-600 text-white shadow-2xs'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <Calendar className="w-3.5 h-3.5" />
-          <span>Bulan Ini ({currentObligations.length})</span>
-        </button>
-
-        {upcomingObligations.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('UPCOMING')}
-            className={`shrink-0 rounded-lg px-3 py-1.5 transition flex items-center gap-1.5 cursor-pointer ${
-              activeTab === 'UPCOMING'
-                ? 'bg-emerald-600 text-white shadow-2xs'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Bayar di Muka ({upcomingObligations.length})</span>
-          </button>
-        )}
-
-        {annualObligations.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('ANNUAL')}
-            className={`shrink-0 rounded-lg px-3 py-1.5 transition cursor-pointer ${
-              activeTab === 'ANNUAL'
-                ? 'bg-emerald-600 text-white shadow-2xs'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            Tahunan ({annualObligations.length})
-          </button>
-        )}
-      </div>
-
-      {/* 4. SEKSI: Tunggakan Periode Sebelumnya (Jika Ada) */}
-      {(activeTab === 'ALL' || activeTab === 'PAST') && pastObligations.length > 0 && (
-        <div className="rounded-xl border border-rose-200/90 bg-rose-50/40 p-4 shadow-xs space-y-3">
-          <div className="flex items-center justify-between border-b border-rose-200/60 pb-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
-                <AlertTriangle className="h-4 w-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-black text-rose-950">
-                  Tunggakan Periode Sebelumnya
-                </h3>
-                <p className="text-[11px] text-rose-700 font-medium">
-                  Kewajiban bulan lalu yang belum diselesaikan. SPP wajib dibayar penuh per periode.
-                </p>
-              </div>
+      {/* 3. GROUP 1: PERLU SEGERA DIBAYAR (Tunggakan Periode Sebelumnya) */}
+      {pastObligations.length > 0 && (
+        <div className="space-y-2 pt-1">
+          <div className="flex items-center gap-2 pb-1">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-rose-950">
+                Perlu Segera Dibayar
+              </h2>
+              <p className="text-[11px] text-rose-700">
+                Kewajiban periode sebelumnya yang belum diselesaikan.
+              </p>
             </div>
-            <button
-              onClick={() => selectGroup(pastObligations)}
-              className="text-xs font-bold text-rose-700 hover:text-rose-900 underline"
-            >
-              {pastAllSelected ? 'Batal Pilih' : 'Pilih Semua'}
-            </button>
           </div>
 
-          <div className="divide-y divide-rose-100">
+          <div className="divide-y divide-rose-100/80 rounded-2xl bg-rose-50/50 p-2">
             {pastObligations.map(ob => {
               const isChecked = selectedIds.has(ob.id)
               return (
                 <label
                   key={ob.id}
-                  className={`flex cursor-pointer items-center justify-between py-3 px-2.5 rounded-xl transition-colors ${
-                    isChecked ? 'bg-rose-100/60' : 'hover:bg-rose-50'
+                  className={`flex min-h-[54px] cursor-pointer items-center justify-between py-3 px-3 rounded-xl transition active:bg-rose-100/60 ${
+                    isChecked ? 'bg-rose-100/50' : 'hover:bg-rose-100/20'
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 pr-2">
                     <input
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => toggleSelect(ob.id)}
-                      className="h-4 w-4 rounded border-rose-300 text-rose-600 focus:ring-rose-500"
+                      className="h-5 w-5 rounded-md border-rose-300 text-rose-600 focus:ring-rose-500 cursor-pointer shrink-0"
                     />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-slate-900 truncate">
-                          {ob.itemLabel}
-                        </p>
-                        <span className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
-                          {ob.periodLabel}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        Periode: {ob.periodLabel}
+                      <p className="text-sm font-bold text-slate-900 truncate">
+                        {ob.itemLabel}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">
+                        {ob.periodLabel}
                         {ob.providerName && ` · ${ob.providerName}`}
                       </p>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-black text-rose-900">
+                    <p className="text-sm font-black text-rose-900 font-mono">
                       {formatRupiah(ob.remaining)}
                     </p>
-                    <p className="text-[10px] text-rose-600 font-semibold">Tunggakan</p>
+                    <span className="text-[10px] font-bold text-rose-700">Belum dibayar</span>
                   </div>
                 </label>
               )
@@ -486,135 +362,45 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
         </div>
       )}
 
-      {/* 5. SEKSI: Periode Berjalan (Bulan Ini) */}
-      {(activeTab === 'ALL' || activeTab === 'CURRENT') && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-emerald-700" />
-                <h3 className="text-sm font-bold text-slate-900">Tagihan Bulan Ini</h3>
-              </div>
-              <p className="text-xs text-slate-500">
-                Kewajiban rutin untuk periode berjalan.
-              </p>
-            </div>
-            {activeTab === 'ALL' && (
-              <button
-                type="button"
-                onClick={selectAll}
-                className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer"
-              >
-                {selectedIds.size === allObligations.length ? 'Batal Semua' : 'Pilih Semua'}
-              </button>
-            )}
-          </div>
-
-          <div className="mt-3 divide-y divide-slate-100">
-            {currentObligations.length === 0 ? (
-              <div className="py-6 text-center text-xs text-slate-400">
-                Alhamdulillah, seluruh tagihan bulan ini sudah lunas.
-              </div>
-            ) : (
-              currentObligations.map(ob => {
-                const isChecked = selectedIds.has(ob.id)
-                return (
-                  <label
-                    key={ob.id}
-                    className={`flex cursor-pointer items-center justify-between py-2.5 px-2 rounded-lg transition-colors ${
-                      isChecked ? 'bg-emerald-50/50' : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleSelect(ob.id)}
-                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-slate-900 truncate">
-                            {ob.itemLabel}
-                          </p>
-                          <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                            Bulan Ini
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500">
-                          Periode: {ob.periodLabel}
-                          {ob.providerName && ` · ${ob.providerName}`}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-slate-900 font-mono">
-                        {formatRupiah(ob.remaining)}
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-medium">Lunas penuh</p>
-                    </div>
-                  </label>
-                )
-              })
-            )}
-          </div>
+      {/* 4. GROUP 2: BULAN INI (FLAT LIST, Tanpa Outer Card Pembungkus) */}
+      <div className="space-y-2 pt-1">
+        <div className="pb-1">
+          <h2 className="text-sm font-bold text-slate-900">
+            Bulan ini
+          </h2>
+          <p className="text-xs text-slate-500">
+            Kewajiban rutin untuk periode berjalan.
+          </p>
         </div>
-      )}
 
-      {/* 6. SEKSI: Bayar di Muka (Periode Mendatang) */}
-      {(activeTab === 'ALL' || activeTab === 'UPCOMING') && upcomingObligations.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  Bayar di Muka (Periode Mendatang)
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Anda dapat melunasi SPP bulan mendatang lebih awal.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => selectGroup(upcomingObligations)}
-              className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer"
-            >
-              {upcomingObligations.every(it => selectedIds.has(it.id)) ? 'Batal Pilih' : 'Pilih Semua'}
-            </button>
+        {currentObligations.length === 0 ? (
+          <div className="py-4 text-center text-xs text-slate-400">
+            Alhamdulillah, seluruh tagihan bulan ini sudah lunas.
           </div>
-
+        ) : (
           <div className="divide-y divide-slate-100">
-            {upcomingObligations.map(ob => {
+            {currentObligations.map(ob => {
               const isChecked = selectedIds.has(ob.id)
               return (
                 <label
                   key={ob.id}
-                  className={`flex cursor-pointer items-center justify-between py-2.5 px-2 rounded-lg transition-colors ${
-                    isChecked ? 'bg-slate-100/70' : 'hover:bg-slate-50'
+                  className={`flex min-h-[54px] cursor-pointer items-center justify-between py-3 px-2 rounded-xl transition active:bg-slate-100 ${
+                    isChecked ? 'bg-emerald-50/50' : 'hover:bg-slate-50'
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 pr-2">
                     <input
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => toggleSelect(ob.id)}
-                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      className="h-5 w-5 rounded-md border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
                     />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-slate-900 truncate">
-                          {ob.itemLabel}
-                        </p>
-                        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
-                          {ob.periodLabel}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500">
-                        Periode: {ob.periodLabel}
+                      <p className="text-sm font-semibold text-slate-900 truncate">
+                        {ob.itemLabel}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">
+                        {ob.periodLabel}
                         {ob.providerName && ` · ${ob.providerName}`}
                       </p>
                     </div>
@@ -623,43 +409,47 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
                     <p className="text-sm font-bold text-slate-900 font-mono">
                       {formatRupiah(ob.remaining)}
                     </p>
-                    <p className="text-[10px] text-slate-500 font-medium">Bayar di Muka</p>
                   </div>
                 </label>
               )
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* 7. SEKSI: Iuran Tahunan */}
-      {(activeTab === 'ALL' || activeTab === 'ANNUAL') && annualObligations.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-          <div className="border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-900">Iuran Tahunan</h3>
-            <p className="text-xs text-slate-500">Evaluasi Belajar, Ekstrakurikuler, dan Kesehatan.</p>
+      {/* 5. GROUP 3: TAGIHAN LAINNYA (Iuran Tahunan & USPP) */}
+      {(annualObligations.length > 0 || billingData.obligations.uspp) && (
+        <div className="space-y-2 pt-2 border-t border-slate-100">
+          <div className="pb-1">
+            <h2 className="text-sm font-bold text-slate-900">
+              Tagihan lainnya
+            </h2>
+            <p className="text-xs text-slate-500">
+              Iuran tahunan dan dana pembangunan pesantren.
+            </p>
           </div>
 
-          <div className="mt-3 divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100">
+            {/* Iuran Tahunan */}
             {annualObligations.map(ob => {
               const isChecked = selectedIds.has(ob.id)
               return (
                 <label
                   key={ob.id}
-                  className={`flex cursor-pointer items-center justify-between py-2.5 px-2 rounded-lg transition-colors ${
-                    isChecked ? 'bg-slate-100/70' : 'hover:bg-slate-50'
+                  className={`flex min-h-[54px] cursor-pointer items-center justify-between py-3 px-2 rounded-xl transition active:bg-slate-100 ${
+                    isChecked ? 'bg-slate-100/60' : 'hover:bg-slate-50'
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 pr-2">
                     <input
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => toggleSelect(ob.id)}
-                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      className="h-5 w-5 rounded-md border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
                     />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-900 truncate">{ob.itemLabel}</p>
-                      <p className="text-xs text-slate-500">{ob.periodLabel}</p>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">{ob.periodLabel}</p>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
@@ -668,249 +458,206 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
                 </label>
               )
             })}
+
+            {/* USPP / Uang Bangunan */}
+            {billingData.obligations.uspp && (
+              <div className="py-3 px-2 space-y-3">
+                <label className="flex min-h-[44px] cursor-pointer items-center justify-between">
+                  <div className="flex items-center gap-3 min-w-0 pr-2">
+                    <input
+                      type="checkbox"
+                      checked={isUsppSelected}
+                      onChange={e => setIsUsppSelected(e.target.checked)}
+                      className="h-5 w-5 rounded-md border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <Building2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                        <p className="text-sm font-bold text-slate-900 truncate">Cicilan USPP / Uang Bangunan</p>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5 truncate">
+                        Sisa kewajiban: {formatRupiah(billingData.obligations.uspp.remaining)}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold text-emerald-700 shrink-0">
+                    {isUsppSelected ? 'Dipilih' : 'Ikutkan'}
+                  </span>
+                </label>
+
+                {isUsppSelected && (
+                  <div className="rounded-2xl bg-slate-50 p-3 space-y-2 border border-slate-100">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Nominal Cicilan yang Ingin Dibayar:
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={10000}
+                        max={billingData.obligations.uspp.remaining}
+                        step={50000}
+                        value={usppAmount || ''}
+                        onChange={e => setUsppAmount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                        className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold font-mono text-slate-900 shadow-2xs focus:border-emerald-500 focus:outline-hidden"
+                        placeholder="Besar cicilan"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setUsppAmount(billingData.obligations.uspp!.remaining)}
+                        className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer active:scale-95 transition"
+                      >
+                        Lunas Penuh
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* 8. SEKSI: USPP / Uang Bangunan (Mendukung Cicilan Parsial) */}
-      {(activeTab === 'ALL' || activeTab === 'ANNUAL') && billingData.obligations.uspp && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900">USPP / Uang Bangunan</h3>
-                <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                  Boleh Dicicil
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">Dibayar sekali selama mondok. Bebas menentukan besar cicilan.</p>
-            </div>
-            <label className="flex items-center gap-2 text-xs font-semibold text-emerald-700 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isUsppSelected}
-                onChange={e => setIsUsppSelected(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span>Ikutkan USPP</span>
-            </label>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-              <span className="text-slate-500 font-medium">Total Beban</span>
-              <p className="mt-0.5 font-bold text-slate-900 font-mono">
-                {formatRupiah(billingData.obligations.uspp.amountExpected)}
-              </p>
-            </div>
-            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-              <span className="text-slate-500 font-medium">Sudah Terbayar</span>
-              <p className="mt-0.5 font-bold text-emerald-700 font-mono">
-                {formatRupiah(billingData.obligations.uspp.amountPaid)}
-              </p>
-            </div>
-            <div className="col-span-2 sm:col-span-1 rounded-lg border border-slate-100 bg-slate-50 p-3">
-              <span className="text-slate-500 font-medium">Sisa Kewajiban</span>
-              <p className="mt-0.5 font-bold text-slate-900 font-mono">
-                {formatRupiah(billingData.obligations.uspp.remaining)}
-              </p>
-            </div>
-          </div>
-
-          {isUsppSelected && (
-            <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
-              <label className="block text-xs font-semibold text-slate-700">
-                Tentukan Besar Cicilan yang Ingin Dibayar:
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min={10000}
-                  max={billingData.obligations.uspp.remaining}
-                  step={50000}
-                  value={usppAmount || ''}
-                  onChange={e => setUsppAmount(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-900 shadow-2xs focus:border-emerald-500 focus:outline-hidden"
-                  placeholder="Contoh: 500000"
-                />
-                <button
-                  type="button"
-                  onClick={() => setUsppAmount(billingData.obligations.uspp!.remaining)}
-                  className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 cursor-pointer"
-                >
-                  Lunaskan Penuh
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 9. SEKSI: Top-Up Uang Jajan Online */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-emerald-600" />
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Top-Up Uang Jajan</h3>
-              <p className="text-xs text-slate-500">Dana titipan belanja santri di koperasi.</p>
-            </div>
-          </div>
-          <label className="flex items-center gap-2 text-xs font-semibold text-emerald-700 cursor-pointer">
+      {/* 6. GROUP 4: TOP-UP UANG JAJAN (DANA TITIPAN) */}
+      <div className="space-y-3 pt-2 border-t border-slate-100">
+        <label className="flex min-h-[44px] cursor-pointer items-center justify-between px-2 py-1">
+          <div className="flex items-center gap-3">
             <input
               type="checkbox"
               checked={isTopUpSelected}
               onChange={e => setIsTopUpSelected(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              className="h-5 w-5 rounded-md border-slate-300 text-cyan-600 focus:ring-cyan-500 cursor-pointer shrink-0"
             />
-            <span>Tambah Top-Up</span>
-          </label>
-        </div>
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-50 text-cyan-800">
+                <Wallet className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">Tambah Top-Up Uang Jajan</p>
+                <p className="text-xs text-slate-500">Saldo titipan belanja santri di loket.</p>
+              </div>
+            </div>
+          </div>
+          <span className="text-xs font-semibold text-cyan-800">
+            {isTopUpSelected ? 'Dipilih' : 'Tambah'}
+          </span>
+        </label>
 
         {isTopUpSelected && (
-          <div className="mt-4 space-y-3">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="space-y-2.5 rounded-2xl bg-cyan-50/50 p-3.5 border border-cyan-100">
+            <div className="grid grid-cols-4 gap-2">
               {[50000, 100000, 200000, 500000].map(val => (
                 <button
                   key={val}
                   type="button"
                   onClick={() => setTopUpAmount(val)}
-                  className={`rounded-lg border py-2 text-xs font-semibold transition-all cursor-pointer ${
+                  className={`rounded-xl py-2 text-xs font-bold font-mono transition active:scale-95 cursor-pointer ${
                     topUpAmount === val
-                      ? 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-500/30'
-                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+                      ? 'bg-cyan-700 text-white shadow-xs'
+                      : 'bg-white border border-cyan-200/80 text-cyan-900 hover:bg-cyan-100/50'
                   }`}
                 >
                   {formatRupiah(val)}
                 </button>
               ))}
             </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <span className="text-xs font-semibold text-slate-500">Nominal Lain:</span>
-              <div className="relative flex-1">
-                <input
-                  type="number"
-                  min={10000}
-                  step={10000}
-                  value={topUpAmount || ''}
-                  onChange={e => setTopUpAmount(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-900 shadow-2xs focus:border-emerald-500 focus:outline-hidden"
-                  placeholder="Nominal custom"
-                />
-              </div>
-            </div>
+            <input
+              type="number"
+              min={10000}
+              step={10000}
+              value={topUpAmount || ''}
+              onChange={e => setTopUpAmount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold font-mono text-slate-900 shadow-2xs focus:border-cyan-500 focus:outline-hidden"
+              placeholder="Nominal custom lainnya"
+            />
           </div>
         )}
       </div>
 
-      {/* 10. Floating Bottom Bar Checkout Summary — Posisi aman di atas BottomNav (P0 Fix) */}
-      {selectedItemsSummary.count > 0 && (
-        <div className="fixed bottom-[calc(58px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-3 pb-2 transition-all portal-rise">
-          <div className="rounded-2xl border border-slate-200/90 bg-white/98 p-3.5 shadow-xl backdrop-blur-md space-y-2.5">
-            {/* Pilihan Metode Bayar & Rincian Periode */}
-            <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-slate-100 pb-2 text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-500 font-medium text-xs">Metode:</span>
-                {isVaEnabled && (
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('DUITKU_VA')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                      paymentMethod === 'DUITKU_VA'
-                        ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    Virtual Account
-                  </button>
-                )}
-                {isQrisEnabled && (
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('DUITKU_QRIS')}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                      paymentMethod === 'DUITKU_QRIS'
-                        ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    QRIS
-                  </button>
-                )}
-                {isVaEnabled && paymentMethod === 'DUITKU_VA' && (
-                  <select
-                    value={vaBank}
-                    onChange={e => setVaBank(e.target.value)}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 cursor-pointer"
-                  >
-                    <option value="BR">BRI</option>
-                    <option value="NC">BNI</option>
-                    <option value="M2">Mandiri</option>
-                    <option value="BT">Permata</option>
-                    <option value="BC">BCA</option>
-                  </select>
-                )}
-              </div>
-
-              {/* Indikator Lintas Periode */}
-              {(selectedItemsSummary.countPast > 0 || selectedItemsSummary.countUpcoming > 0) && (
-                <div className="flex items-center gap-1 text-[10px]">
-                  {selectedItemsSummary.countPast > 0 && (
-                    <span className="rounded-md bg-rose-100 text-rose-800 px-1.5 py-0.5 font-bold">
-                      {selectedItemsSummary.countPast} Tunggakan
-                    </span>
-                  )}
-                  {selectedItemsSummary.countUpcoming > 0 && (
-                    <span className="rounded-md bg-slate-100 text-slate-700 px-1.5 py-0.5 font-bold">
-                      {selectedItemsSummary.countUpcoming} Di Muka
-                    </span>
-                  )}
-                </div>
+      {/* 7. STICKY PAYMENT CTA BAR (Hasil Eksplisit & Native Touch Target) */}
+      <div className="fixed bottom-[calc(60px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-3 pb-2">
+        <div className="rounded-[22px] bg-white/95 backdrop-blur-lg border border-slate-200/70 p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.12)] space-y-2.5">
+          {/* Pemilih Metode Pembayaran */}
+          <div className="flex items-center justify-between text-xs border-b border-slate-100 pb-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-500 font-medium">Metode:</span>
+              {isVaEnabled && (
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('DUITKU_VA')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer active:scale-95 ${
+                    paymentMethod === 'DUITKU_VA'
+                      ? 'bg-[#064e3b] text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Virtual Account
+                </button>
+              )}
+              {isQrisEnabled && (
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('DUITKU_QRIS')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer active:scale-95 ${
+                    paymentMethod === 'DUITKU_QRIS'
+                      ? 'bg-[#064e3b] text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  QRIS
+                </button>
+              )}
+              {isVaEnabled && paymentMethod === 'DUITKU_VA' && (
+                <select
+                  value={vaBank}
+                  onChange={e => setVaBank(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-700 outline-hidden focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="BR">BRI</option>
+                  <option value="NC">BNI</option>
+                  <option value="M2">Mandiri</option>
+                  <option value="BT">Permata</option>
+                  <option value="BC">BCA</option>
+                </select>
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs text-slate-500 font-medium">
-                  {selectedItemsSummary.count} Item Terpilih
-                </p>
-                <p className="text-lg font-bold text-slate-900 font-mono truncate">
-                  {formatRupiah(selectedItemsSummary.grossAmount)}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                disabled={selectedItemsSummary.count === 0 || isCheckingOut}
-                onClick={handleProceedCheckout}
-                className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] transition-all cursor-pointer"
-              >
-                {isCheckingOut ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Memproses...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Lanjut Bayar</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
-              </button>
-            </div>
+            <span className="text-[11px] font-semibold text-slate-500">
+              {selectedItemsSummary.count} item dipilih
+            </span>
           </div>
-        </div>
-      )}
 
-      {/* 11. Modal Instruksi Pembayaran Duitku */}
+          {/* Primary Payment CTA Button */}
+          <button
+            type="button"
+            disabled={selectedItemsSummary.count === 0 || isCheckingOut}
+            onClick={handleProceedCheckout}
+            className="w-full min-h-[48px] flex items-center justify-center gap-2 rounded-xl bg-[#064e3b] hover:bg-[#047857] py-3 text-sm font-bold text-[#bef264] shadow-xs active:scale-[0.98] transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {isCheckingOut ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin text-[#bef264]" />
+                <span>Memproses Pembayaran…</span>
+              </>
+            ) : selectedItemsSummary.count > 0 ? (
+              <>
+                <span>Bayar {formatRupiah(selectedItemsSummary.totalCharged)}</span>
+                <ArrowRight className="h-4 w-4 text-[#bef264]" />
+              </>
+            ) : (
+              <span>Pilih Tagihan Terlebih Dahulu</span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* 8. MODAL INSTRUKSI PEMBAYARAN DUITKU */}
       {isModalOpen && checkoutResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-md rounded-[22px] bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                <h3 className="text-base font-bold text-slate-900">Instruksi Pembayaran</h3>
+                <h3 className="text-base font-bold text-slate-900">Petunjuk Pembayaran</h3>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -924,31 +671,31 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 Total yang Harus Ditransfer
               </p>
-              <p className="text-2xl font-black text-indigo-950">
+              <p className="text-2xl font-black text-slate-900 font-mono">
                 {formatRupiah(checkoutResult.order.totalCharged)}
               </p>
               <p className="text-[11px] text-slate-500">
-                Termasuk biaya transaksi {formatRupiah(checkoutResult.order.gatewayFee)}
+                Termasuk biaya admin {formatRupiah(checkoutResult.order.gatewayFee)}
               </p>
             </div>
 
-            {/* Tampilan Virtual Account */}
+            {/* Virtual Account / Payment Link */}
             {checkoutResult.checkout.vaNumber ? (
-              <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 text-center space-y-2">
-                <span className="text-xs font-bold text-indigo-900">Nomor Virtual Account</span>
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 text-center space-y-2">
+                <span className="text-xs font-bold text-emerald-900">Nomor Virtual Account</span>
                 <div className="flex items-center justify-center gap-2">
-                  <span className="font-mono text-xl font-black text-indigo-950 tracking-wider">
+                  <span className="font-mono text-xl font-black text-emerald-950 tracking-wider">
                     {checkoutResult.checkout.vaNumber}
                   </span>
                   <button
                     onClick={() => handleCopyVa(checkoutResult.checkout.vaNumber!)}
-                    className="rounded-lg bg-white p-1.5 border border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-2xs"
+                    className="rounded-lg bg-white p-1.5 border border-emerald-200 text-emerald-700 hover:bg-emerald-50 shadow-2xs cursor-pointer active:scale-95 transition"
                   >
                     {copied ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                   </button>
                 </div>
-                <p className="text-[11px] text-indigo-700">
-                  Berlaku sampai {new Date(checkoutResult.order.expiresAt).toLocaleString('id-ID')}
+                <p className="text-[11px] text-emerald-700">
+                  Berlaku 24 jam (sampai {new Date(checkoutResult.order.expiresAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB)
                 </p>
               </div>
             ) : checkoutResult.checkout.paymentUrl ? (
@@ -957,22 +704,22 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
                   href={checkoutResult.checkout.paymentUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white shadow-xs hover:bg-indigo-700"
+                  className="inline-flex items-center justify-center w-full rounded-xl bg-[#064e3b] py-3 text-sm font-bold text-[#bef264] shadow-xs hover:bg-[#047857]"
                 >
                   Buka Halaman Pembayaran Duitku
                 </a>
               </div>
             ) : null}
 
-            {/* Petunjuk Transfer */}
-            <div className="text-xs text-slate-600 space-y-1.5 border-t border-slate-100 pt-3">
-              <p className="font-bold text-slate-800">Petunjuk Pembayaran:</p>
+            {/* Petunjuk Pembayaran */}
+            <div className="text-xs text-slate-600 space-y-1 border-t border-slate-100 pt-3">
+              <p className="font-bold text-slate-800">Langkah Pembayaran:</p>
               <ul className="list-disc pl-4 space-y-1 text-slate-500">
-                <li>Buka aplikasi m-Banking atau ATM bank pilihan Anda.</li>
+                <li>Buka aplikasi m-Banking atau ATM bank Anda.</li>
                 <li>Pilih menu Transfer Virtual Account / Bayar Tagihan.</li>
                 <li>Masukkan nomor Virtual Account di atas.</li>
                 <li>Pastikan nominal transfer sama persis dengan total tagihan.</li>
-                <li>Setelah berhasil, sistem akan mengupdate status dalam 1-2 menit.</li>
+                <li>Status pembayaran akan terupdate otomatis dalam 1-2 menit.</li>
               </ul>
             </div>
 
@@ -983,14 +730,14 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
                   setIsModalOpen(false)
                   router.push('/portal-ortu/riwayat')
                 }}
-                className="w-full rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                className="w-full rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer active:scale-95 transition"
               >
                 Lihat di Riwayat
               </button>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="w-full rounded-xl bg-indigo-600 py-2.5 text-xs font-bold text-white hover:bg-indigo-700"
+                className="w-full rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white hover:bg-slate-800 cursor-pointer active:scale-95 transition"
               >
                 Selesai
               </button>

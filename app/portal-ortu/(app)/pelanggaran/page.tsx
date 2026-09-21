@@ -1,15 +1,15 @@
+import Link from 'next/link'
 import { ShieldCheck } from '@phosphor-icons/react/dist/ssr'
 import { requirePortalSessionStrict } from '@/lib/portal/session'
 import { getPelanggaranAnak } from '@/lib/portal/data'
 import { formatTanggalId } from '@/lib/portal/format'
-import { PortalPageHeader } from '../../_components/page-header'
 
 export const dynamic = 'force-dynamic'
 
 const JENIS_STYLE: Record<string, string> = {
-  RINGAN: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20',
-  SEDANG: 'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20',
-  BERAT: 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-600/20',
+  RINGAN: 'bg-amber-100 text-amber-800',
+  SEDANG: 'bg-orange-100 text-orange-800',
+  BERAT: 'bg-rose-100 text-rose-800',
 }
 
 export default async function PelanggaranPage() {
@@ -18,47 +18,54 @@ export default async function PelanggaranPage() {
   const totalPoin = daftar.reduce((sum, p) => sum + p.poin, 0)
 
   return (
-    <div>
-      <PortalPageHeader
-        kicker="Catatan Keamanan"
-        title="Pelanggaran"
-        subtitle="Catatan kedisiplinan dari bagian keamanan pesantren"
-      >
-        <div className="mt-3 flex items-center gap-4 rounded-lg bg-slate-50 border border-slate-200 px-4 py-2.5 shadow-2xs">
-          <div>
-            <p className="text-xl font-bold leading-none text-slate-900">{totalPoin}</p>
-            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Total Poin</p>
-          </div>
-          <div className="w-px h-7 bg-slate-200" />
-          <div>
-            <p className="text-xl font-bold leading-none text-slate-900">{daftar.length}</p>
-            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Catatan</p>
-          </div>
-        </div>
-      </PortalPageHeader>
+    <div className="px-5 pt-5 pb-32 space-y-5">
+      <div>
+        <Link
+          href="/portal-ortu/aktivitas"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 hover:text-emerald-900 transition mb-2"
+        >
+          &larr; Kembali ke Aktivitas
+        </Link>
+        <h1 className="text-xl font-bold tracking-tight text-slate-950">Catatan Kedisiplinan</h1>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Catatan kedisiplinan dan pelanggaran dari bagian keamanan pesantren.
+        </p>
+      </div>
 
-      <div className="px-4 pt-4 sm:px-5 pb-24 space-y-4">
+      {/* Summary surface */}
+      <div className="rounded-[22px] bg-[#064e3b] p-5 text-white shadow-[0_8px_24px_rgba(6,78,59,0.16)] flex items-center justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-[#bef264]">Total Poin</p>
+          <p className="mt-0.5 text-3xl font-black font-mono leading-none text-white">{totalPoin} Poin</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-emerald-200">Jumlah Catatan</p>
+          <p className="text-lg font-bold font-mono text-white mt-0.5">{daftar.length} Catatan</p>
+        </div>
+      </div>
+
+      {/* Flat List */}
+      <div className="space-y-2 pt-1">
+        <h2 className="text-sm font-bold text-slate-900">
+          Daftar Catatan
+        </h2>
+
         {daftar.length === 0 ? (
-          <div className="flex items-center gap-3 rounded-xl bg-emerald-50/70 border border-emerald-200 px-4 py-4 shadow-xs">
-            <ShieldCheck className="w-6 h-6 shrink-0 text-emerald-600" />
+          <div className="flex items-center gap-3 py-4 text-xs text-emerald-800">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-emerald-900">Alhamdulillah, bersih!</p>
-              <p className="mt-0.5 text-xs text-emerald-700">
-                Tidak ada catatan pelanggaran untuk santri ini.
-              </p>
+              <p className="font-bold text-emerald-950">Alhamdulillah, bersih!</p>
+              <p className="text-slate-500">Tidak ada catatan pelanggaran yang tercatat untuk santri ini.</p>
             </div>
           </div>
         ) : (
-          <div className="space-y-2.5">
+          <div className="divide-y divide-slate-100">
             {daftar.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-xs"
-              >
-                <div className="flex items-center justify-between gap-2">
+              <div key={item.id} className="py-3.5 space-y-1">
+                <div className="flex items-center justify-between">
                   <span
-                    className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ${
-                      JENIS_STYLE[String(item.jenis).toUpperCase()] || 'bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-600/20'
+                    className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold ${
+                      JENIS_STYLE[String(item.jenis).toUpperCase()] || 'bg-slate-100 text-slate-700'
                     }`}
                   >
                     {item.jenis}
@@ -68,9 +75,9 @@ export default async function PelanggaranPage() {
                   </span>
                 </div>
                 {item.deskripsi && (
-                  <p className="mt-2 text-xs sm:text-sm leading-relaxed text-slate-700">{item.deskripsi}</p>
+                  <p className="text-xs text-slate-700 leading-relaxed pt-0.5">{item.deskripsi}</p>
                 )}
-                <p className="mt-1.5 text-xs font-semibold text-rose-600">{item.poin} poin</p>
+                <p className="text-xs font-bold text-rose-600 font-mono">+{item.poin} poin</p>
               </div>
             ))}
           </div>

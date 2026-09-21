@@ -2,7 +2,6 @@ import { requirePortalSessionStrict } from '@/lib/portal/session'
 import { getPortalFinancialHistory, getPortalStudentBilling } from '@/lib/portal/finance'
 import { getRiwayatSubmissions } from '@/lib/portal/data'
 import { namaBulanId } from '@/lib/portal/format'
-import { PortalPageHeader } from '../../_components/page-header'
 import { RiwayatClient, type LegacyRiwayatItem } from './_riwayat-client'
 
 export const dynamic = 'force-dynamic'
@@ -63,19 +62,19 @@ export default async function RiwayatPage() {
   }))
 
   return (
-    <div>
-      <PortalPageHeader
-        kicker="Pembayaran"
-        title="Riwayat Transaksi"
-        subtitle="Riwayat pembayaran resmi tagihan, Uang Jajan & kuitansi sah"
-      />
-      <div className="px-4 pt-4 sm:px-5 pb-24 space-y-4">
-        <RiwayatClient
-          history={history}
-          santri={billing.santri}
-          legacyItems={legacyItems}
-        />
+    <div className="px-5 pt-5 pb-32 space-y-4">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-slate-950">Riwayat</h1>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Arsip pembayaran tagihan, uang jajan &amp; kuitansi resmi.
+        </p>
       </div>
+
+      <RiwayatClient
+        history={history}
+        santri={billing.santri}
+        legacyItems={legacyItems}
+      />
     </div>
   )
 }

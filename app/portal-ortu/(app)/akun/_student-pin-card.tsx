@@ -11,6 +11,8 @@ interface StudentPinCardProps {
   isLocked: boolean
   santriNama: string
   nis: string
+  isModal?: boolean
+  onSuccess?: () => void
 }
 
 export function StudentPinCard({
@@ -18,6 +20,8 @@ export function StudentPinCard({
   isLocked,
   santriNama,
   nis,
+  isModal = false,
+  onSuccess,
 }: StudentPinCardProps) {
   const router = useRouter()
   const [passwordPortal, setPasswordPortal] = useState('')
@@ -57,6 +61,7 @@ export function StudentPinCard({
       setPasswordPortal('')
       setPinBaru('')
       setKonfirmasiPin('')
+      onSuccess?.()
       router.refresh()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Gagal mengubah PIN santri.')
@@ -66,20 +71,21 @@ export function StudentPinCard({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-      {/* Header Kartu */}
-      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-            <KeyRound className="h-4 w-4" />
+    <div className={isModal ? 'space-y-4' : 'rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4'}>
+      {/* Header Kartu (hanya ditampilkan jika bukan modal) */}
+      {!isModal && (
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+              <KeyRound className="h-4 w-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">PIN Transaksi Santri (Koperasi)</h3>
+              <p className="text-xs text-slate-500">
+                PIN 6-digit untuk transaksi uang jajan {santriNama} (NIS {nis}).
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900">PIN Transaksi Santri (Koperasi)</h3>
-            <p className="text-xs text-slate-500">
-              PIN 6-digit untuk transaksi uang jajan {santriNama} (NIS {nis}).
-            </p>
-          </div>
-        </div>
 
         {/* Status Badge */}
         <span
@@ -106,6 +112,7 @@ export function StudentPinCard({
           )}
         </span>
       </div>
+      )}
 
       {/* Alert jika terkunci */}
       {isLocked && (

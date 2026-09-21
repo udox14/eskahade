@@ -12,6 +12,8 @@ interface WalletLimitCardProps {
   initialWeekly: number | null
   initialMonthly: number | null
   globalDailyLimit: number
+  isModal?: boolean
+  onSuccess?: () => void
 }
 
 export function WalletLimitCard({
@@ -19,6 +21,8 @@ export function WalletLimitCard({
   initialWeekly,
   initialMonthly,
   globalDailyLimit,
+  isModal = false,
+  onSuccess,
 }: WalletLimitCardProps) {
   const router = useRouter()
   const [daily, setDaily] = useState<string>(initialDaily !== null ? String(initialDaily) : '')
@@ -50,6 +54,7 @@ export function WalletLimitCard({
       }
 
       toast.success('Batas limit uang jajan berhasil diperbarui!')
+      onSuccess?.()
       router.refresh()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Gagal menyimpan limit.')
@@ -59,16 +64,18 @@ export function WalletLimitCard({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-      <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-          <Wallet className="h-4 w-4" />
+    <div className={isModal ? 'space-y-4' : 'rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4'}>
+      {!isModal && (
+        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+            <Wallet className="h-4 w-4" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Limit Penarikan Uang Jajan</h3>
+            <p className="text-xs text-slate-500">Batasi penarikan uang saku santri di loket koperasi.</p>
+          </div>
         </div>
-        <div>
-          <h3 className="text-sm font-semibold text-slate-900">Limit Penarikan Uang Jajan</h3>
-          <p className="text-xs text-slate-500">Batasi penarikan uang saku santri di loket koperasi.</p>
-        </div>
-      </div>
+      )}
 
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
         <div className="flex items-center gap-1.5 font-semibold text-slate-800">
