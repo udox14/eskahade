@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne, execute, generateId, now } from '@/lib/db'
+import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
 import { getSession, hasRole } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
@@ -132,6 +132,7 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[]) {
   if (!daftarVonis || daftarVonis.length === 0) return { error: 'Tidak ada data untuk disimpan' }
 
   const violationsToInsert: any[] = []
+  const statements: { sql: string; params?: unknown[] }[] = []
 
   for (const data of daftarVonis) {
     const { santriId, items, vonis } = data
@@ -147,8 +148,12 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[]) {
         })
         .join(', ')
 
+      const violationId = `absensi-verifikasi:${santriId}:${items
+        .map(item => `${item.absen_id}:${item.sesi}`)
+        .sort()
+        .join('|')}`
       violationsToInsert.push({
-        id:         generateId(),
+        id:         violationId,
         santri_id:  santriId,
         tanggal:    now(),
         jenis:      'ALFA_PENGAJIAN',
@@ -157,36 +162,32 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[]) {
         penindak_id: session?.id ?? null,
       })
 
-      for (const item of items) {
-        await execute(
-          `UPDATE absensi_harian SET ${getVerifColumn(item.sesi)} = 'OK' WHERE id = ?`,
-          [item.absen_id]
-        )
-      }
+      for (const item of items) statements.push({
+        sql: `UPDATE absensi_harian SET ${getVerifColumn(item.sesi)} = 'OK' WHERE id = ?`,
+        params: [item.absen_id],
+      })
     } else if (vonis === 'BELUM') {
-      for (const item of items) {
-        await execute(
-          `UPDATE absensi_harian SET ${getVerifColumn(item.sesi)} = 'BELUM' WHERE id = ?`,
-          [item.absen_id]
-        )
-      }
+      for (const item of items) statements.push({
+        sql: `UPDATE absensi_harian SET ${getVerifColumn(item.sesi)} = 'BELUM' WHERE id = ?`,
+        params: [item.absen_id],
+      })
     } else {
       const newStatus = vonis === 'SAKIT' ? 'S' : vonis === 'IZIN' ? 'I' : 'H'
-      for (const item of items) {
-        await execute(
-          `UPDATE absensi_harian SET ${getSesiColumn(item.sesi)} = ?, ${getVerifColumn(item.sesi)} = NULL WHERE id = ?`,
-          [newStatus, item.absen_id]
-        )
-      }
+      for (const item of items) statements.push({
+        sql: `UPDATE absensi_harian SET ${getSesiColumn(item.sesi)} = ?, ${getVerifColumn(item.sesi)} = NULL WHERE id = ?`,
+        params: [newStatus, item.absen_id],
+      })
     }
   }
 
   for (const v of violationsToInsert) {
-    await execute(`
-      INSERT INTO pelanggaran (id, santri_id, tanggal, jenis, deskripsi, poin, penindak_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [v.id, v.santri_id, v.tanggal, v.jenis, v.deskripsi, v.poin, v.penindak_id])
+    statements.push({
+      sql: `INSERT OR IGNORE INTO pelanggaran (id, santri_id, tanggal, jenis, deskripsi, poin, penindak_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      params: [v.id, v.santri_id, v.tanggal, v.jenis, v.deskripsi, v.poin, v.penindak_id],
+    })
   }
+  await batch(statements)
 
   const alfaCount = daftarVonis.filter((item) => item.vonis === 'ALFA_MURNI').length
   const sakitCount = daftarVonis.filter((item) => item.vonis === 'SAKIT').length

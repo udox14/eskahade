@@ -8,6 +8,7 @@ import {
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { formatVerificationWeek } from '@/lib/absensi/week-period'
 import {
   getFinalVonisQueue,
   simpanFinalVonis,
@@ -275,8 +276,9 @@ export default function FinalVonisPage({
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <label className="block">
-            <span className="text-[10px] font-black uppercase text-slate-400">Tanggal Referensi</span>
+            <span className="text-[10px] font-black uppercase text-slate-400">Pilih Pekan</span>
             <input type="date" value={tanggalRef} onChange={(e) => setTanggalRef(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+            <span className="mt-1 block text-[10px] text-slate-400">Menentukan periode Rabu–Selasa.</span>
           </label>
           <label className="block">
             <span className="text-[10px] font-black uppercase text-slate-400">Status</span>
@@ -306,7 +308,7 @@ export default function FinalVonisPage({
           <span className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-100 px-3 py-2 text-xs font-black text-blue-700"><Users className="w-3.5 h-3.5" /> {rows.length} antrian</span>
           <span className="inline-flex items-center gap-1.5 rounded-xl bg-rose-50 border border-rose-100 px-3 py-2 text-xs font-black text-rose-700"><AlertTriangle className="w-3.5 h-3.5" /> {counts.alfa} alfa</span>
           <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 border border-slate-200 px-3 py-2 text-xs font-black text-slate-700">{counts.mangkir} mangkir</span>
-          {periode && <span className="inline-flex rounded-xl bg-white border border-slate-200 px-3 py-2 text-xs font-bold text-slate-500">{periode.start} s/d {periode.end}</span>}
+          {periode && <span className="inline-flex rounded-xl bg-white border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">{formatVerificationWeek(periode)}</span>}
           {totalDrafts > 0 && <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2 text-xs font-black text-emerald-700"><CheckCircle className="w-3.5 h-3.5" /> {totalDrafts} draft</span>}
         </div>
       )}

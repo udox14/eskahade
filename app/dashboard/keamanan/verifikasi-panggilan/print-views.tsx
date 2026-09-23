@@ -2,6 +2,7 @@ import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { Fragment } from 'react'
 import type { AlfaEvent } from './actions'
+import { formatVerificationWeek } from '@/lib/absensi/week-period'
 
 type PrintItem = {
   id: string
@@ -40,7 +41,7 @@ function sessionsFor(item: PrintItem, dateStr: string, source: 'pengajian' | 'be
 export function TempelanAsramaPrintView({ data, tglPanggil }: { data: PrintData; tglPanggil: string }) {
   const asramaList = Object.keys(data.grouped).sort()
   const tglPanggilLabel = formatDate(tglPanggil, 'EEEE, dd MMMM yyyy').toUpperCase()
-  const periodeLabel = `${formatDate(data.periode.start)} s/d ${formatDate(data.periode.end)}`
+  const periodeLabel = formatVerificationWeek(data.periode, true)
 
   return (
     <div className="w-[210mm] text-black font-serif text-sm">
@@ -54,7 +55,7 @@ export function TempelanAsramaPrintView({ data, tglPanggil }: { data: PrintData;
           <div className="text-center mb-6">
             <h2 className="text-base font-bold underline">DAFTAR PEMANGGILAN SANTRI</h2>
             <h3 className="text-sm font-bold uppercase mt-1 bg-gray-200 inline-block px-4 py-1 rounded">ASRAMA: {asrama}</h3>
-            <p className="text-xs font-bold uppercase mt-2">Periode {periodeLabel}</p>
+            <p className="text-sm font-bold uppercase mt-3 border border-black px-4 py-2 inline-block">{periodeLabel}</p>
           </div>
 
           <table className="w-full border-collapse border border-black mb-6 text-xs">
@@ -83,7 +84,7 @@ export function TempelanAsramaPrintView({ data, tglPanggil }: { data: PrintData;
           </table>
 
           <div className="mt-8 border border-black p-4 bg-gray-50/50 break-inside-avoid">
-            <p className="font-bold mb-2 underline">PERHATIAN BAGI SANTRI YANG TERCANTUM DI ATAS:</p>
+            <p className="font-bold mb-2 underline">PELAKSANAAN PEMANGGILAN:</p>
             <p className="text-justify leading-relaxed mb-2">
               Sehubungan dengan ketidakhadiran pada kegiatan pengajian dan/atau shalat berjamaah, maka
               seluruh nama di atas wajib hadir pada:
@@ -105,7 +106,7 @@ export function TempelanAsramaPrintView({ data, tglPanggil }: { data: PrintData;
 
 export function EksekutorLandscapePrintView({ data }: { data: PrintData }) {
   const asramaList = Object.keys(data.grouped).sort()
-  const periodeLabel = `${formatDate(data.periode.start)} s/d ${formatDate(data.periode.end)}`
+  const periodeLabel = formatVerificationWeek(data.periode, true)
 
   return (
     <div className="w-[297mm] text-black font-serif text-[10px]">
@@ -114,7 +115,8 @@ export function EksekutorLandscapePrintView({ data }: { data: PrintData }) {
         <div key={asrama} className="min-h-[210mm] bg-white p-5 break-after-page">
           <div className="text-center border-b-2 border-black pb-2 mb-3">
             <h1 className="text-lg font-bold uppercase">LEMBAR EKSEKUTOR PEMANGGILAN SANTRI</h1>
-            <p className="text-[10px] uppercase">Asrama {asrama} - Periode {periodeLabel}</p>
+            <p className="text-[10px] uppercase">Asrama {asrama}</p>
+            <p className="mt-1 text-[11px] font-bold border border-black px-3 py-1 inline-block">{periodeLabel}</p>
           </div>
 
           <table className="w-full border-collapse border border-black">

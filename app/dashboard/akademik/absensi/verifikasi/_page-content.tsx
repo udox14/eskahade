@@ -14,11 +14,12 @@ import {
 } from './actions'
 import {
   Gavel, CheckCircle, Loader2, AlertTriangle,
-  Save, ChevronLeft, ChevronRight, RefreshCw, Search, Filter, ChevronDown, Users,
+  ChevronLeft, ChevronRight, RefreshCw, Search, Filter, ChevronDown, Users,
   CalendarCheck
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { formatVerificationWeek } from '@/lib/absensi/week-period'
 
 type VonisType = 'ALFA_MURNI' | 'SAKIT' | 'IZIN' | 'KESALAHAN' | 'BELUM'
 type AbsenItem = {
@@ -34,10 +35,11 @@ function fmtTgl(s: string) {
 }
 
 // ── Baris (desktop) / Card (mobile) ──────────────────────────────────────────
-function BarisAbsen({ item, no, vonis, onSelect }: {
+function BarisAbsen({ item, no, vonis, onSelect, disabled = false }: {
   item: AbsenItem; no: number
   vonis: VonisType | undefined
   onSelect: (santriId: string, v: VonisType) => void
+  disabled?: boolean
 }) {
   const terpilih = !!vonis
 
@@ -50,8 +52,8 @@ function BarisAbsen({ item, no, vonis, onSelect }: {
         { v: 'BELUM'      as VonisType, label: 'Mangkir',active: 'bg-slate-700 text-white shadow-sm',   idle: 'text-slate-600 hover:bg-white' },
         { v: 'KESALAHAN'  as VonisType, label: 'Salah',  active: 'bg-violet-600 text-white shadow-sm', idle: 'text-slate-600 hover:bg-white hover:text-violet-600' },
       ].map(({ v, label, active, idle }) => (
-        <button key={v} onClick={() => onSelect(item.santri_id, v)}
-          className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all active:scale-90 ${vonis === v ? active : idle}`}>
+        <button key={v} onClick={() => onSelect(item.santri_id, v)} disabled={disabled}
+          className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all active:scale-90 disabled:opacity-50 disabled:cursor-wait ${vonis === v ? active : idle}`}>
           {label}
         </button>
       )))}
@@ -125,6 +127,8 @@ export default function VerifikasiAbsenPage() {
   const [isSaving, setIsSaving]   = useState(false)
   const [page, setPage]           = useState(1)
   const [searchInput, setSearchInput] = useState('')
+  const [autoSaveError, setAutoSaveError] = useState<string | null>(null)
+  const [retryRevision, setRetryRevision] = useState(0)
   const [search, setSearch]       = useState('')
 
   const [kelasList, setKelasList] = useState<any[]>([])
@@ -180,9 +184,14 @@ export default function VerifikasiAbsenPage() {
   const [isProcessingPeriode, setIsProcessingPeriode] = useState(false)
 
   const loadPeriodeData = useCallback(async () => {
+    if (!selectedDate) {
+      setPeriodeData(null)
+      setLoadingPeriode(false)
+      return
+    }
     setLoadingPeriode(true)
     try {
-      const data = await getStatusVerifikasiPeriode(selectedDate || undefined)
+      const data = await getStatusVerifikasiPeriode(selectedDate)
       setPeriodeData(data)
     } catch {
       // noop
@@ -251,24 +260,40 @@ export default function VerifikasiAbsenPage() {
     }
   }
 
-  const handleSimpan = async () => {
+  const handleSimpan = useCallback(async () => {
     const ids = Object.keys(drafts)
-    if (!ids.length) return
-    if (!await confirm(`Simpan keputusan untuk ${ids.length} santri?`)) return
-    setIsSaving(true)
+    if (!ids.length || isSaving) return
+    const snapshot = { ...drafts }
     const payload = ids.map(id => ({
       santriId: id,
       items:    list.find(i => i.santri_id === id)!.items,
-      vonis:    drafts[id],
+      vonis:    snapshot[id],
     }))
-    const res = await simpanVerifikasiMassal(payload)
-    setIsSaving(false)
-    if (res?.error) { toast.error('Gagal', { description: res.error }); return }
-    toast.success('Tersimpan', { description: `${ids.length} santri berhasil diproses.` })
-    setList(prev => prev.filter(i => !drafts[i.santri_id]))
-    setDrafts({}); setPage(1)
-    await loadPeriodeData()
-  }
+
+    setIsSaving(true)
+    setAutoSaveError(null)
+    try {
+      const res = await simpanVerifikasiMassal(payload)
+      if (res?.error) throw new Error(res.error)
+
+      setList(prev => prev.filter(item => !ids.includes(item.santri_id)))
+      setDrafts(prev => {
+        const next = { ...prev }
+        ids.forEach(id => {
+          if (next[id] === snapshot[id]) delete next[id]
+        })
+        return next
+      })
+      setPage(1)
+      await loadPeriodeData()
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan.'
+      setAutoSaveError(message)
+      setRetryRevision(value => value + 1)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [drafts, isSaving, list, loadPeriodeData])
 
 
   const filtered = list.filter(i => {
@@ -278,6 +303,14 @@ export default function VerifikasiAbsenPage() {
   const totalPages  = Math.ceil(filtered.length / PAGE_SIZE)
   const paged       = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE)
   const totalDrafts = Object.keys(drafts).length
+
+  useEffect(() => {
+    if (!totalDrafts || isSaving) return
+    const timer = window.setTimeout(() => {
+      void handleSimpan()
+    }, 2000)
+    return () => window.clearTimeout(timer)
+  }, [drafts, handleSimpan, isSaving, retryRevision, totalDrafts])
 
   return (
     <div className="max-w-7xl mx-auto pb-32 space-y-6">
@@ -289,7 +322,7 @@ export default function VerifikasiAbsenPage() {
         </div>
         
         <div className="flex items-center gap-3">
-           <button onClick={loadData} disabled={loading}
+           <button onClick={loadData} disabled={loading || totalDrafts > 0 || isSaving}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50 disabled:opacity-60 transition-all shadow-sm">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Segarkan
@@ -311,6 +344,7 @@ export default function VerifikasiAbsenPage() {
                   className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg outline-none appearance-none text-sm text-slate-700 cursor-pointer transition-all hover:border-slate-300"
                   value={selectedMarhalah}
                   onChange={(e) => { setSelectedMarhalah(e.target.value); setSelectedKelas('') }}
+                  disabled={totalDrafts > 0 || isSaving}
                 >
                   <option value="">Semua Marhalah</option>
                   {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
@@ -326,6 +360,7 @@ export default function VerifikasiAbsenPage() {
                   className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg outline-none appearance-none text-sm text-slate-700 cursor-pointer transition-all hover:border-slate-300"
                   value={selectedKelas}
                   onChange={(e) => setSelectedKelas(e.target.value)}
+                  disabled={totalDrafts > 0 || isSaving}
                 >
                   <option value="">Semua Kelas</option>
                   {kelasList
@@ -344,6 +379,7 @@ export default function VerifikasiAbsenPage() {
                   className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg outline-none appearance-none text-sm text-slate-700 cursor-pointer transition-all hover:border-slate-300"
                   value={selectedAsrama}
                   onChange={(e) => setSelectedAsrama(e.target.value)}
+                  disabled={totalDrafts > 0 || isSaving}
                 >
                   <option value="">Semua Asrama</option>
                   {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
@@ -359,7 +395,9 @@ export default function VerifikasiAbsenPage() {
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none text-sm text-slate-700 transition-all hover:border-slate-300"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
+                disabled={totalDrafts > 0 || isSaving}
               />
+              <p className="mt-1 text-[10px] text-slate-400">Tanggal ini menentukan periode Rabu–Selasa.</p>
             </div>
           </div>
 
@@ -384,8 +422,8 @@ export default function VerifikasiAbsenPage() {
               { v: 'SAKIT'      as VonisType, label: 'SAKIT',  cls: 'bg-amber-500 text-white hover:bg-amber-600' },
               { v: 'IZIN'       as VonisType, label: 'IZIN',   cls: 'bg-blue-600 text-white hover:bg-blue-700' },
             ].map(({ v, label, cls }) => (
-              <button key={v} onClick={() => handlePilihSemua(v)}
-                className={`px-5 py-2.5 rounded-lg text-[11px] font-black tracking-widest transition-all active:scale-95 shadow-sm ${cls}`}>
+              <button key={v} onClick={() => handlePilihSemua(v)} disabled={isSaving}
+                className={`px-5 py-2.5 rounded-lg text-[11px] font-black tracking-widest transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-wait ${cls}`}>
                 {label}
               </button>
             )))}
@@ -393,8 +431,16 @@ export default function VerifikasiAbsenPage() {
         </div>
       </div>
 
-      {/* Panel Penyelesaian Verifikasi Periode */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+      {!selectedDate ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3 text-amber-900">
+          <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold">Mode gabungan tiga bulan</p>
+            <p className="text-xs mt-0.5">Daftar dapat memuat beberapa pekan. Pilih satu pekan untuk mencocokkan lembar pemanggilan dan menyelesaikan verifikasi periode.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1">
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -403,7 +449,7 @@ export default function VerifikasiAbsenPage() {
             </h2>
             <p className="text-xs text-slate-500">
               {periodeData
-                ? `Pekan: ${fmtTgl(periodeData.tanggalMulai)} — ${fmtTgl(periodeData.tanggalSelesai)}.`
+                ? `${formatVerificationWeek({ start: periodeData.tanggalMulai, end: periodeData.tanggalSelesai })}.`
                 : 'Memuat data periode...'}
               {' '}Hasil verifikasi yang telah diselesaikan menjadi dasar resmi data kehadiran santri di Portal Orang Tua.
             </p>
@@ -474,7 +520,8 @@ export default function VerifikasiAbsenPage() {
             <span className="font-bold">Alasan dibuka kembali:</span> {periodeData.reopenReason}
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       {loading ? (
@@ -543,7 +590,8 @@ export default function VerifikasiAbsenPage() {
                     <BarisAbsen key={item.santri_id} item={item}
                       no={(page-1)*PAGE_SIZE+i+1}
                       vonis={drafts[item.santri_id]}
-                      onSelect={handleSelect} />
+                      onSelect={handleSelect}
+                      disabled={isSaving} />
                   ))}
                 </tbody>
               </table>
@@ -555,7 +603,8 @@ export default function VerifikasiAbsenPage() {
                 <BarisAbsen key={item.santri_id} item={item}
                   no={-1}
                   vonis={drafts[item.santri_id]}
-                  onSelect={handleSelect} />
+                  onSelect={handleSelect}
+                  disabled={isSaving} />
               ))}
             </div>
 
@@ -596,22 +645,31 @@ export default function VerifikasiAbsenPage() {
         </>
       )}
 
-      {/* Floating save */}
+      {/* Floating autosave status */}
       {totalDrafts > 0 && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-sm px-4 z-50 animate-in slide-in-from-bottom-8 duration-300">
-          <button onClick={handleSimpan} disabled={isSaving}
-            className="w-full bg-slate-900 text-white py-4 px-6 rounded-[2rem] shadow-2xl flex items-center justify-between hover:bg-black hover:scale-[1.02] transition-all active:scale-95 disabled:opacity-60 ring-4 ring-white">
+          <div className={`w-full text-white py-4 px-6 rounded-[2rem] shadow-2xl flex items-center justify-between ring-4 ring-white ${autoSaveError ? 'bg-rose-950' : 'bg-slate-900'}`}>
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center font-black text-slate-900 text-lg">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-lg ${autoSaveError ? 'bg-rose-400 text-rose-950' : 'bg-emerald-500 text-slate-900'}`}>
                 {totalDrafts}
               </div>
               <div className="text-left">
-                <p className="font-black text-sm tracking-tight">SIMPAN PUTUSAN</p>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{totalDrafts} SANTRI SIAP PROSES</p>
+                <p className="font-black text-sm tracking-tight">
+                  {isSaving ? 'MENYIMPAN OTOMATIS' : autoSaveError ? 'GAGAL MENYIMPAN' : 'MENUNGGU AUTOSAVE'}
+                </p>
+                <p className={`text-[10px] font-bold uppercase tracking-widest mt-0.5 ${autoSaveError ? 'text-rose-200' : 'text-slate-400'}`}>
+                  {autoSaveError ? 'MENCOBA LAGI DALAM 2 DETIK' : 'DISIMPAN 2 DETIK SETELAH INPUT TERAKHIR'}
+                </p>
               </div>
             </div>
-            {isSaving ? <Loader2 className="w-6 h-6 animate-spin text-emerald-400" /> : <Save className="w-6 h-6 text-emerald-400" />}
-          </button>
+            {isSaving ? (
+              <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+            ) : autoSaveError ? (
+              <AlertTriangle className="w-6 h-6 text-rose-300" />
+            ) : (
+              <RefreshCw className="w-6 h-6 text-emerald-400" />
+            )}
+          </div>
         </div>
       )}
     </div>

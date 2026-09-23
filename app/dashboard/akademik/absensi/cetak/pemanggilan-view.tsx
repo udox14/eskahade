@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
+import { formatVerificationWeek } from '@/lib/absensi/week-period'
 
 interface PemanggilanProps {
   data: any[];
@@ -10,10 +11,10 @@ interface PemanggilanProps {
 }
 
 export function PemanggilanView({ data, periode, tglPanggil, namaAsrama, isMangkir }: PemanggilanProps) {
-  // Format Tanggal Header
-  const strBulan = format(periode.start, 'MMMM yyyy', { locale: id }).toUpperCase()
-  const strMinggu = `MINGGU KE-${Math.ceil(periode.start.getDate() / 7)}`
-  const strRange = `${format(periode.start, 'dd', { locale: id })} S.D. ${format(periode.end, 'dd MMMM yyyy', { locale: id }).toUpperCase()}`
+  const periodeLabel = formatVerificationWeek({
+    start: format(periode.start, 'yyyy-MM-dd'),
+    end: format(periode.end, 'yyyy-MM-dd'),
+  }, true)
   
   // Format Tanggal Panggil Footer
   const hariPanggil = format(tglPanggil, 'EEEE', { locale: id }).toUpperCase()
@@ -35,9 +36,8 @@ export function PemanggilanView({ data, periode, tglPanggil, namaAsrama, isMangk
         </h2>
         {/* Nama Asrama Ditampilkan Disini */}
         <h3 className="text-sm font-bold uppercase mt-1 bg-gray-200 inline-block px-4 py-1 rounded">ASRAMA: {namaAsrama}</h3>
-        <p className="text-xs font-bold uppercase mt-2">
-          {strMinggu} BULAN {strBulan}<br/>
-          TANGGAL {strRange}
+        <p className="text-sm font-bold uppercase mt-3 border border-black px-4 py-2 inline-block">
+          {periodeLabel}
         </p>
       </div>
 
@@ -78,7 +78,7 @@ export function PemanggilanView({ data, periode, tglPanggil, namaAsrama, isMangk
 
       {/* 4. FOOTER / PEMANGGILAN */}
       <div className="mt-8 border border-black p-4 bg-gray-50/50 break-inside-avoid">
-        <p className="font-bold mb-2 underline">PERHATIAN BAGI SANTRI YANG TERCANTUM DI ATAS:</p>
+        <p className="font-bold mb-2 underline">PELAKSANAAN PEMANGGILAN:</p>
         <p className="text-justify leading-relaxed mb-2">
           Sehubungan dengan ketidakhadiran (Alfa) pada kegiatan pengajian mingguan, maka dengan ini 
           Bagian Keamanan mewajibkan seluruh nama di atas untuk hadir pada:
