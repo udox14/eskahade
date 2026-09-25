@@ -15,6 +15,14 @@ import {
 } from '@/lib/menu/config'
 import type { SidebarGroupConfig } from '@/lib/menu/groups'
 
+function splitMenuLabel(value: string): string[] {
+  const words = value.trim().split(/\s+/).filter(Boolean)
+  if (words.length < 2) return [value]
+  if (words.length === 2) return words
+  if (words.length === 3) return [words[0], words.slice(1).join(' ')]
+  const splitAt = Math.ceil(words.length / 2)
+  return [words.slice(0, splitAt).join(' '), words.slice(splitAt).join(' ')]
+}
 type Props = {
   open: boolean
   items: FiturAkses[]
@@ -124,7 +132,7 @@ export function MobileMenuSheet({ open, items, groups, onClose }: Props) {
             className={'mb-3 flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition duration-200 active:scale-[0.98] motion-reduce:transition-none ' +
               (pathname === '/dashboard' ? 'bg-[#eaf3e9] text-[#12372a]' : 'bg-[#f5f2eb] text-[#34483c] hover:bg-[#eaf3e9]')}
           >
-            <LayoutDashboard className="h-5 w-5" aria-hidden="true" />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#d8e4da] bg-white/80 text-[#247451]"><LayoutDashboard className="h-4 w-4" aria-hidden="true" /></span>
             <span>Dashboard</span>
             {pathname === '/dashboard' && <span className="ml-auto h-2 w-2 rounded-full bg-[#247451]" aria-hidden="true" />}
           </Link>
@@ -159,16 +167,19 @@ export function MobileMenuSheet({ open, items, groups, onClose }: Props) {
                   {groupItems.map(item => {
                     const Icon = getIcon(item.icon)
                     const active = activeHref === item.href
+                    const title = getMenuTitle(item.title)
+                    const titleLines = splitMenuLabel(title)
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
                         onClick={closeMenu}
-                        className={'group flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl px-1.5 py-2 text-center text-sm transition duration-200 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#247451] motion-reduce:transition-none ' +
+                        aria-label={title}
+                        className={'group flex min-h-[88px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl px-1.5 py-2 text-center text-sm transition duration-200 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#247451] motion-reduce:transition-none ' +
                           (active ? 'bg-[#eaf3e9] font-semibold text-[#12372a]' : 'text-[#34483c] hover:-translate-y-0.5 hover:bg-[#f5f2eb]')}
                       >
-                        <Icon className={'h-5 w-5 shrink-0 transition-transform duration-200 group-active:scale-90 ' + (active ? 'text-[#247451]' : 'text-[#66736c]')} aria-hidden="true" />
-                        <span className="line-clamp-2 min-w-0 text-[10px] font-medium leading-tight sm:text-xs">{getMenuTitle(item.title)}</span>
+                        <span className={'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition duration-200 group-active:scale-95 ' + (active ? 'border-[#c9d8ce] bg-white text-[#247451] shadow-sm' : 'border-[#e4ddcf] bg-white/80 text-[#66736c] group-hover:border-[#c9d8ce] group-hover:bg-[#eaf3e9]')}><Icon className="h-5 w-5 transition-transform duration-200 group-active:scale-90" aria-hidden="true" /></span>
+                        <span aria-hidden="true" className="flex min-w-0 max-w-full flex-col items-center text-[10px] font-medium leading-tight sm:text-xs">{titleLines.map((line, index) => <span key={index} className="max-w-full truncate">{line}</span>)}</span>
                       </Link>
                     )
                   })}

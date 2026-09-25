@@ -56,157 +56,42 @@ type ThemeColor = {
   searchFocus: string;
 };
 
-const PASTEL_LIGHT: ThemeColor = {
-  bg: "bg-[#fffdf8]",
-  baseText: "text-[#34483c]",
-  borderBase: "border-[#e4ddcf]",
-  logoText: "text-[#12372a]",
-  toggleBtn: "bg-white border-[#ddd4c3] text-[#66736c] hover:bg-[#eaf3e9] hover:text-[#12372a] hover:border-[#9ab5a2] shadow-sm",
-  glowText: "text-[#247451]",
-  activeText: "text-[#12372a]",
-  activeBg: "bg-[#eaf3e9]",
-  activeBorder: "border-[#9ab5a2]",
-  hoverBg: "hover:bg-[#f5f2eb]",
-  hoverText: "group-hover:text-[#12372a]",
-  mutedText: "text-[#66736c]",
-  folderActiveBg: "bg-[#eaf3e9] border-[#c9d8ce]",
-  folderOpenBg: "border-[#c9d8ce]",
-  indicator: "before:bg-[#247451] before:shadow-none",
+const PASTEL_DARK: ThemeColor = {
+  bg: "bg-[#34463f]",
+  baseText: "text-white",
+  borderBase: "border-white/10",
+  logoText: "text-white",
+  toggleBtn: "bg-white/10 border-white/15 text-white hover:bg-white/20 hover:border-white/30",
+  glowText: "text-white",
+  activeText: "text-white",
+  activeBg: "bg-white/15",
+  activeBorder: "border-white/30",
+  hoverBg: "hover:bg-white/10",
+  hoverText: "group-hover:text-white",
+  mutedText: "text-white/75",
+  folderActiveBg: "bg-white/15 border-white/20",
+  folderOpenBg: "border-white/20",
+  indicator: "before:bg-white before:shadow-none",
   glowBg: "bg-transparent",
-  lineDivider: "before:bg-[#ddd4c3]",
-  footerBg: "bg-[#f7f1e5] border-[#e4ddcf]",
+  lineDivider: "before:bg-white/20",
+  footerBg: "bg-black/10 border-white/10",
   footerGlow: "bg-transparent",
-  themeIcon: "text-[#66736c]",
-  themeActiveBorder: "border-[#247451]",
-  roleBadge: "bg-white/80 text-[#34483c] border border-[#ddd4c3]",
-  roleLabel: "text-[#66736c]",
-  searchBg: "bg-white",
-  searchBorder: "border border-[#ddd4c3]",
-  searchFocus: "focus:bg-white focus:border-[#9ab5a2] focus:ring-1 focus:ring-[#9ab5a2]",
+  themeIcon: "text-white/75",
+  themeActiveBorder: "border-white",
+  roleBadge: "bg-white/10 text-white border border-white/15",
+  roleLabel: "text-white/65",
+  searchBg: "bg-white/10",
+  searchBorder: "border border-white/15",
+  searchFocus: "focus:bg-white/15 focus:border-white/35 focus:ring-1 focus:ring-white/20",
 };
 
 const THEME_COLORS: Record<ThemeKey, ThemeColor> = {
-  light: PASTEL_LIGHT,
-  emerald: {
-    ...PASTEL_LIGHT,
-    bg: "bg-emerald-50",
-    borderBase: "border-emerald-100",
-    logoText: "text-emerald-950",
-    toggleBtn: "bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-950 hover:border-emerald-300 shadow-sm",
-    glowText: "text-emerald-700",
-    activeText: "text-emerald-950",
-    activeBg: "bg-emerald-100",
-    activeBorder: "border-emerald-300",
-    hoverBg: "hover:bg-emerald-100",
-    hoverText: "group-hover:text-emerald-950",
-    mutedText: "text-emerald-800",
-    folderActiveBg: "bg-emerald-100 border-emerald-200",
-    folderOpenBg: "border-emerald-200",
-    indicator: "before:bg-emerald-600 before:shadow-none",
-    lineDivider: "before:bg-emerald-200",
-    footerBg: "bg-emerald-100 border-emerald-200",
-    themeActiveBorder: "border-emerald-600",
-    roleBadge: "bg-white/80 text-emerald-900 border border-emerald-200",
-    roleLabel: "text-emerald-700",
-    searchBorder: "border border-emerald-200",
-    searchFocus: "focus:bg-white focus:border-emerald-400 focus:ring-1 focus:ring-emerald-300",
-  },
-  blue: {
-    ...PASTEL_LIGHT,
-    bg: "bg-sky-50",
-    borderBase: "border-sky-100",
-    logoText: "text-sky-950",
-    toggleBtn: "bg-white border-sky-200 text-sky-700 hover:bg-sky-100 hover:text-sky-950 hover:border-sky-300 shadow-sm",
-    glowText: "text-sky-700",
-    activeText: "text-sky-950",
-    activeBg: "bg-sky-100",
-    activeBorder: "border-sky-300",
-    hoverBg: "hover:bg-sky-100",
-    hoverText: "group-hover:text-sky-950",
-    mutedText: "text-sky-800",
-    folderActiveBg: "bg-sky-100 border-sky-200",
-    folderOpenBg: "border-sky-200",
-    indicator: "before:bg-sky-600 before:shadow-none",
-    lineDivider: "before:bg-sky-200",
-    footerBg: "bg-sky-100 border-sky-200",
-    themeActiveBorder: "border-sky-600",
-    roleBadge: "bg-white/80 text-sky-900 border border-sky-200",
-    roleLabel: "text-sky-700",
-    searchBorder: "border border-sky-200",
-    searchFocus: "focus:bg-white focus:border-sky-400 focus:ring-1 focus:ring-sky-300",
-  },
-  purple: {
-    ...PASTEL_LIGHT,
-    bg: "bg-violet-50",
-    borderBase: "border-violet-100",
-    logoText: "text-violet-950",
-    toggleBtn: "bg-white border-violet-200 text-violet-700 hover:bg-violet-100 hover:text-violet-950 hover:border-violet-300 shadow-sm",
-    glowText: "text-violet-700",
-    activeText: "text-violet-950",
-    activeBg: "bg-violet-100",
-    activeBorder: "border-violet-300",
-    hoverBg: "hover:bg-violet-100",
-    hoverText: "group-hover:text-violet-950",
-    mutedText: "text-violet-800",
-    folderActiveBg: "bg-violet-100 border-violet-200",
-    folderOpenBg: "border-violet-200",
-    indicator: "before:bg-violet-600 before:shadow-none",
-    lineDivider: "before:bg-violet-200",
-    footerBg: "bg-violet-100 border-violet-200",
-    themeActiveBorder: "border-violet-600",
-    roleBadge: "bg-white/80 text-violet-900 border border-violet-200",
-    roleLabel: "text-violet-700",
-    searchBorder: "border border-violet-200",
-    searchFocus: "focus:bg-white focus:border-violet-400 focus:ring-1 focus:ring-violet-300",
-  },
-  rose: {
-    ...PASTEL_LIGHT,
-    bg: "bg-rose-50",
-    borderBase: "border-rose-100",
-    logoText: "text-rose-950",
-    toggleBtn: "bg-white border-rose-200 text-rose-700 hover:bg-rose-100 hover:text-rose-950 hover:border-rose-300 shadow-sm",
-    glowText: "text-rose-700",
-    activeText: "text-rose-950",
-    activeBg: "bg-rose-100",
-    activeBorder: "border-rose-300",
-    hoverBg: "hover:bg-rose-100",
-    hoverText: "group-hover:text-rose-950",
-    mutedText: "text-rose-800",
-    folderActiveBg: "bg-rose-100 border-rose-200",
-    folderOpenBg: "border-rose-200",
-    indicator: "before:bg-rose-600 before:shadow-none",
-    lineDivider: "before:bg-rose-200",
-    footerBg: "bg-rose-100 border-rose-200",
-    themeActiveBorder: "border-rose-600",
-    roleBadge: "bg-white/80 text-rose-900 border border-rose-200",
-    roleLabel: "text-rose-700",
-    searchBorder: "border border-rose-200",
-    searchFocus: "focus:bg-white focus:border-rose-400 focus:ring-1 focus:ring-rose-300",
-  },
-  slate: {
-    ...PASTEL_LIGHT,
-    bg: "bg-slate-50",
-    borderBase: "border-slate-200",
-    logoText: "text-slate-900",
-    toggleBtn: "bg-white border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 hover:border-slate-300 shadow-sm",
-    glowText: "text-slate-700",
-    activeText: "text-slate-900",
-    activeBg: "bg-slate-100",
-    activeBorder: "border-slate-300",
-    hoverBg: "hover:bg-slate-100",
-    hoverText: "group-hover:text-slate-900",
-    mutedText: "text-slate-700",
-    folderActiveBg: "bg-slate-100 border-slate-200",
-    folderOpenBg: "border-slate-200",
-    indicator: "before:bg-slate-600 before:shadow-none",
-    lineDivider: "before:bg-slate-200",
-    footerBg: "bg-slate-100 border-slate-200",
-    themeActiveBorder: "border-slate-600",
-    roleBadge: "bg-white/80 text-slate-800 border border-slate-200",
-    roleLabel: "text-slate-600",
-    searchBorder: "border border-slate-200",
-    searchFocus: "focus:bg-white focus:border-slate-400 focus:ring-1 focus:ring-slate-300",
-  },
+  light: PASTEL_DARK,
+  emerald: { ...PASTEL_DARK, bg: "bg-[#30463b]" },
+  blue: { ...PASTEL_DARK, bg: "bg-[#364552]" },
+  purple: { ...PASTEL_DARK, bg: "bg-[#464052]" },
+  rose: { ...PASTEL_DARK, bg: "bg-[#4a3d42]" },
+  slate: { ...PASTEL_DARK, bg: "bg-[#41454a]" },
 };
 const OPEN_GROUPS_KEY = 'eskahade_sidebar_open_groups';
 
@@ -366,21 +251,21 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
     return (
       <div className={cn("flex flex-col h-full w-full relative transition-colors duration-500", c.baseText, c.bg)}>
 
-        {/* ── LOGO BAR — h-12 sejajar header ── */}
+        {/* ── LOGO BAR — identitas sidebar ── */}
         <div className={cn(
-          "flex items-center justify-center border-b shrink-0 transition-all duration-300 overflow-hidden relative w-full",
+          "flex items-center justify-start border-b shrink-0 transition-all duration-300 overflow-hidden relative w-full",
           c.borderBase,
-          collapsed ? "h-12 px-0 justify-center" : "h-12 gap-2.5 px-4"
+          collapsed ? "h-14 px-0 justify-center" : "h-14 gap-3 px-4"
         )}>
           <div className={cn("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 blur-[24px] rounded-full pointer-events-none transition-colors duration-500", c.glowBg)} />
           {collapsed ? (
-            <img src="/logo.png" alt="Logo" className="w-7 h-7 object-contain drop-shadow-lg relative z-10 hover:scale-105 transition-transform" />
+            <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain relative z-10 hover:scale-105 transition-transform motion-reduce:transition-none" />
           ) : (
             <>
-              <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain drop-shadow-xl relative z-10 shrink-0" />
+              <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain relative z-10 shrink-0 rounded-xl bg-white/10 p-1 border border-white/10" />
               <div className="flex flex-col min-w-0 justify-center relative z-10">
-                <span className={cn("text-[9px] font-semibold uppercase tracking-[0.12em] leading-tight transition-colors duration-300", c.glowText)}>Pondok Pesantren</span>
-                <h1 className={cn("text-[15px] font-black font-serif tracking-wide leading-tight drop-shadow-md", c.logoText)}>SUKAHIDENG</h1>
+                <span className={cn("text-[9px] font-medium uppercase tracking-[0.14em] leading-tight transition-colors duration-300 opacity-75", c.glowText)}>Pondok Pesantren</span>
+                <h1 className={cn("text-[14px] font-bold tracking-[0.08em] leading-tight", c.logoText)}>SUKAHIDENG</h1>
               </div>
             </>
           )}
@@ -397,7 +282,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
 
         {/* ── PINNED: Cari Menu + Item Standalone ── */}
         {!collapsed && (
-          <div className={cn("px-3 py-3 border-b shrink-0", c.borderBase)}>
+          <div className={cn("px-3.5 py-3 border-b shrink-0", c.borderBase)}>
             <div className="relative">
               <MagnifyingGlass className={cn("absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4", c.mutedText)} />
               <input
@@ -406,7 +291,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={cn(
-                  "w-full pl-9 pr-8 py-1.5 text-xs rounded-lg outline-none transition-all duration-300 placeholder:opacity-70",
+                  "w-full min-h-10 pl-9 pr-8 py-2 text-xs rounded-xl outline-none transition-all duration-200 placeholder:text-white/50",
                   c.searchBg,
                   c.baseText,
                   c.searchBorder,
@@ -428,7 +313,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
         )}
 
         {/* ── NAV — grup menu (scrollable) ── */}
-        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-transparent hover:[&::-webkit-scrollbar-thumb]:bg-slate-300 transition-colors pb-10">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-transparent hover:[&::-webkit-scrollbar-thumb]:bg-white/20 transition-colors pb-6">
           {groupedMenu.map(({ group, label, items }) => {
 
             // Item standalone (top-level, tanpa folder)
@@ -443,8 +328,8 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
                       prefetch={true}
                       onClick={mobile ? onMobileClose : undefined}
                       className={cn(
-                        "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl overflow-hidden",
-                        collapsed ? "justify-center p-2.5 mb-1" : "justify-start px-3 py-2 mb-0.5",
+                        "w-full flex items-center transition-all duration-200 group relative outline-none rounded-xl overflow-hidden active:scale-[0.99] motion-reduce:transition-none",
+                        collapsed ? "justify-center p-2.5 mb-1" : "justify-start px-3 py-2.5 mb-0.5",
                         isActive
                           ? `${c.activeBg} ${c.activeText} font-bold border-l-4 ${c.activeBorder}`
                           : `${c.mutedText} ${c.hoverBg} ${c.hoverText} hover:translate-x-1 border-l-4 border-transparent`
@@ -479,10 +364,10 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
                 <button
                   onClick={() => toggleFolder(group)}
                   className={cn(
-                    "w-full flex items-center transition-all duration-300 group relative outline-none rounded-xl",
+                    "w-full flex items-center transition-all duration-200 group relative outline-none rounded-xl active:scale-[0.99] motion-reduce:transition-none",
                     collapsed ? "justify-center p-2.5 mb-1" : "justify-between px-3 py-2 mb-0.5",
                     hasActiveChild && !isOpen && isCollapsed
-                      ? `${c.folderActiveBg} ${c.activeText} shadow-lg border`
+                      ? `${c.folderActiveBg} ${c.activeText} border`
                       : `${c.mutedText} ${c.hoverBg} ${c.hoverText} hover:translate-x-1`,
                     isOpen && !collapsed
                       ? `bg-transparent ${c.activeText} border-l-2 ${c.folderOpenBg}`
@@ -531,7 +416,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
                               prefetch={true}
                               onClick={mobile ? onMobileClose : undefined}
                               className={cn(
-                                "flex items-center pl-6 pr-2 py-1.5 rounded-r-xl text-xs transition-all duration-300 relative group overflow-hidden",
+                                "flex items-center pl-6 pr-2 py-2 rounded-r-xl text-xs transition-all duration-200 relative group overflow-hidden active:scale-[0.99] motion-reduce:transition-none",
                                 isActive
                                   ? `${c.activeText} ${c.activeBg} font-bold before:absolute before:left-1.5 before:top-1/2 before:-translate-y-1/2 before:w-2 before:h-2 before:rounded-full ${c.indicator}`
                                   : `${c.mutedText} ${c.hoverText} ${c.hoverBg} font-medium hover:translate-x-1 before:absolute before:left-[7px] before:top-1/2 before:-translate-y-1/2 before:w-1.5 before:h-1.5 before:bg-current before:opacity-20 before:rounded-full hover:before:opacity-60`
@@ -539,7 +424,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
                             >
                               <ItemIcon className={cn(
                                 "w-3.5 h-3.5 mr-2 flex-shrink-0 transition-all duration-300",
-                                isActive ? `opacity-100 ${c.activeText} scale-110` : "opacity-40 group-hover:opacity-100 group-hover:scale-110"
+                                isActive ? `opacity-100 ${c.activeText} scale-110` : "opacity-70 group-hover:opacity-100 group-hover:scale-105"
                               )} />
                               <span className="truncate">{getMenuTitle(fitur.title)}</span>
                             </Link>
@@ -556,7 +441,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
 
         {/* ── FOOTER: tema + role ── */}
         {!collapsed && (
-          <div className={cn("p-4 border-t shrink-0 backdrop-blur-md relative overflow-hidden", c.footerBg)}>
+          <div className={cn("p-3.5 border-t shrink-0 relative overflow-hidden", c.footerBg)}>
             <div className={cn("absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl pointer-events-none", c.footerGlow)} />
 
             {/* Theme switcher */}
@@ -575,11 +460,11 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
                   )}
                   style={{
                     backgroundColor:
-                      t === 'light'   ? '#e8dfcf' :
-                      t === 'emerald' ? '#d1fae5' :
-                      t === 'blue'    ? '#dbeafe' :
-                      t === 'purple'  ? '#ede9fe' :
-                      t === 'rose'    ? '#ffe4e6' : '#e2e8f0'
+                      t === 'light'   ? '#34463f' :
+                      t === 'emerald' ? '#30463b' :
+                      t === 'blue'    ? '#364552' :
+                      t === 'purple'  ? '#464052' :
+                      t === 'rose'    ? '#4a3d42' : '#41454a'
                   }}
                 />
               ))}
@@ -587,8 +472,8 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
 
             {/* Role badge */}
             <div className="flex flex-col gap-1.5 mt-2 relative z-10">
-              <span className={cn("text-[9px] uppercase tracking-widest font-semibold ml-1", c.roleLabel)}>
-                Akses Admin
+              <span className={cn("text-[9px] uppercase tracking-[0.16em] font-semibold ml-1", c.roleLabel)}>
+                Peran Anda
               </span>
               <div className={cn("flex flex-wrap gap-1", roleLabels.length > 2 ? "" : "items-center")}>
                 {roleLabels.slice(0, 2).map((label, idx) => (
@@ -614,14 +499,14 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
       {/* Overlay mobile */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden animate-in fade-in"
+          className="fixed inset-0 bg-black/55 backdrop-blur-[2px] z-40 md:hidden animate-in fade-in"
           onClick={onMobileClose}
         />
       )}
 
       {/* Desktop sidebar */}
       <div className={cn(
-        "no-print hidden md:flex flex-col fixed inset-y-0 z-50 border-r border-slate-200 transition-all duration-300 ease-in-out",
+        "no-print hidden md:flex flex-col fixed inset-y-0 z-50 border-r transition-all duration-300 ease-in-out",
         isCollapsed ? "w-16" : "w-60"
       )}>
         {renderNavContent()}
@@ -641,7 +526,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
 
       {/* Drawer mobile */}
       <div className={cn(
-        "no-print fixed inset-y-0 left-0 z-50 w-60 bg-slate-900 text-white shadow-2xl transform transition-transform duration-300 md:hidden",
+        "no-print fixed inset-y-0 left-0 z-50 w-60 border-r shadow-xl transform transition-transform duration-300 md:hidden",
         isMobileOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         {renderNavContent(true)}

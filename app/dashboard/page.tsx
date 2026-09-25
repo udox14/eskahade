@@ -29,6 +29,7 @@ export default async function DashboardPage() {
 
   return <HomeClient
     userName={capitalizeEachWord(session.full_name || 'Pengguna')}
+    avatarUrl={session.avatar_url ?? null}
     primaryRoleLabel={primaryRoleLabel}
     greeting={greeting}
     dateLabel={dateLabel}

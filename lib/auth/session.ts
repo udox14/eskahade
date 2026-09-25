@@ -25,6 +25,7 @@ export type SessionUser = {
   id: string
   email: string
   full_name: string
+  avatar_url?: string | null
   role: string
   roles: string[]
   asrama_binaan: string | null
@@ -38,6 +39,7 @@ export type SessionUser = {
 type SessionUserRow = {
   email: string | null
   full_name: string | null
+  avatar_url: string | null
   role: string | null
   roles: string | null
   asrama_binaan: string | null
@@ -228,7 +230,7 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
   try {
     await ensureUserStructuralJabatanColumn()
     const user = await queryOne<SessionUserRow>(
-      'SELECT email, full_name, role, roles, asrama_binaan, structural_jabatan, psb_verifikasi_akses, psb_asrama_akses, psb_bayar_akses, upk_panitia_akses FROM users WHERE id = ?',
+      'SELECT email, full_name, avatar_url, role, roles, asrama_binaan, structural_jabatan, psb_verifikasi_akses, psb_asrama_akses, psb_bayar_akses, upk_panitia_akses FROM users WHERE id = ?',
       [session.id]
     )
 
@@ -239,6 +241,7 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
       ...session,
       email: user.email || session.email,
       full_name: user.full_name || session.full_name,
+      avatar_url: user.avatar_url ?? null,
       role: roles[0] || user.role || session.role,
       roles,
       asrama_binaan: user.asrama_binaan ?? null,

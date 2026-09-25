@@ -4,16 +4,17 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { ArrowDown, ArrowUp, Megaphone, Menu, RefreshCw, Settings2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Megaphone, RefreshCw, Settings2, X } from 'lucide-react'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
 import { getIcon, getMenuTitle } from '@/lib/menu/config'
-import { useDashboardMenu, useDashboardSidebar } from '@/components/layout/menu-context'
+import { useDashboardSidebar } from '@/components/layout/menu-context'
 import type { HeroConfig, TickerConfig } from '@/lib/dashboard/config'
 import { saveDashboardShortcuts } from './actions'
 import './home.css'
 
 type Props = {
   userName: string
+  avatarUrl: string | null
   primaryRoleLabel: string
   greeting: string
   dateLabel: string
@@ -36,8 +37,7 @@ function HeroPhoto({ hero }: { hero: HeroConfig }) {
   return <>{image('desktop')}{image('mobile')}</>
 }
 
-export function HomeClient({ userName, primaryRoleLabel, greeting, dateLabel, menu, initialShortcuts, hero, ticker }: Props) {
-  const openMenu = useDashboardMenu()
+export function HomeClient({ userName, avatarUrl, primaryRoleLabel, greeting, dateLabel, menu, initialShortcuts, hero, ticker }: Props) {
   const openSidebar = useDashboardSidebar()
   const router = useRouter()
   const [shortcuts, setShortcuts] = useState(initialShortcuts)
@@ -45,11 +45,13 @@ export function HomeClient({ userName, primaryRoleLabel, greeting, dateLabel, me
   const [filter, setFilter] = useState('')
   const [busy, setBusy] = useState<'shortcuts' | null>(null)
   const [isRefreshing, startRefresh] = useTransition()
+  const [avatarFailed, setAvatarFailed] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const userNameRef = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => setShortcuts(initialShortcuts), [initialShortcuts])
+  useEffect(() => setAvatarFailed(false), [avatarUrl])
 
   useEffect(() => {
     const element = userNameRef.current
@@ -128,7 +130,7 @@ export function HomeClient({ userName, primaryRoleLabel, greeting, dateLabel, me
       <section className={"relative isolate h-[292px] overflow-hidden bg-[#12372a] sm:h-[316px] md:h-[326px] " + (whiteText ? 'text-white' : 'text-black')}>
         <HeroPhoto hero={hero} />
         <div className={"absolute inset-0 " + (whiteText ? 'bg-gradient-to-r from-black/75 via-black/35 to-black/5' : 'bg-gradient-to-r from-white/85 via-white/45 to-white/5')} />
-        <div className="relative z-10 mx-auto flex h-full max-w-6xl flex-col justify-between px-4 pb-6 pt-4 sm:px-6 md:px-8 md:pb-7 md:pt-5">
+        <div className="relative z-10 mx-auto flex h-full max-w-7xl flex-col justify-between px-4 pb-6 pt-4 sm:px-6 md:pb-7 md:pt-5">
           <div className="flex items-center justify-between gap-3">
             <button type="button" onClick={() => { if (window.matchMedia('(max-width: 767px)').matches) openSidebar() }} aria-label="Buka sidebar" title="Buka sidebar" className="group flex min-w-0 items-center gap-2.5 rounded-lg text-left transition duration-200 active:scale-95 motion-reduce:transition-none">
               <Image src="/logo.png" alt="Logo Pesantren ESKAHADE" width={34} height={34} priority className="h-8 w-8 shrink-0 object-contain transition-transform duration-200 group-hover:scale-105" />
@@ -136,8 +138,13 @@ export function HomeClient({ userName, primaryRoleLabel, greeting, dateLabel, me
             </button>
             <div className={whiteText ? "flex shrink-0 items-center gap-1.5 rounded-full bg-black/55 p-1 backdrop-blur-sm" : "flex shrink-0 items-center gap-1.5 rounded-full bg-white/85 p-1 backdrop-blur-sm"}>
               <button onClick={refresh} disabled={isRefreshing} title="Segarkan dashboard" aria-label="Segarkan dashboard" className="flex h-9 w-9 items-center justify-center rounded-full border border-current/30 transition duration-200 hover:bg-white/15 active:scale-95 motion-reduce:transition-none disabled:opacity-60"><RefreshCw className={"h-4 w-4 " + (isRefreshing ? 'animate-spin' : '')} aria-hidden="true" /></button>
-              <button onClick={openMenu} title="Buka menu" aria-label="Buka menu" className="flex h-9 w-9 items-center justify-center rounded-full border border-current/30 transition duration-200 hover:bg-white/15 active:scale-95 motion-reduce:transition-none md:hidden"><Menu className="h-4 w-4" aria-hidden="true" /></button>
-              <Link href="/dashboard/profil" title="Profil saya" aria-label="Profil saya" className="flex h-9 w-9 items-center justify-center rounded-full border border-current/35 text-sm font-bold transition duration-200 hover:bg-white/15 active:scale-95 motion-reduce:transition-none">{initial}</Link>
+
+              <Link href="/dashboard/profil" title="Profil saya" aria-label="Profil saya" className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-current/35 bg-white/15 text-sm font-bold transition duration-200 hover:bg-white/25 active:scale-95 motion-reduce:transition-none">
+                {avatarUrl && !avatarFailed ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt="" aria-hidden="true" onError={() => setAvatarFailed(true)} className="h-full w-full object-cover" />
+                ) : <span aria-hidden="true">{initial}</span>}
+              </Link>
             </div>
           </div>
           <div className="w-full max-w-2xl">
@@ -154,7 +161,7 @@ export function HomeClient({ userName, primaryRoleLabel, greeting, dateLabel, me
         <div className="dashboard-ticker-window flex-1 overflow-hidden"><div className="dashboard-ticker-track whitespace-nowrap text-sm" aria-label={ticker.text}>{ticker.text}<span aria-hidden="true" className="mx-16">•</span><span aria-hidden="true">{ticker.text}</span></div></div>
       </div>}
 
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-5 sm:px-6 md:px-8 md:py-7 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500 motion-reduce:animate-none">
+      <div className="mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 md:py-7 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500 motion-reduce:animate-none">
         {message && <p role="status" className="rounded-lg border border-[#ddd4c3] bg-white px-4 py-3 text-sm">{message}</p>}
         <section aria-labelledby="shortcuts-heading">
           <div className="mb-3 flex items-center justify-between gap-3"><h2 id="shortcuts-heading" className="text-sm font-semibold text-[#66736c] sm:text-base">{dateLabel}</h2><button onClick={editShortcuts} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-[#247451] transition duration-200 hover:bg-[#e7eee6] active:scale-95 motion-reduce:transition-none"><Settings2 className="h-4 w-4" /> Atur pintasan</button></div>
