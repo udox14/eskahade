@@ -332,7 +332,7 @@ export default function StatusPembayaranContent({
                   setCatatBayarSantriId(null)
                   setIsCatatBayarOpen(true)
                 }}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition cursor-pointer"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 min-h-11 text-sm font-semibold text-white shadow-sm transition cursor-pointer"
               >
                 <Wallet className="h-4 w-4 text-white" />
                 <span>Catat Pembayaran</span>
@@ -481,7 +481,7 @@ export default function StatusPembayaranContent({
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Tagihan Bulanan</span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
                   <Wallet className="h-4 w-4" />
                 </div>
               </div>
@@ -532,7 +532,7 @@ export default function StatusPembayaranContent({
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Tingkat Kelunasan</span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
                   <TrendingUp className="h-4 w-4" />
                 </div>
               </div>
@@ -625,7 +625,7 @@ export default function StatusPembayaranContent({
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Tagihan Tahunan</span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
                   <Calendar className="h-4 w-4" />
                 </div>
               </div>
@@ -764,7 +764,7 @@ export default function StatusPembayaranContent({
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Komitmen USPP</span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
                 <Building2 className="h-4 w-4" />
               </div>
             </div>

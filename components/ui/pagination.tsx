@@ -39,20 +39,20 @@ export default function Pagination({
   const end = pageSize === 0 ? total : Math.min(currentPage * pageSize, total)
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t bg-gray-50 rounded-b-xl text-sm">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 rounded-b-xl text-sm">
       {/* Info */}
-      <div className="text-gray-500 text-xs">
+      <div className="text-slate-500 text-xs">
         {total === 0 ? 'Tidak ada data' : `Menampilkan ${start}–${end} dari ${total} data`}
       </div>
 
       <div className="flex items-center gap-3">
         {/* Page size selector */}
         <div className="flex items-center gap-1.5">
-          <span className="text-gray-500 text-xs">Tampilkan</span>
+          <span className="text-slate-500 text-xs">Tampilkan</span>
           <select
             value={pageSize}
             onChange={e => { onPageSizeChange(Number(e.target.value)); onPageChange(1) }}
-            className="border rounded-md px-2 py-1 text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500"
           >
             {PAGE_SIZE_OPTIONS.map(s => (
               <option key={s} value={s}>{getPageSizeLabel(s)}</option>
@@ -74,15 +74,15 @@ export default function Pagination({
             <div className="flex items-center gap-1">
               {getPageRange(currentPage, totalPages).map((p, i) =>
                 p === '...' ? (
-                  <span key={`dots-${i}`} className="px-1 text-gray-400">…</span>
+                  <span key={`dots-${i}`} className="px-1 text-slate-400">…</span>
                 ) : (
                   <button
                     key={p}
                     onClick={() => onPageChange(Number(p))}
-                    className={`w-7 h-7 rounded text-xs font-medium transition-colors ${
+                    className={`h-7 w-7 rounded-lg text-xs font-medium transition-colors sm:h-8 sm:w-8 ${
                       p === currentPage
-                        ? 'bg-blue-600 text-white'
-                        : 'hover:bg-gray-200 text-gray-600'
+                        ? 'bg-emerald-700 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
                     {p}
@@ -112,7 +112,7 @@ function NavBtn({ onClick, disabled, title, children }: {
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className="w-7 h-7 flex items-center justify-center rounded border bg-white hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      className="flex h-7 w-7 items-center justify-center rounded-lg sm:h-8 sm:w-8 border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </button>

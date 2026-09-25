@@ -112,7 +112,7 @@ export function SantriPhotoAvatar({
           event.stopPropagation()
           setOpen(true)
         }}
-        className="block shrink-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        className="block shrink-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
         aria-label={`Lihat foto ${name}`}
       >
         {frame}

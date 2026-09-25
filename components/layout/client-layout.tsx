@@ -59,7 +59,7 @@ export function ClientLayout({ children, userRole, userRoles, userName, avatarUr
     <IconContext.Provider value={{ weight: "duotone" }}>
       <DashboardMenuContext.Provider value={openMenu}>
       <DashboardSidebarContext.Provider value={openSidebar}>
-      <div className="relative flex h-[100dvh] w-full overflow-hidden bg-slate-50 font-sans text-slate-900 antialiased selection:bg-green-100 selection:text-green-900">
+      <div className="staff-app relative flex h-[100dvh] w-full overflow-hidden bg-slate-50 font-sans text-slate-900 antialiased selection:bg-green-100 selection:text-green-900">
 
       {/* Sidebar desktop */}
       <Sidebar

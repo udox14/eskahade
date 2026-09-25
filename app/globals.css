@@ -294,6 +294,147 @@ body {
   }
 }
 
+/* Staff application theme: keeps the dashboard's forest and cream palette
+   within the staff shell. Public pages and the parent portal remain scoped
+   to their own themes, and print output keeps the default token values. */
+@media screen {
+  .staff-app {
+    --staff-canvas: #f7f1e5;
+    --staff-surface: #fffdf8;
+    --staff-ink: #1c2923;
+    --staff-muted: #66736c;
+    --staff-line: #e4ddcf;
+    --staff-brand: #247451;
+    --staff-brand-deep: #12372a;
+
+    --color-white: var(--staff-surface);
+    --color-slate-50: var(--staff-canvas);
+    --color-slate-100: #efe7d8;
+    --color-slate-200: var(--staff-line);
+    --color-slate-300: #ddd4c3;
+    --color-slate-400: #68756d;
+    --color-slate-500: var(--staff-muted);
+    --color-slate-600: #4f665a;
+    --color-slate-700: #34483c;
+    --color-slate-800: var(--staff-ink);
+    --color-slate-900: var(--staff-brand-deep);
+    --color-slate-950: #09251c;
+
+    --color-gray-50: var(--color-slate-50);
+    --color-gray-100: var(--color-slate-100);
+    --color-gray-200: var(--color-slate-200);
+    --color-gray-300: var(--color-slate-300);
+    --color-gray-400: var(--color-slate-400);
+    --color-gray-500: var(--color-slate-500);
+    --color-gray-600: var(--color-slate-600);
+    --color-gray-700: var(--color-slate-700);
+    --color-gray-800: var(--color-slate-800);
+    --color-gray-900: var(--color-slate-900);
+    --color-gray-950: var(--color-slate-950);
+    --color-zinc-50: var(--color-slate-50);
+    --color-zinc-100: var(--color-slate-100);
+    --color-zinc-200: var(--color-slate-200);
+    --color-zinc-300: var(--color-slate-300);
+    --color-zinc-400: var(--color-slate-400);
+    --color-zinc-500: var(--color-slate-500);
+    --color-zinc-600: var(--color-slate-600);
+    --color-zinc-700: var(--color-slate-700);
+    --color-zinc-800: var(--color-slate-800);
+    --color-zinc-900: var(--color-slate-900);
+    --color-zinc-950: var(--color-slate-950);
+
+    --color-emerald-50: #eaf3e9;
+    --color-emerald-100: #dcecdf;
+    --color-emerald-200: #c9d8ce;
+    --color-emerald-300: #9ab5a2;
+    --color-emerald-400: #4f946e;
+    --color-emerald-500: var(--staff-brand);
+    --color-emerald-600: var(--staff-brand);
+    --color-emerald-700: var(--staff-brand-deep);
+    --color-emerald-800: #0f4e37;
+    --color-emerald-900: #09251c;
+    --color-emerald-950: #061a13;
+
+    --color-green-50: var(--color-emerald-50);
+    --color-green-100: var(--color-emerald-100);
+    --color-green-200: var(--color-emerald-200);
+    --color-green-300: var(--color-emerald-300);
+    --color-green-400: var(--color-emerald-400);
+    --color-green-500: var(--color-emerald-500);
+    --color-green-600: var(--color-emerald-600);
+    --color-green-700: var(--color-emerald-700);
+    --color-green-800: var(--color-emerald-800);
+    --color-green-900: var(--color-emerald-900);
+    --color-green-950: var(--color-emerald-950);
+
+    --radius-2xl: 0.875rem;
+    --radius-3xl: 1rem;
+    --shadow-sm: 0 1px 2px 0 rgb(18 55 42 / 0.06);
+  }
+
+  /* Legacy blue/indigo action controls inherit the staff brand. Informational
+     badges and charts keep their semantic colors because they are not controls. */
+  .staff-app :is(button, a, [role="button"])[class~="bg-blue-500"],
+  .staff-app :is(button, a, [role="button"])[class~="bg-blue-600"],
+  .staff-app :is(button, a, [role="button"])[class~="bg-indigo-500"],
+  .staff-app :is(button, a, [role="button"])[class~="bg-indigo-600"] {
+    background-color: var(--staff-brand);
+  }
+
+  .staff-app :is(button, a, [role="button"])[class~="bg-blue-700"],
+  .staff-app :is(button, a, [role="button"])[class~="bg-blue-800"],
+  .staff-app :is(button, a, [role="button"])[class~="bg-indigo-700"],
+  .staff-app :is(button, a, [role="button"])[class~="bg-indigo-800"] {
+    background-color: var(--staff-brand-deep);
+  }
+
+  .staff-app :is(button, a, [role="button"])[class~="hover:bg-blue-500"]:hover,
+  .staff-app :is(button, a, [role="button"])[class~="hover:bg-blue-600"]:hover,
+  .staff-app :is(button, a, [role="button"])[class~="hover:bg-indigo-500"]:hover,
+  .staff-app :is(button, a, [role="button"])[class~="hover:bg-indigo-600"]:hover {
+    background-color: var(--staff-brand);
+  }
+
+  .staff-app :is(button, a, [role="button"])[class~="hover:bg-blue-700"]:hover,
+  .staff-app :is(button, a, [role="button"])[class~="hover:bg-blue-800"]:hover,
+  .staff-app :is(button, a, [role="button"])[class~="hover:bg-indigo-700"]:hover,
+  .staff-app :is(button, a, [role="button"])[class~="hover:bg-indigo-800"]:hover {
+    background-color: var(--staff-brand-deep);
+  }
+
+  .staff-app :is(button, a, [role="button"])[class~="text-blue-500"],
+  .staff-app :is(button, a, [role="button"])[class~="text-blue-600"],
+  .staff-app :is(button, a, [role="button"])[class~="text-indigo-500"],
+  .staff-app :is(button, a, [role="button"])[class~="text-indigo-600"] {
+    color: var(--staff-brand);
+  }
+
+  .staff-app :is(button, a, [role="button"])[class~="border-blue-500"],
+  .staff-app :is(button, a, [role="button"])[class~="border-blue-600"],
+  .staff-app :is(button, a, [role="button"])[class~="border-indigo-500"],
+  .staff-app :is(button, a, [role="button"])[class~="border-indigo-600"] {
+    border-color: var(--staff-brand);
+  }
+
+  .staff-app :is(button, [role="button"])[class*="disabled:bg-slate-"]:disabled {
+    background-color: var(--color-slate-200);
+    color: var(--color-slate-500);
+  }
+  .staff-app :is(input[type="checkbox"], input[type="radio"]) {
+    accent-color: var(--staff-brand);
+  }
+
+  .staff-app :is(button, a, [role="button"]):focus-visible,
+  .staff-app :is(input, select, textarea):focus-visible {
+    outline: 2px solid var(--staff-brand);
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  .staff-app :is(input, select, textarea)[aria-invalid="true"]:focus-visible {
+    outline-color: #b4233d;
+  }
+}
 /* ── PRINT STYLES ─────────────────────────────────────────── */
 @media print {
   /* Sembunyikan header app, sidebar, dan elemen non-print */
