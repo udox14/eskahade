@@ -9,6 +9,7 @@ import { ArrowLeft } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { MobileMenuSheet } from "@/components/layout/mobile-menu-sheet";
 import { DashboardMenuContext } from "@/components/layout/menu-context";
 import { cn } from "@/lib/utils";
 import type { FiturAkses } from "@/lib/cache/fitur-akses";
@@ -56,7 +57,7 @@ export function ClientLayout({ children, userRole, userRoles, userName, avatarUr
       <DashboardMenuContext.Provider value={() => setIsMobileOpen(true)}>
       <div className="relative flex h-[100dvh] w-full overflow-hidden bg-slate-50 font-sans text-slate-900 antialiased selection:bg-green-100 selection:text-green-900">
       
-      {/* 1. SIDEBAR — desktop rail + drawer mobile + overlay dikelola di dalam komponen */}
+      {/* Sidebar desktop */}
       <Sidebar
         userRole={userRole}
         userRoles={userRoles}
@@ -72,8 +73,6 @@ export function ClientLayout({ children, userRole, userRoles, userName, avatarUr
             return next;
           });
         }}
-        isMobileOpen={isMobileOpen}
-        onMobileClose={() => setIsMobileOpen(false)}
       />
 
       {/* 2. AREA KONTEN (DYNAMIC PADDING) */}
@@ -98,7 +97,7 @@ export function ClientLayout({ children, userRole, userRoles, userName, avatarUr
 
         {/* MAIN CONTENT */}
         <main className={cn("flex-1 overflow-y-auto scroll-smooth scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent", isDashboardHome ? "bg-[#f7f1e5]" : "bg-slate-50/50 p-4 md:p-8")}>
-          <div className={cn("w-full", isDashboardHome ? "min-h-full pb-16 md:pb-0" : "max-w-7xl mx-auto space-y-6 pb-20 md:pb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out")}>
+          <div className={cn("w-full", isDashboardHome ? "min-h-full pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0" : "max-w-7xl mx-auto space-y-6 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out")}>
             {showSetupReturn ? (
               <div className="no-print sticky top-0 z-30 flex justify-end">
                 <Link
@@ -117,11 +116,16 @@ export function ClientLayout({ children, userRole, userRoles, userName, avatarUr
         {/* BOTTOM NAV — mobile only, di dalam flex column jadi tidak nutup konten */}
         <BottomNav
           fiturAkses={fiturAkses}
-          userRole={userRole}
-          userRoles={userRoles}
           globalEnabled={globalBottomNavEnabled}
           userShowBottomNav={userShowBottomNav}
           onOpenMenu={() => setIsMobileOpen(true)}
+          menuOpen={isMobileOpen}
+        />
+        <MobileMenuSheet
+          open={isMobileOpen}
+          items={fiturAkses}
+          groups={sidebarGroups}
+          onClose={() => setIsMobileOpen(false)}
         />
       </div>
     </div>

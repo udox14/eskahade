@@ -104,12 +104,13 @@ Aturan ini berlaku untuk `/`, `/login`, dan `/portal-ortu/login`. Halaman dashbo
 
 ## 7. Beranda internal /dashboard
 
-Aturan ini khusus beranda internal. Shell desktop tetap memiliki sidebar, sedangkan header putih dan padding konten shell dihilangkan hanya pada /dashboard. Halaman lain tetap memakai shell dan komponen existing.
+Aturan ini khusus beranda internal. Sidebar desktop tetap digunakan, sedangkan header putih dan padding shell dihilangkan hanya pada /dashboard. Halaman lain mempertahankan shell existing.
 
-- Hero memakai satu gambar penuh dari tepi atas area konten. Identitas ESKAHADE, akses akun, dan tombol menu mobile berada di atas gambar. Admin dapat mengatur fokus gambar (x, y, zoom) secara terpisah untuk desktop dan mobile, serta memilih teks putih atau hitam. Overlay netral mengikuti pilihan warna teks agar judul terbaca.
-- Setelah hero, strip pengumuman memakai warna latar dan teks pilihan admin dengan kontras minimal WCAG AA. Running text berhenti bergerak untuk prefers-reduced-motion: reduce; isi yang sama tetap terbaca.
-- Latar konten #f7f1e5, permukaan #fffdf8, tinta #1c2923, hijau utama #12372a, hijau aksi #247451, aksen emas #c9952e. Gunakan tipografi serif hanya untuk judul besar dan judul seksi. Jaga border tipis, tanpa bayangan berat atau kartu berlapis.
-- Pintasan maksimal delapan, empat kolom pada lebar sempit dan luas. Urutan berasal dari pilihan pengguna, tetapi menu yang izinnya dicabut langsung hilang. Tombol Home pada bottom navbar membuka drawer semua menu yang diizinkan; saat navbar dimatikan, tombol menu di atas hero tetap tersedia.
-- Widget ditampilkan sebagai ringkasan singkat dalam grid responsif satu, dua, lalu empat kolom. Urutannya berasal dari konfigurasi per role, digabung tanpa duplikat untuk akun multi-role. Semua angka menghormati cakupan pengguna. Data uang jajan diberi penjelasan sebagai dana titipan santri dan tidak digabung dengan penerimaan kewajiban pesantren.
-- Tombol Segarkan meminta ulang data widget yang tampak. Tidak ada pemuatan berkala. Status gagal ditampilkan dalam widget, bukan menyembunyikan seluruh beranda.
-- Kontrol, dialog, dan link menyediakan fokus yang jelas serta label aksesibilitas. Animasi strip dan transisi non-esensial dimatikan ketika pengguna meminta gerakan berkurang.
+- Hero menggunakan gambar penuh dari tepi atas area konten dengan tinggi yang lebih ringkas. Tampilkan logo resmi public/logo.png, nama ESKAHADE, sapaan kecil, nama lengkap satu baris yang mengecil sesuai lebar, dan label role utama. Jangan memotong nama dengan ellipsis. Kontrol profil, menu mobile, dan tombol Segarkan memakai area sentuh yang jelas. Admin mengubah gambar, crop, dan warna teks melalui pengaturan dashboard.
+- Running text berada tepat di bawah hero. Tampilkan ikon dan isi saja, tanpa label “Pengumuman”. Gunakan warna pilihan admin dan hentikan gerak ketika prefers-reduced-motion: reduce; isi tetap terbaca.
+- Gunakan latar #f7f1e5, permukaan #fffdf8, tinta #1c2923, hijau #12372a, hijau aksi #247451, dan aksen emas #c9952e. Jaga tinggi hero, pintasan, padding, dan jarak antarseksi tetap ringkas. Hindari bayangan berat dan kartu berlapis.
+- Pintasan maksimal delapan, tersusun empat kolom di mobile dan desktop. Urutan berasal dari pilihan pengguna; menu yang izinnya dicabut harus hilang. Modal pengaturan pintasan tetap tersedia.
+- Widget beranda sedang ditunda. Sembunyikan bagian kartu dan jangan memanggil loader widget dari halaman dashboard. Pertahankan katalog serta pilihan widget per role; beri keterangan di pengaturan admin bahwa widget belum tampil. Saat widget diaktifkan lagi, judul bagiannya hanya “Ringkasan”.
+- Tombol Menu pada navbar bawah dan tombol menu di header/hero membuka panel dari bawah setinggi sekitar 68dvh. Panel menampilkan akses Dashboard, pencarian, dan seluruh menu aktif yang diizinkan, dikelompokkan mengikuti label serta urutan grup existing. Panel dapat ditutup dengan tombol, klik latar, atau Escape.
+- Navbar bawah mobile memakai warna krem dan hijau yang sama, indikator aktif yang terlihat, label “Menu”, dan ruang aman perangkat. Sidebar desktop tidak berubah. Saat navbar bawah dinonaktifkan, tombol menu pada hero dan header tetap tersedia.
+- Kontrol memiliki label aksesibilitas dan fokus keyboard yang jelas. Transisi non-esensial dihentikan saat pengguna meminta gerakan berkurang.

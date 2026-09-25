@@ -1,0 +1,15 @@
+export const ROLE_LABEL: Record<string, string> = {
+  admin: 'Administrator',
+  tester: 'Tester',
+  keamanan: 'Keamanan',
+  sekpen: 'SEKPEN',
+  dewan_santri: 'Dewan Santri',
+  pengurus_asrama: 'Pengurus Asrama',
+  wali_kelas: 'Wali Kelas',
+  guru: 'Guru',
+  bendahara: 'Bendahara',
+  admin_koperasi: 'Admin Koperasi',
+  petugas_koperasi: 'Petugas Koperasi',
+  poskestren: 'POSKESTREN',
+  pimpinan: 'Pimpinan',
+}

@@ -152,7 +152,7 @@ export function DashboardSettingsClient({ appearance, selections }: Props) {
       </section>
 
       <section className="space-y-5 border-t border-[#ddd4c3] pt-7">
-        <div><h2 className="text-lg font-semibold">Widget per role</h2><p className="text-sm text-[#66736c]">Widget tetap mengikuti izin menu dan cakupan data masing-masing pengguna.</p></div>
+        <div><h2 className="text-lg font-semibold">Widget per role</h2><p className="text-sm text-[#66736c]">Widget tetap mengikuti izin menu dan cakupan data masing-masing pengguna.</p><p className="mt-1 text-sm font-medium text-[#8b6b2b]">Widget beranda sedang ditunda dan belum ditampilkan. Pilihan per role tetap tersimpan untuk digunakan kembali.</p></div>
         <label className="block text-sm font-semibold">Role
           <select value={role} onChange={event => setRole(event.target.value)} className="ml-3 rounded-lg border border-[#ddd4c3] bg-white px-3 py-2 font-normal">
             {DASHBOARD_ROLES.map(item => <option key={item} value={item}>{prettyRole(item)}</option>)}

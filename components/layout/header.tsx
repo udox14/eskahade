@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { signOut } from './actions'
-import { SignOut as LogOut, Bell, User, List as Menu, Gear as Settings, CaretDown as ChevronDown } from '@phosphor-icons/react'
+import { SignOut as LogOut, Bell, List as Menu, Gear as Settings, CaretDown as ChevronDown } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -42,9 +42,12 @@ const ROLE_COLOR: Record<string, string> = {
 function useClock() {
   const [now, setNow] = useState<Date | null>(null)
   useEffect(() => {
-    setNow(new Date())
-    const t = setInterval(() => setNow(new Date()), 60000)
-    return () => clearInterval(t)
+    const initial = window.setTimeout(() => setNow(new Date()), 0)
+    const interval = window.setInterval(() => setNow(new Date()), 60000)
+    return () => {
+      window.clearTimeout(initial)
+      window.clearInterval(interval)
+    }
   }, [])
   return now
 }
@@ -87,6 +90,8 @@ export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick }
         {/* Hamburger mobile */}
         <button
           onClick={onMenuClick}
+          aria-label="Buka menu"
+          title="Buka menu"
           className="md:hidden p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
         >
           <Menu className="w-5 h-5" />
