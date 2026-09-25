@@ -56,177 +56,158 @@ type ThemeColor = {
   searchFocus: string;
 };
 
-const THEME_COLORS: Record<ThemeKey, ThemeColor> = {
-  light: {
-    bg: "bg-white",
-    baseText: "text-slate-700",
-    borderBase: "border-slate-100",
-    logoText: "text-slate-800",
-    toggleBtn: "bg-white border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 hover:border-slate-300 shadow-sm",
-    glowText: "text-emerald-600",
-    activeText: "text-slate-800",
-    activeBg: "bg-slate-50",
-    activeBorder: "border-slate-300",
-    hoverBg: "hover:bg-slate-50",
-    hoverText: "group-hover:text-slate-900",
-    mutedText: "text-slate-500",
-    folderActiveBg: "bg-transparent border-transparent",
-    folderOpenBg: "border-transparent",
-    indicator: "before:bg-slate-400 before:shadow-none",
-    glowBg: "bg-transparent",
-    lineDivider: "before:bg-slate-200",
-    footerBg: "bg-white border-slate-100",
-    footerGlow: "bg-transparent",
-    themeIcon: "text-slate-500",
-    themeActiveBorder: "border-slate-400",
-    roleBadge: "bg-slate-100 text-slate-700 border border-slate-200",
-    roleLabel: "text-slate-500",
-    searchBg: "bg-slate-50",
-    searchBorder: "border border-slate-200",
-    searchFocus: "focus:bg-white focus:border-slate-300 focus:ring-1 focus:ring-slate-300",
-  },
-  emerald: {
-    bg: "bg-gradient-to-b from-emerald-950 via-emerald-900 to-slate-950",
-    baseText: "text-white/90",
-    borderBase: "border-white/5",
-    logoText: "text-white",
-    toggleBtn: "bg-emerald-900 border-emerald-500/30 text-emerald-400 hover:bg-emerald-700 hover:text-emerald-100 hover:border-emerald-400",
-    glowText: "text-emerald-400",
-    activeText: "text-white",
-    activeBg: "bg-black/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]",
-    activeBorder: "border-emerald-400",
-    hoverBg: "hover:bg-black/10",
-    hoverText: "group-hover:text-white",
-    mutedText: "text-emerald-100/60",
-    folderActiveBg: "bg-black/20 border-emerald-500/20",
-    folderOpenBg: "border-emerald-500/30",
-    indicator: "before:bg-emerald-400 before:shadow-[0_0_8px_rgba(52,211,153,0.8)]",
-    glowBg: "bg-emerald-400/10",
-    lineDivider: "before:bg-white/10",
-    footerBg: "bg-black/20 border-white/10",
-    footerGlow: "bg-white/5",
-    themeIcon: "text-white/30",
-    themeActiveBorder: "border-white",
-    roleBadge: "bg-emerald-500/20 border-emerald-400/30 text-emerald-300",
-    roleLabel: "text-emerald-400/70",
-    searchBg: "bg-black/20",
-    searchBorder: "border border-white/10",
-    searchFocus: "focus:bg-black/40 focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/50",
-  },
-  blue: {
-    bg: "bg-gradient-to-b from-blue-950 via-blue-900 to-slate-950",
-    baseText: "text-white/90",
-    borderBase: "border-white/5",
-    logoText: "text-white",
-    toggleBtn: "bg-blue-900 border-blue-500/30 text-blue-400 hover:bg-blue-700 hover:text-blue-100 hover:border-blue-400",
-    glowText: "text-blue-400",
-    activeText: "text-white",
-    activeBg: "bg-black/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]",
-    activeBorder: "border-blue-400",
-    hoverBg: "hover:bg-black/10",
-    hoverText: "group-hover:text-white",
-    mutedText: "text-blue-100/60",
-    folderActiveBg: "bg-black/20 border-blue-500/20",
-    folderOpenBg: "border-blue-500/30",
-    indicator: "before:bg-blue-400 before:shadow-[0_0_8px_rgba(96,165,250,0.8)]",
-    glowBg: "bg-blue-400/10",
-    lineDivider: "before:bg-white/10",
-    footerBg: "bg-black/20 border-white/10",
-    footerGlow: "bg-white/5",
-    themeIcon: "text-white/30",
-    themeActiveBorder: "border-white",
-    roleBadge: "bg-blue-500/20 border-blue-400/30 text-blue-300",
-    roleLabel: "text-blue-400/70",
-    searchBg: "bg-black/20",
-    searchBorder: "border border-white/10",
-    searchFocus: "focus:bg-black/40 focus:border-blue-400/50 focus:ring-1 focus:ring-blue-400/50",
-  },
-  purple: {
-    bg: "bg-gradient-to-b from-purple-950 via-purple-900 to-slate-950",
-    baseText: "text-white/90",
-    borderBase: "border-white/5",
-    logoText: "text-white",
-    toggleBtn: "bg-purple-900 border-purple-500/30 text-purple-400 hover:bg-purple-700 hover:text-purple-100 hover:border-purple-400",
-    glowText: "text-purple-400",
-    activeText: "text-white",
-    activeBg: "bg-black/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]",
-    activeBorder: "border-purple-400",
-    hoverBg: "hover:bg-black/10",
-    hoverText: "group-hover:text-white",
-    mutedText: "text-purple-100/60",
-    folderActiveBg: "bg-black/20 border-purple-500/20",
-    folderOpenBg: "border-purple-500/30",
-    indicator: "before:bg-purple-400 before:shadow-[0_0_8px_rgba(192,132,252,0.8)]",
-    glowBg: "bg-purple-400/10",
-    lineDivider: "before:bg-white/10",
-    footerBg: "bg-black/20 border-white/10",
-    footerGlow: "bg-white/5",
-    themeIcon: "text-white/30",
-    themeActiveBorder: "border-white",
-    roleBadge: "bg-purple-500/20 border-purple-400/30 text-purple-300",
-    roleLabel: "text-purple-400/70",
-    searchBg: "bg-black/20",
-    searchBorder: "border border-white/10",
-    searchFocus: "focus:bg-black/40 focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/50",
-  },
-  rose: {
-    bg: "bg-gradient-to-b from-rose-950 via-rose-900 to-slate-950",
-    baseText: "text-white/90",
-    borderBase: "border-white/5",
-    logoText: "text-white",
-    toggleBtn: "bg-rose-900 border-rose-500/30 text-rose-400 hover:bg-rose-700 hover:text-rose-100 hover:border-rose-400",
-    glowText: "text-rose-400",
-    activeText: "text-white",
-    activeBg: "bg-black/30 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]",
-    activeBorder: "border-rose-400",
-    hoverBg: "hover:bg-black/10",
-    hoverText: "group-hover:text-white",
-    mutedText: "text-rose-100/60",
-    folderActiveBg: "bg-black/20 border-rose-500/20",
-    folderOpenBg: "border-rose-500/30",
-    indicator: "before:bg-rose-400 before:shadow-[0_0_8px_rgba(251,113,133,0.8)]",
-    glowBg: "bg-rose-400/10",
-    lineDivider: "before:bg-white/10",
-    footerBg: "bg-black/20 border-white/10",
-    footerGlow: "bg-white/5",
-    themeIcon: "text-white/30",
-    themeActiveBorder: "border-white",
-    roleBadge: "bg-rose-500/20 border-rose-400/30 text-rose-300",
-    roleLabel: "text-rose-400/70",
-    searchBg: "bg-black/20",
-    searchBorder: "border border-white/10",
-    searchFocus: "focus:bg-black/40 focus:border-rose-400/50 focus:ring-1 focus:ring-rose-400/50",
-  },
-  slate: {
-    bg: "bg-gradient-to-b from-slate-950 via-slate-900 to-black",
-    baseText: "text-white/90",
-    borderBase: "border-white/5",
-    logoText: "text-white",
-    toggleBtn: "bg-slate-900 border-slate-500/30 text-slate-400 hover:bg-slate-800 hover:text-slate-100 hover:border-slate-400",
-    glowText: "text-slate-300",
-    activeText: "text-white",
-    activeBg: "bg-black/40 shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]",
-    activeBorder: "border-slate-400",
-    hoverBg: "hover:bg-white/5",
-    hoverText: "group-hover:text-white",
-    mutedText: "text-slate-400",
-    folderActiveBg: "bg-black/30 border-slate-500/20",
-    folderOpenBg: "border-slate-500/30",
-    indicator: "before:bg-slate-400 before:shadow-[0_0_8px_rgba(148,163,184,0.8)]",
-    glowBg: "bg-slate-400/10",
-    lineDivider: "before:bg-white/10",
-    footerBg: "bg-black/20 border-white/10",
-    footerGlow: "bg-white/5",
-    themeIcon: "text-white/30",
-    themeActiveBorder: "border-white",
-    roleBadge: "bg-slate-500/20 border-slate-400/30 text-slate-300",
-    roleLabel: "text-slate-400/70",
-    searchBg: "bg-black/20",
-    searchBorder: "border border-white/10",
-    searchFocus: "focus:bg-black/40 focus:border-slate-400/50 focus:ring-1 focus:ring-slate-400/50",
-  }
+const PASTEL_LIGHT: ThemeColor = {
+  bg: "bg-[#fffdf8]",
+  baseText: "text-[#34483c]",
+  borderBase: "border-[#e4ddcf]",
+  logoText: "text-[#12372a]",
+  toggleBtn: "bg-white border-[#ddd4c3] text-[#66736c] hover:bg-[#eaf3e9] hover:text-[#12372a] hover:border-[#9ab5a2] shadow-sm",
+  glowText: "text-[#247451]",
+  activeText: "text-[#12372a]",
+  activeBg: "bg-[#eaf3e9]",
+  activeBorder: "border-[#9ab5a2]",
+  hoverBg: "hover:bg-[#f5f2eb]",
+  hoverText: "group-hover:text-[#12372a]",
+  mutedText: "text-[#66736c]",
+  folderActiveBg: "bg-[#eaf3e9] border-[#c9d8ce]",
+  folderOpenBg: "border-[#c9d8ce]",
+  indicator: "before:bg-[#247451] before:shadow-none",
+  glowBg: "bg-transparent",
+  lineDivider: "before:bg-[#ddd4c3]",
+  footerBg: "bg-[#f7f1e5] border-[#e4ddcf]",
+  footerGlow: "bg-transparent",
+  themeIcon: "text-[#66736c]",
+  themeActiveBorder: "border-[#247451]",
+  roleBadge: "bg-white/80 text-[#34483c] border border-[#ddd4c3]",
+  roleLabel: "text-[#66736c]",
+  searchBg: "bg-white",
+  searchBorder: "border border-[#ddd4c3]",
+  searchFocus: "focus:bg-white focus:border-[#9ab5a2] focus:ring-1 focus:ring-[#9ab5a2]",
 };
 
+const THEME_COLORS: Record<ThemeKey, ThemeColor> = {
+  light: PASTEL_LIGHT,
+  emerald: {
+    ...PASTEL_LIGHT,
+    bg: "bg-emerald-50",
+    borderBase: "border-emerald-100",
+    logoText: "text-emerald-950",
+    toggleBtn: "bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-950 hover:border-emerald-300 shadow-sm",
+    glowText: "text-emerald-700",
+    activeText: "text-emerald-950",
+    activeBg: "bg-emerald-100",
+    activeBorder: "border-emerald-300",
+    hoverBg: "hover:bg-emerald-100",
+    hoverText: "group-hover:text-emerald-950",
+    mutedText: "text-emerald-800",
+    folderActiveBg: "bg-emerald-100 border-emerald-200",
+    folderOpenBg: "border-emerald-200",
+    indicator: "before:bg-emerald-600 before:shadow-none",
+    lineDivider: "before:bg-emerald-200",
+    footerBg: "bg-emerald-100 border-emerald-200",
+    themeActiveBorder: "border-emerald-600",
+    roleBadge: "bg-white/80 text-emerald-900 border border-emerald-200",
+    roleLabel: "text-emerald-700",
+    searchBorder: "border border-emerald-200",
+    searchFocus: "focus:bg-white focus:border-emerald-400 focus:ring-1 focus:ring-emerald-300",
+  },
+  blue: {
+    ...PASTEL_LIGHT,
+    bg: "bg-sky-50",
+    borderBase: "border-sky-100",
+    logoText: "text-sky-950",
+    toggleBtn: "bg-white border-sky-200 text-sky-700 hover:bg-sky-100 hover:text-sky-950 hover:border-sky-300 shadow-sm",
+    glowText: "text-sky-700",
+    activeText: "text-sky-950",
+    activeBg: "bg-sky-100",
+    activeBorder: "border-sky-300",
+    hoverBg: "hover:bg-sky-100",
+    hoverText: "group-hover:text-sky-950",
+    mutedText: "text-sky-800",
+    folderActiveBg: "bg-sky-100 border-sky-200",
+    folderOpenBg: "border-sky-200",
+    indicator: "before:bg-sky-600 before:shadow-none",
+    lineDivider: "before:bg-sky-200",
+    footerBg: "bg-sky-100 border-sky-200",
+    themeActiveBorder: "border-sky-600",
+    roleBadge: "bg-white/80 text-sky-900 border border-sky-200",
+    roleLabel: "text-sky-700",
+    searchBorder: "border border-sky-200",
+    searchFocus: "focus:bg-white focus:border-sky-400 focus:ring-1 focus:ring-sky-300",
+  },
+  purple: {
+    ...PASTEL_LIGHT,
+    bg: "bg-violet-50",
+    borderBase: "border-violet-100",
+    logoText: "text-violet-950",
+    toggleBtn: "bg-white border-violet-200 text-violet-700 hover:bg-violet-100 hover:text-violet-950 hover:border-violet-300 shadow-sm",
+    glowText: "text-violet-700",
+    activeText: "text-violet-950",
+    activeBg: "bg-violet-100",
+    activeBorder: "border-violet-300",
+    hoverBg: "hover:bg-violet-100",
+    hoverText: "group-hover:text-violet-950",
+    mutedText: "text-violet-800",
+    folderActiveBg: "bg-violet-100 border-violet-200",
+    folderOpenBg: "border-violet-200",
+    indicator: "before:bg-violet-600 before:shadow-none",
+    lineDivider: "before:bg-violet-200",
+    footerBg: "bg-violet-100 border-violet-200",
+    themeActiveBorder: "border-violet-600",
+    roleBadge: "bg-white/80 text-violet-900 border border-violet-200",
+    roleLabel: "text-violet-700",
+    searchBorder: "border border-violet-200",
+    searchFocus: "focus:bg-white focus:border-violet-400 focus:ring-1 focus:ring-violet-300",
+  },
+  rose: {
+    ...PASTEL_LIGHT,
+    bg: "bg-rose-50",
+    borderBase: "border-rose-100",
+    logoText: "text-rose-950",
+    toggleBtn: "bg-white border-rose-200 text-rose-700 hover:bg-rose-100 hover:text-rose-950 hover:border-rose-300 shadow-sm",
+    glowText: "text-rose-700",
+    activeText: "text-rose-950",
+    activeBg: "bg-rose-100",
+    activeBorder: "border-rose-300",
+    hoverBg: "hover:bg-rose-100",
+    hoverText: "group-hover:text-rose-950",
+    mutedText: "text-rose-800",
+    folderActiveBg: "bg-rose-100 border-rose-200",
+    folderOpenBg: "border-rose-200",
+    indicator: "before:bg-rose-600 before:shadow-none",
+    lineDivider: "before:bg-rose-200",
+    footerBg: "bg-rose-100 border-rose-200",
+    themeActiveBorder: "border-rose-600",
+    roleBadge: "bg-white/80 text-rose-900 border border-rose-200",
+    roleLabel: "text-rose-700",
+    searchBorder: "border border-rose-200",
+    searchFocus: "focus:bg-white focus:border-rose-400 focus:ring-1 focus:ring-rose-300",
+  },
+  slate: {
+    ...PASTEL_LIGHT,
+    bg: "bg-slate-50",
+    borderBase: "border-slate-200",
+    logoText: "text-slate-900",
+    toggleBtn: "bg-white border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 hover:border-slate-300 shadow-sm",
+    glowText: "text-slate-700",
+    activeText: "text-slate-900",
+    activeBg: "bg-slate-100",
+    activeBorder: "border-slate-300",
+    hoverBg: "hover:bg-slate-100",
+    hoverText: "group-hover:text-slate-900",
+    mutedText: "text-slate-700",
+    folderActiveBg: "bg-slate-100 border-slate-200",
+    folderOpenBg: "border-slate-200",
+    indicator: "before:bg-slate-600 before:shadow-none",
+    lineDivider: "before:bg-slate-200",
+    footerBg: "bg-slate-100 border-slate-200",
+    themeActiveBorder: "border-slate-600",
+    roleBadge: "bg-white/80 text-slate-800 border border-slate-200",
+    roleLabel: "text-slate-600",
+    searchBorder: "border border-slate-200",
+    searchFocus: "focus:bg-white focus:border-slate-400 focus:ring-1 focus:ring-slate-300",
+  },
+};
 const OPEN_GROUPS_KEY = 'eskahade_sidebar_open_groups';
 
 function persistOpenFolders(folders: Record<string, boolean>) {
@@ -250,6 +231,7 @@ interface SidebarProps {
 export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sidebarGroups = [], isCollapsed, toggleSidebar, isMobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const [theme, setTheme] = useState<ThemeKey>('light');
+
   const [mounted, setMounted] = useState(false);
   const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState("");
@@ -290,8 +272,8 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
     .map(g => {
       if (!searchQuery) return g;
       const lowerQuery = searchQuery.toLowerCase();
-      const filteredItems = g.items.filter(i => 
-        getMenuTitle(i.title).toLowerCase().includes(lowerQuery) || 
+      const filteredItems = g.items.filter(i =>
+        getMenuTitle(i.title).toLowerCase().includes(lowerQuery) ||
         (g.group !== '_standalone' && g.label.toLowerCase().includes(lowerQuery))
       );
       return { ...g, items: filteredItems };
@@ -300,7 +282,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
 
   const activeHref = getActiveMenu(pathname, fiturAkses);
 
-  // Mount: restore tema + grup yang terbuka
+  // Mount: pulihkan grup sidebar yang terbuka
   useEffect(() => {
     setMounted(true);
     const savedTheme = localStorage.getItem('app-theme') as ThemeKey;
@@ -585,17 +567,19 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
                   key={t}
                   onClick={() => changeTheme(t)}
                   title={t.charAt(0).toUpperCase() + t.slice(1)}
+                  aria-label={'Tema ' + t}
+                  aria-pressed={theme === t}
                   className={cn(
-                    "w-3.5 h-3.5 rounded-full border-2 transition-all duration-300",
-                    theme === t ? `${c.themeActiveBorder} scale-125` : "border-transparent opacity-40 hover:opacity-100 hover:scale-110"
+                    "w-4 h-4 rounded-full border-2 transition-all duration-200 active:scale-95 motion-reduce:transition-none",
+                    theme === t ? c.themeActiveBorder + ' scale-110' : "border-transparent opacity-70 hover:opacity-100 hover:scale-110"
                   )}
                   style={{
                     backgroundColor:
-                      t === 'light'   ? '#f8fafc' :
-                      t === 'emerald' ? '#10b981' :
-                      t === 'blue'    ? '#3b82f6' :
-                      t === 'purple'  ? '#a855f7' :
-                      t === 'rose'    ? '#f43f5e' : '#475569'
+                      t === 'light'   ? '#e8dfcf' :
+                      t === 'emerald' ? '#d1fae5' :
+                      t === 'blue'    ? '#dbeafe' :
+                      t === 'purple'  ? '#ede9fe' :
+                      t === 'rose'    ? '#ffe4e6' : '#e2e8f0'
                   }}
                 />
               ))}

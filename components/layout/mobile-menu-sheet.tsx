@@ -24,21 +24,37 @@ type Props = {
 
 export function MobileMenuSheet({ open, items, groups, onClose }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
+
   const [search, setSearch] = useState('')
+  const [isClosing, setIsClosing] = useState(false)
+  const closeTimerRef = useRef<number | null>(null)
   const pathname = usePathname()
-  const closeMenu = () => { setSearch(''); onClose() }
+  const closeMenu = () => {
+    setSearch('')
+    if (closeTimerRef.current !== null) return
+    const delay = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180
+    setIsClosing(delay > 0)
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null
+      setIsClosing(false)
+      onClose()
+    }, delay)
+  }
 
   useEffect(() => {
     const dialog = dialogRef.current
     if (!dialog) return
     if (open && !dialog.open) {
       dialog.showModal()
-      requestAnimationFrame(() => searchRef.current?.focus())
+
     } else if (!open && dialog.open) {
       dialog.close()
     }
   }, [open])
+
+  useEffect(() => () => {
+    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current)
+  }, [])
 
   const groupedItems = useMemo(() => {
     const available = items.filter(item => item.is_active && item.href !== '/dashboard')
@@ -93,19 +109,19 @@ export function MobileMenuSheet({ open, items, groups, onClose }: Props) {
       onClick={event => { if (event.target === event.currentTarget) closeMenu() }}
       className="fixed inset-0 m-0 h-screen w-screen max-h-none max-w-none overflow-visible border-0 bg-transparent p-0 text-[#1c2923] backdrop:bg-black/50"
     >
-      <section className="absolute inset-x-0 bottom-0 flex h-[68dvh] max-h-[720px] flex-col overflow-hidden rounded-t-3xl border border-[#ddd4c3] bg-[#fffdf8] shadow-[0_-12px_40px_rgba(18,55,42,.16)]">
+      <section className={"absolute inset-x-0 bottom-0 flex h-[84dvh] max-h-[900px] flex-col overflow-hidden rounded-t-3xl border border-[#ddd4c3] bg-[#fffdf8] shadow-[0_-12px_40px_rgba(18,55,42,.16)] transition-[transform,opacity] duration-200 motion-reduce:transition-none motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-8 motion-safe:duration-300 " + (isClosing ? 'translate-y-8 opacity-0' : 'translate-y-0 opacity-100')}>
         <div className="shrink-0 border-b border-[#e4ddcf] px-4 pb-3 pt-3 sm:px-6">
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[#b9c9bd]" aria-hidden="true" />
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 id="mobile-menu-title" className="font-serif text-lg font-semibold">Menu</h2>
-            <button type="button" onClick={closeMenu} aria-label="Tutup menu" className="flex h-10 w-10 items-center justify-center rounded-full text-[#66736c] transition hover:bg-[#f1ede4] hover:text-[#12372a]">
+            <button type="button" onClick={closeMenu} aria-label="Tutup menu" className="flex h-10 w-10 items-center justify-center rounded-full text-[#66736c] transition duration-200 hover:bg-[#f1ede4] hover:text-[#12372a] active:scale-95 motion-reduce:transition-none">
               <X className="h-5 w-5" aria-hidden="true" />
             </button>
           </div>
           <Link
             href="/dashboard"
             onClick={closeMenu}
-            className={'mb-3 flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ' +
+            className={'mb-3 flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition duration-200 active:scale-[0.98] motion-reduce:transition-none ' +
               (pathname === '/dashboard' ? 'bg-[#eaf3e9] text-[#12372a]' : 'bg-[#f5f2eb] text-[#34483c] hover:bg-[#eaf3e9]')}
           >
             <LayoutDashboard className="h-5 w-5" aria-hidden="true" />
@@ -115,7 +131,7 @@ export function MobileMenuSheet({ open, items, groups, onClose }: Props) {
           <label className="flex min-h-11 items-center gap-2.5 rounded-xl border border-[#ddd4c3] bg-white px-3 focus-within:border-[#247451] focus-within:ring-2 focus-within:ring-[#247451]/20">
             <Search className="h-4 w-4 shrink-0 text-[#66736c]" aria-hidden="true" />
             <input
-              ref={searchRef}
+
               value={search}
               onChange={event => setSearch(event.target.value)}
               placeholder="Cari menu..."
@@ -139,7 +155,7 @@ export function MobileMenuSheet({ open, items, groups, onClose }: Props) {
                     {label}
                   </h3>
                 )}
-                <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {groupItems.map(item => {
                     const Icon = getIcon(item.icon)
                     const active = activeHref === item.href
@@ -148,11 +164,11 @@ export function MobileMenuSheet({ open, items, groups, onClose }: Props) {
                         key={item.href}
                         href={item.href}
                         onClick={closeMenu}
-                        className={'flex min-h-11 min-w-0 items-center gap-2 rounded-xl px-2.5 py-2 text-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#247451] ' +
-                          (active ? 'bg-[#eaf3e9] font-semibold text-[#12372a]' : 'text-[#34483c] hover:bg-[#f5f2eb]')}
+                        className={'group flex min-h-[76px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl px-1.5 py-2 text-center text-sm transition duration-200 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#247451] motion-reduce:transition-none ' +
+                          (active ? 'bg-[#eaf3e9] font-semibold text-[#12372a]' : 'text-[#34483c] hover:-translate-y-0.5 hover:bg-[#f5f2eb]')}
                       >
-                        <Icon className={'h-4 w-4 shrink-0 ' + (active ? 'text-[#247451]' : 'text-[#66736c]')} aria-hidden="true" />
-                        <span className="line-clamp-2 min-w-0 leading-tight">{getMenuTitle(item.title)}</span>
+                        <Icon className={'h-5 w-5 shrink-0 transition-transform duration-200 group-active:scale-90 ' + (active ? 'text-[#247451]' : 'text-[#66736c]')} aria-hidden="true" />
+                        <span className="line-clamp-2 min-w-0 text-[10px] font-medium leading-tight sm:text-xs">{getMenuTitle(item.title)}</span>
                       </Link>
                     )
                   })}

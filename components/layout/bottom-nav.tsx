@@ -42,7 +42,7 @@ export function BottomNav({ fiturAkses, globalEnabled, userShowBottomNav, onOpen
         href={item.href}
         prefetch
         aria-current={active ? 'page' : undefined}
-        className="group flex h-full min-w-0 w-full flex-col items-center justify-center gap-0.5 px-1 text-[#66736c] transition-colors active:scale-95"
+        className="group flex h-full min-w-0 w-full flex-col items-center justify-center gap-0.5 px-1 text-[#66736c] transition duration-200 active:scale-95 motion-reduce:transition-none"
       >
         <span className={cn(
           'flex h-8 w-10 items-center justify-center rounded-xl transition-colors',
@@ -75,7 +75,7 @@ export function BottomNav({ fiturAkses, globalEnabled, userShowBottomNav, onOpen
             aria-label="Buka menu"
             aria-haspopup="dialog"
             aria-expanded={menuOpen}
-            className="group flex h-full w-full flex-col items-center justify-center gap-0.5 text-[#66736c] transition-colors active:scale-95"
+            className="group flex h-full w-full flex-col items-center justify-center gap-0.5 text-[#66736c] transition duration-200 active:scale-95 motion-reduce:transition-none"
           >
             <span className={cn(
               'flex h-8 w-10 items-center justify-center rounded-xl transition-colors',

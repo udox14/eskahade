@@ -104,13 +104,12 @@ Aturan ini berlaku untuk `/`, `/login`, dan `/portal-ortu/login`. Halaman dashbo
 
 ## 7. Beranda internal /dashboard
 
-Aturan ini khusus beranda internal. Sidebar desktop tetap digunakan, sedangkan header putih dan padding shell dihilangkan hanya pada /dashboard. Halaman lain mempertahankan shell existing.
+Aturan ini khusus beranda internal. Sidebar desktop tetap digunakan, sedangkan header putih dan padding shell dihilangkan hanya pada /dashboard. Halaman lain mempertahankan shell yang ada.
 
-- Hero menggunakan gambar penuh dari tepi atas area konten dengan tinggi yang lebih ringkas. Tampilkan logo resmi public/logo.png, nama ESKAHADE, sapaan kecil, nama lengkap satu baris yang mengecil sesuai lebar, dan label role utama. Jangan memotong nama dengan ellipsis. Kontrol profil, menu mobile, dan tombol Segarkan memakai area sentuh yang jelas. Admin mengubah gambar, crop, dan warna teks melalui pengaturan dashboard.
-- Running text berada tepat di bawah hero. Tampilkan ikon dan isi saja, tanpa label “Pengumuman”. Gunakan warna pilihan admin dan hentikan gerak ketika prefers-reduced-motion: reduce; isi tetap terbaca.
-- Gunakan latar #f7f1e5, permukaan #fffdf8, tinta #1c2923, hijau #12372a, hijau aksi #247451, dan aksen emas #c9952e. Jaga tinggi hero, pintasan, padding, dan jarak antarseksi tetap ringkas. Hindari bayangan berat dan kartu berlapis.
-- Pintasan maksimal delapan, tersusun empat kolom di mobile dan desktop. Urutan berasal dari pilihan pengguna; menu yang izinnya dicabut harus hilang. Modal pengaturan pintasan tetap tersedia.
-- Widget beranda sedang ditunda. Sembunyikan bagian kartu dan jangan memanggil loader widget dari halaman dashboard. Pertahankan katalog serta pilihan widget per role; beri keterangan di pengaturan admin bahwa widget belum tampil. Saat widget diaktifkan lagi, judul bagiannya hanya “Ringkasan”.
-- Tombol Menu pada navbar bawah dan tombol menu di header/hero membuka panel dari bawah setinggi sekitar 68dvh. Panel menampilkan akses Dashboard, pencarian, dan seluruh menu aktif yang diizinkan, dikelompokkan mengikuti label serta urutan grup existing. Panel dapat ditutup dengan tombol, klik latar, atau Escape.
-- Navbar bawah mobile memakai warna krem dan hijau yang sama, indikator aktif yang terlihat, label “Menu”, dan ruang aman perangkat. Sidebar desktop tidak berubah. Saat navbar bawah dinonaktifkan, tombol menu pada hero dan header tetap tersedia.
-- Kontrol memiliki label aksesibilitas dan fokus keyboard yang jelas. Transisi non-esensial dihentikan saat pengguna meminta gerakan berkurang.
+- Hero memakai gambar penuh dengan skala ringkas. Tampilkan logo public/logo.png, nama ESKAHADE, sapaan yang jelas, nama lengkap satu baris yang mengecil mengikuti lebar, dan role utama dalam badge glass transparan. Logo ESKAHADE pada mobile membuka sidebar existing; kontrol Segarkan, Menu, dan profil punya area sentuh yang jelas.
+- Running text berada tepat di bawah hero. Tampilkan ikon dan isi pengumuman saja, tanpa label. Hentikan gerak saat prefers-reduced-motion: reduce.
+- Hari dan tanggal tampil di bawah hero, di posisi judul â€œAkses Cepatâ€. Pintasan maksimal delapan; gunakan empat kolom di mobile dan satu baris delapan kolom di desktop.
+- Widget beranda sedang ditunda. Sembunyikan bagian kartu dan jangan memanggil loader widget. Pertahankan katalog serta pilihan widget per role dan beri keterangan di pengaturan admin bahwa widget belum tampil. Saat diaktifkan lagi, judul bagiannya hanya â€œRingkasanâ€.
+- Tombol Menu membuka panel dari bawah setinggi sekitar 84dvh. Panel menampilkan tombol Dashboard, kolom pencarian opsional yang tidak fokus otomatis, dan semua menu aktif yang diizinkan dalam grup existing. Setiap menu tampil sebagai ikon dengan label di bawahnya. Panel bisa ditutup dengan tombol, klik latar, atau Escape.
+- Logo dan nama ESKAHADE di kiri atas header mobile membuka sidebar existing. Sidebar memakai pilihan palet pastel datar yang selaras dengan dashboard, tanpa gradient. Navbar bawah memakai warna yang selaras, indikator aktif yang jelas, label â€œMenuâ€, dan ruang aman perangkat.
+- Beri transisi singkat pada drawer, pintasan, dan tombol tekan. Hentikan animasi serta transformasi dekoratif saat prefers-reduced-motion: reduce. Semua kontrol tetap punya label aksesibilitas dan fokus keyboard yang jelas.

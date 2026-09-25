@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowDown, ArrowUp, Megaphone, Menu, RefreshCw, Settings2, X } from 'lucide-react'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
 import { getIcon, getMenuTitle } from '@/lib/menu/config'
-import { useDashboardMenu } from '@/components/layout/menu-context'
+import { useDashboardMenu, useDashboardSidebar } from '@/components/layout/menu-context'
 import type { HeroConfig, TickerConfig } from '@/lib/dashboard/config'
 import { saveDashboardShortcuts } from './actions'
 import './home.css'
@@ -38,6 +38,7 @@ function HeroPhoto({ hero }: { hero: HeroConfig }) {
 
 export function HomeClient({ userName, primaryRoleLabel, greeting, dateLabel, menu, initialShortcuts, hero, ticker }: Props) {
   const openMenu = useDashboardMenu()
+  const openSidebar = useDashboardSidebar()
   const router = useRouter()
   const [shortcuts, setShortcuts] = useState(initialShortcuts)
   const [draft, setDraft] = useState<number[]>([])
@@ -123,27 +124,27 @@ export function HomeClient({ userName, primaryRoleLabel, greeting, dateLabel, me
   const whiteText = hero.textColor === 'white'
 
   return (
-    <div className="dashboard-home min-h-full bg-[#f7f1e5] text-[#1c2923]">
+    <div className="dashboard-home min-h-full bg-[#f7f1e5] text-[#1c2923] motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500 motion-reduce:animate-none">
       <section className={"relative isolate h-[292px] overflow-hidden bg-[#12372a] sm:h-[316px] md:h-[326px] " + (whiteText ? 'text-white' : 'text-black')}>
         <HeroPhoto hero={hero} />
         <div className={"absolute inset-0 " + (whiteText ? 'bg-gradient-to-r from-black/75 via-black/35 to-black/5' : 'bg-gradient-to-r from-white/85 via-white/45 to-white/5')} />
         <div className="relative z-10 mx-auto flex h-full max-w-6xl flex-col justify-between px-4 pb-6 pt-4 sm:px-6 md:px-8 md:pb-7 md:pt-5">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <Image src="/logo.png" alt="Logo Pesantren ESKAHADE" width={34} height={34} priority className="h-8 w-8 shrink-0 object-contain" />
-              <span className="truncate font-serif text-base font-semibold tracking-[0.08em] sm:text-lg">ESKAHADE</span>
-            </div>
+            <button type="button" onClick={() => { if (window.matchMedia('(max-width: 767px)').matches) openSidebar() }} aria-label="Buka sidebar" title="Buka sidebar" className="group flex min-w-0 items-center gap-2.5 rounded-lg text-left transition duration-200 active:scale-95 motion-reduce:transition-none">
+              <Image src="/logo.png" alt="Logo Pesantren ESKAHADE" width={34} height={34} priority className="h-8 w-8 shrink-0 object-contain transition-transform duration-200 group-hover:scale-105" />
+              <span className="truncate font-serif text-base font-semibold tracking-[0.08em] transition-opacity group-hover:opacity-85 sm:text-lg">ESKAHADE</span>
+            </button>
             <div className={whiteText ? "flex shrink-0 items-center gap-1.5 rounded-full bg-black/55 p-1 backdrop-blur-sm" : "flex shrink-0 items-center gap-1.5 rounded-full bg-white/85 p-1 backdrop-blur-sm"}>
-              <button onClick={refresh} disabled={isRefreshing} title="Segarkan dashboard" aria-label="Segarkan dashboard" className="flex h-9 w-9 items-center justify-center rounded-full border border-current/30 transition hover:bg-white/15 disabled:opacity-60"><RefreshCw className={"h-4 w-4 " + (isRefreshing ? 'animate-spin' : '')} aria-hidden="true" /></button>
-              <button onClick={openMenu} title="Buka menu" aria-label="Buka menu" className="flex h-9 w-9 items-center justify-center rounded-full border border-current/30 transition hover:bg-white/15 md:hidden"><Menu className="h-4 w-4" aria-hidden="true" /></button>
-              <Link href="/dashboard/profil" title="Profil saya" aria-label="Profil saya" className="flex h-9 w-9 items-center justify-center rounded-full border border-current/35 text-sm font-bold transition hover:bg-white/15">{initial}</Link>
+              <button onClick={refresh} disabled={isRefreshing} title="Segarkan dashboard" aria-label="Segarkan dashboard" className="flex h-9 w-9 items-center justify-center rounded-full border border-current/30 transition duration-200 hover:bg-white/15 active:scale-95 motion-reduce:transition-none disabled:opacity-60"><RefreshCw className={"h-4 w-4 " + (isRefreshing ? 'animate-spin' : '')} aria-hidden="true" /></button>
+              <button onClick={openMenu} title="Buka menu" aria-label="Buka menu" className="flex h-9 w-9 items-center justify-center rounded-full border border-current/30 transition duration-200 hover:bg-white/15 active:scale-95 motion-reduce:transition-none md:hidden"><Menu className="h-4 w-4" aria-hidden="true" /></button>
+              <Link href="/dashboard/profil" title="Profil saya" aria-label="Profil saya" className="flex h-9 w-9 items-center justify-center rounded-full border border-current/35 text-sm font-bold transition duration-200 hover:bg-white/15 active:scale-95 motion-reduce:transition-none">{initial}</Link>
             </div>
           </div>
           <div className="w-full max-w-2xl">
-            <p className="mb-1 text-[11px] font-medium tracking-wide opacity-90 sm:text-xs">{dateLabel}</p>
-            <p className="text-xs font-medium leading-tight opacity-90 sm:text-sm">{greeting}</p>
+
+            <p className="text-sm font-medium leading-tight opacity-95 sm:text-base">{greeting}</p>
             <h1 ref={userNameRef} className="w-full whitespace-nowrap font-serif text-[30px] font-semibold leading-[1.08] tracking-tight">{userName}</h1>
-            <p className="mt-1 text-xs font-medium opacity-90 sm:text-sm">{primaryRoleLabel}</p>
+            <p className={"mt-2 inline-flex max-w-full rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur-md " + (whiteText ? "border-white/25 bg-white/15 text-white" : "border-black/10 bg-white/35 text-black")}>{primaryRoleLabel}</p>
           </div>
         </div>
       </section>
@@ -153,12 +154,12 @@ export function HomeClient({ userName, primaryRoleLabel, greeting, dateLabel, me
         <div className="dashboard-ticker-window flex-1 overflow-hidden"><div className="dashboard-ticker-track whitespace-nowrap text-sm" aria-label={ticker.text}>{ticker.text}<span aria-hidden="true" className="mx-16">•</span><span aria-hidden="true">{ticker.text}</span></div></div>
       </div>}
 
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-5 sm:px-6 md:px-8 md:py-7">
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-5 sm:px-6 md:px-8 md:py-7 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500 motion-reduce:animate-none">
         {message && <p role="status" className="rounded-lg border border-[#ddd4c3] bg-white px-4 py-3 text-sm">{message}</p>}
         <section aria-labelledby="shortcuts-heading">
-          <div className="mb-3 flex items-center justify-between gap-3"><h2 id="shortcuts-heading" className="font-serif text-lg font-semibold sm:text-xl">Akses cepat</h2><button onClick={editShortcuts} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-[#247451] hover:bg-[#e7eee6]"><Settings2 className="h-4 w-4" /> Atur pintasan</button></div>
-          {shortcuts.length ? <div className="grid grid-cols-4 gap-2 sm:gap-3">
-            {shortcuts.map(item => { const Icon = getIcon(item.icon); return <Link key={item.id} href={item.href} className="group flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-xl border border-[#e4ddcf] bg-[#fffdf8] px-1.5 py-2 text-center transition-colors hover:border-[#9ab5a2] hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#247451] sm:min-h-[84px] sm:gap-2 sm:px-2">
+          <div className="mb-3 flex items-center justify-between gap-3"><h2 id="shortcuts-heading" className="text-sm font-semibold text-[#66736c] sm:text-base">{dateLabel}</h2><button onClick={editShortcuts} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-[#247451] transition duration-200 hover:bg-[#e7eee6] active:scale-95 motion-reduce:transition-none"><Settings2 className="h-4 w-4" /> Atur pintasan</button></div>
+          {shortcuts.length ? <div className="grid grid-cols-4 gap-2 sm:gap-3 lg:grid-cols-8">
+            {shortcuts.map(item => { const Icon = getIcon(item.icon); return <Link key={item.id} href={item.href} className="group flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-xl border border-[#e4ddcf] bg-[#fffdf8] px-1.5 py-2 text-center transition duration-200 hover:-translate-y-0.5 hover:border-[#9ab5a2] hover:bg-white active:scale-[0.97] motion-reduce:transform-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#247451] sm:min-h-[84px] sm:gap-2 sm:px-2">
               <Icon className="h-5 w-5 text-[#12372a] group-hover:text-[#247451] sm:h-[22px] sm:w-[22px]" aria-hidden="true" />
               <span className="line-clamp-2 text-[10px] font-medium leading-tight text-[#1c2923] sm:text-xs">{getMenuTitle(item.title)}</span>
             </Link> })}

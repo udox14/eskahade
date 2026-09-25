@@ -5,6 +5,7 @@ import { signOut } from './actions'
 import { SignOut as LogOut, Bell, List as Menu, Gear as Settings, CaretDown as ChevronDown } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface HeaderProps {
   userName: string
@@ -12,6 +13,7 @@ interface HeaderProps {
   userRoles?: string[]
   avatarUrl?: string | null
   onMenuClick?: () => void
+  onSidebarClick?: () => void
 }
 
 const ROLE_LABEL: Record<string, string> = {
@@ -52,7 +54,7 @@ function useClock() {
   return now
 }
 
-export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick }: HeaderProps) {
+export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick, onSidebarClick }: HeaderProps) {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isNotifOpen, setIsNotifOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
@@ -92,7 +94,7 @@ export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick }
           onClick={onMenuClick}
           aria-label="Buka menu"
           title="Buka menu"
-          className="md:hidden p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+          className="md:hidden p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition duration-200 active:scale-95 motion-reduce:transition-none"
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -107,7 +109,16 @@ export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick }
         </div>
 
         {/* Nama app — mobile only */}
-        <span className="md:hidden text-sm font-bold text-slate-800 tracking-tight">ESKAHADE</span>
+        <button
+          type="button"
+          onClick={onSidebarClick}
+          aria-label="Buka sidebar"
+          title="Buka sidebar"
+          className="md:hidden inline-flex items-center gap-2 rounded-lg py-1 pr-2 text-left transition active:scale-95"
+        >
+          <Image src="/logo.png" alt="" width={28} height={28} className="h-7 w-7 object-contain" />
+          <span className="text-sm font-bold tracking-tight text-slate-800">ESKAHADE</span>
+        </button>
       </div>
 
       {/* ── KANAN ── */}

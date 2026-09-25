@@ -10,7 +10,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { MobileMenuSheet } from "@/components/layout/mobile-menu-sheet";
-import { DashboardMenuContext } from "@/components/layout/menu-context";
+import { DashboardMenuContext, DashboardSidebarContext } from "@/components/layout/menu-context";
 import { cn } from "@/lib/utils";
 import type { FiturAkses } from "@/lib/cache/fitur-akses";
 import type { SidebarGroupConfig } from "@/lib/menu/groups";
@@ -40,6 +40,9 @@ export function ClientLayout({ children, userRole, userRoles, userName, avatarUr
     }
   });
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const openMenu = () => { setIsMobileSidebarOpen(false); setIsMobileOpen(true); };
+  const openSidebar = () => { setIsMobileOpen(false); setIsMobileSidebarOpen(true); };
   const pathname = usePathname();
   const isDashboardHome = pathname === '/dashboard';
   const searchParams = useSearchParams();
@@ -54,9 +57,10 @@ export function ClientLayout({ children, userRole, userRoles, userName, avatarUr
 
   return (
     <IconContext.Provider value={{ weight: "duotone" }}>
-      <DashboardMenuContext.Provider value={() => setIsMobileOpen(true)}>
+      <DashboardMenuContext.Provider value={openMenu}>
+      <DashboardSidebarContext.Provider value={openSidebar}>
       <div className="relative flex h-[100dvh] w-full overflow-hidden bg-slate-50 font-sans text-slate-900 antialiased selection:bg-green-100 selection:text-green-900">
-      
+
       {/* Sidebar desktop */}
       <Sidebar
         userRole={userRole}
@@ -64,6 +68,8 @@ export function ClientLayout({ children, userRole, userRoles, userName, avatarUr
         fiturAkses={fiturAkses}
         sidebarGroups={sidebarGroups}
         isCollapsed={isCollapsed}
+        isMobileOpen={isMobileSidebarOpen}
+        onMobileClose={() => setIsMobileSidebarOpen(false)}
         toggleSidebar={() => {
           setIsCollapsed(prev => {
             const next = !prev;
@@ -76,7 +82,7 @@ export function ClientLayout({ children, userRole, userRoles, userName, avatarUr
       />
 
       {/* 2. AREA KONTEN (DYNAMIC PADDING) */}
-      <div 
+      <div
         className={cn(
           "flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out h-full [--dashboard-sidebar-offset:0px]",
           isCollapsed ? "md:pl-16 md:[--dashboard-sidebar-offset:4rem]" : "md:pl-60 md:[--dashboard-sidebar-offset:15rem]"
@@ -85,12 +91,12 @@ export function ClientLayout({ children, userRole, userRoles, userName, avatarUr
         {/* HEADER */}
         {!isDashboardHome && <div className="no-print sticky top-0 z-40 w-full h-12 bg-white border-b border-slate-100 flex items-center px-4 md:px-8 transition-all">
           <div className="w-full">
-            <Header 
-                userName={userName} 
+            <Header
+                userName={userName}
                 userRole={userRole}
                 userRoles={userRoles}
                 avatarUrl={avatarUrl}
-                onMenuClick={() => setIsMobileOpen(true)}
+                onMenuClick={openMenu} onSidebarClick={openSidebar}
             />
           </div>
         </div>}
@@ -118,7 +124,7 @@ export function ClientLayout({ children, userRole, userRoles, userName, avatarUr
           fiturAkses={fiturAkses}
           globalEnabled={globalBottomNavEnabled}
           userShowBottomNav={userShowBottomNav}
-          onOpenMenu={() => setIsMobileOpen(true)}
+          onOpenMenu={openMenu}
           menuOpen={isMobileOpen}
         />
         <MobileMenuSheet
@@ -129,6 +135,7 @@ export function ClientLayout({ children, userRole, userRoles, userName, avatarUr
         />
       </div>
     </div>
+        </DashboardSidebarContext.Provider>
     </DashboardMenuContext.Provider>
     </IconContext.Provider>
   );
