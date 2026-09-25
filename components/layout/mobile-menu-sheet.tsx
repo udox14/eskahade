@@ -175,11 +175,11 @@ export function MobileMenuSheet({ open, items, groups, onClose }: Props) {
                         href={item.href}
                         onClick={closeMenu}
                         aria-label={title}
-                        className={'group flex min-h-[88px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl px-1.5 py-2 text-center text-sm transition duration-200 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#247451] motion-reduce:transition-none ' +
-                          (active ? 'bg-[#eaf3e9] font-semibold text-[#12372a]' : 'text-[#34483c] hover:-translate-y-0.5 hover:bg-[#f5f2eb]')}
+                        className={'group flex h-[104px] min-w-0 flex-col items-center rounded-2xl border px-1.5 py-2 text-center text-sm transition duration-200 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#247451] motion-reduce:transition-none ' +
+                          (active ? 'border-[#9ab5a2] bg-[#eaf3e9] font-semibold text-[#12372a]' : 'border-[#e4ddcf] bg-white text-[#34483c] hover:-translate-y-0.5 hover:border-[#c9d8ce] hover:bg-[#fffdf8]')}
                       >
                         <span className={'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition duration-200 group-active:scale-95 ' + (active ? 'border-[#c9d8ce] bg-white text-[#247451] shadow-sm' : 'border-[#e4ddcf] bg-white/80 text-[#66736c] group-hover:border-[#c9d8ce] group-hover:bg-[#eaf3e9]')}><Icon className="h-5 w-5 transition-transform duration-200 group-active:scale-90" aria-hidden="true" /></span>
-                        <span aria-hidden="true" className="flex min-w-0 max-w-full flex-col items-center text-[10px] font-medium leading-tight sm:text-xs">{titleLines.map((line, index) => <span key={index} className="max-w-full truncate">{line}</span>)}</span>
+                        <span aria-hidden="true" className="mt-1.5 flex h-7 w-full min-w-0 max-w-full shrink-0 flex-col items-center justify-center text-[10px] font-medium leading-3 sm:text-xs">{titleLines.map((line, index) => <span key={index} className="w-full max-w-full truncate leading-3">{line}</span>)}</span>
                       </Link>
                     )
                   })}

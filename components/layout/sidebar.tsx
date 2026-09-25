@@ -44,7 +44,6 @@ type ThemeColor = {
   folderOpenBg: string;
   indicator: string;
   glowBg: string;
-  lineDivider: string;
   footerBg: string;
   footerGlow: string;
   themeIcon: string;
@@ -56,7 +55,35 @@ type ThemeColor = {
   searchFocus: string;
 };
 
-const PASTEL_DARK: ThemeColor = {
+const PASTEL_LIGHT: ThemeColor = {
+  bg: "bg-[#f7f1e5]",
+  baseText: "text-[#34483c]",
+  borderBase: "border-[#e4ddcf]",
+  logoText: "text-[#12372a]",
+  toggleBtn: "bg-white border-[#ddd4c3] text-[#247451] hover:bg-[#eaf3e9] hover:border-[#9ab5a2]",
+  glowText: "text-[#247451]",
+  activeText: "text-[#12372a]",
+  activeBg: "bg-[#eaf3e9]",
+  activeBorder: "border-[#9ab5a2]",
+  hoverBg: "hover:bg-[#eee7d9]",
+  hoverText: "group-hover:text-[#12372a]",
+  mutedText: "text-[#4f665a]",
+  folderActiveBg: "bg-[#eaf3e9] border-[#c9d8ce]",
+  folderOpenBg: "border-[#c9d8ce]",
+  indicator: "before:bg-[#247451] before:shadow-none",
+  glowBg: "bg-transparent",
+  footerBg: "bg-[#efe7d8] border-[#e4ddcf]",
+  footerGlow: "bg-transparent",
+  themeIcon: "text-[#247451]",
+  themeActiveBorder: "border-[#247451]",
+  roleBadge: "bg-white/80 text-[#34483c] border border-[#ddd4c3]",
+  roleLabel: "text-[#66736c]",
+  searchBg: "bg-white/80",
+  searchBorder: "border border-[#ddd4c3]",
+  searchFocus: "focus:bg-white focus:border-[#9ab5a2] focus:ring-1 focus:ring-[#9ab5a2]",
+};
+
+const DARK_PASTEL_BASE: ThemeColor = {
   bg: "bg-[#34463f]",
   baseText: "text-white",
   borderBase: "border-white/10",
@@ -73,7 +100,6 @@ const PASTEL_DARK: ThemeColor = {
   folderOpenBg: "border-white/20",
   indicator: "before:bg-white before:shadow-none",
   glowBg: "bg-transparent",
-  lineDivider: "before:bg-white/20",
   footerBg: "bg-black/10 border-white/10",
   footerGlow: "bg-transparent",
   themeIcon: "text-white/75",
@@ -86,12 +112,87 @@ const PASTEL_DARK: ThemeColor = {
 };
 
 const THEME_COLORS: Record<ThemeKey, ThemeColor> = {
-  light: PASTEL_DARK,
-  emerald: { ...PASTEL_DARK, bg: "bg-[#30463b]" },
-  blue: { ...PASTEL_DARK, bg: "bg-[#364552]" },
-  purple: { ...PASTEL_DARK, bg: "bg-[#464052]" },
-  rose: { ...PASTEL_DARK, bg: "bg-[#4a3d42]" },
-  slate: { ...PASTEL_DARK, bg: "bg-[#41454a]" },
+  light: PASTEL_LIGHT,
+  emerald: {
+    ...DARK_PASTEL_BASE,
+    bg: "bg-[#34463f]",
+    toggleBtn: "bg-[#41564c] border-white/20 text-white hover:bg-[#50675c] hover:border-white/35",
+    activeBg: "bg-[#466153]",
+    activeBorder: "border-[#849a8d]",
+    hoverBg: "hover:bg-[#3e554a]",
+    folderActiveBg: "bg-[#41594d] border-[#72877a]",
+    folderOpenBg: "border-[#81998a]",
+    indicator: "before:bg-[#c4ddcf] before:shadow-none",
+    footerBg: "bg-[#2d3d36] border-white/10",
+    themeActiveBorder: "border-[#d3e1d7]",
+    roleBadge: "bg-[#41564c] text-white border border-[#6e8276]",
+    searchBg: "bg-[#40544a]",
+    searchFocus: "focus:bg-[#465f53] focus:border-[#9cb5a4] focus:ring-1 focus:ring-[#8aa796]/40",
+  },
+  blue: {
+    ...DARK_PASTEL_BASE,
+    bg: "bg-[#344f68]",
+    toggleBtn: "bg-[#405f7a] border-white/20 text-white hover:bg-[#4a6c88] hover:border-white/35",
+    activeBg: "bg-[#43617b]",
+    activeBorder: "border-[#8aa8c1]",
+    hoverBg: "hover:bg-[#3d5a74]",
+    folderActiveBg: "bg-[#405d77] border-[#718ca5]",
+    folderOpenBg: "border-[#829db5]",
+    indicator: "before:bg-[#d7e8f6] before:shadow-none",
+    footerBg: "bg-[#2e455a] border-white/10",
+    themeActiveBorder: "border-[#d7e8f6]",
+    roleBadge: "bg-[#405f7a] text-white border border-[#718ca5]",
+    searchBg: "bg-[#405a71]",
+    searchFocus: "focus:bg-[#496783] focus:border-[#a5bfd4] focus:ring-1 focus:ring-[#91aec5]/40",
+  },
+  purple: {
+    ...DARK_PASTEL_BASE,
+    bg: "bg-[#4d3e5b]",
+    toggleBtn: "bg-[#5d4d6c] border-white/20 text-white hover:bg-[#6a587a] hover:border-white/35",
+    activeBg: "bg-[#5f5070]",
+    activeBorder: "border-[#a493b5]",
+    hoverBg: "hover:bg-[#594967]",
+    folderActiveBg: "bg-[#594967] border-[#887697]",
+    folderOpenBg: "border-[#a090ad]",
+    indicator: "before:bg-[#e5d8f0] before:shadow-none",
+    footerBg: "bg-[#403449] border-white/10",
+    themeActiveBorder: "border-[#e5d8f0]",
+    roleBadge: "bg-[#5d4d6c] text-white border border-[#887697]",
+    searchBg: "bg-[#574765]",
+    searchFocus: "focus:bg-[#645371] focus:border-[#b5a5c3] focus:ring-1 focus:ring-[#a291b2]/40",
+  },
+  rose: {
+    ...DARK_PASTEL_BASE,
+    bg: "bg-[#5a3b46]",
+    toggleBtn: "bg-[#6c4a56] border-white/20 text-white hover:bg-[#7a5360] hover:border-white/35",
+    activeBg: "bg-[#704f5b]",
+    activeBorder: "border-[#b38b97]",
+    hoverBg: "hover:bg-[#63434e]",
+    folderActiveBg: "bg-[#674752] border-[#9a6f7b]",
+    folderOpenBg: "border-[#ad8390]",
+    indicator: "before:bg-[#f1d9df] before:shadow-none",
+    footerBg: "bg-[#4a3039] border-white/10",
+    themeActiveBorder: "border-[#f1d9df]",
+    roleBadge: "bg-[#6c4a56] text-white border border-[#9a6f7b]",
+    searchBg: "bg-[#63434e]",
+    searchFocus: "focus:bg-[#754f5c] focus:border-[#c39aa5] focus:ring-1 focus:ring-[#b68b98]/40",
+  },
+  slate: {
+    ...DARK_PASTEL_BASE,
+    bg: "bg-[#454e59]",
+    toggleBtn: "bg-[#56616d] border-white/20 text-white hover:bg-[#626e7b] hover:border-white/35",
+    activeBg: "bg-[#5d6773]",
+    activeBorder: "border-[#9aa6b2]",
+    hoverBg: "hover:bg-[#515b66]",
+    folderActiveBg: "bg-[#535e69] border-[#818d98]",
+    folderOpenBg: "border-[#939faa]",
+    indicator: "before:bg-[#e1e8ed] before:shadow-none",
+    footerBg: "bg-[#39414a] border-white/10",
+    themeActiveBorder: "border-[#e1e8ed]",
+    roleBadge: "bg-[#56616d] text-white border border-[#818d98]",
+    searchBg: "bg-[#4d5863]",
+    searchFocus: "focus:bg-[#596572] focus:border-[#a6b1bc] focus:ring-1 focus:ring-[#96a2ae]/40",
+  },
 };
 const OPEN_GROUPS_KEY = 'eskahade_sidebar_open_groups';
 
@@ -405,7 +506,7 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
                     isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
                   )}>
                     <div className="min-w-0 overflow-hidden">
-                      <div className={cn("pl-3 space-y-0.5 relative before:absolute before:left-5 before:top-2 before:bottom-2 before:w-[2px] before:rounded-full", c.lineDivider)}>
+                      <div className="pl-3 space-y-0.5">
                         {items.map((fitur) => {
                           const ItemIcon = getIcon(fitur.icon);
                           const isActive = activeHref === fitur.href;
@@ -460,11 +561,11 @@ export function Sidebar({ userRole = 'wali_kelas', userRoles, fiturAkses, sideba
                   )}
                   style={{
                     backgroundColor:
-                      t === 'light'   ? '#34463f' :
-                      t === 'emerald' ? '#30463b' :
-                      t === 'blue'    ? '#364552' :
-                      t === 'purple'  ? '#464052' :
-                      t === 'rose'    ? '#4a3d42' : '#41454a'
+                      t === 'light'   ? '#f7f1e5' :
+                      t === 'emerald' ? '#34463f' :
+                      t === 'blue'    ? '#344f68' :
+                      t === 'purple'  ? '#4d3e5b' :
+                      t === 'rose'    ? '#5a3b46' : '#454e59'
                   }}
                 />
               ))}
