@@ -119,6 +119,7 @@ export interface RingkasanRowItem {
   santriId: string
   nis: string
   namaLengkap: string
+  fotoUrl: string | null
   asrama: string | null
   kamar: string | null
   kelasSekolah: string | null
@@ -140,6 +141,7 @@ export interface BulananRowItem {
   santriId: string
   nis: string
   namaLengkap: string
+  fotoUrl: string | null
   asrama: string | null
   kamar: string | null
   kelasSekolah: string | null
@@ -163,6 +165,7 @@ export interface TahunanRowItem {
   santriId: string
   nis: string
   namaLengkap: string
+  fotoUrl: string | null
   asrama: string | null
   kamar: string | null
   kelasSekolah: string | null
@@ -185,6 +188,7 @@ export interface UsppRowItem {
   santriId: string
   nis: string
   namaLengkap: string
+  fotoUrl: string | null
   asrama: string | null
   kamar: string | null
   kelasSekolah: string | null
@@ -205,6 +209,7 @@ export interface TunggakanRowItem {
   santriId: string
   nis: string
   namaLengkap: string
+  fotoUrl: string | null
   asrama: string | null
   kamar: string | null
   kelasSekolah: string | null
@@ -281,6 +286,7 @@ export interface StudentIdentityDetail {
   id: string
   nis: string
   namaLengkap: string
+  fotoUrl: string | null
   jenisKelamin: string
   asrama: string | null
   kamar: string | null
@@ -403,6 +409,7 @@ export interface StudentSearchResultItem {
   id: string
   nis: string
   namaLengkap: string
+  fotoUrl: string | null
   asrama: string | null
   kamar: string | null
   unpaidCount: number
@@ -789,11 +796,12 @@ async function fetchRingkasanData(options: {
     id: string
     nis: string
     nama_lengkap: string
+    foto_url: string | null
     asrama: string | null
     kamar: string | null
     kelas_sekolah: string | null
   }>(
-    `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, s.kelas_sekolah
+    `SELECT s.id, s.nis, s.nama_lengkap, s.foto_url, s.asrama, s.kamar, s.kelas_sekolah
      FROM santri s
      WHERE ${whereSql}
      ORDER BY s.nama_lengkap ASC
@@ -965,6 +973,7 @@ async function fetchRingkasanData(options: {
       santriId: s.id,
       nis: s.nis,
       namaLengkap: s.nama_lengkap,
+      fotoUrl: s.foto_url,
       asrama: s.asrama,
       kamar: s.kamar,
       kelasSekolah: s.kelas_sekolah,
@@ -1079,6 +1088,7 @@ async function fetchBulananData(options: {
     santri_id: string
     nis: string
     nama_lengkap: string
+    foto_url: string | null
     asrama: string | null
     kamar: string | null
     kelas_sekolah: string | null
@@ -1096,6 +1106,7 @@ async function fetchBulananData(options: {
        o.santri_id,
        s.nis,
        s.nama_lengkap,
+       s.foto_url,
        s.asrama,
        s.kamar,
        s.kelas_sekolah,
@@ -1193,6 +1204,7 @@ async function fetchBulananData(options: {
       santriId: r.santri_id,
       nis: r.nis,
       namaLengkap: r.nama_lengkap,
+      fotoUrl: r.foto_url,
       asrama: r.asrama,
       kamar: r.kamar,
       kelasSekolah: r.kelas_sekolah,
@@ -1311,6 +1323,7 @@ async function fetchTahunanData(options: {
     santri_id: string
     nis: string
     nama_lengkap: string
+    foto_url: string | null
     asrama: string | null
     kamar: string | null
     kelas_sekolah: string | null
@@ -1327,6 +1340,7 @@ async function fetchTahunanData(options: {
        o.santri_id,
        s.nis,
        s.nama_lengkap,
+       s.foto_url,
        s.asrama,
        s.kamar,
        s.kelas_sekolah,
@@ -1429,6 +1443,7 @@ async function fetchTahunanData(options: {
       santriId: r.santri_id,
       nis: r.nis,
       namaLengkap: r.nama_lengkap,
+      fotoUrl: r.foto_url,
       asrama: r.asrama,
       kamar: r.kamar,
       kelasSekolah: r.kelas_sekolah,
@@ -1540,6 +1555,7 @@ async function fetchUsppData(options: {
     santri_id: string
     nis: string
     nama_lengkap: string
+    foto_url: string | null
     asrama: string | null
     kamar: string | null
     kelas_sekolah: string | null
@@ -1554,6 +1570,7 @@ async function fetchUsppData(options: {
        s.id as santri_id,
        s.nis,
        s.nama_lengkap,
+       s.foto_url,
        s.asrama,
        s.kamar,
        s.kelas_sekolah,
@@ -1617,6 +1634,7 @@ async function fetchUsppData(options: {
       santriId: r.santri_id,
       nis: r.nis,
       namaLengkap: r.nama_lengkap,
+      fotoUrl: r.foto_url,
       asrama: r.asrama,
       kamar: r.kamar,
       kelasSekolah: r.kelas_sekolah,
@@ -1762,6 +1780,7 @@ async function fetchTunggakanData(options: {
     santri_id: string
     nis: string
     nama_lengkap: string
+    foto_url: string | null
     asrama: string | null
     kamar: string | null
     kelas_sekolah: string | null
@@ -1777,6 +1796,7 @@ async function fetchTunggakanData(options: {
        o.santri_id,
        s.nis,
        s.nama_lengkap,
+       s.foto_url,
        s.asrama,
        s.kamar,
        s.kelas_sekolah,
@@ -1854,6 +1874,7 @@ async function fetchTunggakanData(options: {
       santriId: r.santri_id,
       nis: r.nis,
       namaLengkap: r.nama_lengkap,
+      fotoUrl: r.foto_url,
       asrama: r.asrama,
       kamar: r.kamar,
       kelasSekolah: r.kelas_sekolah,
@@ -2182,6 +2203,7 @@ export async function getStudentPaymentDetail(
     id: string
     nis: string
     nama_lengkap: string
+    foto_url: string | null
     jenis_kelamin: string
     status_global: string
     asrama: string | null
@@ -2191,7 +2213,7 @@ export async function getStudentPaymentDetail(
     tempat_makan: string | null
     tempat_mencuci: string | null
   }>(
-    `SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin, s.status_global, s.asrama, s.kamar,
+    `SELECT s.id, s.nis, s.nama_lengkap, s.foto_url, s.jenis_kelamin, s.status_global, s.asrama, s.kamar,
             s.tahun_masuk, s.tanggal_masuk,
             m1.nama_jasa AS tempat_makan, m2.nama_jasa AS tempat_mencuci
      FROM santri s
@@ -2209,6 +2231,7 @@ export async function getStudentPaymentDetail(
     id: santriRow.id,
     nis: santriRow.nis,
     namaLengkap: santriRow.nama_lengkap,
+    fotoUrl: santriRow.foto_url,
     jenisKelamin: santriRow.jenis_kelamin,
     statusGlobal: santriRow.status_global,
     asrama: santriRow.asrama,
@@ -2523,10 +2546,11 @@ export async function searchStudentsForPayment(
     id: string
     nis: string
     nama_lengkap: string
+    foto_url: string | null
     asrama: string | null
     kamar: string | null
   }>(
-    `SELECT id, nis, nama_lengkap, asrama, kamar
+    `SELECT id, nis, nama_lengkap, foto_url, asrama, kamar
      FROM santri
      WHERE status_global = 'aktif'
        AND (nama_lengkap LIKE ? OR nis LIKE ?)
@@ -2548,6 +2572,7 @@ export async function searchStudentsForPayment(
       id: r.id,
       nis: r.nis,
       namaLengkap: r.nama_lengkap,
+      fotoUrl: r.foto_url,
       asrama: r.asrama,
       kamar: r.kamar,
       unpaidCount: obSummary?.count ?? 0,
@@ -2580,6 +2605,7 @@ export async function getUnpaidObligationsForCashPayment(
     id: string
     nis: string
     nama_lengkap: string
+    foto_url: string | null
     jenis_kelamin: string
     status_global: string
     asrama: string | null
@@ -2589,7 +2615,7 @@ export async function getUnpaidObligationsForCashPayment(
     tempat_makan: string | null
     tempat_mencuci: string | null
   }>(
-    `SELECT s.id, s.nis, s.nama_lengkap, s.jenis_kelamin, s.status_global, s.asrama, s.kamar,
+    `SELECT s.id, s.nis, s.nama_lengkap, s.foto_url, s.jenis_kelamin, s.status_global, s.asrama, s.kamar,
             s.tahun_masuk, s.tanggal_masuk,
             m1.nama_jasa AS tempat_makan, m2.nama_jasa AS tempat_mencuci
      FROM santri s
@@ -2661,6 +2687,7 @@ export async function getUnpaidObligationsForCashPayment(
       id: santriRow.id,
       nis: santriRow.nis,
       namaLengkap: santriRow.nama_lengkap,
+      fotoUrl: santriRow.foto_url,
       jenisKelamin: santriRow.jenis_kelamin,
       statusGlobal: santriRow.status_global,
       asrama: santriRow.asrama,

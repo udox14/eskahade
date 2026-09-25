@@ -52,6 +52,28 @@ function cellAddress(row: number, column: number): string {
   return `${columnName(column)}${row}`
 }
 
+/**
+ * Batas dimensi (bounding box) tiap worksheet yang dibangun manual.
+ * SheetJS menentukan sel yang ditulis ke file HANYA dari `ws['!ref']`; tanpa itu
+ * seluruh sel di luar range diabaikan sehingga file Excel terunduh kosong.
+ */
+const sheetBounds = new WeakMap<object, { minRow: number; minCol: number; maxRow: number; maxCol: number }>()
+
+function updateSheetRef(ws: Record<string, unknown>, row: number, col: number) {
+  let bounds = sheetBounds.get(ws)
+  if (!bounds) {
+    bounds = { minRow: row, minCol: col, maxRow: row, maxCol: col }
+    sheetBounds.set(ws, bounds)
+  } else {
+    bounds.minRow = Math.min(bounds.minRow, row)
+    bounds.minCol = Math.min(bounds.minCol, col)
+    bounds.maxRow = Math.max(bounds.maxRow, row)
+    bounds.maxCol = Math.max(bounds.maxCol, col)
+  }
+
+  ws['!ref'] = `${cellAddress(bounds.minRow, bounds.minCol)}:${cellAddress(bounds.maxRow, bounds.maxCol)}`
+}
+
 function setSheetCell(
   ws: Record<string, unknown>,
   row: number,
@@ -66,6 +88,7 @@ function setSheetCell(
     ...(typeof val === 'number' && style.numFmt ? { z: style.numFmt } : {}),
     s: style,
   }
+  updateSheetRef(ws, row, col)
 }
 
 function downloadExcelBlob(blob: Blob, filename: string) {
@@ -719,7 +742,7 @@ export async function exportWalletExcel(
       'Total Setoran (IN)',
       'Total Penarikan (OUT)',
       'Saldo Saat Ini',
-      'Limit Harian Ortu',
+      'Limit Harian Efektif',
       'Kartu QR Aktif',
       'Status Kartu',
     ]
@@ -739,7 +762,7 @@ export async function exportWalletExcel(
       setCell(rowIdx, 5, item.totalIn, tdNum)
       setCell(rowIdx, 6, item.totalOut, tdNum)
       setCell(rowIdx, 7, item.currentBalance, tdNum)
-      setCell(rowIdx, 8, item.parentDailyLimit ? item.parentDailyLimit : 'Default (50rb)', tdCenter)
+      setCell(rowIdx, 8, item.effectiveDailyLimit, tdNum)
       setCell(rowIdx, 9, item.activeCardCode || '-', tdCenter)
       setCell(rowIdx, 10, item.activeCardStatus || 'NONE', tdCenter)
 

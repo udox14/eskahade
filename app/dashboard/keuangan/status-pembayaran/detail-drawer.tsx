@@ -207,6 +207,8 @@ export function StatusPembayaranDetailDrawer({
             {detail ? (
               <div className="flex items-center gap-3.5 min-w-0">
                 <SantriPhotoAvatar
+                  src={detail.santri.fotoUrl}
+                  alt={detail.santri.namaLengkap}
                   name={detail.santri.namaLengkap}
                   size="md"
                   clickable={false}

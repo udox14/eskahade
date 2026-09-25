@@ -1218,7 +1218,13 @@ export default function StatusPembayaranContent({
                     >
                       <td className="py-3.5 pl-5 pr-3">
                         <div className="flex items-center gap-3">
-                          <SantriPhotoAvatar name={item.namaLengkap} size="sm" clickable={false} />
+                          <SantriPhotoAvatar
+                            src={item.fotoUrl}
+                            alt={item.namaLengkap}
+                            name={item.namaLengkap}
+                            size="sm"
+                            clickable={false}
+                          />
                           <div className="min-w-0">
                             <span className="font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors truncate block">
                               {item.namaLengkap}
@@ -1285,7 +1291,13 @@ export default function StatusPembayaranContent({
                     >
                       <td className="py-3.5 pl-5 pr-3">
                         <div className="flex items-center gap-3">
-                          <SantriPhotoAvatar name={item.namaLengkap} size="sm" clickable={false} />
+                          <SantriPhotoAvatar
+                            src={item.fotoUrl}
+                            alt={item.namaLengkap}
+                            name={item.namaLengkap}
+                            size="sm"
+                            clickable={false}
+                          />
                           <div className="min-w-0">
                             <span className="font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors truncate block">
                               {item.namaLengkap}
@@ -1360,7 +1372,13 @@ export default function StatusPembayaranContent({
                     >
                       <td className="py-3.5 pl-5 pr-3">
                         <div className="flex items-center gap-3">
-                          <SantriPhotoAvatar name={item.namaLengkap} size="sm" clickable={false} />
+                          <SantriPhotoAvatar
+                            src={item.fotoUrl}
+                            alt={item.namaLengkap}
+                            name={item.namaLengkap}
+                            size="sm"
+                            clickable={false}
+                          />
                           <div className="min-w-0">
                             <span className="font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors truncate block">
                               {item.namaLengkap}
@@ -1430,7 +1448,13 @@ export default function StatusPembayaranContent({
                     >
                       <td className="py-3.5 pl-5 pr-3">
                         <div className="flex items-center gap-3">
-                          <SantriPhotoAvatar name={item.namaLengkap} size="sm" clickable={false} />
+                          <SantriPhotoAvatar
+                            src={item.fotoUrl}
+                            alt={item.namaLengkap}
+                            name={item.namaLengkap}
+                            size="sm"
+                            clickable={false}
+                          />
                           <div className="min-w-0">
                             <span className="font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors truncate block">
                               {item.namaLengkap}
@@ -1505,7 +1529,13 @@ export default function StatusPembayaranContent({
                     >
                       <td className="py-3.5 pl-5 pr-3">
                         <div className="flex items-center gap-3">
-                          <SantriPhotoAvatar name={item.namaLengkap} size="sm" clickable={false} />
+                          <SantriPhotoAvatar
+                            src={item.fotoUrl}
+                            alt={item.namaLengkap}
+                            name={item.namaLengkap}
+                            size="sm"
+                            clickable={false}
+                          />
                           <div className="min-w-0">
                             <span className="font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors truncate block">
                               {item.namaLengkap}

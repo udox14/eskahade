@@ -68,7 +68,7 @@ export default function PengaturanKeuanganContent({
         title="Pengaturan Keuangan"
         description="Konfigurasi tarif terversi, pembebasan biaya santri, limit buku besar uang jajan, gateway pembayaran, dan profil kop cetak resmi."
         action={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
             {!canMutate && (
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
                 <Eye className="w-4 h-4 text-amber-600" />

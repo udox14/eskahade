@@ -121,12 +121,53 @@ export default function DashboardKeuanganContent({
 
   return (
     <div className="space-y-6 pb-12">
-      {/* 1. Header & Periode Selector */}
+      {/* 1. Header Halaman — hanya judul & deskripsi agar tidak bertabrakan
+          dengan kontrol periode/aksi cepat pada layar mobile. */}
       <DashboardPageHeader
         title="Dashboard Keuangan"
         description="Ikhtisar eksekutif penerimaan kas pesantren, dana titipan santri, status penyaluran, dan rekonsiliasi."
-        action={
-          <div className="flex flex-wrap items-center gap-2">
+      />
+
+      {/* Pesan Kesalahan jika ada */}
+      {errorMessage && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+          {errorMessage}
+        </div>
+      )}
+
+      {/* Shortcut Status Sesi Kasir + Kontrol Periode & Aksi Cepat (satu baris sejajar) */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`p-2.5 rounded-xl ${cashSession ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+              <Store className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-800">
+                  {cashSession ? 'Sesi Kasir Aktif' : 'Sesi Kasir Belum Dibuka'}
+                </h3>
+                {cashSession ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                    {cashSession.session_code}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                    Non-aktif
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {cashSession
+                  ? `Dibuka ${formatDateIndo(cashSession.opened_at)} • Saldo laci saat ini: ${formatRupiah(cashSession.expected_closing_balance)}`
+                  : 'Buka sesi kas di loket kasir untuk mulai melayani transaksi pembayaran tunai atau pencairan uang jajan.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Kontrol periode, segarkan, riwayat, dan aksi sesi kas disatukan pada baris ini */}
+          <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-xs">
               <label htmlFor={periodSelectId} className="text-xs font-medium text-slate-500">
                 Periode:
@@ -158,63 +199,25 @@ export default function DashboardKeuanganContent({
 
             <Link
               href="/dashboard/keuangan/riwayat"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3.5 py-2 text-sm font-medium text-white shadow-xs hover:bg-emerald-800 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 transition-colors"
             >
               <Clock className="h-4 w-4" />
               <span>Riwayat Transaksi</span>
             </Link>
-          </div>
-        }
-      />
 
-      {/* Pesan Kesalahan jika ada */}
-      {errorMessage && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
-          {errorMessage}
-        </div>
-      )}
-
-      {/* Shortcut Status Sesi Kasir Operator */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className={`p-2.5 rounded-xl ${cashSession ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
-            <Store className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-800">
-                {cashSession ? 'Sesi Kasir Aktif' : 'Sesi Kasir Belum Dibuka'}
-              </h3>
-              {cashSession ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                  {cashSession.session_code}
-                </span>
-              ) : (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                  Non-aktif
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {cashSession
-                ? `Dibuka ${formatDateIndo(cashSession.opened_at)} • Saldo laci saat ini: ${formatRupiah(cashSession.expected_closing_balance)}`
-                : 'Buka sesi kas di loket kasir untuk mulai melayani transaksi pembayaran tunai atau pencairan uang jajan.'}
-            </p>
+            <Link
+              href="/dashboard/koperasi/loket"
+              className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold shadow-2xs transition-colors ${
+                cashSession
+                  ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                  : 'bg-emerald-600 text-white hover:bg-emerald-700'
+              }`}
+            >
+              <span>{cashSession ? 'Buka Loket Kasir' : 'Buka Sesi Kas'}</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
-
-        <Link
-          href="/dashboard/koperasi/loket"
-          className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold shadow-2xs transition-colors ${
-            cashSession
-              ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
-              : 'bg-emerald-600 text-white hover:bg-emerald-700'
-          }`}
-        >
-          <span>{cashSession ? 'Buka Loket Kasir' : 'Buka Sesi Kas'}</span>
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
       </div>
 
       {/* 2. Banner Peringatan Rekonsiliasi (Mismatch Alert) */}

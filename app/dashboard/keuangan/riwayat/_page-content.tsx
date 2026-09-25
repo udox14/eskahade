@@ -188,7 +188,7 @@ export default function RiwayatTransaksiContent({
         title="Riwayat Transaksi Global"
         description="Histori terpadu seluruh mutasi keuangan pesantren: pembayaran online & tunai, uang jajan santri, penyaluran, dan koreksi."
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <Link
               href="/dashboard/keuangan"
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 transition-colors"

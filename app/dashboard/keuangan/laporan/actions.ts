@@ -6,6 +6,10 @@
 import { getSession, getEffectiveRoles } from '@/lib/auth/session'
 import { canAccessFeatureForSession } from '@/lib/auth/feature'
 import {
+  collectAllReportPages,
+  type ReportExportPayload,
+} from '@/lib/finance/report-export-paging'
+import {
   getReceiptsReport,
   getDistributionsReport,
   getArrearsReport,
@@ -17,6 +21,15 @@ import {
   getSettlementsReport,
   getReconciliationsReport,
   getReportFilterOptions,
+  type ReceiptItemRow,
+  type DistributionItemRow,
+  type ArrearItemRow,
+  type ExemptionItemRow,
+  type WalletSummaryRow,
+  type WalletMutationRow,
+  type CashSessionItemRow,
+  type SettlementItemRow,
+  type ReconciliationReportRow,
   type ReceiptsReportFilter,
   type DistributionsReportFilter,
   type ArrearsReportFilter,
@@ -105,4 +118,87 @@ export async function fetchCashSessionDetailReport(sessionId: string) {
 export async function fetchReportFilterOptions() {
   await assertReportPermission()
   return await getReportFilterOptions()
+}
+
+// ── EKSPOR EXCEL: SELURUH BARIS SESUAI FILTER ───────────────────────────────
+// PRD Bab 34: berkas Excel harus memuat seluruh data hasil filter, bukan hanya
+// baris yang sedang tampil di satu halaman tabel.
+// Logika penelusuran halaman ada di lib/finance/report-export-paging.ts (teruji murni).
+
+export async function fetchReceiptsForExport(
+  filters: ReceiptsReportFilter
+): Promise<ReportExportPayload<ReceiptItemRow>> {
+  await assertReportPermission()
+  return await collectAllReportPages((page, pageSize) =>
+    getReceiptsReport({ ...filters, page, pageSize })
+  )
+}
+
+export async function fetchDistributionsForExport(
+  filters: DistributionsReportFilter
+): Promise<ReportExportPayload<DistributionItemRow>> {
+  await assertReportPermission()
+  return await collectAllReportPages((page, pageSize) =>
+    getDistributionsReport({ ...filters, page, pageSize })
+  )
+}
+
+export async function fetchArrearsForExport(
+  filters: ArrearsReportFilter
+): Promise<ReportExportPayload<ArrearItemRow>> {
+  await assertReportPermission()
+  return await collectAllReportPages((page, pageSize) =>
+    getArrearsReport({ ...filters, page, pageSize })
+  )
+}
+
+export async function fetchExemptionsForExport(
+  filters: ExemptionsReportFilter
+): Promise<ReportExportPayload<ExemptionItemRow>> {
+  await assertReportPermission()
+  return await collectAllReportPages((page, pageSize) =>
+    getExemptionsReport({ ...filters, page, pageSize })
+  )
+}
+
+export async function fetchWalletForExport(
+  filters: WalletReportFilter
+): Promise<ReportExportPayload<WalletSummaryRow | WalletMutationRow>> {
+  await assertReportPermission()
+  return await collectAllReportPages<WalletSummaryRow | WalletMutationRow>(
+    async (page, pageSize) => {
+      const res = await getWalletReport({ ...filters, page, pageSize })
+      return {
+        items: res.mode === 'SUMMARY' ? res.summaryItems ?? [] : res.mutationItems ?? [],
+        pagination: res.pagination,
+      }
+    }
+  )
+}
+
+export async function fetchCashSessionsForExport(
+  filters: CashSessionsReportFilter
+): Promise<ReportExportPayload<CashSessionItemRow>> {
+  await assertReportPermission()
+  return await collectAllReportPages((page, pageSize) =>
+    getCashSessionsReport({ ...filters, page, pageSize })
+  )
+}
+
+export async function fetchSettlementsForExport(
+  filters: SettlementsReportFilter
+): Promise<ReportExportPayload<SettlementItemRow>> {
+  await assertReportPermission()
+  return await collectAllReportPages((page, pageSize) =>
+    getSettlementsReport({ ...filters, page, pageSize })
+  )
+}
+
+export async function fetchReconciliationsForExport(
+  filters: ReconciliationsReportFilter
+): Promise<ReportExportPayload<ReconciliationReportRow>> {
+  await assertReportPermission()
+  return await collectAllReportPages((page, pageSize) =>
+    getReconciliationsReport({ ...filters, page, pageSize })
+  )
 }

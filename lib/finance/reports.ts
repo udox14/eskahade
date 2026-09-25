@@ -18,6 +18,7 @@
 import { query, queryOne } from '@/lib/db'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
 import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
+import { getGlobalDailyLimit } from '@/lib/finance/wallet'
 
 // ── TYPES & INTERFACES ────────────────────────────────────────────────────────
 
@@ -311,6 +312,7 @@ export interface WalletSummaryRow {
   totalOut: number
   currentBalance: number
   parentDailyLimit: number | null
+  globalDailyLimit: number
   effectiveDailyLimit: number
   activeCardCode: string | null
   activeCardStatus: string | null
@@ -1601,6 +1603,10 @@ export async function getWalletReport(
 
   if (mode === 'SUMMARY') {
     // Mode Rekap Saldo Per Santri
+    // Limit harian efektif WAJIB mengikuti konfigurasi Pengaturan Keuangan
+    // (Limit Global Pesantren ∪ Limit Orang Tua → ambil yang paling ketat), bukan nilai tetap.
+    const globalDailyLimit = await getGlobalDailyLimit()
+
     const conditions: string[] = ["s.status_global = 'aktif'"]
     const params: unknown[] = []
 
@@ -1676,20 +1682,27 @@ export async function getWalletReport(
       [...params, pageSize, offset]
     )
 
-    const summaryItems: WalletSummaryRow[] = rows.map((r) => ({
-      santriId: r.santri_id,
-      santriName: r.santri_name,
-      santriNis: r.santri_nis,
-      santriAsrama: r.santri_asrama,
-      santriKelas: r.santri_kelas,
-      totalIn: r.total_in,
-      totalOut: r.total_out,
-      currentBalance: r.total_in - r.total_out,
-      parentDailyLimit: r.parent_daily_limit,
-      effectiveDailyLimit: r.parent_daily_limit ?? 50000,
-      activeCardCode: r.card_code,
-      activeCardStatus: r.card_status,
-    }))
+    const summaryItems: WalletSummaryRow[] = rows.map((r) => {
+      const parentDailyLimit = r.parent_daily_limit ?? null
+      const effectiveDailyLimit =
+        parentDailyLimit !== null ? Math.min(globalDailyLimit, parentDailyLimit) : globalDailyLimit
+
+      return {
+        santriId: r.santri_id,
+        santriName: r.santri_name,
+        santriNis: r.santri_nis,
+        santriAsrama: r.santri_asrama,
+        santriKelas: r.santri_kelas,
+        totalIn: r.total_in,
+        totalOut: r.total_out,
+        currentBalance: r.total_in - r.total_out,
+        parentDailyLimit,
+        globalDailyLimit,
+        effectiveDailyLimit,
+        activeCardCode: r.card_code,
+        activeCardStatus: r.card_status,
+      }
+    })
 
     return {
       mode: 'SUMMARY',

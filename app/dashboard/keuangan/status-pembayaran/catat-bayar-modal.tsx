@@ -13,6 +13,7 @@ import {
   Check,
 } from 'lucide-react'
 import DocumentLetterhead from '@/components/print/document-letterhead'
+import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 import {
   searchStudentsForPayment,
   getUnpaidObligationsForCashPayment,
@@ -57,6 +58,7 @@ interface ActiveStudentInfo {
   id: string
   nis: string
   namaLengkap: string
+  fotoUrl: string | null
   asrama: string | null
   kamar: string | null
 }
@@ -167,6 +169,7 @@ export function CatatPembayaranModal({
             id: res.santri.id,
             nis: res.santri.nis,
             namaLengkap: res.santri.namaLengkap,
+            fotoUrl: res.santri.fotoUrl,
             asrama: res.santri.asrama,
             kamar: res.santri.kamar,
           })
@@ -226,6 +229,15 @@ export function CatatPembayaranModal({
 
     try {
       const res = await getUnpaidObligationsForCashPayment(student.id)
+      // Sinkronkan identitas (termasuk foto) dari data otoritatif server
+      setSelectedStudent({
+        id: res.santri.id,
+        nis: res.santri.nis,
+        namaLengkap: res.santri.namaLengkap,
+        fotoUrl: res.santri.fotoUrl,
+        asrama: res.santri.asrama,
+        kamar: res.santri.kamar,
+      })
       setObligations(res.obligations)
       const initMap: Record<string, { selected: boolean; amount: number }> = {}
       for (const ob of res.obligations) {
@@ -620,9 +632,13 @@ export function CatatPembayaranModal({
                         className="w-full text-left p-3.5 hover:bg-emerald-50/50 flex items-center justify-between transition cursor-pointer"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-semibold text-xs shrink-0">
-                            {st.namaLengkap.slice(0, 2).toUpperCase()}
-                          </div>
+                          <SantriPhotoAvatar
+                            src={st.fotoUrl}
+                            alt={st.namaLengkap}
+                            name={st.namaLengkap}
+                            size="sm"
+                            clickable={false}
+                          />
                           <div>
                             <p className="text-sm font-semibold text-slate-900">{st.namaLengkap}</p>
                             <p className="text-xs text-slate-500">
@@ -654,9 +670,13 @@ export function CatatPembayaranModal({
               {selectedStudent && (
                 <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">
-                      {selectedStudent.namaLengkap.slice(0, 2).toUpperCase()}
-                    </div>
+                    <SantriPhotoAvatar
+                      src={selectedStudent.fotoUrl}
+                      alt={selectedStudent.namaLengkap}
+                      name={selectedStudent.namaLengkap}
+                      size="sm"
+                      clickable={false}
+                    />
                     <div>
                       <p className="text-sm font-bold text-slate-900">{selectedStudent.namaLengkap}</p>
                       <p className="text-xs text-slate-500">

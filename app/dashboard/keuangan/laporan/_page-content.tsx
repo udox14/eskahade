@@ -25,6 +25,7 @@ import {
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import Pagination from '@/components/ui/pagination'
 import ReportPrintableView from '@/components/finance/report-printable-view'
+import { toast } from 'sonner'
 import {
   fetchReceiptsReport,
   fetchDistributionsReport,
@@ -36,6 +37,14 @@ import {
   fetchCashSessionDetailReport,
   fetchSettlementsReport,
   fetchReconciliationsReport,
+  fetchReceiptsForExport,
+  fetchDistributionsForExport,
+  fetchArrearsForExport,
+  fetchExemptionsForExport,
+  fetchWalletForExport,
+  fetchCashSessionsForExport,
+  fetchSettlementsForExport,
+  fetchReconciliationsForExport,
 } from './actions'
 import {
   exportReceiptsExcel,
@@ -55,14 +64,19 @@ import type {
   DistributionsReportResponse,
   ArrearsReportResponse,
   ExemptionsReportResponse,
+  ExemptionItemRow,
   StudentDetailReportResponse,
+  StudentDetailObligationRow,
   WalletReportResponse,
   WalletSummaryRow,
   WalletMutationRow,
   CashSessionsReportResponse,
+  CashSessionItemRow,
   CashSessionDetailReportResponse,
   SettlementsReportResponse,
+  SettlementItemRow,
   ReconciliationsReportResponse,
+  ReconciliationReportRow,
 } from '@/lib/finance/reports'
 
 interface LaporanKeuanganContentProps {
@@ -133,23 +147,29 @@ export default function LaporanKeuanganContent({
   }
 
   // ── 4. RELOAD DATA ACTION ───────────────────────────────────────────────────
+  /**
+   * Filter dasar yang dipakai bersama oleh tabel (server-side) dan ekspor Excel,
+   * sehingga berkas yang diunduh selalu memakai kriteria yang sama dengan tampilan.
+   */
+  const buildBaseFilter = (page: number, size: number) => ({
+    search,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
+    period: period || undefined,
+    asrama: asrama !== 'ALL' ? asrama : undefined,
+    kelas: kelas !== 'ALL' ? kelas : undefined,
+    academicYearId,
+    page,
+    pageSize: size,
+  })
+
   const loadReportData = (
     tab: ReportType = activeTab,
     page: number = currentPage,
     size: number = pageSize
   ) => {
     startTransition(async () => {
-      const baseFilter = {
-        search,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        period: period || undefined,
-        asrama: asrama !== 'ALL' ? asrama : undefined,
-        kelas: kelas !== 'ALL' ? kelas : undefined,
-        academicYearId,
-        page,
-        pageSize: size,
-      }
+      const baseFilter = buildBaseFilter(page, size)
 
       if (tab === 'PENERIMAAN') {
         const res = await fetchReceiptsReport({
@@ -241,30 +261,113 @@ export default function LaporanKeuanganContent({
   }
 
   // ── 5. EXPORT EXCEL HANDLER ─────────────────────────────────────────────────
+  /**
+   * Ekspor Excel memuat SELURUH baris hasil filter (bukan hanya halaman aktif),
+   * diambil bertahap dari server agar query tetap ringan (PRD Bab 34 & 41).
+   */
   const handleExportExcel = async () => {
     setIsExporting(true)
+    const toastId = toast.loading('Menyiapkan data ekspor...')
     try {
       const filterSummary = `Asrama: ${asrama} | Kelas: ${kelas} | Periode: ${period || 'Semua'}`
 
-      if (activeTab === 'PENERIMAAN') {
-        await exportReceiptsExcel(receiptsData.items, filterSummary)
-      } else if (activeTab === 'PENYALURAN' && distributionsData) {
-        await exportDistributionsExcel(distributionsData.items, filterSummary)
-      } else if (activeTab === 'PENUNGGAK' && arrearsData) {
-        await exportArrearsExcel(arrearsData.items, filterSummary)
-      } else if (activeTab === 'PEMBEBASAN' && exemptionsData) {
-        await exportExemptionsExcel(exemptionsData.items, filterSummary)
-      } else if (activeTab === 'DETAIL_SANTRI' && studentDetailData) {
-        await exportStudentDetailExcel(studentDetailData)
-      } else if (activeTab === 'UANG_JAJAN' && walletData) {
-        await exportWalletExcel(walletData, filterSummary)
-      } else if (activeTab === 'TRANSAKSI_LOKET' && cashSessionsData) {
-        await exportCashSessionsExcel(cashSessionsData.items, filterSummary)
-      } else if (activeTab === 'SETTLEMENT' && settlementsData) {
-        await exportSettlementsExcel(settlementsData.items, filterSummary)
-      } else if (activeTab === 'REKONSILIASI' && reconciliationsData) {
-        await exportReconciliationsExcel(reconciliationsData.items, filterSummary)
+      const notify = (exported: number, totalRecords: number, truncated: boolean) => {
+        if (exported === 0) {
+          toast.warning('Tidak ada data yang cocok dengan filter untuk diekspor.', { id: toastId })
+          return
+        }
+        if (truncated) {
+          toast.warning(
+            `Ekspor dibatasi ${exported.toLocaleString('id-ID')} baris dari total ${totalRecords.toLocaleString('id-ID')} baris. Persempit filter untuk data lengkap.`,
+            { id: toastId, duration: 8000 }
+          )
+          return
+        }
+        toast.success(`Ekspor Excel selesai: ${exported.toLocaleString('id-ID')} baris.`, { id: toastId })
       }
+
+      if (activeTab === 'PENERIMAAN') {
+        const { items, totalRecords, truncated } = await fetchReceiptsForExport({
+          ...buildBaseFilter(1, pageSize),
+          itemType: itemType !== 'ALL' ? itemType : undefined,
+        })
+        await exportReceiptsExcel(items, filterSummary)
+        notify(items.length, totalRecords, truncated)
+      } else if (activeTab === 'PENYALURAN') {
+        const { items, totalRecords, truncated } = await fetchDistributionsForExport({
+          ...buildBaseFilter(1, pageSize),
+          recipientType:
+            recipientType !== 'ALL'
+              ? (recipientType as 'BENDAHARA_PESANTREN' | 'KATERING' | 'LAUNDRY')
+              : undefined,
+          providerId: providerId !== 'ALL' ? providerId : undefined,
+        })
+        await exportDistributionsExcel(items, filterSummary)
+        notify(items.length, totalRecords, truncated)
+      } else if (activeTab === 'PENUNGGAK') {
+        const { items, totalRecords, truncated } = await fetchArrearsForExport({
+          ...buildBaseFilter(1, pageSize),
+          itemType: itemType !== 'ALL' ? itemType : undefined,
+        })
+        await exportArrearsExcel(items, filterSummary)
+        notify(items.length, totalRecords, truncated)
+      } else if (activeTab === 'PEMBEBASAN') {
+        const { items, totalRecords, truncated } = await fetchExemptionsForExport({
+          ...buildBaseFilter(1, pageSize),
+          status: exemptionStatus,
+          itemType: itemType !== 'ALL' ? itemType : undefined,
+        })
+        await exportExemptionsExcel(items, filterSummary)
+        notify(items.length, totalRecords, truncated)
+      } else if (activeTab === 'DETAIL_SANTRI') {
+        const report =
+          studentDetailData ??
+          (await fetchStudentDetailReport({
+            santriId: selectedStudentId,
+            academicYearId,
+            period: period || undefined,
+          }))
+        if (!report?.student) {
+          toast.warning('Pilih santri terlebih dahulu sebelum mengekspor lembar keuangan.', { id: toastId })
+        } else {
+          await exportStudentDetailExcel(report)
+          toast.success(`Ekspor Excel selesai: lembar keuangan ${report.student.nama}.`, { id: toastId })
+        }
+      } else if (activeTab === 'UANG_JAJAN') {
+        const { items, totalRecords, truncated } = await fetchWalletForExport({
+          ...buildBaseFilter(1, pageSize),
+          mode: walletMode,
+        })
+        await exportWalletExcel(
+          { mode: walletMode, summaryItems: walletMode === 'SUMMARY' ? (items as WalletSummaryRow[]) : [], mutationItems: walletMode === 'MUTATION' ? (items as WalletMutationRow[]) : [] },
+          filterSummary
+        )
+        notify(items.length, totalRecords, truncated)
+      } else if (activeTab === 'TRANSAKSI_LOKET') {
+        const { items, totalRecords, truncated } = await fetchCashSessionsForExport({
+          ...buildBaseFilter(1, pageSize),
+          operatorId: operatorId !== 'ALL' ? operatorId : undefined,
+        })
+        await exportCashSessionsExcel(items, filterSummary)
+        notify(items.length, totalRecords, truncated)
+      } else if (activeTab === 'SETTLEMENT') {
+        const { items, totalRecords, truncated } = await fetchSettlementsForExport(buildBaseFilter(1, pageSize))
+        await exportSettlementsExcel(items, filterSummary)
+        notify(items.length, totalRecords, truncated)
+      } else if (activeTab === 'REKONSILIASI') {
+        const { items, totalRecords, truncated } = await fetchReconciliationsForExport(
+          buildBaseFilter(1, pageSize)
+        )
+        await exportReconciliationsExcel(items, filterSummary)
+        notify(items.length, totalRecords, truncated)
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? `Ekspor Excel gagal: ${err.message}`
+          : 'Ekspor Excel gagal. Coba lagi.',
+        { id: toastId, duration: 8000 }
+      )
     } finally {
       setIsExporting(false)
     }
@@ -283,6 +386,19 @@ export default function LaporanKeuanganContent({
     { id: 'REKONSILIASI' as ReportType, label: 'Rekonsiliasi', icon: Scale },
   ]
 
+  // Pastikan setiap tab memiliki lembar cetak siap pakai (Fase 10: PRD Bab 34).
+  // Jika data tab belum termuat, tombol Cetak / PDF tetap memberi umpan balik (lihat fallback modal).
+  const isPrintViewAvailable =
+    activeTab === 'PENERIMAAN' ||
+    (activeTab === 'PENUNGGAK' && Boolean(arrearsData)) ||
+    (activeTab === 'PENYALURAN' && Boolean(distributionsData)) ||
+    (activeTab === 'UANG_JAJAN' && Boolean(walletData)) ||
+    (activeTab === 'PEMBEBASAN' && Boolean(exemptionsData)) ||
+    (activeTab === 'DETAIL_SANTRI' && Boolean(studentDetailData)) ||
+    (activeTab === 'TRANSAKSI_LOKET' && Boolean(cashSessionsData)) ||
+    (activeTab === 'SETTLEMENT' && Boolean(settlementsData)) ||
+    (activeTab === 'REKONSILIASI' && Boolean(reconciliationsData))
+
   const searchId = useId()
   const asramaId = useId()
   const kelasId = useId()
@@ -296,7 +412,7 @@ export default function LaporanKeuanganContent({
         title="Laporan & Ekspor Keuangan"
         description="Pusat pelaporan finansial terpadu, lembar rekap siap cetak, dan ekspor spreadsheet terformat untuk operasional pesantren."
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <button
               type="button"
               onClick={() => setIsPrintModalOpen(true)}
@@ -1533,6 +1649,202 @@ export default function LaporanKeuanganContent({
           data={walletData.mutationItems || []}
           orientation="landscape"
         />
+      )}
+
+      {activeTab === 'PEMBEBASAN' && exemptionsData && (
+        <ReportPrintableView<ExemptionItemRow>
+          isOpen={isPrintModalOpen}
+          onClose={() => setIsPrintModalOpen(false)}
+          title="LAPORAN SANTRI DIBEBASKAN DARI BIAYA"
+          subtitle="Pondok Pesantren Eskahade — Rekapitulasi Pembebasan Kewajiban Santri"
+          filterSummary={`Asrama: ${asrama} | Kelas: ${kelas} | Pos: ${itemType} | Status: ${exemptionStatus}`}
+          kpis={[
+            { label: 'Total Nominal Bebas', value: formatRupiah(exemptionsData.kpi.totalNominalExempted) },
+            { label: 'Pembebasan Aktif', value: `${exemptionsData.kpi.activeExemptionsCount} rekaman` },
+            { label: 'Sudah Dicabut', value: `${exemptionsData.kpi.revokedExemptionsCount} rekaman` },
+            { label: 'Santri Terdampak', value: `${exemptionsData.kpi.uniqueStudentsCount} santri` },
+          ]}
+          columns={[
+            { header: 'NIS', accessor: (r) => r.santriNis, align: 'center' },
+            { header: 'Nama Santri', accessor: (r) => r.santriName },
+            { header: 'Asrama/Kelas', accessor: (r) => `${r.santriAsrama || '-'} / ${r.santriKelas || '-'}` },
+            { header: 'Pos Biaya', accessor: (r) => r.itemLabel },
+            {
+              header: 'Periode Berlaku',
+              accessor: (r) => `${r.periodStart || 'Awal'} s.d. ${r.periodEnd || 'Seterusnya'}`,
+              align: 'center',
+            },
+            { header: 'Alasan', accessor: (r) => r.reason },
+            { header: 'Nominal Terbebas', accessor: (r) => formatRupiah(r.totalExemptedAmount), align: 'right' },
+            { header: 'Status', accessor: (r) => r.status, align: 'center' },
+            { header: 'Diberikan Oleh', accessor: (r) => r.createdByName || '-' },
+          ]}
+          data={exemptionsData.items}
+          footerTotals={[
+            { label: 'Total Nominal Terbebas', value: formatRupiah(exemptionsData.kpi.totalNominalExempted), colSpan: 10 },
+          ]}
+          orientation="landscape"
+        />
+      )}
+
+      {activeTab === 'DETAIL_SANTRI' && studentDetailData && (
+        <ReportPrintableView<StudentDetailObligationRow>
+          isOpen={isPrintModalOpen}
+          onClose={() => setIsPrintModalOpen(false)}
+          title="LEMBAR KEUANGAN SANTRI"
+          subtitle={
+            studentDetailData.student
+              ? `${studentDetailData.student.nama} — NIS ${studentDetailData.student.nis}`
+              : 'Data santri belum tersedia'
+          }
+          filterSummary={
+            studentDetailData.student
+              ? `Asrama: ${studentDetailData.student.asrama || '-'} (Kamar ${studentDetailData.student.kamar || '-'}) | Kelas: ${studentDetailData.student.kelas || '-'} | Saldo Uang Jajan: ${formatRupiah(studentDetailData.student.walletBalance)}`
+              : 'Semua data'
+          }
+          kpis={[
+            { label: 'Total Kewajiban', value: formatRupiah(studentDetailData.summary.totalExpected) },
+            { label: 'Keringanan', value: formatRupiah(studentDetailData.summary.totalExempted) },
+            { label: 'Sudah Terbayar', value: formatRupiah(studentDetailData.summary.totalPaid) },
+            { label: 'Sisa Tanggungan', value: formatRupiah(studentDetailData.summary.totalRemaining) },
+          ]}
+          columns={[
+            { header: 'Periode', accessor: (r) => r.period, align: 'center' },
+            { header: 'Pos Tagihan', accessor: (r) => r.itemLabel },
+            { header: 'Tagihan', accessor: (r) => formatRupiah(r.amountExpected), align: 'right' },
+            { header: 'Keringanan', accessor: (r) => formatRupiah(r.amountExempted), align: 'right' },
+            { header: 'Terbayar', accessor: (r) => formatRupiah(r.amountPaid), align: 'right' },
+            { header: 'Sisa', accessor: (r) => formatRupiah(r.remaining), align: 'right' },
+            { header: 'Status', accessor: (r) => r.status, align: 'center' },
+          ]}
+          data={studentDetailData.obligations}
+          footerTotals={[
+            { label: 'Total Sisa Tanggungan', value: formatRupiah(studentDetailData.summary.totalRemaining), colSpan: 8 },
+          ]}
+          orientation="landscape"
+        />
+      )}
+
+      {activeTab === 'TRANSAKSI_LOKET' && cashSessionsData && (
+        <ReportPrintableView<CashSessionItemRow>
+          isOpen={isPrintModalOpen}
+          onClose={() => setIsPrintModalOpen(false)}
+          title="LAPORAN SESI KAS & TRANSAKSI LOKET"
+          subtitle="Pondok Pesantren Eskahade — Rekonsiliasi Kas Fisik Loket Koperasi"
+          filterSummary={`Periode: ${startDate || 'Awal'} s.d. ${endDate || 'Akhir'}`}
+          kpis={[
+            { label: 'Total Sesi', value: `${cashSessionsData.kpi.totalSessionsCount} sesi` },
+            { label: 'Total Kas Masuk', value: formatRupiah(cashSessionsData.kpi.totalCashInAllSessions) },
+            { label: 'Total Kas Keluar', value: formatRupiah(cashSessionsData.kpi.totalCashOutAllSessions) },
+            {
+              label: 'Sesi Berselisih',
+              value: `${cashSessionsData.kpi.discrepancySessionsCount} sesi (${formatRupiah(cashSessionsData.kpi.totalDifference)})`,
+            },
+          ]}
+          columns={[
+            { header: 'Kode Sesi', accessor: (r) => r.sessionCode, align: 'center' },
+            { header: 'Petugas', accessor: (r) => r.operatorName },
+            { header: 'Buka', accessor: (r) => r.openedAt.slice(0, 16), align: 'center' },
+            { header: 'Tutup', accessor: (r) => (r.closedAt ? r.closedAt.slice(0, 16) : 'AKTIF'), align: 'center' },
+            { header: 'Saldo Awal', accessor: (r) => formatRupiah(r.openingBalance), align: 'right' },
+            { header: 'Kas Masuk', accessor: (r) => formatRupiah(r.totalCashIn), align: 'right' },
+            { header: 'Kas Keluar', accessor: (r) => formatRupiah(r.totalCashOut), align: 'right' },
+            { header: 'Saldo Seharusnya', accessor: (r) => formatRupiah(r.expectedClosingBalance), align: 'right' },
+            {
+              header: 'Saldo Fisik',
+              accessor: (r) => (r.actualClosingBalance !== null ? formatRupiah(r.actualClosingBalance) : '-'),
+              align: 'right',
+            },
+            { header: 'Selisih', accessor: (r) => (r.difference !== null ? formatRupiah(r.difference) : '-'), align: 'right' },
+            { header: 'Status', accessor: (r) => r.status, align: 'center' },
+          ]}
+          data={cashSessionsData.items}
+          orientation="landscape"
+        />
+      )}
+
+      {activeTab === 'SETTLEMENT' && settlementsData && (
+        <ReportPrintableView<SettlementItemRow>
+          isOpen={isPrintModalOpen}
+          onClose={() => setIsPrintModalOpen(false)}
+          title="LAPORAN SETTLEMENT PAYMENT GATEWAY"
+          subtitle="Pondok Pesantren Eskahade — Pencairan Dana Duitku ke Rekening Pesantren"
+          filterSummary={`Periode: ${startDate || 'Awal'} s.d. ${endDate || 'Akhir'}`}
+          kpis={[
+            { label: 'Total Bruto', value: formatRupiah(settlementsData.kpi.totalGrossSettled) },
+            { label: 'Total Fee', value: formatRupiah(settlementsData.kpi.totalFeeDeducted) },
+            { label: 'Net Diterima', value: formatRupiah(settlementsData.kpi.totalNetReceived) },
+            { label: 'Jumlah Batch', value: `${settlementsData.kpi.totalSettlementBatches} batch` },
+          ]}
+          columns={[
+            { header: 'No. Settlement', accessor: (r) => r.settlementNumber, align: 'center' },
+            { header: 'Tanggal', accessor: (r) => r.settlementDate, align: 'center' },
+            { header: 'Bank Tujuan', accessor: (r) => r.destinationBank },
+            { header: 'No. Rekening', accessor: (r) => r.destinationAccount, align: 'center' },
+            { header: 'Atas Nama', accessor: (r) => r.accountHolderName },
+            { header: 'Jml Trx', accessor: (r) => r.itemCount, align: 'center' },
+            { header: 'Bruto', accessor: (r) => formatRupiah(r.grossAmount), align: 'right' },
+            { header: 'Total Fee', accessor: (r) => formatRupiah(r.totalFee), align: 'right' },
+            { header: 'Net Masuk', accessor: (r) => formatRupiah(r.netAmount), align: 'right' },
+            { header: 'Status', accessor: (r) => r.status, align: 'center' },
+          ]}
+          data={settlementsData.items}
+          footerTotals={[
+            { label: 'Total Net Diterima', value: formatRupiah(settlementsData.kpi.totalNetReceived), colSpan: 11 },
+          ]}
+          orientation="landscape"
+        />
+      )}
+
+      {activeTab === 'REKONSILIASI' && reconciliationsData && (
+        <ReportPrintableView<ReconciliationReportRow>
+          isOpen={isPrintModalOpen}
+          onClose={() => setIsPrintModalOpen(false)}
+          title="LAPORAN AUDIT REKONSILIASI & RESOLUSI DISKREPANSI"
+          subtitle="Pondok Pesantren Eskahade — Pencocokan Internal vs Gateway vs Rekening Bank"
+          filterSummary={`Periode: ${startDate || 'Awal'} s.d. ${endDate || 'Akhir'}`}
+          kpis={[
+            { label: 'Cocok', value: `${reconciliationsData.kpi.totalMatchedItems} rekaman` },
+            { label: 'Selisih', value: `${reconciliationsData.kpi.totalDiscrepancyItems} rekaman` },
+            { label: 'Nilai Selisih', value: formatRupiah(reconciliationsData.kpi.totalDiscrepancyAmount) },
+            { label: 'Sudah Diselesaikan', value: `${reconciliationsData.kpi.totalResolvedItems} rekaman` },
+          ]}
+          columns={[
+            { header: 'Waktu', accessor: (r) => r.createdAt.slice(0, 16), align: 'center' },
+            { header: 'Status', accessor: (r) => r.matchStatus, align: 'center' },
+            { header: 'Ref Eksternal', accessor: (r) => r.externalReference || '-', align: 'center' },
+            { header: 'No. Pembayaran', accessor: (r) => r.paymentNumber || '-', align: 'center' },
+            { header: 'Santri', accessor: (r) => r.santriName || '-' },
+            { header: 'Nominal Sistem', accessor: (r) => formatRupiah(r.internalAmount), align: 'right' },
+            { header: 'Nominal Eksternal', accessor: (r) => formatRupiah(r.externalAmount), align: 'right' },
+            { header: 'Selisih', accessor: (r) => formatRupiah(r.discrepancyAmount), align: 'right' },
+            { header: 'Tindakan', accessor: (r) => r.resolutionAction, align: 'center' },
+            { header: 'Penyelesai', accessor: (r) => r.resolvedByName || '-' },
+          ]}
+          data={reconciliationsData.items}
+          orientation="landscape"
+        />
+      )}
+
+      {/* Fallback: pastikan tombol Cetak / PDF selalu memberi respons walau data tab belum siap */}
+      {isPrintModalOpen && !isPrintViewAvailable && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <h2 className="text-base font-bold text-slate-900">Data laporan belum siap dicetak</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Tunggu hingga data laporan selesai dimuat, lalu tekan <strong>Cetak / PDF</strong> kembali.
+            </p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsPrintModalOpen(false)}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {/* MODAL: DETAIL SESI KASIR (REKONSTRUKSI OTORITATIF LOKET) */}
       {selectedSessionDetail && (
