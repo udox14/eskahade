@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
-import { List as Menu } from "@phosphor-icons/react";
+import { House } from "@phosphor-icons/react";
 import { getIcon } from '@/lib/menu/config'
 
 interface BottomNavProps {
@@ -13,9 +13,10 @@ interface BottomNavProps {
   userRoles?: string[]
   globalEnabled: boolean      // dari admin — kalau false, sembunyikan untuk semua
   userShowBottomNav: boolean  // preferensi user — kalau false, sembunyikan untuk user ini
+  onOpenMenu: () => void
 }
 
-export function BottomNav({ fiturAkses, globalEnabled, userShowBottomNav }: BottomNavProps) {
+export function BottomNav({ fiturAkses, globalEnabled, userShowBottomNav, onOpenMenu }: BottomNavProps) {
   const pathname = usePathname()
 
   // Cek dua kondisi: admin harus aktifkan global, DAN user tidak matikan sendiri
@@ -85,24 +86,25 @@ export function BottomNav({ fiturAkses, globalEnabled, userShowBottomNav }: Bott
         {/* Slot 3: Center MENU (Stand-out) */}
         <div className="flex items-center justify-center relative">
           <div className="flex flex-col items-center justify-end h-full pb-1.5 relative w-full">
-            <Link
-              href="/dashboard"
-              prefetch={true}
+            <button
+              type="button"
+              onClick={onOpenMenu}
               className={cn(
                 "absolute -top-4 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 active:scale-90 shadow-md",
                 menuActive
-                  ? "bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-emerald-500/40 scale-105 border-2 border-white"
+                  ? "bg-[#12372a] text-white scale-105 border-2 border-white"
                   : "bg-white border border-slate-200 text-slate-600 shadow-slate-200/50 hover:border-emerald-200 hover:text-emerald-600"
               )}
-              title="Menu Utama"
+              title="Buka seluruh menu"
+              aria-label="Home: buka seluruh menu"
             >
-              <Menu className="w-5.5 h-5.5" weight="bold" />
-            </Link>
+              <House className="w-5.5 h-5.5" weight="bold" />
+            </button>
             <span className={cn(
               "text-[9.5px] font-bold tracking-wider transition-colors duration-200",
               menuActive ? "text-emerald-700" : "text-slate-500"
             )}>
-              MENU
+              HOME
             </span>
           </div>
         </div>

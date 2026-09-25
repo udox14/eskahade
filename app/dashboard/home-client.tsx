@@ -1,728 +1,164 @@
 'use client'
 
-import React from 'react'
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
+import { ArrowDown, ArrowRight, ArrowUp, House, Megaphone, Menu, RefreshCw, Settings2, X } from 'lucide-react'
 import type { FiturAkses } from '@/lib/cache/fitur-akses'
-import {
-  SquaresFour as LayoutDashboard,
-  Users,
-  BookOpen,
-  ShieldWarning as ShieldAlert,
-  FileText,
-  Gear as Settings,
-  Database,
-  CalendarCheck,
-  TrendUp as TrendingUp,
-  ArrowUp as ArrowUpCircle,
-  UserPlus,
-  Printer,
-  ClipboardText as ClipboardCheck,
-  UserCheck,
-  MapPin,
-  Book,
-  UserGear as UserCog,
-  Moon,
-  Stethoscope,
-  Clock,
-  Gavel,
-  CreditCard,
-  List as LayoutList,
-  FileXls as FileSpreadsheet,
-  Funnel as Filter,
-  Envelope as Mail,
-  ChartBar as BarChart3,
-  Briefcase,
-  Wallet,
-  Coins,
-  ShoppingCart,
-  Package,
-  Image as ImageIcon,
-  GraduationCap as School,
-  Archive,
-  ForkKnife as Utensils,
-  Calendar,
-  ArrowsLeftRight as ArrowLeftRight,
-  Flame,
-  Clipboard as ClipboardList,
-  ToggleRight,
-  SignOut as LogOut,
-  Download,
-  Warning as FileWarning,
-  Shuffle,
-  House as Home,
-  UserMinus as UserX,
-  Door as DoorOpen,
-  MagnifyingGlass as Search,
-  CaretLeft as ChevronLeft,
-  CaretRight as ChevronRight,
-  X,
-  // New unique icons:
-  ChalkboardTeacher,
-  SignIn,
-  Eye,
-  ListChecks,
-  Chalkboard,
-  ChartPie,
-  IdentificationBadge,
-  Notebook,
-  ChartLine,
-  ShieldCheck,
-  UserCirclePlus,
-  PresentationChart,
-  Table,
-  Sun,
-  Bed,
-  UsersThree,
-  IdentificationCard,
-  Columns,
-  HandCoins,
-  Cardholder,
-  Wrench,
-  CalendarBlank,
-  ListDashes,
-  Bank,
-  PiggyBank,
-  PlusCircle,
-  MinusCircle,
-  Bookmark,
-  Books
-} from "@phosphor-icons/react";
+import { getIcon, getMenuTitle } from '@/lib/menu/config'
+import { useDashboardMenu } from '@/components/layout/menu-context'
+import type { HeroConfig, TickerConfig } from '@/lib/dashboard/config'
+import type { DashboardWidgetData } from '@/lib/dashboard/data'
+import { refreshDashboardWidgets, saveDashboardShortcuts } from './actions'
+import './home.css'
 
-const CalendarRange = Calendar;
-const CalendarDays = Calendar;
-
-// ── Icon map ──────────────────────────────────────────────────────────────────
-const ICON_MAP: Record<string, React.ElementType> = {
-  LayoutDashboard, Users, BookOpen, ShieldAlert, FileText, Settings,
-  Database, CalendarCheck, TrendingUp, ArrowUpCircle, UserPlus,
-  Printer, ClipboardCheck, UserCheck, MapPin, Book, UserCog,
-  Moon, Stethoscope, Clock, Gavel, CreditCard, LayoutList, FileSpreadsheet,
-  Filter, Mail, BarChart3, Briefcase, Wallet, Coins, ShoppingCart, Package,
-  ImageIcon, School, Archive, Utensils, CalendarDays, ArrowLeftRight,
-  Flame, ClipboardList, ToggleRight, LogOut, CalendarRange, Download,
-  FileWarning, Shuffle, Home, UserX, DoorOpen,
-  // Mapping new unique icons:
-  ChalkboardTeacher, SignIn, Eye, ListChecks, Chalkboard, ChartPie,
-  IdentificationBadge, Notebook, ChartLine, ShieldCheck, UserCirclePlus,
-  PresentationChart, Table, Sun, Bed, UsersThree, IdentificationCard,
-  Columns, HandCoins, Cardholder, Wrench, CalendarBlank, ListDashes,
-  Bank, PiggyBank, PlusCircle, MinusCircle, Bookmark, Books,
-  CashRegister: Wallet
+type Props = {
+  userName: string
+  greeting: string
+  dateLabel: string
+  isAdmin: boolean
+  menu: FiturAkses[]
+  initialShortcuts: FiturAkses[]
+  initialWidgets: DashboardWidgetData[]
+  hero: HeroConfig
+  ticker: TickerConfig
 }
 
-function getIcon(name: string): React.ElementType {
-  return ICON_MAP[name] ?? Settings
-}
-
-const MENU_TITLE_MAP: Record<string, string> = {
-  'Manajemen User': 'User',
-  'Manajemen Santri': 'Tools Santri',
-  'Manajemen Guru & Jadwal': 'Guru & Jadwal',
-  'Manajemen Kelas': 'Kelas',
-  'Manajemen Kitab': 'Kitab',
-  'Pembagian Kitab Guru': 'Kitab Guru',
-  'Manajemen Fitur': 'Fitur Akses',
-};
-
-function getMenuTitle(title: string) {
-  return MENU_TITLE_MAP[title] ?? title;
-}
-
-const GROUP_ITEM_ORDER: Record<string, string[]> = {
-  'Master Data': [
-    'Tahun Ajaran',
-    'Setup Tahun Ajaran',
-    'Kelas',
-    'Kitab',
-    'Kitab Guru',
-    'Guru & Jadwal',
-    'Tools Santri',
-    'Arsip Alumni',
-    'Periode Perpulangan',
-    'Master Pelanggaran',
-    'User',
-    'Fitur Akses',
-    'Log Aktivitas',
-  ],
-};
-
-function sortGroupItems(group: string, items: FiturAkses[]) {
-  const preferredOrder = GROUP_ITEM_ORDER[group];
-  if (!preferredOrder) return items;
-
-  const rankMap = new Map(preferredOrder.map((title, index) => [title, index]));
-  return [...items].sort((a, b) => {
-    const aTitle = getMenuTitle(a.title);
-    const bTitle = getMenuTitle(b.title);
-    const aRank = rankMap.get(aTitle);
-    const bRank = rankMap.get(bTitle);
-
-    if (aRank != null && bRank != null) return aRank - bRank;
-    if (aRank != null) return -1;
-    if (bRank != null) return 1;
-    return a.urutan - b.urutan;
-  });
-}
-
-// ── Deskripsi tiap fitur ──────────────────────────────────────────────────────
-const FITUR_DESC: Record<string, string> = {
-  '/dashboard/santri':                               'Lihat dan kelola seluruh data induk santri yang aktif.',
-  '/dashboard/dewan-santri/sensus':                  'Input dan kelola data sensus penduduk santri per asrama.',
-  '/dashboard/dewan-santri/sensus/laporan':          'Cetak laporan hasil sensus penduduk dalam format yang rapi.',
-  '/dashboard/santri/input':                         'Input data santri baru beserta identitas awalnya.',
-  '/dashboard/santri/export':                        'Export data santri aktif sesuai kebutuhan administrasi.',
-  '/dashboard/santri/keluar':                        'Catat santri yang keluar atau berhenti di tengah tahun.',
-  '/dashboard/santri/foto':                          'Upload dan kelola foto profil santri.',
-  '/dashboard/dewan-santri/surat':                   'Buat surat izin, keterangan, dan tagihan untuk santri.',
-  '/dashboard/asrama/absen-malam':                   'Catat kehadiran santri saat apel malam per kamar.',
-  '/dashboard/asrama/absen-berjamaah':               'Rekam kehadiran shalat berjamaah santri per waktu.',
-  '/dashboard/asrama/kamar':                         'Lihat kartu kamar, anggota kamar, ketua kamar, dan mutasi kamar dalam satu asrama.',
-  '/dashboard/asrama/kepengurusan':                 'Atur pembina asrama, rois, sekretaris, bendahara, dan pembina kamar per asrama.',
-  '/dashboard/asrama/perpindahan-kamar':             'Proses perpindahan santri antar kamar dalam satu asrama.',
-  '/dashboard/asrama/mutasi-asrama':                 'Pindahkan santri antar asrama, assign santri baru, atau mutasi batch.',
-  '/dashboard/asrama/absen-sakit':                   'Data santri sakit per sesi pagi, sore, dan malam.',
-  '/dashboard/asrama/layanan':                       'Kelola data katering (tempat makan) dan laundry santri.',
-  '/dashboard/asrama/perpulangan':                   'Kelola izin perpulangan santri per periode.',
-  '/dashboard/asrama/santri-kembali':                'Konfirmasi kedatangan santri dari izin pulang atau keluar kompleks.',
-  '/dashboard/asrama/perpulangan/monitoring':        'Pantau status perpulangan dan kedatangan santri.',
-  '/dashboard/asrama/perpulangan/cetak-telat':       'Cetak daftar santri yang terlambat kembali dari perpulangan.',
-  '/dashboard/asrama/perpulangan/verifikasi-telat':  'Proses sidang dan vonis telat datang dari data perpulangan.',
-  '/dashboard/keamanan/perizinan':                   'Input dan pantau izin pulang atau keluar kompleks santri.',
-  '/dashboard/keamanan/perizinan/cetak-telat':       'Cetak daftar santri yang terlambat kembali.',
-  '/dashboard/keamanan/perizinan/verifikasi-telat':  'Proses sidang dan vonis santri yang terlambat datang.',
-  '/dashboard/keamanan/verifikasi-panggilan':        'Tentukan daftar panggilan dari alfa pengajian dan berjamaah dengan konteks izin dan sakit.',
-  '/dashboard/keamanan/verifikasi-berjamaah':        'Proses vonis final alfa berjamaah dari hasil pemanggilan.',
-  '/dashboard/keamanan/denda-buku-pribadi':          'Catat denda kehilangan buku pribadi santri dan status pembayarannya.',
-  '/dashboard/keamanan/rekap-asrama':                'Rekap absen malam dan shalat berjamaah per bulan.',
-  '/dashboard/keamanan/rekap-absen-malam':           'Rekap absensi malam santri per bulan per asrama.',
-  '/dashboard/keamanan/rekap-absen-berjamaah':       'Rekap shalat berjamaah santri (Shubuh, Ashar, Maghrib, Isya) per bulan.',
-  '/dashboard/keamanan':                             'Input pelanggaran dan kelola catatan disiplin santri.',
-  '/dashboard/santri/tes-klasifikasi':               'Input hasil tes penempatan level untuk santri baru.',
-  '/dashboard/santri/atur-kelas':                    'Tempatkan santri ke kelas pesantren yang sesuai.',
-  '/dashboard/akademik/grading':                     'Lihat dan verifikasi nilai grading santri per kelas.',
-  '/dashboard/akademik/kenaikan':                    'Proses kenaikan kelas santri di akhir tahun ajaran.',
-  '/dashboard/akademik/nilai/input':                 'Dialihkan ke Nilai Rapor terpadu.',
-  '/dashboard/akademik/leger':                       'Input nilai rapor, leger, kepribadian, catatan wali, dan import Excel.',
-  '/dashboard/akademik/ranking':                     'Lihat peringkat dan prestasi santri per kelas.',
-  '/dashboard/akademik/administrasi-guru':           'Cetak bundle administrasi guru per kelas dalam format PDF atau Word.',
-  '/dashboard/laporan/rapor':                        'Cetak rapor santri dalam format PDF siap print.',
-  '/dashboard/akademik/absensi':                     'Input absensi pengajian santri secara mingguan.',
-  '/dashboard/guru/absensi':                         'Catat absensi pribadi pengajar per kelas dan sesi pengajian.',
-  '/dashboard/akademik/absensi/rekap':               'Lihat rekap absensi santri per periode and filter.',
-  '/dashboard/akademik/absensi/verifikasi':          'Verifikasi dan proses sidang alfa santri mingguan.',
-  '/dashboard/akademik/absensi/vonis-final':         'Proses vonis final alfa pengajian dari hasil pemanggilan.',
-  '/dashboard/akademik/absensi/cetak':               'Cetak surat pemanggilan untuk santri yang banyak alfa.',
-  '/dashboard/akademik/absensi/cetak-blanko':        'Cetak blanko absen kosong untuk diisi manual di kelas.',
-  '/dashboard/akademik/absensi-guru':                'Catat kehadiran guru pengajar setiap pertemuan.',
-  '/dashboard/akademik/absensi-guru/rekap':          'Lihat rekap kinerja kehadiran guru per periode.',
-  '/dashboard/keuangan/pembayaran':                  'Loket pembayaran — proses tagihan santri.',
-  '/dashboard/keuangan/laporan':                     'Laporan arus kas, pemasukan, dan tunggakan keuangan.',
-  '/dashboard/asrama/spp':                           'Input dan pantau pembayaran SPP bulanan per asrama.',
-  '/dashboard/asrama/uang-jajan':                    'Kelola saldo dan pengeluaran uang jajan harian santri.',
-  '/dashboard/asrama/status-setoran':                'Lihat status setoran SPP asrama binaan Anda.',
-  '/dashboard/dewan-santri/setoran':                 'Monitor status setoran SPP dari semua asrama.',
-  '/dashboard/dewan-santri/uang-jajan':              'Pantau saldo & topup uang jajan santri per asrama.',
-  '/dashboard/keuangan/tarif':                       'Atur nominal biaya masuk dan SPP per angkatan.',
-  '/dashboard/akademik/upk/kasir':                   'Proses pembelian kitab dan kebutuhan santri.',
-  '/dashboard/akademik/upk/katalog':                 'Kelola katalog, stok, toko, harga beli, dan harga jual UPK.',
-  '/dashboard/akademik/upk/belanja':                 'Rencanakan belanja kitab, tambah stok, dan pantau hutang toko.',
-  '/dashboard/akademik/upk/riwayat':                 'Lihat transaksi UPK selesai dan lakukan void dengan alasan.',
-  '/dashboard/pengaturan/users':                     'Kelola akun pengguna, reset password, dan hak akses.',
-  '/dashboard/pengaturan/tahun-ajaran':              'Atur tahun ajaran aktif dan arsip tahun sebelumnya.',
-  '/dashboard/master/santri-tools':                  'Alat bantu massal: naik kelas, arsip, dan reset data santri.',
-  '/dashboard/master/wali-kelas':                    'Kelola data guru pengajar dan jadwal mengajar.',
-  '/dashboard/master/kelas':                         'Kelola daftar kelas, marhalah, dan kapasitas.',
-  '/dashboard/master/kitab':                         'Kelola daftar kitab pelajaran per marhalah dan mapel.',
-  '/dashboard/master/guru-kitab':                    'Atur pembagian kitab yang diajar guru per kelas, sesi, dan tahun ajaran.',
-  '/dashboard/santri/arsip':                         'Kelola santri yang lulus, keluar, atau diarsipkan.',
-  '/dashboard/pengaturan/fitur-akses':               'Atur fitur apa saja yang bisa diakses oleh tiap role.',
-  '/dashboard/ehb/jadwal':                           'Atur jadwal ujian EHB: event, sesi, dan distribusi kelas.',
-  '/dashboard/ehb/ruangan':                          'Kelola ruangan ujian dan plotting penempatan santri.',
-  '/dashboard/ehb/pengawas':                         'Kelola pengawas EHB dan jadwal tugasnya per ruangan.',
-  '/dashboard/ehb/absensi-pengawas':                 'Catat kehadiran pengawas EHB dan badal per hari dan sesi.',
-  '/dashboard/ehb/absensi':                          'Catat kehadiran peserta EHB per sesi dan ruangan.',
-  '/dashboard/ehb/susulan':                          'Kelola peserta yang mengikuti ujian susulan EHB.',
-  '/dashboard/ehb/cetak':                            'Cetak administrasi EHB: kartu peserta, blanko, jadwal, dan tempelan ruangan.',
-  '/dashboard/ehb/kepanitiaan':                       'Kelola susunan panitia EHB dan cetak organigram kepanitiaan.',
-  '/dashboard/ehb/keuangan':                          'Susun RAB dan kelola anggaran pelaksanaan EHB.',
-  '/dashboard/pimpinan':                              'Ringkasan pantauan seluruh bidang untuk pimpinan.',
-  '/dashboard/pimpinan/keuangan':                     'Pantau saldo kas, arus kas, alert, dan tunggakan SPP.',
-  '/dashboard/pimpinan/absensi-santri':               'Pantau rekap kehadiran pengajian, berjamaah, dan malam santri.',
-  '/dashboard/pimpinan/absensi-guru':                 'Pantau kinerja kehadiran guru pengajar.',
-  '/dashboard/pimpinan/kesehatan':                    'Pantau santri sakit dan kunjungan POSKESTREN.',
-  '/dashboard/pimpinan/asrama':                       'Pantau isi asrama, perizinan, dan perpulangan.',
-  '/dashboard/pimpinan/disiplin':                     'Pantau pelanggaran dan surat perjanjian santri.',
-  '/dashboard/pimpinan/akademik':                     'Pantau struktur kelas, nilai rata-rata, dan ranking.',
-  '/dashboard/pimpinan/psb':                          'Pantau progress daftar ulang santri baru.',
-}
-
-// ── Accent per grup ──────────────────────────────────────────────────────────
-const GROUP_ACCENT: Record<string, { dot: string; line: string; label: string; iconHover: string }> = {
-  '_standalone':  { dot: 'bg-slate-400',    line: 'bg-slate-200',    label: 'text-slate-500',   iconHover: 'group-hover:text-slate-700' },
-  'Data Santri':  { dot: 'bg-sky-400',      line: 'bg-sky-100',      label: 'text-sky-600',     iconHover: 'group-hover:text-sky-600' },
-  'Kesantrian':   { dot: 'bg-orange-400',   line: 'bg-orange-100',   label: 'text-orange-600',  iconHover: 'group-hover:text-orange-600' },
-  'Asrama':       { dot: 'bg-lime-500',     line: 'bg-lime-100',     label: 'text-lime-700',    iconHover: 'group-hover:text-lime-700' },
-  'Perizinan & Disiplin': { dot: 'bg-red-400', line: 'bg-red-100',   label: 'text-red-600',     iconHover: 'group-hover:text-red-600' },
-  'Akademik':     { dot: 'bg-blue-400',     line: 'bg-blue-100',     label: 'text-blue-600',    iconHover: 'group-hover:text-blue-600' },
-  'Pengkelasan':  { dot: 'bg-blue-400',     line: 'bg-blue-100',     label: 'text-blue-600',    iconHover: 'group-hover:text-blue-600' },
-  'Nilai & Rapor':{ dot: 'bg-violet-400',   line: 'bg-violet-100',   label: 'text-violet-600',  iconHover: 'group-hover:text-violet-600' },
-  'Absensi Akademik': { dot: 'bg-teal-400', line: 'bg-teal-100',     label: 'text-teal-600',    iconHover: 'group-hover:text-teal-600' },
-  'Absensi':      { dot: 'bg-teal-400',     line: 'bg-teal-100',     label: 'text-teal-600',    iconHover: 'group-hover:text-teal-600' },
-  'Keuangan Pusat': { dot: 'bg-emerald-500', line: 'bg-emerald-100', label: 'text-emerald-600', iconHover: 'group-hover:text-emerald-600' },
-  'Keuangan Santri': { dot: 'bg-cyan-500',  line: 'bg-cyan-100',     label: 'text-cyan-600',    iconHover: 'group-hover:text-cyan-600' },
-  'Keuangan':     { dot: 'bg-emerald-500',  line: 'bg-emerald-100',  label: 'text-emerald-600', iconHover: 'group-hover:text-emerald-600' },
-  'UPK':          { dot: 'bg-amber-400',    line: 'bg-amber-100',    label: 'text-amber-600',   iconHover: 'group-hover:text-amber-600' },
-  'Master Data':  { dot: 'bg-rose-400',     line: 'bg-rose-100',     label: 'text-rose-600',    iconHover: 'group-hover:text-rose-600' },
-  'EHB':          { dot: 'bg-indigo-500',  line: 'bg-indigo-100',   label: 'text-indigo-600',  iconHover: 'group-hover:text-indigo-600' },
-  'Operasional':  { dot: 'bg-cyan-500',    line: 'bg-cyan-100',     label: 'text-cyan-600',    iconHover: 'group-hover:text-cyan-600' },
-  'PSB':          { dot: 'bg-indigo-500',  line: 'bg-indigo-100',   label: 'text-indigo-600',  iconHover: 'group-hover:text-indigo-600' },
-  'Monitoring Pimpinan': { dot: 'bg-indigo-400', line: 'bg-indigo-100', label: 'text-indigo-600', iconHover: 'group-hover:text-indigo-600' },
-}
-
-// ── Metadata Kategori Menu (SPA Native Feel) ──────────────────────────────────
-const GROUP_META: Record<string, { label: string; icon: React.ElementType }> = {
-  '_standalone':  { label: 'Menu Utama',           icon: LayoutDashboard },
-  'Data Santri':  { label: 'Data Santri',          icon: Users },
-  'Kesantrian':   { label: 'Kesantrian',           icon: UserCheck },
-  'Asrama':       { label: 'Asrama',               icon: Home },
-  'Perizinan & Disiplin': { label: 'Izin & Disiplin', icon: ShieldAlert },
-  'Akademik':     { label: 'Akademik',             icon: BookOpen },
-  'Pengkelasan':  { label: 'Pengkelasan',          icon: Shuffle },
-  'Nilai & Rapor':{ label: 'Nilai & Rapor',        icon: FileSpreadsheet },
-  'Absensi Akademik': { label: 'Absen Akademik',   icon: CalendarDays },
-  'Absensi':      { label: 'Absensi Umum',         icon: ClipboardCheck },
-  'Keuangan Pusat': { label: 'Keuangan Pusat',     icon: Wallet },
-  'Keuangan Santri': { label: 'Keuangan Santri',   icon: Coins },
-  'Keuangan':     { label: 'Keuangan',             icon: CreditCard },
-  'Operasional':  { label: 'Kas Operasional',      icon: Briefcase },
-  'UPK':          { label: 'UPK & Kitab',          icon: ShoppingCart },
-  'EHB':          { label: 'Ujian EHB',            icon: ClipboardList },
-  'PSB':          { label: 'Pendaftaran PSB',      icon: UserPlus },
-  'POSKESTREN':   { label: 'POSKESTREN',           icon: Stethoscope },
-  'Monitoring Pimpinan': { label: 'Monitoring Pimpinan', icon: Eye },
-  'Master Data':  { label: 'Master Data',          icon: Database },
-}
-
-function getGroupMeta(name: string) {
-  return GROUP_META[name] ?? {
-    label: name,
-    icon: Settings
+function HeroPhoto({ hero }: { hero: HeroConfig }) {
+  const image = (mode: 'desktop' | 'mobile') => {
+    const crop = hero[mode]
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={hero.imageUrl} alt="" aria-hidden="true"
+        className={`absolute inset-0 h-full w-full object-cover ${mode === 'desktop' ? 'hidden md:block' : 'md:hidden'}`}
+        style={{ objectPosition: `${crop.x}% ${crop.y}%`, transform: `scale(${crop.zoom})` }} />
+    )
   }
+  return <>{image('desktop')}{image('mobile')}</>
 }
 
-function getTimeKey(hour: number) {
-  if (hour >= 4  && hour < 11) return 'pagi'
-  if (hour >= 11 && hour < 15) return 'siang'
-  if (hour >= 15 && hour < 18) return 'sore'
-  return 'malam'
-}
-
-const THEME_STYLES: Record<string, { shades: string[]; text: string; border: string; hoverText: string }> = {
-  pagi:  { shades: ['bg-emerald-50/60', 'bg-emerald-100/50', 'bg-emerald-50/90', 'bg-emerald-100/70'], text: 'text-emerald-600', border: 'border-emerald-200/50', hoverText: 'group-hover:text-emerald-700' },
-  siang: { shades: ['bg-amber-50/60', 'bg-amber-100/50', 'bg-amber-50/90', 'bg-amber-100/70'], text: 'text-amber-600', border: 'border-amber-200/50', hoverText: 'group-hover:text-amber-700' },
-  sore:  { shades: ['bg-orange-50/60', 'bg-orange-100/50', 'bg-orange-50/90', 'bg-orange-100/70'], text: 'text-orange-600', border: 'border-orange-200/50', hoverText: 'group-hover:text-orange-700' },
-  malam: { shades: ['bg-blue-50/60', 'bg-blue-100/50', 'bg-blue-50/90', 'bg-blue-100/70'], text: 'text-blue-600', border: 'border-blue-200/50', hoverText: 'group-hover:text-blue-700' },
-}
-
-const ROLE_LABEL: Record<string, string> = {
-  admin: 'Administrator', keamanan: 'Petugas Keamanan', sekpen: 'Sekretaris Pendidikan',
-  dewan_santri: 'Dewan Santri', pengurus_asrama: 'Pengurus Asrama',
-  wali_kelas: 'Wali Kelas', guru: 'Guru', bendahara: 'Bendahara',
-  pimpinan: 'Pimpinan',
-}
-
-const ROLE_EMOJI: Record<string, string> = {
-  admin: '🛡️', keamanan: '🔐', sekpen: '📋',
-  dewan_santri: '🏛️', pengurus_asrama: '🏠', wali_kelas: '📚', bendahara: '💰',
-  pimpinan: '🧑‍💼',
-}
-
-const GROUP_ORDER = [
-  '_standalone',
-  'Monitoring Pimpinan',
-  'Data Santri',
-  'Kesantrian',
-  'Asrama',
-  'Perizinan & Disiplin',
-  'Akademik',
-  'Pengkelasan',
-  'Nilai & Rapor',
-  'Absensi Akademik',
-  'Absensi',
-  'Keuangan Pusat',
-  'Keuangan Santri',
-  'Keuangan',
-  'Operasional',
-  'UPK',
-  'EHB',
-  'PSB',
-  'POSKESTREN',
-  'Master Data',
-]
-
-function getGreeting(hour: number) {
-  if (hour >= 4  && hour < 11) return { text: 'Selamat Pagi',  sub: 'Semoga hari ini penuh berkah.', emoji: '🌅' }
-  if (hour >= 11 && hour < 15) return { text: 'Selamat Siang', sub: 'Jangan lupa istirahat sejenak.', emoji: '☀️' }
-  if (hour >= 15 && hour < 18) return { text: 'Selamat Sore',  sub: 'Semangat menyelesaikan tugas.', emoji: '🌤️' }
-  return { text: 'Selamat Malam', sub: 'Istirahat yang cukup ya.', emoji: '🌙' }
-}
-
-function getGreetingImage(hour: number) {
-  if (hour >= 4  && hour < 11) return '/hero_pagi.png'
-  if (hour >= 11 && hour < 15) return '/hero_siang.png'
-  if (hour >= 15 && hour < 18) return '/hero_sore.png'
-  return '/hero_malam.png'
-}
-
-function formatTanggal(date: Date) {
-  return date.toLocaleDateString('id-ID', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  })
-}
-
-function formatJam(date: Date) {
-  return date.toLocaleTimeString('id-ID', {
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-  })
-}
-
-const GROUP_COLORS: Record<string, { bg: string; text: string; hoverText: string }> = {
-  '_standalone':           { bg: 'bg-slate-50 text-slate-500', text: 'text-slate-600', hoverText: 'group-hover:text-slate-800' },
-  'Data Santri':           { bg: 'bg-sky-50 text-sky-600', text: 'text-sky-600', hoverText: 'group-hover:text-sky-700' },
-  'Kesantrian':            { bg: 'bg-orange-50 text-orange-600', text: 'text-orange-600', hoverText: 'group-hover:text-orange-700' },
-  'Asrama':                { bg: 'bg-emerald-50 text-emerald-600', text: 'text-emerald-600', hoverText: 'group-hover:text-emerald-700' },
-  'Perizinan & Disiplin':  { bg: 'bg-rose-50 text-rose-600', text: 'text-rose-600', hoverText: 'group-hover:text-rose-700' },
-  'Akademik':              { bg: 'bg-blue-50 text-blue-600', text: 'text-blue-600', hoverText: 'group-hover:text-blue-700' },
-  'Pengkelasan':           { bg: 'bg-indigo-50 text-indigo-600', text: 'text-indigo-600', hoverText: 'group-hover:text-indigo-700' },
-  'Nilai & Rapor':         { bg: 'bg-violet-50 text-violet-600', text: 'text-violet-600', hoverText: 'group-hover:text-violet-700' },
-  'Absensi Akademik':      { bg: 'bg-teal-50 text-teal-600', text: 'text-teal-600', hoverText: 'group-hover:text-teal-700' },
-  'Absensi':               { bg: 'bg-teal-50 text-teal-600', text: 'text-teal-600', hoverText: 'group-hover:text-teal-700' },
-  'Keuangan Pusat':        { bg: 'bg-emerald-50 text-emerald-600', text: 'text-emerald-600', hoverText: 'group-hover:text-emerald-700' },
-  'Keuangan Santri':       { bg: 'bg-cyan-50 text-cyan-600', text: 'text-cyan-600', hoverText: 'group-hover:text-cyan-700' },
-  'Keuangan':              { bg: 'bg-emerald-50 text-emerald-600', text: 'text-emerald-600', hoverText: 'group-hover:text-emerald-700' },
-  'UPK':                   { bg: 'bg-amber-50 text-amber-600', text: 'text-amber-600', hoverText: 'group-hover:text-amber-700' },
-  'Master Data':           { bg: 'bg-rose-50 text-rose-600', text: 'text-rose-600', hoverText: 'group-hover:text-rose-700' },
-  'EHB':                   { bg: 'bg-indigo-50 text-indigo-600', text: 'text-indigo-600', hoverText: 'group-hover:text-indigo-700' },
-  'Operasional':           { bg: 'bg-cyan-50 text-cyan-600', text: 'text-cyan-600', hoverText: 'group-hover:text-cyan-700' },
-  'PSB':                   { bg: 'bg-violet-50 text-violet-600', text: 'text-violet-600', hoverText: 'group-hover:text-violet-700' },
-  'POSKESTREN':            { bg: 'bg-red-50 text-red-600', text: 'text-red-600', hoverText: 'group-hover:text-red-700' },
-  'Monitoring Pimpinan':   { bg: 'bg-indigo-50 text-indigo-600', text: 'text-indigo-600', hoverText: 'group-hover:text-indigo-700' },
-}
-
-// renderGroupIcon helper is deleted, using getGroupMeta(group).icon directly
-
-interface Props { userName: string; userRole: string; userRoles?: string[]; fiturAkses: FiturAkses[] }
-
-// ── Main Component ─────────────────────────────────────────────────────────────
-export function HomeClient({ userName, userRole, userRoles, fiturAkses }: Props) {
-  const [now, setNow] = useState<Date | null>(null)
-  const [activeGroup, setActiveGroup] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-
+export function HomeClient({ userName, greeting, dateLabel, isAdmin, menu, initialShortcuts, initialWidgets, hero, ticker }: Props) {
+  const openMenu = useDashboardMenu()
+  const [shortcuts, setShortcuts] = useState(initialShortcuts)
+  const [draft, setDraft] = useState<number[]>([])
+  const [filter, setFilter] = useState('')
+  const [widgets, setWidgets] = useState(initialWidgets)
+  const [busy, setBusy] = useState<'shortcuts' | 'widgets' | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const dialogRef = useRef<HTMLDialogElement>(null)
 
   useEffect(() => {
-    setNow(new Date())
-    const timer = window.setInterval(() => setNow(new Date()), 1000)
-    
-    const handlePopState = (e: PopStateEvent) => {
-      if (!e.state?.submenu) {
-        setActiveGroup(null)
-      }
-    }
-    window.addEventListener('popstate', handlePopState)
-    
-    return () => {
-      window.clearInterval(timer)
-      window.removeEventListener('popstate', handlePopState)
-    }
+    const dialog = dialogRef.current
+    if (!dialog) return
+    const onClose = () => { setFilter(''); setDraft([]) }
+    dialog.addEventListener('close', onClose)
+    return () => dialog.removeEventListener('close', onClose)
   }, [])
 
-  const handleOpenGroup = (group: string) => {
-    setActiveGroup(group)
-    window.history.pushState({ submenu: group }, '', '')
+  const editShortcuts = () => {
+    setDraft(shortcuts.map(item => item.id))
+    setMessage(null)
+    dialogRef.current?.showModal()
   }
-
-  const handleCloseGroup = () => {
-    setActiveGroup(null)
-    if (window.history.state?.submenu) {
-      window.history.back()
-    }
+  const toggleDraft = (id: number) => {
+    setDraft(current => current.includes(id) ? current.filter(value => value !== id) : current.length < 8 ? [...current, id] : current)
   }
-
-  const hour      = now?.getHours() ?? 9
-  const greeting  = getGreeting(hour)
-  const heroImage = getGreetingImage(hour)
-  const timeKey   = getTimeKey(hour)
-  const theme     = THEME_STYLES[timeKey]
-  const effectiveRoles = (userRoles && userRoles.length > 0) ? userRoles : [userRole]
-  const roleLabel = effectiveRoles.filter(r => !r.includes(':')).map(r => ROLE_LABEL[r] ?? r.replace('_', ' ')).join(' • ')
-  const roleEmoji = ROLE_EMOJI[effectiveRoles[0]] ?? '👤'
-  const totalFitur = fiturAkses.filter(f => f.href !== '/dashboard').length
-
-  // Group fitur
-  const grouped = new Map<string, FiturAkses[]>()
-  for (const f of fiturAkses) {
-    if (f.href === '/dashboard') continue
-    if (!grouped.has(f.group_name)) grouped.set(f.group_name, [])
-    grouped.get(f.group_name)!.push(f)
+  const moveDraft = (id: number, direction: number) => {
+    const index = draft.indexOf(id)
+    const target = index + direction
+    if (index < 0 || target < 0 || target >= draft.length) return
+    const next = [...draft]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    setDraft(next)
   }
-  const groups = GROUP_ORDER.filter(g => grouped.has(g))
-
-  // Search filter
-  const allFeatures = fiturAkses.filter(f => f.href !== '/dashboard')
-  const filteredFeatures = allFeatures.filter(fitur => {
-    const titleMatch = getMenuTitle(fitur.title).toLowerCase().includes(searchQuery.toLowerCase())
-    const descMatch = (FITUR_DESC[fitur.href] || '').toLowerCase().includes(searchQuery.toLowerCase())
-    const groupMatch = fitur.group_name.toLowerCase().includes(searchQuery.toLowerCase())
-    return titleMatch || descMatch || groupMatch
-  })
+  const saveShortcuts = async () => {
+    setBusy('shortcuts')
+    try {
+      await saveDashboardShortcuts(draft)
+      const byId = new Map(menu.map(item => [item.id, item]))
+      setShortcuts(draft.map(id => byId.get(id)).filter((item): item is FiturAkses => !!item))
+      dialogRef.current?.close()
+      setMessage('Pintasan berhasil disimpan.')
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Gagal menyimpan pintasan.') }
+    finally { setBusy(null) }
+  }
+  const refresh = async () => {
+    setBusy('widgets'); setMessage(null)
+    try { setWidgets(await refreshDashboardWidgets()); setMessage('Ringkasan sudah diperbarui.') }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Gagal memperbarui widget.') }
+    finally { setBusy(null) }
+  }
+  const firstName = userName.split(' ')[0] || userName
+  const filteredMenu = menu.filter(item => item.href !== '/dashboard' &&
+    `${item.title} ${item.group_name}`.toLocaleLowerCase('id').includes(filter.toLocaleLowerCase('id')))
+  const whiteText = hero.textColor === 'white'
 
   return (
-    <div className="max-w-7xl mx-auto w-full space-y-6 pb-16">
-      {/* ── Sticky Hero & Search Container ── */}
-      <div 
-        className="sticky top-[-16px] md:top-[-32px] z-30 bg-slate-50 -mx-4 px-4 pb-4 pt-1 sm:-mx-8 sm:px-8 sm:pb-6 flex flex-col gap-4 sm:gap-6"
-      >
-        {/* ── Hero Greeting Card ── */}
-        <div 
-          className="relative overflow-hidden bg-white select-none rounded-[2rem] shadow-sm p-5 sm:p-8 w-full aspect-[16/10] sm:aspect-auto sm:min-h-[220px] flex items-center"
-          style={{
-            backgroundImage: `url('${heroImage}')`,
-            backgroundSize: 'contain',
-            backgroundPosition: 'right bottom',
-            backgroundRepeat: 'no-repeat'
-          }}
-        >
-          <div className="relative z-10 flex w-full animate-in fade-in duration-300">
-            {/* Left Side: Greeting & User Name */}
-            <div className="space-y-4 sm:space-y-5 flex-1 min-w-0 max-w-[75%] sm:max-w-[60%]">
-              <div className="space-y-1 sm:space-y-1.5">
-                <p className="text-slate-600 text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5 drop-shadow-sm">
-                  <span>{greeting.emoji}</span>
-                  <span>{greeting.text},</span>
-                </p>
-                <h1 className="text-2xl sm:text-4xl font-black text-slate-800 tracking-tight leading-none break-words drop-shadow-sm">
-                  {userName}
-                  <span className="text-emerald-500">.</span>
-                </h1>
-                <p className="text-slate-500 text-xs sm:text-sm pt-0.5 sm:pt-1 font-medium drop-shadow-sm">
-                  {greeting.sub}
-                </p>
-              </div>
-
-              {/* Mockup Pills row */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Role Card */}
-                <div className="flex items-center gap-2 bg-white border border-slate-100 px-3.5 py-2 rounded-2xl shadow-sm backdrop-blur-md bg-opacity-80">
-                  <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-[11px] bg-opacity-10">
-                    {roleEmoji}
-                  </div>
-                  <div className="leading-none text-left">
-                    <p className="text-[8px] text-slate-500 uppercase tracking-widest font-black mb-0.5">Akses Akun</p>
-                    <p className="text-xs font-bold text-slate-800 truncate max-w-[85px] sm:max-w-[120px]">{roleLabel}</p>
-                  </div>
-                </div>
-              </div>
+    <div className="dashboard-home min-h-full bg-[#f7f1e5] text-[#1c2923]">
+      <section className={`relative isolate h-[370px] overflow-hidden bg-[#12372a] sm:h-[410px] md:h-[390px] ${whiteText ? 'text-white' : 'text-black'}`}>
+        <HeroPhoto hero={hero} />
+        <div className={`absolute inset-0 ${whiteText ? 'bg-gradient-to-r from-black/75 via-black/35 to-black/5' : 'bg-gradient-to-r from-white/85 via-white/45 to-white/5'}`} />
+        <div className="relative z-10 mx-auto flex h-full max-w-7xl flex-col justify-between px-5 pb-8 pt-6 sm:px-8 md:px-10 md:pb-10">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-current/40"><House className="h-4 w-4" aria-hidden="true" /></span>
+              <span className="font-serif text-lg font-semibold tracking-[0.09em] sm:text-xl">ESKAHADE</span>
             </div>
+            <div className={whiteText ? "flex items-center gap-2 rounded-full bg-black/60 p-1 backdrop-blur-sm" : "flex items-center gap-2 rounded-full bg-white/85 p-1 backdrop-blur-sm"}>
+              {isAdmin && <Link href="/dashboard/pengaturan/dashboard" title="Pengaturan dashboard" aria-label="Pengaturan dashboard" className="rounded-full border border-current/35 p-2.5 hover:bg-white/15"><Settings2 className="h-4 w-4" /></Link>}
+              <button onClick={openMenu} title="Buka seluruh menu" aria-label="Buka seluruh menu" className="rounded-full border border-current/35 p-2.5 hover:bg-white/15 md:hidden"><Menu className="h-4 w-4" /></button>
+              <Link href="/dashboard/profil" title="Profil saya" aria-label="Profil saya" className="flex h-10 w-10 items-center justify-center rounded-full border border-current/40 text-sm font-bold hover:bg-white/15">{firstName.slice(0, 1).toUpperCase()}</Link>
+            </div>
+          </div>
+          <div className="max-w-2xl">
+            <p className="mb-3 text-sm font-medium tracking-wide opacity-90">{dateLabel}</p>
+            <h1 className="font-serif text-[clamp(2.25rem,5vw,4.4rem)] font-semibold leading-[1.08] tracking-tight">{greeting},<br />{firstName}</h1>
+            <p className="mt-4 max-w-lg text-sm leading-relaxed opacity-95 sm:text-base">Kelola kegiatan pesantren dengan jelas, tenang, dan penuh perhatian.</p>
+            <div className="mt-5 h-px w-14 bg-[#c9952e]" />
           </div>
         </div>
+      </section>
 
-        {/* ── Search Bar Redesigned ── */}
-        <div className="relative group w-full animate-in fade-in duration-200">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Search className="h-4.5 w-4.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-          </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari menu atau layanan di sini..."
-            className="w-full pl-11 pr-10 py-3 bg-slate-100 border border-slate-200 focus:border-slate-300 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:ring-opacity-20 transition-all duration-200 shadow-inner focus:shadow-sm"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-            >
-              <X className="h-4.5 w-4.5" />
-            </button>
-          )}
+      {ticker.text && <div className="dashboard-ticker flex min-h-11 items-center overflow-hidden px-4" style={{ backgroundColor: ticker.backgroundColor, color: ticker.textColor }}>
+        <Megaphone className="mr-3 h-4 w-4 shrink-0" aria-hidden="true" />
+        <span className="mr-4 shrink-0 text-xs font-bold uppercase tracking-wider">Pengumuman</span>
+        <div className="dashboard-ticker-window flex-1 overflow-hidden"><div className="dashboard-ticker-track whitespace-nowrap text-sm" aria-label={ticker.text}>{ticker.text}<span aria-hidden="true" className="mx-16">•</span><span aria-hidden="true">{ticker.text}</span></div></div>
+      </div>}
+
+      <div className="mx-auto max-w-7xl space-y-9 px-4 py-8 sm:px-8 md:px-10 md:py-10">
+        {message && <p role="status" className="rounded-lg border border-[#ddd4c3] bg-white px-4 py-3 text-sm">{message}</p>}
+        <section aria-labelledby="shortcuts-heading">
+          <div className="mb-4 flex items-center justify-between gap-3"><h2 id="shortcuts-heading" className="font-serif text-xl font-semibold sm:text-2xl">Akses cepat</h2><button onClick={editShortcuts} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold text-[#247451] hover:bg-[#e7eee6]"><Settings2 className="h-4 w-4" /> Atur pintasan</button></div>
+          {shortcuts.length ? <div className="grid grid-cols-4 gap-2 sm:gap-3">
+            {shortcuts.map(item => { const Icon = getIcon(item.icon); return <Link key={item.id} href={item.href} className="group flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-[#e4ddcf] bg-[#fffdf8] px-2 py-3 text-center transition-colors hover:border-[#9ab5a2] hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#247451]">
+              <Icon className="h-6 w-6 text-[#12372a] group-hover:text-[#247451]" aria-hidden="true" />
+              <span className="line-clamp-2 text-[11px] font-medium leading-tight text-[#1c2923] sm:text-sm">{getMenuTitle(item.title)}</span>
+            </Link> })}
+          </div> : <div className="rounded-xl border border-dashed border-[#c9d8ce] px-5 py-7 text-sm text-[#66736c]">Belum ada pintasan. Pilih menu yang paling sering Anda gunakan.</div>}
+        </section>
+
+        <section aria-labelledby="widgets-heading">
+          <div className="mb-4 flex items-center justify-between gap-3"><div><h2 id="widgets-heading" className="font-serif text-xl font-semibold sm:text-2xl">Ringkasan untuk Anda</h2><p className="mt-1 text-xs text-[#66736c]">Angka ringkasan tersimpan sampai 5 menit. Segarkan untuk data terbaru.</p></div><button onClick={refresh} disabled={!!busy} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#c9d8ce] bg-white px-3 py-2 text-xs font-semibold text-[#12372a] disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${busy === 'widgets' ? 'animate-spin' : ''}`} /> Segarkan</button></div>
+          {widgets.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {widgets.map(widget => <article key={widget.key} className={`flex min-h-48 flex-col rounded-xl border p-5 ${widget.key === 'wallet' ? 'border-[#c9ddce] bg-[#eaf3e9]' : 'border-[#e4ddcf] bg-[#fffdf8]'}`}>
+              <div className="flex items-start justify-between gap-3"><h3 className="font-serif text-base font-semibold">{widget.title}</h3>{widget.href && !widget.unavailable && <Link href={widget.href} aria-label={`Buka ${widget.title}`} className="rounded-full p-1 text-[#247451] hover:bg-[#e7eee6]"><ArrowRight className="h-4 w-4" /></Link>}</div>
+              <div className="mt-5 text-[clamp(1.7rem,3vw,2.5rem)] font-semibold leading-none tabular-nums text-[#12372a]">{widget.value}</div>
+              <p className="mt-2 text-xs text-[#66736c]">{widget.description}</p>
+              {widget.lines.length > 0 && <ul className="mt-4 space-y-2 border-t border-[#e4ddcf] pt-3 text-xs text-[#34483c]">{widget.lines.map((line, index) => <li key={index} className="flex justify-between gap-2"><span>{line.label}</span>{line.detail && <span className="shrink-0 text-[#66736c]">{line.detail}</span>}</li>)}</ul>}
+            </article>)}
+          </div> : <p className="rounded-xl border border-dashed border-[#c9d8ce] px-5 py-7 text-sm text-[#66736c]">Belum ada widget untuk role Anda.</p>}
+        </section>
+      </div>
+
+      <dialog ref={dialogRef} className="m-auto w-[min(96vw,650px)] max-h-[85dvh] rounded-2xl border border-[#ddd4c3] bg-[#fffdf8] p-0 text-[#1c2923] shadow-xl backdrop:bg-black/50">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#e4ddcf] bg-[#fffdf8] px-5 py-4"><div><h2 className="font-serif text-lg font-semibold">Atur pintasan</h2><p className="text-xs text-[#66736c]">Pilih maksimal 8 menu yang Anda gunakan.</p></div><button onClick={() => dialogRef.current?.close()} aria-label="Tutup" className="rounded-lg p-2 hover:bg-[#e7eee6]"><X className="h-5 w-5" /></button></div>
+        {message && <p role="alert" className="mx-5 mt-4 rounded-lg border border-[#ddd4c3] bg-white px-3 py-2 text-sm">{message}</p>}
+        <div className="max-h-[60dvh] overflow-y-auto p-5">
+          <input value={filter} onChange={event => setFilter(event.target.value)} placeholder="Cari menu..." aria-label="Cari menu" className="mb-4 w-full rounded-lg border border-[#ddd4c3] bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#247451]" />
+          {draft.length > 0 && <div className="mb-5"><p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#66736c]">Dipilih ({draft.length}/8)</p><div className="space-y-1">{draft.map(id => { const item = menu.find(value => value.id === id); if (!item) return null; return <div key={id} className="flex items-center gap-2 rounded-lg bg-[#eaf3e9] px-3 py-2 text-sm"><span className="flex-1">{getMenuTitle(item.title)}</span><button onClick={() => moveDraft(id, -1)} aria-label={`Naikkan ${item.title}`} className="p-1"><ArrowUp className="h-4 w-4" /></button><button onClick={() => moveDraft(id, 1)} aria-label={`Turunkan ${item.title}`} className="p-1"><ArrowDown className="h-4 w-4" /></button><button onClick={() => toggleDraft(id)} aria-label={`Hapus ${item.title}`} className="p-1"><X className="h-4 w-4" /></button></div> })}</div></div>}
+          <div className="space-y-1">{filteredMenu.map(item => <label key={item.id} className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-[#f7f1e5]"><input type="checkbox" checked={draft.includes(item.id)} disabled={!draft.includes(item.id) && draft.length >= 8} onChange={() => toggleDraft(item.id)} /><span className="flex-1">{getMenuTitle(item.title)}</span><span className="text-xs text-[#66736c]">{item.group_name}</span></label>)}</div>
         </div>
-      </div>
-
-      {/* ── SPA Views Container ── */}
-      <div className="relative">
-        
-        {/* ── VIEW 1: SEARCH RESULTS ── */}
-        {searchQuery.trim() !== '' && (
-          <div className="space-y-3.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                Hasil Pencarian ({filteredFeatures.length})
-              </span>
-              <button
-                onClick={() => setSearchQuery('')}
-                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors cursor-pointer"
-              >
-                Bersihkan
-              </button>
-            </div>
-
-            {filteredFeatures.length === 0 ? (
-              <div className="flex flex-col items-center py-12 bg-white border border-slate-200 rounded-2xl text-slate-400 text-center gap-2">
-                <Search className="w-8 h-8 opacity-20 mb-1" />
-                <p className="font-medium text-sm">Tidak menemukan "{searchQuery}"</p>
-                <p className="text-xs text-slate-500">Coba kata kunci lain atau cari per kategori.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {filteredFeatures.map(fitur => {
-                  const meta = getGroupMeta(fitur.group_name)
-                  const FeatureIcon = getIcon(fitur.icon)
-                  const desc = FITUR_DESC[fitur.href] || 'Akses fitur ini untuk mengelola data terkait.'
-
-                  return (
-                    <Link
-                      key={fitur.href}
-                      href={fitur.href}
-                      className="flex items-center gap-3.5 p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200 active:scale-[0.98] group"
-                    >
-                      {/* Clean direct icon (no badge container) */}
-                      <div className="w-9 h-9 flex items-center justify-center shrink-0">
-                        <FeatureIcon className={cn("w-6 h-6 transition-transform duration-200 group-hover:scale-110", theme.text)} />
-                      </div>
-                      <div className="flex-1 min-w-0 leading-tight">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate max-w-[120px]">
-                            {fitur.group_name === '_standalone' ? 'Menu Utama' : fitur.group_name}
-                          </span>
-                        </div>
-                        <h4 className="text-sm font-bold text-slate-800 truncate">{getMenuTitle(fitur.title)}</h4>
-                        <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── VIEW 2 & 3: CATEGORY SELECTION & SUB-MENU DETAILS (with smooth native sliding transitions) ── */}
-        {searchQuery.trim() === '' && (
-          <div className="relative w-full overflow-hidden min-h-[300px]">
-            {/* VIEW 2: CATEGORY SELECTION */}
-            <div
-              className={cn(
-                "w-full transition-all duration-300 ease-out transform",
-                activeGroup === null
-                  ? "relative opacity-100 translate-x-0"
-                  : "absolute top-0 left-0 opacity-0 -translate-x-8 pointer-events-none"
-              )}
-            >
-              {groups.length === 0 ? (
-                <div className="flex flex-col items-center py-16 text-slate-400 text-center gap-2">
-                  <Settings className="w-10 h-10 opacity-20 mb-1" />
-                  <p className="font-medium text-sm">Belum ada fitur yang tersedia</p>
-                  <p className="text-xs text-slate-500">Hubungi admin untuk mengatur akses Anda.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                  {groups.map((group) => {
-                    const meta = getGroupMeta(group)
-                    const GroupIcon = meta.icon
-                    const items = grouped.get(group)!
-                    const accent = GROUP_COLORS[group] ?? { bg: 'bg-slate-50 text-slate-500', text: 'text-slate-600', hoverText: 'group-hover:text-slate-800' }
-
-                    return (
-                      <button
-                        key={group}
-                        onClick={() => handleOpenGroup(group)}
-                        className="group flex items-center text-left p-3.5 rounded-2xl border border-slate-200/80 bg-white shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] hover:border-slate-300 hover:shadow-[0_4px_12px_-3px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 cursor-pointer relative overflow-hidden"
-                      >
-                        <div className={cn("shrink-0 w-9 h-9 flex items-center justify-center mr-3 transition-transform duration-300 group-hover:scale-110", accent.text)}>
-                          <GroupIcon size={22} className="w-5.5 h-5.5" />
-                        </div>
-                        <div className="flex-1 min-w-0 leading-tight">
-                          <span className={cn("block text-sm font-bold text-slate-800 line-clamp-1 mb-0.5 transition-colors", accent.hoverText)}>
-                            {group === '_standalone' ? 'Menu Utama' : group}
-                          </span>
-                          <span className="block text-[10px] sm:text-[11px] text-slate-400 font-medium group-hover:text-slate-500 transition-colors">
-                            {items.length} fitur
-                          </span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* VIEW 3: SUB-MENU DETAILS */}
-            <div
-              className={cn(
-                "w-full transition-all duration-300 ease-out transform",
-                activeGroup !== null
-                  ? "relative opacity-100 translate-x-0"
-                  : "absolute top-0 left-0 opacity-0 translate-x-8 pointer-events-none"
-              )}
-            >
-              {activeGroup !== null && (() => {
-                const items = sortGroupItems(activeGroup, grouped.get(activeGroup)!)
-                const meta = getGroupMeta(activeGroup)
-                const GroupIcon = meta.icon
-
-                return (
-                  <div className="space-y-4">
-                    {/* Navigation and active stats */}
-                    <div className="flex items-center justify-between pb-1">
-                      <button
-                        onClick={handleCloseGroup}
-                        className="group/btn inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-slate-200 rounded-full text-xs font-bold text-slate-600 hover:text-slate-800 hover:border-slate-300 transition-all shadow-sm active:scale-95 cursor-pointer"
-                      >
-                        <ChevronLeft className="w-4 h-4 group-hover/btn:-translate-x-0.5 transition-transform" />
-                        Kembali
-                      </button>
-                      <div className="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/20 rounded-full px-3 py-1">
-                        <span className="text-emerald-600 text-[10px] font-bold tracking-tight uppercase">{items.length} fitur aktif</span>
-                      </div>
-                    </div>
-
-                    {/* Grid lists of submenu features */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {items.map(fitur => {
-                        const FeatureIcon = getIcon(fitur.icon)
-                        const desc = FITUR_DESC[fitur.href] || 'Akses fitur ini untuk mengelola data terkait.'
-
-                        return (
-                          <Link
-                            key={fitur.href}
-                            href={fitur.href}
-                            className="flex items-center gap-3.5 p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200 active:scale-[0.98] group"
-                          >
-                            {/* Clean direct icon (no badge) */}
-                            <div className="w-9 h-9 flex items-center justify-center shrink-0">
-                              <FeatureIcon className={cn("w-6 h-6 transition-transform duration-200 group-hover:scale-110", theme.text)} />
-                            </div>
-                            <div className="flex-1 min-w-0 leading-tight">
-                              <h4 className="text-sm font-bold text-slate-800 truncate">{getMenuTitle(fitur.title)}</h4>
-                              <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
-                            </div>
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })()}
-            </div>
-          </div>
-        )}
-
-      </div>
-
+        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-[#e4ddcf] bg-[#fffdf8] px-5 py-4"><button onClick={() => dialogRef.current?.close()} className="rounded-lg px-4 py-2.5 text-sm">Batal</button><button disabled={!!busy} onClick={saveShortcuts} className="rounded-lg bg-[#12372a] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">Simpan pintasan</button></div>
+      </dialog>
     </div>
   )
 }

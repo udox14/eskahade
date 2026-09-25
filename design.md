@@ -101,3 +101,15 @@ Kontras minimum teks mengikuti WCAG AA. Emas tidak digunakan sebagai warna teks 
 ```
 
 Aturan ini berlaku untuk `/`, `/login`, dan `/portal-ortu/login`. Halaman dashboard dan isi portal mempertahankan sistem visualnya masing-masing.
+
+## 7. Beranda internal /dashboard
+
+Aturan ini khusus beranda internal. Shell desktop tetap memiliki sidebar, sedangkan header putih dan padding konten shell dihilangkan hanya pada /dashboard. Halaman lain tetap memakai shell dan komponen existing.
+
+- Hero memakai satu gambar penuh dari tepi atas area konten. Identitas ESKAHADE, akses akun, dan tombol menu mobile berada di atas gambar. Admin dapat mengatur fokus gambar (x, y, zoom) secara terpisah untuk desktop dan mobile, serta memilih teks putih atau hitam. Overlay netral mengikuti pilihan warna teks agar judul terbaca.
+- Setelah hero, strip pengumuman memakai warna latar dan teks pilihan admin dengan kontras minimal WCAG AA. Running text berhenti bergerak untuk prefers-reduced-motion: reduce; isi yang sama tetap terbaca.
+- Latar konten #f7f1e5, permukaan #fffdf8, tinta #1c2923, hijau utama #12372a, hijau aksi #247451, aksen emas #c9952e. Gunakan tipografi serif hanya untuk judul besar dan judul seksi. Jaga border tipis, tanpa bayangan berat atau kartu berlapis.
+- Pintasan maksimal delapan, empat kolom pada lebar sempit dan luas. Urutan berasal dari pilihan pengguna, tetapi menu yang izinnya dicabut langsung hilang. Tombol Home pada bottom navbar membuka drawer semua menu yang diizinkan; saat navbar dimatikan, tombol menu di atas hero tetap tersedia.
+- Widget ditampilkan sebagai ringkasan singkat dalam grid responsif satu, dua, lalu empat kolom. Urutannya berasal dari konfigurasi per role, digabung tanpa duplikat untuk akun multi-role. Semua angka menghormati cakupan pengguna. Data uang jajan diberi penjelasan sebagai dana titipan santri dan tidak digabung dengan penerimaan kewajiban pesantren.
+- Tombol Segarkan meminta ulang data widget yang tampak. Tidak ada pemuatan berkala. Status gagal ditampilkan dalam widget, bukan menyembunyikan seluruh beranda.
+- Kontrol, dialog, dan link menyediakan fokus yang jelas serta label aksesibilitas. Animasi strip dan transisi non-esensial dimatikan ketika pengguna meminta gerakan berkurang.

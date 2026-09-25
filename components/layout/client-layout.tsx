@@ -9,6 +9,7 @@ import { ArrowLeft } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { DashboardMenuContext } from "@/components/layout/menu-context";
 import { cn } from "@/lib/utils";
 import type { FiturAkses } from "@/lib/cache/fitur-akses";
 import type { SidebarGroupConfig } from "@/lib/menu/groups";
@@ -27,7 +28,7 @@ interface ClientLayoutProps {
   userShowBottomNav: boolean;
 }
 
-export function ClientLayout({ children, userRole, userRoles, userEmail, userName, avatarUrl, fiturAkses, sidebarGroups = [], globalBottomNavEnabled, userShowBottomNav }: ClientLayoutProps) {
+export function ClientLayout({ children, userRole, userRoles, userName, avatarUrl, fiturAkses, sidebarGroups = [], globalBottomNavEnabled, userShowBottomNav }: ClientLayoutProps) {
   // State collapse dipersist ke localStorage agar pilihan user bertahan antar sesi
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -39,6 +40,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
   });
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
+  const isDashboardHome = pathname === '/dashboard';
   const searchParams = useSearchParams();
   const returnTo = searchParams.get('returnTo');
   const showSetupReturn = returnTo === '/dashboard/setup-tahun-ajaran' && pathname !== '/dashboard/setup-tahun-ajaran';
@@ -51,6 +53,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
 
   return (
     <IconContext.Provider value={{ weight: "duotone" }}>
+      <DashboardMenuContext.Provider value={() => setIsMobileOpen(true)}>
       <div className="relative flex h-[100dvh] w-full overflow-hidden bg-slate-50 font-sans text-slate-900 antialiased selection:bg-green-100 selection:text-green-900">
       
       {/* 1. SIDEBAR — desktop rail + drawer mobile + overlay dikelola di dalam komponen */}
@@ -81,7 +84,7 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
         )}
       >
         {/* HEADER */}
-        <div className="no-print sticky top-0 z-40 w-full h-12 bg-white border-b border-slate-100 flex items-center px-4 md:px-8 transition-all">
+        {!isDashboardHome && <div className="no-print sticky top-0 z-40 w-full h-12 bg-white border-b border-slate-100 flex items-center px-4 md:px-8 transition-all">
           <div className="w-full">
             <Header 
                 userName={userName} 
@@ -91,11 +94,11 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
                 onMenuClick={() => setIsMobileOpen(true)}
             />
           </div>
-        </div>
+        </div>}
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent bg-slate-50/50">
-          <div className="max-w-7xl mx-auto w-full space-y-6 pb-20 md:pb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out">
+        <main className={cn("flex-1 overflow-y-auto scroll-smooth scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent", isDashboardHome ? "bg-[#f7f1e5]" : "bg-slate-50/50 p-4 md:p-8")}>
+          <div className={cn("w-full", isDashboardHome ? "min-h-full pb-16 md:pb-0" : "max-w-7xl mx-auto space-y-6 pb-20 md:pb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out")}>
             {showSetupReturn ? (
               <div className="no-print sticky top-0 z-30 flex justify-end">
                 <Link
@@ -118,9 +121,11 @@ export function ClientLayout({ children, userRole, userRoles, userEmail, userNam
           userRoles={userRoles}
           globalEnabled={globalBottomNavEnabled}
           userShowBottomNav={userShowBottomNav}
+          onOpenMenu={() => setIsMobileOpen(true)}
         />
       </div>
     </div>
+    </DashboardMenuContext.Provider>
     </IconContext.Provider>
   );
 }

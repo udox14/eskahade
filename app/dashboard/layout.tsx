@@ -84,6 +84,10 @@ export default async function DashboardLayout({
     try { fiturAkses = await getFiturForRoles(accessRoles, session.id) } catch {}
   }
 
+  if (!accessRoles.includes('admin')) {
+    fiturAkses = fiturAkses.filter(f => f.href !== '/dashboard/pengaturan/dashboard')
+  }
+
   const hasOperasionalRecipientMenu = fiturAkses.some(f => f.href === '/dashboard/operasional')
   if (accessRoles.includes('admin') && !hasOperasionalRecipientMenu) {
     fiturAkses = [
