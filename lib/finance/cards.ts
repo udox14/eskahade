@@ -104,8 +104,8 @@ export async function issueCard(
   issuedBy?: string | null,
   options?: { reason?: string }
 ): Promise<FinanceCredential> {
-  const student = await queryOne<{ id: string; status_global: string; nama_lengkap: string; asrama: string | null }>(
-    `SELECT id, status_global, nama_lengkap, asrama FROM santri WHERE id = ?`,
+  const student = await queryOne<{ id: string; status_global: string; nama_lengkap: string; asrama: string | null; kategori_santri: string | null }>(
+    `SELECT id, status_global, nama_lengkap, asrama, kategori_santri FROM santri WHERE id = ?`,
     [santriId]
   )
   if (!student) {
@@ -114,7 +114,7 @@ export async function issueCard(
   if (student.status_global !== 'aktif') {
     throw new Error(`Tidak dapat menerbitkan kartu untuk santri non-aktif ("${student.nama_lengkap}").`)
   }
-  assertSantriBillable(student.asrama, student.nama_lengkap)
+  assertSantriBillable(student.asrama, student.nama_lengkap, student.kategori_santri)
 
   const timestamp = now()
   const newCardId = generateId()

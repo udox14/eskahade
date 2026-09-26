@@ -143,14 +143,14 @@ export async function resetStudentPin(
 ): Promise<void> {
   validatePinFormat(newPin)
 
-  const student = await queryOne<{ id: string; status_global: string; asrama: string | null; nama_lengkap: string }>(
-    `SELECT id, status_global, asrama, nama_lengkap FROM santri WHERE id = ?`,
+  const student = await queryOne<{ id: string; status_global: string; asrama: string | null; nama_lengkap: string; kategori_santri: string | null }>(
+    `SELECT id, status_global, asrama, nama_lengkap, kategori_santri FROM santri WHERE id = ?`,
     [santriId]
   )
   if (!student) {
     throw new Error(`Santri dengan ID "${santriId}" tidak ditemukan.`)
   }
-  assertSantriBillable(student.asrama, student.nama_lengkap)
+  assertSantriBillable(student.asrama, student.nama_lengkap, student.kategori_santri)
 
   const existing = await queryOne<FinanceStudentPin>(
     `SELECT santri_id FROM finance_student_pins WHERE santri_id = ?`,
@@ -204,14 +204,14 @@ export async function setStudentPin(
 
   validatePinFormat(pin)
 
-  const student = await queryOne<{ id: string; status_global: string; asrama: string | null; nama_lengkap: string }>(
-    `SELECT id, status_global, asrama, nama_lengkap FROM santri WHERE id = ?`,
+  const student = await queryOne<{ id: string; status_global: string; asrama: string | null; nama_lengkap: string; kategori_santri: string | null }>(
+    `SELECT id, status_global, asrama, nama_lengkap, kategori_santri FROM santri WHERE id = ?`,
     [santriId]
   )
   if (!student) {
     throw new Error(`Santri dengan ID "${santriId}" tidak ditemukan.`)
   }
-  assertSantriBillable(student.asrama, student.nama_lengkap)
+  assertSantriBillable(student.asrama, student.nama_lengkap, student.kategori_santri)
 
   const existing = await queryOne<FinanceStudentPin>(
     `SELECT santri_id FROM finance_student_pins WHERE santri_id = ?`,

@@ -718,11 +718,13 @@ export async function processSnapPaymentNotification(
     )
   }
 
-  // 3b. Guard bebas tagihan: santri penduduk setempat (AL-BAGHORY) tidak boleh
-  // diproses pada sistem keuangan baru. Dana yang terlanjur masuk TIDAK dialokasikan
-  // dan dicatat ke finance_gateway_events untuk ditinjau Modul Rekonsiliasi.
+  // 3b. Guard bebas tagihan: santri penduduk setempat (AL-BAGHORY) dan kategori SADESA
+  // tidak boleh diproses pada sistem keuangan baru. Dana yang terlanjur masuk TIDAK
+  // dialokasikan dan dicatat ke finance_gateway_events untuk ditinjau Modul Rekonsiliasi.
   const billableStudent = await queryOne<{ asrama: string | null; nama_lengkap: string }>(
-    `SELECT asrama, nama_lengkap FROM santri WHERE id = ? AND ${nonBillableSantriSqlPredicate('asrama')}`,
+    `SELECT asrama, nama_lengkap FROM santri
+     WHERE id = ?
+       AND ${nonBillableSantriSqlPredicate('asrama')}`,
     [studentId]
   )
 
@@ -739,14 +741,15 @@ export async function processSnapPaymentNotification(
         trxId || null,
         JSON.stringify({
           ...payload,
-          eskahade_blocked_reason: 'Santri bebas tagihan (penduduk setempat / AL-BAGHORY) - dana tidak dialokasikan',
+          eskahade_blocked_reason:
+            'Santri bebas tagihan (AL-BAGHORY / kategori SADESA) - dana tidak dialokasikan',
         }),
         now(),
       ]
     )
 
     throw new Error(
-      `Pembayaran ditolak: santri pemilik Virtual Account "${virtualAccountNo}" berasrama AL-BAGHORY (penduduk setempat) sehingga bebas dari seluruh tagihan keuangan. Dana tidak dialokasikan otomatis dan dicatat untuk peninjauan Bendahara.`
+      `Pembayaran ditolak: santri pemilik Virtual Account "${virtualAccountNo}" termasuk kelompok bebas tagihan (asrama AL-BAGHORY atau kategori SADESA). Dana tidak dialokasikan otomatis dan dicatat untuk peninjauan Bendahara.`
     )
   }
 

@@ -46,8 +46,8 @@ export async function grantExemption(
   input: CreateExemptionInput
 ): Promise<FinanceExemption> {
   // 1. Validasi santri aktif
-  const santri = await queryOne<{ id: string; nama_lengkap: string; status_global: string; asrama: string | null }>(
-    `SELECT id, nama_lengkap, status_global, asrama FROM santri WHERE id = ?`,
+  const santri = await queryOne<{ id: string; nama_lengkap: string; status_global: string; asrama: string | null; kategori_santri: string | null }>(
+    `SELECT id, nama_lengkap, status_global, asrama, kategori_santri FROM santri WHERE id = ?`,
     [input.santri_id]
   )
 
@@ -61,7 +61,7 @@ export async function grantExemption(
     )
   }
 
-  assertSantriBillable(santri.asrama, santri.nama_lengkap)
+  assertSantriBillable(santri.asrama, santri.nama_lengkap, santri.kategori_santri)
 
   // 2. Validasi rentang periode jika keduanya diisi
   if (input.period_start && input.period_end && input.period_start > input.period_end) {

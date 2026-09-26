@@ -52,14 +52,14 @@ export async function assignStudentFixedVa(
   }
 
   // Validasi santri terdaftar
-  const student = await queryOne<{ id: string; status_global: string; asrama: string | null; nama_lengkap: string }>(
-    `SELECT id, status_global, asrama, nama_lengkap FROM santri WHERE id = ?`,
+  const student = await queryOne<{ id: string; status_global: string; asrama: string | null; nama_lengkap: string; kategori_santri: string | null }>(
+    `SELECT id, status_global, asrama, nama_lengkap, kategori_santri FROM santri WHERE id = ?`,
     [santriId]
   )
   if (!student) {
     throw new Error(`Santri dengan ID "${santriId}" tidak ditemukan.`)
   }
-  assertSantriBillable(student.asrama, student.nama_lengkap)
+  assertSantriBillable(student.asrama, student.nama_lengkap, student.kategori_santri)
 
   // Periksa apakah nomor VA sudah dipakai oleh santri lain
   const existingVa = await findStudentByFixedVa(cleanVa)

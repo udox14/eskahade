@@ -15,6 +15,9 @@ import RekeningModal from './rekening-modal'
 import BuktiPenyaluranModal from './bukti-penyaluran-modal'
 import ProviderDetailModal from './provider-detail-modal'
 import RekeningImportModal from './rekening-import-modal'
+import BendaharaItemDetailModal, {
+  type BendaharaDetailTarget,
+} from './bendahara-item-detail-modal'
 import {
   Bank,
   CheckCircle,
@@ -64,6 +67,7 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
   const [receiptDistributionId, setReceiptDistributionId] = useState<string | null>(null)
   const [detailModalProviderId, setDetailModalProviderId] = useState<string | null>(null)
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false)
+  const [bendaharaDetailTarget, setBendaharaDetailTarget] = useState<BendaharaDetailTarget | null>(null)
 
   const canDisburse = data.userPermissions.canDisburse
 
@@ -288,12 +292,56 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
                     </td>
                     <td className="py-3.5 px-4 font-medium text-slate-600">{row.period}</td>
                     <td className="py-3.5 px-4 text-center">
-                      <span className="font-bold text-slate-800">{row.santriSudahBayar}</span>
-                      <span className="text-slate-400"> / {row.santriTerdaftar}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBendaharaDetailTarget({
+                            key: `item:${row.itemType}:${row.period}:sudah`,
+                            itemType: row.itemType,
+                            itemLabel: row.itemLabel,
+                            period: row.period,
+                            initialStatus: 'SUDAH_BAYAR',
+                          })
+                        }
+                        className="font-bold text-slate-800 hover:text-emerald-700 hover:underline underline-offset-2 transition"
+                        title="Lihat santri yang sudah bayar"
+                      >
+                        {row.santriSudahBayar}
+                      </button>
+                      <span className="text-slate-400"> / </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setBendaharaDetailTarget({
+                            key: `item:${row.itemType}:${row.period}:semua`,
+                            itemType: row.itemType,
+                            itemLabel: row.itemLabel,
+                            period: row.period,
+                            initialStatus: 'ALL',
+                          })
+                        }
+                        className="text-slate-500 hover:text-emerald-700 hover:underline underline-offset-2 transition"
+                        title="Lihat seluruh santri terdaftar"
+                      >
+                        {row.santriTerdaftar}
+                      </button>
                       {row.santriBelumBayar > 0 && (
-                        <span className="block text-[10px] text-amber-600 font-medium">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBendaharaDetailTarget({
+                              key: `item:${row.itemType}:${row.period}:belum`,
+                              itemType: row.itemType,
+                              itemLabel: row.itemLabel,
+                              period: row.period,
+                              initialStatus: 'BELUM_BAYAR',
+                            })
+                          }
+                          className="block w-full text-[10px] text-amber-600 font-medium hover:text-amber-700 hover:underline underline-offset-2 transition"
+                          title="Lihat daftar santri yang belum bayar"
+                        >
                           ({row.santriBelumBayar} belum)
-                        </span>
+                        </button>
                       )}
                     </td>
                     <td className="py-3.5 px-4 text-right font-medium text-slate-800">
@@ -671,6 +719,13 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
         onClose={() => setIsImportModalOpen(false)}
         onSuccess={() => refreshData()}
         serviceType={activeTab === 'LAUNDRY' ? 'Cuci' : 'Makan'}
+      />
+
+      <BendaharaItemDetailModal
+        key={bendaharaDetailTarget?.key ?? 'bendahara-detail'}
+        isOpen={!!bendaharaDetailTarget}
+        onClose={() => setBendaharaDetailTarget(null)}
+        target={bendaharaDetailTarget}
       />
     </div>
   )

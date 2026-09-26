@@ -349,8 +349,9 @@ export async function getStudentWalletDetail(
     kamar: string | null
     foto_url: string | null
     status_global: string
+    kategori_santri: string | null
   }>(
-    `SELECT id, nis, nama_lengkap, asrama, kamar, foto_url, status_global
+    `SELECT id, nis, nama_lengkap, asrama, kamar, foto_url, status_global, kategori_santri
      FROM santri WHERE id = ?`,
     [santriId]
   )
@@ -358,7 +359,7 @@ export async function getStudentWalletDetail(
   if (!student) {
     throw new Error(`Santri dengan ID "${santriId}" tidak ditemukan.`)
   }
-  assertSantriBillable(student.asrama, student.nama_lengkap)
+  assertSantriBillable(student.asrama, student.nama_lengkap, student.kategori_santri)
 
   const { balance, cachedBalance } = await getStudentWalletBalance(santriId)
   const limits = await evaluateWalletLimit(santriId)

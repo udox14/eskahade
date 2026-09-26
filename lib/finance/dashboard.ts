@@ -10,7 +10,7 @@
 
 import { query, queryOne } from '@/lib/db'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
-import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
+import { nonBillableSantriSqlPredicate, nonBillableItemSqlPredicate } from '@/lib/finance/non-billable-santri'
 
 export interface PesantrenKpi {
   totalPenerimaan: number
@@ -246,7 +246,14 @@ export async function getExecutiveFinanceKpi(periodInput?: string): Promise<Fina
        FROM finance_obligations
        WHERE status IN ('UNPAID', 'PARTIALLY_PAID')
          AND (period <= ? OR period = 'LIFETIME')
-         AND ${nonBillableSantriSqlPredicate('(SELECT s.asrama FROM santri s WHERE s.id = finance_obligations.santri_id)')}`,
+         AND ${nonBillableSantriSqlPredicate(
+           '(SELECT s.asrama FROM santri s WHERE s.id = finance_obligations.santri_id)'
+         )}
+         AND ${nonBillableItemSqlPredicate(
+           '(SELECT s.asrama FROM santri s WHERE s.id = finance_obligations.santri_id)',
+           '(SELECT s.kategori_santri FROM santri s WHERE s.id = finance_obligations.santri_id)',
+           'finance_obligations.item_type'
+         )}`,
       [period]
     ),
 

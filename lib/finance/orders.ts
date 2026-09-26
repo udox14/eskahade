@@ -4,7 +4,7 @@
 
 import { query, queryOne, batch, execute, generateId, now } from '@/lib/db'
 import { getStudentFixedVa } from '@/lib/finance/va'
-import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
+import { assertSantriBillable, assertSantriBillableUntukItem } from '@/lib/finance/non-billable-santri'
 import type {
   FinancePaymentOrder,
   FinanceOrderItem,
@@ -52,8 +52,8 @@ export async function createPaymentOrder(
   }
 
   // 1. Validasi Santri Aktif
-  const student = await queryOne<{ id: string; status_global: string; asrama: string | null; nama_lengkap: string }>(
-    `SELECT id, status_global, asrama, nama_lengkap FROM santri WHERE id = ?`,
+  const student = await queryOne<{ id: string; status_global: string; asrama: string | null; nama_lengkap: string; kategori_santri: string | null }>(
+    `SELECT id, status_global, asrama, nama_lengkap, kategori_santri FROM santri WHERE id = ?`,
     [santriId]
   )
   if (!student) {
@@ -64,7 +64,7 @@ export async function createPaymentOrder(
       `Tidak dapat membuat order pembayaran untuk santri berstatus "${student.status_global}".`
     )
   }
-  assertSantriBillable(student.asrama, student.nama_lengkap)
+  assertSantriBillable(student.asrama, student.nama_lengkap, student.kategori_santri)
 
   // 2. Validasi Item-Item & Kewajiban
   let grossAmount = 0
@@ -81,6 +81,16 @@ export async function createPaymentOrder(
     if (amount <= 0) {
       throw new Error(`Nominal item "${item.itemType}" harus lebih besar dari 0.`)
     }
+
+    // Guard per item: SADESA tidak boleh ditagih UANG_MAKAN & UANG_NYUCI
+    assertSantriBillableUntukItem(
+      {
+        asrama: student.asrama,
+        kategoriSantri: student.kategori_santri,
+        namaSantri: student.nama_lengkap,
+      },
+      item.itemType
+    )
 
     if (item.obligationId) {
       const obligation = await queryOne<

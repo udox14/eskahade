@@ -16,6 +16,7 @@ import {
 import {
   assertSantriBillable,
   nonBillableSantriSqlPredicate,
+  nonBillableItemSqlPredicate,
 } from '@/lib/finance/non-billable-santri'
 
 export interface EnrichedStudentObligationMatrixItem extends StudentObligationMatrixItem {
@@ -852,7 +853,12 @@ async function fetchRingkasanData(options: {
        (SELECT COALESCE(SUM(amount), 0) FROM finance_correction_items WHERE obligation_id = o.id) as total_corr
      FROM finance_obligations o
      WHERE o.santri_id IN (${ph})
-       AND (o.period = ? OR o.period = ? OR o.period = 'LIFETIME')`,
+       AND (o.period = ? OR o.period = ? OR o.period = 'LIFETIME')
+       AND ${nonBillableItemSqlPredicate(
+         '(SELECT s.asrama FROM santri s WHERE s.id = o.santri_id)',
+         '(SELECT s.kategori_santri FROM santri s WHERE s.id = o.santri_id)',
+         'o.item_type'
+       )}`,
     [...santriIds, monthlyPeriod, annualYear]
   )
 
@@ -1017,6 +1023,9 @@ async function fetchBulananData(options: {
     "o.item_type IN ('SPP', 'UANG_MAKAN', 'UANG_NYUCI')",
     "o.period = ?",
     nonBillableSantriSqlPredicate('s.asrama'),
+    // SADESA tidak ditagih UANG_MAKAN & UANG_NYUCI (SPP tetap ditagih).
+    // Termasuk menutup kewajiban lama yang belum ter-EXEMPTED sebelum aturan ini berlaku.
+    nonBillableItemSqlPredicate('s.asrama', 's.kategori_santri', 'o.item_type'),
   ]
   const params: unknown[] = [options.selectedPeriod]
 
@@ -1697,6 +1706,9 @@ async function fetchTunggakanData(options: {
     "o.item_type IN ('SPP', 'UANG_MAKAN', 'UANG_NYUCI')",
     "o.period < ?",
     nonBillableSantriSqlPredicate('s.asrama'),
+    // SADESA tidak ditagih UANG_MAKAN & UANG_NYUCI (tidak boleh muncul sebagai tunggakan)
+    nonBillableItemSqlPredicate('s.asrama', 's.kategori_santri', 'o.item_type'),
+    "o.status <> 'EXEMPTED'",
   ]
   const params: unknown[] = [options.currentPeriod]
 
@@ -2223,12 +2235,14 @@ export async function getStudentPaymentDetail(
     status_global: string
     asrama: string | null
     kamar: string | null
+    kategori_santri: string | null
     tahun_masuk: number | null
     tanggal_masuk: string | null
     tempat_makan: string | null
     tempat_mencuci: string | null
   }>(
     `SELECT s.id, s.nis, s.nama_lengkap, s.foto_url, s.jenis_kelamin, s.status_global, s.asrama, s.kamar,
+            s.kategori_santri,
             s.tahun_masuk, s.tanggal_masuk,
             m1.nama_jasa AS tempat_makan, m2.nama_jasa AS tempat_mencuci
      FROM santri s
@@ -2242,7 +2256,7 @@ export async function getStudentPaymentDetail(
     throw new Error('Data santri tidak ditemukan.')
   }
 
-  assertSantriBillable(santriRow.asrama, santriRow.nama_lengkap)
+  assertSantriBillable(santriRow.asrama, santriRow.nama_lengkap, santriRow.kategori_santri)
 
   const santri: StudentIdentityDetail = {
     id: santriRow.id,
@@ -2628,12 +2642,14 @@ export async function getUnpaidObligationsForCashPayment(
     status_global: string
     asrama: string | null
     kamar: string | null
+    kategori_santri: string | null
     tahun_masuk: number | null
     tanggal_masuk: string | null
     tempat_makan: string | null
     tempat_mencuci: string | null
   }>(
     `SELECT s.id, s.nis, s.nama_lengkap, s.foto_url, s.jenis_kelamin, s.status_global, s.asrama, s.kamar,
+            s.kategori_santri,
             s.tahun_masuk, s.tanggal_masuk,
             m1.nama_jasa AS tempat_makan, m2.nama_jasa AS tempat_mencuci
      FROM santri s
@@ -2649,7 +2665,7 @@ export async function getUnpaidObligationsForCashPayment(
   if (santriRow.status_global !== 'aktif') {
     throw new Error(`Santri berstatus "${santriRow.status_global}", tidak dapat menerima pembayaran.`)
   }
-  assertSantriBillable(santriRow.asrama, santriRow.nama_lengkap)
+  assertSantriBillable(santriRow.asrama, santriRow.nama_lengkap, santriRow.kategori_santri)
 
   const rows = await query<{
     id: string
@@ -2980,8 +2996,8 @@ export async function recordCashPayment(
 
     try {
       // 5. Validasi Santri Aktif
-      const student = await queryOne<{ id: string; nis: string; nama_lengkap: string; status_global: string; asrama: string | null; kamar: string | null }>(
-        `SELECT id, nis, nama_lengkap, status_global, asrama, kamar FROM santri WHERE id = ?`,
+      const student = await queryOne<{ id: string; nis: string; nama_lengkap: string; status_global: string; asrama: string | null; kamar: string | null; kategori_santri: string | null }>(
+        `SELECT id, nis, nama_lengkap, status_global, asrama, kamar, kategori_santri FROM santri WHERE id = ?`,
         [input.santriId]
       )
       if (!student) {
@@ -2990,7 +3006,7 @@ export async function recordCashPayment(
       if (student.status_global !== 'aktif') {
         throw new Error(`Santri berstatus "${student.status_global}", tidak dapat melakukan pembayaran.`)
       }
-      assertSantriBillable(student.asrama, student.nama_lengkap)
+      assertSantriBillable(student.asrama, student.nama_lengkap, student.kategori_santri)
 
       // 6. Buat Payment Order HANYA jika belum ada order yang terbentuk sebelumnya
       if (!orderToUse) {

@@ -69,11 +69,11 @@ export async function bayarTagihan(
   keterangan: string
 ) {
   const session = await getSession()
-  const santri = await queryOne<{ nama_lengkap: string; nis: string | null; asrama: string | null }>(
-    'SELECT nama_lengkap, nis, asrama FROM santri WHERE id = ?',
+  const santri = await queryOne<{ nama_lengkap: string; nis: string | null; asrama: string | null; kategori_santri: string | null }>(
+    'SELECT nama_lengkap, nis, asrama, kategori_santri FROM santri WHERE id = ?',
     [santriId]
   )
-  assertSantriBillable(santri?.asrama ?? null, santri?.nama_lengkap)
+  assertSantriBillable(santri?.asrama ?? null, santri?.nama_lengkap, santri?.kategori_santri)
 
   if (jenis !== 'BANGUNAN' && tahunTagihan) {
     const exist = await queryOne<{ id: string }>(
@@ -188,11 +188,11 @@ export async function getMonitoringPembayaran(
 
 export async function bayarLunasSetahun(santriId: string, tahunTagihan: number, tahunMasuk: number) {
   const session = await getSession()
-  const santri = await queryOne<{ nama_lengkap: string; nis: string | null; asrama: string | null }>(
-    'SELECT nama_lengkap, nis, asrama FROM santri WHERE id = ?',
+  const santri = await queryOne<{ nama_lengkap: string; nis: string | null; asrama: string | null; kategori_santri: string | null }>(
+    'SELECT nama_lengkap, nis, asrama, kategori_santri FROM santri WHERE id = ?',
     [santriId]
   )
-  assertSantriBillable(santri?.asrama ?? null, santri?.nama_lengkap)
+  assertSantriBillable(santri?.asrama ?? null, santri?.nama_lengkap, santri?.kategori_santri)
 
   const tarif = await query<any>(
     `SELECT jenis_biaya, nominal FROM biaya_settings

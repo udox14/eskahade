@@ -6,7 +6,7 @@ import { getActiveTariff } from '@/lib/finance/tariffs'
 import { checkExemption } from '@/lib/finance/exemptions'
 import { checkLegacySettlement, checkLegacyUsppStatus } from '@/lib/finance/legacy'
 import { computeObligationStatus } from '@/lib/finance/types'
-import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
+import { assertSantriBillable, assertSantriBillableUntukItem } from '@/lib/finance/non-billable-santri'
 import type {
   FinanceObligation,
   FinanceItemType,
@@ -31,6 +31,7 @@ interface SantriSnapshotRow {
   nama_lengkap: string
   status_global: string
   asrama: string | null
+  kategori_santri: string | null
   tempat_makan_id: string | null
   tempat_mencuci_id: string | null
 }
@@ -129,7 +130,7 @@ export async function ensureObligation(
 
   // 3. Ambil data santri existing untuk verifikasi status aktif dan snapshot provider
   const santri = await queryOne<SantriSnapshotRow>(
-    `SELECT id, nama_lengkap, status_global, asrama, tempat_makan_id, tempat_mencuci_id
+    `SELECT id, nama_lengkap, status_global, asrama, kategori_santri, tempat_makan_id, tempat_mencuci_id
      FROM santri
      WHERE id = ?`,
     [santriId]
@@ -146,8 +147,15 @@ export async function ensureObligation(
     )
   }
 
-  // Guard bebas tagihan: santri penduduk setempat (AL-BAGHORY) tidak boleh memiliki kewajiban apa pun
+  // Guard bebas tagihan:
+  // - AL-BAGHORY (penduduk setempat) tidak boleh memiliki kewajiban apa pun.
+  // - Kategori SADESA tidak boleh ditagih untuk UANG_MAKAN & UANG_NYUCI,
+  //   sedangkan SPP/EHB/EKSKUL/KESEHATAN/USPP tetap dapat ditagih.
   assertSantriBillable(santri.asrama, santri.nama_lengkap)
+  assertSantriBillableUntukItem(
+    { asrama: santri.asrama, kategoriSantri: santri.kategori_santri, namaSantri: santri.nama_lengkap },
+    itemType
+  )
 
   // Wajibkan provider valid untuk Makan dan Nyuci dari master_jasa
   let providerId: string | null = null

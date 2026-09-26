@@ -40,12 +40,12 @@ export async function recordOrderPayment(
 
   const externalRef = input.externalReference ? input.externalReference.trim() : null
 
-  // 1b. Guard bebas tagihan: santri penduduk setempat (AL-BAGHORY) tidak boleh menerima pembayaran
-  const orderSantri = await queryOne<{ asrama: string | null; nama_lengkap: string }>(
-    `SELECT asrama, nama_lengkap FROM santri WHERE id = ?`,
+  // 1b. Guard bebas tagihan: santri AL-BAGHORY / kategori SADESA tidak boleh menerima pembayaran
+  const orderSantri = await queryOne<{ asrama: string | null; nama_lengkap: string; kategori_santri: string | null }>(
+    `SELECT asrama, nama_lengkap, kategori_santri FROM santri WHERE id = ?`,
     [order.santri_id]
   )
-  assertSantriBillable(orderSantri?.asrama ?? null, orderSantri?.nama_lengkap)
+  assertSantriBillable(orderSantri?.asrama ?? null, orderSantri?.nama_lengkap, orderSantri?.kategori_santri)
 
   // 1. Gateway Idempotency: Jika externalReference sudah tercatat pada channel yang sama,
   // kembalikan pembayaran existing secara instan (menjamin deduplikasi callback ulang dari gateway)
@@ -521,14 +521,14 @@ export async function recordUnallocatedPayment(
   }
 
   // Validasi santri terdaftar
-  const student = await queryOne<{ id: string; asrama: string | null; nama_lengkap: string }>(
-    `SELECT id, asrama, nama_lengkap FROM santri WHERE id = ?`,
+  const student = await queryOne<{ id: string; asrama: string | null; nama_lengkap: string; kategori_santri: string | null }>(
+    `SELECT id, asrama, nama_lengkap, kategori_santri FROM santri WHERE id = ?`,
     [input.santriId]
   )
   if (!student) {
     throw new Error(`Santri dengan ID "${input.santriId}" tidak ditemukan.`)
   }
-  assertSantriBillable(student.asrama, student.nama_lengkap)
+  assertSantriBillable(student.asrama, student.nama_lengkap, student.kategori_santri)
 
   const paymentId = generateId()
   const paymentNumber = generatePaymentNumber()

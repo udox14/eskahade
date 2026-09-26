@@ -8,7 +8,7 @@ import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 import { syncLegacyPayment, syncLegacyPaymentReversal } from '@/lib/finance/bridge'
 import {
   assertSantriBillable,
-  isAsramaBebasTagihan,
+  isSantriBebasTagihan,
   nonBillableSantriSqlPredicate,
 } from '@/lib/finance/non-billable-santri'
 
@@ -35,6 +35,7 @@ type SantriRow = {
   nis: string | null
   asrama: string | null
   kamar: string | null
+  kategori_santri?: string | null
   tahun_masuk: number | null
   tanggal_masuk?: string | null
   created_at: string | null
@@ -763,14 +764,15 @@ export async function simpanOpeningBalanceNonSpp(input: {
   const cutoffTanggal = await getLegacyCutoffTanggal()
   const tahunTagihan = inferTahunTagihan(tahunAjaran)
   const santri = await queryOne<SantriRow>(`
-    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.tahun_masuk, s.tanggal_masuk, s.created_at,
+    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kategori_santri, s.tahun_masuk, s.tanggal_masuk, s.created_at,
            pf.id AS psb_flow_id
     FROM santri s
     LEFT JOIN psb_flow pf ON pf.santri_id = s.id
     WHERE s.id = ? AND s.status_global = 'aktif'
+      AND ${nonBillableSantriSqlPredicate('s.asrama')}
   `, [input.santriId])
   if (!santri) return { error: 'Santri tidak ditemukan.' }
-  assertSantriBillable(santri.asrama, santri.nama_lengkap)
+  assertSantriBillable(santri.asrama, santri.nama_lengkap, santri.kategori_santri)
   if (!usesLegacyOpeningBalance(tahunTagihan)) {
     return { error: 'Mulai Tahun Ajaran 2026/2027, semua santri memakai tarif normal sesuai angkatan.' }
   }
@@ -861,14 +863,14 @@ export async function getBukuBesarSantri(santriId: string, tahunAjaranId?: numbe
   if (!santriId) return null
   const cutoffTanggal = await getLegacyCutoffTanggal()
   const santri = await queryOne<SantriRow>(`
-    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.tahun_masuk, s.tanggal_masuk, s.created_at,
+    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.kategori_santri, s.tahun_masuk, s.tanggal_masuk, s.created_at,
            pf.id AS psb_flow_id
     FROM santri s
     LEFT JOIN psb_flow pf ON pf.santri_id = s.id
     WHERE s.id = ?
   `, [santriId])
   if (!santri) return null
-  if (isAsramaBebasTagihan(santri.asrama)) return null
+  if (isSantriBebasTagihan({ asrama: santri.asrama, kategoriSantri: santri.kategori_santri })) return null
 
   const payments = await query<PaymentRow>(`
     SELECT p.*, ta.nama AS tahun_ajaran_nama, u.full_name AS penerima_nama, vu.full_name AS voided_by_name
@@ -930,14 +932,14 @@ export async function getBukuBesarDetailNonSpp(santriId: string) {
   if (!santriId) return null
   const cutoffTanggal = await getLegacyCutoffTanggal()
   const santri = await queryOne<SantriRow>(`
-    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.tahun_masuk, s.tanggal_masuk, s.created_at,
+    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.kategori_santri, s.tahun_masuk, s.tanggal_masuk, s.created_at,
            pf.id AS psb_flow_id
     FROM santri s
     LEFT JOIN psb_flow pf ON pf.santri_id = s.id
     WHERE s.id = ?
   `, [santriId])
   if (!santri) return null
-  if (isAsramaBebasTagihan(santri.asrama)) return null
+  if (isSantriBebasTagihan({ asrama: santri.asrama, kategoriSantri: santri.kategori_santri })) return null
 
   const tahunMasuk = effectiveYear(santri)
   const tahunAjaranList = await getTahunAjaranOptions()

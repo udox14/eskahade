@@ -10,7 +10,7 @@
 // 7. Modul rekalkulasi authoritatif (recalculateAllocationDisbursement).
 
 import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
-import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
+import { nonBillableSantriSqlPredicate, nonBillableItemSqlPredicate } from '@/lib/finance/non-billable-santri'
 import type {
   FinanceDistribution,
   FinanceDistributionRecipientType,
@@ -28,6 +28,8 @@ import type {
   ProviderAccountTemplatePayload,
   ValidatedImportAccountRow,
   ProviderOperationalPaymentStatus,
+  BendaharaItemStudentRow,
+  BendaharaItemStudentsResult,
 } from '@/lib/finance/distribution-types'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
 import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
@@ -174,6 +176,11 @@ export async function getDistributionSummary(
           OR (o.item_type IN ('EHB', 'EKSKUL', 'KESEHATAN') AND o.period = ?)
           OR (o.item_type = 'USPP' AND o.period = 'LIFETIME')
         )
+        AND ${nonBillableItemSqlPredicate(
+          '(SELECT s.asrama FROM santri s WHERE s.id = o.santri_id)',
+          '(SELECT s.kategori_santri FROM santri s WHERE s.id = o.santri_id)',
+          'o.item_type'
+        )}
       `,
       [...itemTypes, period, yearPrefix]
     )
@@ -304,6 +311,7 @@ export async function getDistributionSummary(
       FROM santri s
       WHERE s.status_global = 'aktif'
         AND ${nonBillableSantriSqlPredicate('s.asrama')}
+        AND ${nonBillableItemSqlPredicate('s.asrama', 's.kategori_santri', recipientType === 'KATERING' ? 'UANG_MAKAN' : 'UANG_NYUCI')}
         AND ${allowCurrentAssignmentFallback ? '1=1' : '1=0'}
         AND ${serviceCol} IS NOT NULL ${provClauseB}
         AND NOT EXISTS (
@@ -481,6 +489,8 @@ export async function getProviderDistributionList(
         0 AS effective_paid
       FROM santri s
       WHERE s.status_global = 'aktif'
+        AND ${nonBillableSantriSqlPredicate('s.asrama')}
+        AND ${nonBillableItemSqlPredicate('s.asrama', 's.kategori_santri', recipientType === 'KATERING' ? 'UANG_MAKAN' : 'UANG_NYUCI')}
         AND ${allowCurrentAssignmentFallback ? '1=1' : '1=0'}
         AND ${serviceCol} IS NOT NULL
         AND NOT EXISTS (
@@ -634,6 +644,11 @@ export async function getBendaharaDistributionList(
       WHERE o.item_type = ?
         AND o.provider_id IS NULL
         AND o.period = ?
+        AND ${nonBillableItemSqlPredicate(
+          '(SELECT s.asrama FROM santri s WHERE s.id = o.santri_id)',
+          '(SELECT s.kategori_santri FROM santri s WHERE s.id = o.santri_id)',
+          'o.item_type'
+        )}
       `,
       [itemType, periodForObligation]
     )
@@ -656,6 +671,137 @@ export async function getBendaharaDistributionList(
   }
 
   return result
+}
+
+export type BendaharaUnpaidStudentRow = BendaharaItemStudentRow
+export type BendaharaUnpaidStudentsResult = BendaharaItemStudentsResult
+
+/**
+ * Rincian santri pada satu pos Bendahara Pesantren untuk periode tertentu,
+ * dengan penanda siapa yang belum membayar. Dipakai untuk drill-down dari
+ * ringkasan "Santri Bayar / Terdaftar" pada modul Penyaluran.
+ *
+ * Santri bebas tagihan (AL-BAGHORY / kategori SADESA) selalu dikecualikan.
+ */
+export async function getBendaharaStudentsByItem(
+  params: {
+    itemType: string
+    period: string
+    status?: 'ALL' | 'BELUM_BAYAR' | 'SUDAH_BAYAR'
+    search?: string
+    page?: number
+    pageSize?: number
+  }
+): Promise<BendaharaUnpaidStudentsResult> {
+  const page = Math.max(1, params.page ?? 1)
+  const pageSize = Math.max(1, Math.min(200, params.pageSize ?? 25))
+  const offset = (page - 1) * pageSize
+  const periodForObligation = normalizeObligationPeriod(params.itemType, params.period)
+
+  const netPaidSql = `MAX(
+    0,
+    (SELECT COALESCE(SUM(a.amount), 0) FROM finance_allocations a WHERE a.obligation_id = o.id)
+    - (SELECT COALESCE(SUM(fci.amount), 0) FROM finance_correction_items fci WHERE fci.obligation_id = o.id)
+  )`
+  const remainingSql = `MAX(0, (o.amount_expected - o.amount_exempted) - ${netPaidSql})`
+
+  // Definisi "sudah bayar" WAJIB identik dengan agregat pada getBendaharaDistributionList
+  // (o.status = 'PAID' OR o.amount_paid > 0) agar jumlah pada tabel dan drill-down selalu sama.
+  const sudahBayarSql = `(o.status = 'PAID' OR o.amount_paid > 0)`
+  const statusBayarSql = `CASE
+    WHEN ${sudahBayarSql} THEN 'SUDAH_BAYAR'
+    WHEN ${remainingSql} <= 0 THEN 'SUDAH_BAYAR'
+    ELSE 'BELUM_BAYAR'
+  END`
+
+  const conditions: string[] = [
+    'o.item_type = ?',
+    'o.period = ?',
+    'o.provider_id IS NULL',
+    // AL-BAGHORY (bebas total) dan SADESA (bebas UANG_MAKAN/UANG_NYUCI) tidak muncul
+    nonBillableSantriSqlPredicate('s.asrama'),
+    nonBillableItemSqlPredicate('s.asrama', 's.kategori_santri', 'o.item_type'),
+  ]
+  const queryParams: unknown[] = [params.itemType, periodForObligation]
+
+  const statusFilter = params.status ?? 'ALL'
+  if (statusFilter === 'BELUM_BAYAR') {
+    conditions.push(`(${statusBayarSql}) = 'BELUM_BAYAR'`)
+  } else if (statusFilter === 'SUDAH_BAYAR') {
+    conditions.push(`(${statusBayarSql}) = 'SUDAH_BAYAR'`)
+  }
+
+  const search = (params.search ?? '').trim()
+  if (search) {
+    conditions.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)')
+    queryParams.push(`%${search}%`, `%${search}%`)
+  }
+
+  const whereSql = conditions.join(' AND ')
+  const fromSql = `
+    FROM finance_obligations o
+    JOIN santri s ON s.id = o.santri_id
+    LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+    LEFT JOIN kelas k ON k.id = rp.kelas_id
+  `
+
+  const countRow = await queryOne<{ total: number }>(
+    `SELECT COUNT(*) AS total ${fromSql} WHERE ${whereSql}`,
+    queryParams
+  )
+  const totalCount = countRow?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+
+  const rows = await query<{
+    santri_id: string
+    nis: string
+    nama_lengkap: string
+    asrama: string | null
+    kamar: string | null
+    kelas: string | null
+    status: string
+    amount_expected: number
+    amount_exempted: number
+    amount_paid: number
+    net_paid: number
+    status_bayar: string
+  }>(
+    `SELECT
+       s.id AS santri_id,
+       s.nis,
+       s.nama_lengkap,
+       s.asrama,
+       s.kamar,
+       COALESCE(k.nama_kelas, s.kelas_sekolah) AS kelas,
+       o.status,
+       o.amount_expected,
+       o.amount_exempted,
+       o.amount_paid,
+       ${netPaidSql} AS net_paid,
+       ${statusBayarSql} AS status_bayar
+     ${fromSql}
+     WHERE ${whereSql}
+     ORDER BY s.nama_lengkap ASC
+     LIMIT ? OFFSET ?`,
+    [...queryParams, pageSize, offset]
+  )
+
+  const items: BendaharaUnpaidStudentRow[] = rows.map((r) => ({
+    santriId: r.santri_id,
+    nis: r.nis,
+    namaLengkap: r.nama_lengkap,
+    asrama: r.asrama,
+    kamar: r.kamar,
+    kelas: r.kelas,
+    status: r.status,
+    statusBayar: r.status_bayar === 'SUDAH_BAYAR' ? 'SUDAH_BAYAR' : 'BELUM_BAYAR',
+    amountExpected: r.amount_expected ?? 0,
+    amountExempted: r.amount_exempted ?? 0,
+    amountPaid: r.net_paid ?? 0,
+    remaining: Math.max(0, (r.amount_expected ?? 0) - (r.amount_exempted ?? 0) - (r.net_paid ?? 0)),
+  }))
+
+  return { items, totalCount, page, pageSize, totalPages }
 }
 
 /**

@@ -16,6 +16,7 @@ import {
   getProviderOperationalDetail,
   getProviderAccountTemplateData,
   importProviderAccounts,
+  getBendaharaStudentsByItem,
 } from '@/lib/finance/distributions'
 import type {
   FinanceDistributionRecipientType,
@@ -32,8 +33,8 @@ import type {
   ProviderOperationalDetailResult,
   ProviderAccountTemplatePayload,
   ValidatedImportAccountRow,
+  BendaharaItemStudentsResult,
 } from '@/lib/finance/distribution-types'
-
 export interface UserPenyaluranPermissions {
   canView: boolean
   canDisburse: boolean
@@ -331,6 +332,22 @@ export async function getProviderOperationalDetailAction(
 ): Promise<ProviderOperationalDetailResult> {
   await authorizeUser()
   return getProviderOperationalDetail(params)
+}
+
+/**
+ * Drill-down daftar santri pada satu pos Bendahara Pesantren beserta status bayarnya.
+ * Dipakai saat pengguna mengklik angka "Santri Bayar / Terdaftar" di modul Penyaluran.
+ */
+export async function getBendaharaStudentsByItemAction(params: {
+  itemType: string
+  period: string
+  status?: 'ALL' | 'BELUM_BAYAR' | 'SUDAH_BAYAR'
+  search?: string
+  page?: number
+  pageSize?: number
+}): Promise<BendaharaItemStudentsResult> {
+  await authorizeUser()
+  return getBendaharaStudentsByItem(params)
 }
 
 export async function getProviderAccountTemplateDataAction(): Promise<ProviderAccountTemplatePayload> {

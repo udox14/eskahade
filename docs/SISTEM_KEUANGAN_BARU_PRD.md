@@ -250,29 +250,59 @@ sesuai kebutuhan.
 
 ---
 
-## 5.8 Santri Bebas Tagihan (Penduduk Setempat)
+## 5.8 Santri Bebas Tagihan (Penduduk Setempat & Kategori SADESA)
 
-Santri yang berasrama **AL-BAGHORY** adalah penduduk setempat, bukan santri bermukim.
-Mereka **tidak dikenai tagihan apa pun** pada Sistem Keuangan Baru:
+Ada **dua tingkat pengecualian** pada Sistem Keuangan Baru.
+
+### 5.8.1 Bebas Total — Asrama AL-BAGHORY
+
+Santri asrama **AL-BAGHORY** adalah penduduk setempat (bukan santri bermukim), sehingga
+**tidak dikenai tagihan apa pun**:
 
 - tidak memiliki SPP, Uang Makan, Uang Nyuci, EHB, Ekstrakurikuler, Kesehatan, maupun USPP;
 - tidak memiliki Uang Jajan, kartu QR, PIN, maupun Fixed VA;
 - tidak pernah ditampilkan pada daftar, tabel, filter, ekspor, atau laporan modul keuangan
   (Status Pembayaran, Uang Jajan, Kredensial, Loket, Penyaluran, Rekonsiliasi, Riwayat, Laporan);
+- tidak ikut dihitung pada angka agregat modul keuangan, termasuk ringkasan
+  "Santri Bayar / Terdaftar" pada modul Penyaluran;
 - tidak dapat menerima pembayaran, allocation, penyaluran, atau koreksi baru.
 
-Sumber aturan tunggal: `lib/finance/non-billable-santri.ts` (turunan dari
-`ASRAMA_TANPA_KAMAR` pada `lib/asrama.ts`). Seluruh modul wajib memakai helper
-`nonBillableSantriSqlPredicate()` / `excludeNonBillableSantriSql()` pada query dan
-`assertSantriBillable()` pada operasi per santri.
+### 5.8.2 Bebas Per Item — Kategori SADESA
 
-Penanganan dana yang terlanjur masuk (mis. callback Duitku menggunakan NIS/customerNo
-santri bebas tagihan): callback **ditolak dan tidak dialokasikan**, lalu dicatat ke
-`finance_gateway_events` dengan alasan pemblokiran agar ditinjau pada Modul Rekonsiliasi.
-Tidak ada hard delete dan tidak ada perubahan historis.
+Santri kategori **SADESA** (`santri.kategori_santri = 'SADESA'`) **tidak memakai katering dan
+laundry**, sehingga hanya dibebaskan dari:
 
-Pengecualian ini bersifat **menyeluruh dan bukan pengganti mekanisme Pembebasan Pembayaran
-(Bab 14)**: pembebasan tetap dipakai untuk santri bermukim yang perlu dibebaskan per item/per periode.
+- `UANG_MAKAN`
+- `UANG_NYUCI`
+
+Sedangkan **SPP, EHB, Ekstrakurikuler, Kesehatan, dan USPP TETAP DAPAT DITAGIH**. Santri SADESA
+tetap muncul pada daftar santri modul keuangan (Status Pembayaran, Uang Jajan, Kredensial,
+Riwayat, Laporan) karena masih memiliki kewajiban SPP dan tahunan.
+
+Jika pesantren ingin membebaskan item lain untuk santri SADESA (mis. SPP), itu dilakukan
+**manual oleh user melalui Modul Pengaturan Keuangan → Pembebasan (Bab 14)**, bukan oleh
+aturan otomatis ini.
+
+Sumber aturan tunggal: `lib/finance/non-billable-santri.ts`:
+
+- `isAsramaBebasTagihan()` / `assertSantriBillable()` — tingkat bebas total (AL-BAGHORY);
+- `isSantriBebasItem()` / `assertSantriBillableUntukItem()` — tingkat bebas per item
+  (AL-BAGHORY selalu, SADESA hanya `UANG_MAKAN` & `UANG_NYUCI`);
+- `nonBillableSantriSqlPredicate()` — predikat SQL bebas total;
+- `nonBillableItemSqlPredicate(column, kategoriColumn, itemType)` — predikat SQL bebas per item.
+
+Migration pendukung: `migrations/0171_finance_exclude_al_baghory_santri.sql` (AL-BAGHORY bebas
+total) dan `migrations/0172_finance_exclude_sadesa_makan_nyuci.sql` (SADESA bebas Makan & Nyuci).
+
+Penanganan dana yang terlanjur masuk (mis. callback Duitku menggunakan NIS/customerNo santri
+AL-BAGHORY): callback **ditolak dan tidak dialokasikan**, lalu dicatat ke `finance_gateway_events`
+dengan alasan pemblokiran agar ditinjau pada Modul Rekonsiliasi. Tidak ada hard delete dan tidak
+ada perubahan historis.
+
+Kewajiban `UANG_MAKAN`/`UANG_NYUCI` milik santri SADESA yang sudah terbentuk sebelum aturan ini
+berlaku ditutup dengan dua cara: dibebaskan (`EXEMPTED`) oleh migration 0172 untuk yang belum
+dibayar, dan disembunyikan dari tampilan oleh filter `o.status <> 'EXEMPTED'` pada tab Status
+Pembayaran.
 
 ---
 

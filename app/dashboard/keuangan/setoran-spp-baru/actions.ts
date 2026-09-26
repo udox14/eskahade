@@ -23,6 +23,7 @@ export async function getSetoranSppBaru(tahun: number) {
       WHERE sl.tahun = ? AND sl.bulan = 7
         AND s.status_global = 'aktif'
         AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
+        AND UPPER(TRIM(COALESCE(s.kategori_santri, 'REGULER'))) <> 'SADESA'
         AND ${sppJuliPusatLogCondition('s', 'sl')}
       GROUP BY COALESCE(NULLIF(TRIM(s.asrama), ''), 'LAINNYA')
     )
@@ -42,6 +43,7 @@ export async function getSetoranSppBaru(tahun: number) {
     WHERE sl.tahun = ? AND sl.bulan = 7
       AND s.status_global = 'aktif'
       AND UPPER(TRIM(COALESCE(s.asrama, ''))) <> 'AL-BAGHORY'
+      AND UPPER(TRIM(COALESCE(s.kategori_santri, 'REGULER'))) <> 'SADESA'
       AND ${sppJuliPusatLogCondition('s', 'sl')}
     ORDER BY unit_setor, s.nama_lengkap
   `, [tahun])

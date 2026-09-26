@@ -383,10 +383,11 @@ async function materializeLegacyHistoricalObligation(
     nama_lengkap: string
     status_global: string
     asrama: string | null
+    kategori_santri: string | null
     tahun_masuk: number | null
     created_at: string | null
   }>(
-    `SELECT id, nama_lengkap, status_global, asrama, tahun_masuk, created_at
+    `SELECT id, nama_lengkap, status_global, asrama, kategori_santri, tahun_masuk, created_at
      FROM santri
      WHERE id = ?`,
     [santriId]
@@ -396,7 +397,7 @@ async function materializeLegacyHistoricalObligation(
     throw new Error(`Santri dengan ID "${santriId}" tidak ditemukan.`)
   }
 
-  assertSantriBillable(santri.asrama, santri.nama_lengkap)
+  assertSantriBillable(santri.asrama, santri.nama_lengkap, santri.kategori_santri)
 
   // 3. Tentukan academic_year_id yang sesuai
   let academicYearId: number | null = null
@@ -714,8 +715,8 @@ export async function syncLegacyPayment(
     method = 'TUNAI'
   }
 
-  // 2b. Guard bebas tagihan: santri penduduk setempat (AL-BAGHORY) tidak boleh
-  // disinkronkan ke Sistem Keuangan Baru (tidak ada tagihan, pembayaran, atau alokasi).
+  // 2b. Guard bebas tagihan: santri AL-BAGHORY (penduduk setempat) dan kategori SADESA
+  // tidak boleh disinkronkan ke Sistem Keuangan Baru (tidak ada tagihan, pembayaran, atau alokasi).
   const billableSantri = await queryOne<{ asrama: string | null; nama_lengkap: string }>(
     `SELECT asrama, nama_lengkap FROM santri
      WHERE id = ? AND ${nonBillableSantriSqlPredicate('asrama')}`,
@@ -727,7 +728,7 @@ export async function syncLegacyPayment(
       source,
       sourceId: strId,
       status: 'EXCLUDED',
-      message: 'Santri asrama AL-BAGHORY (penduduk setempat) bebas dari seluruh tagihan keuangan sehingga pembayaran legacy tidak disinkronkan.',
+      message: 'Santri bebas tagihan (asrama AL-BAGHORY atau kategori SADESA) sehingga pembayaran legacy tidak disinkronkan.',
     }
   }
 

@@ -7,7 +7,7 @@ import {
   ensureLifetimeObligations,
 } from '@/lib/finance/obligations'
 import { checkLegacySettlement } from '@/lib/finance/legacy'
-import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
+import { nonBillableSantriSqlPredicate, isSantriBebasItem } from '@/lib/finance/non-billable-santri'
 import type {
   FinanceItemType,
   BatchGenerationResult,
@@ -33,6 +33,7 @@ interface ActiveSantriRow {
   tempat_makan_id: string | null
   tempat_mencuci_id: string | null
   asrama: string | null
+  kategori_santri: string | null
 }
 
 /**
@@ -60,7 +61,7 @@ export async function generateMonthlyObligationsForActiveStudents(
   }
 
   const students = await query<ActiveSantriRow>(
-    `SELECT id, nama_lengkap, status_global, tempat_makan_id, tempat_mencuci_id, asrama
+    `SELECT id, nama_lengkap, status_global, tempat_makan_id, tempat_mencuci_id, asrama, kategori_santri
      FROM santri
      WHERE ${conditions.join(' AND ')}
      ORDER BY nama_lengkap ASC`,
@@ -82,6 +83,12 @@ export async function generateMonthlyObligationsForActiveStudents(
       }
       // POST-RELEASE PATCH C4: Hanya generate UANG_NYUCI jika santri terdaftar di laundry
       if (itemType === 'UANG_NYUCI' && !student.tempat_mencuci_id) {
+        continue
+      }
+
+      // Santri kategori SADESA tidak memakai katering & laundry:
+      // UANG_MAKAN dan UANG_NYUCI tidak pernah ditagihkan ke mereka.
+      if (isSantriBebasItem({ asrama: student.asrama, kategoriSantri: student.kategori_santri }, itemType)) {
         continue
       }
 
@@ -158,7 +165,7 @@ export async function generateAnnualObligationsForActiveStudents(
   }
 
   const students = await query<ActiveSantriRow>(
-    `SELECT id, nama_lengkap, status_global, tempat_makan_id, tempat_mencuci_id, asrama
+    `SELECT id, nama_lengkap, status_global, tempat_makan_id, tempat_mencuci_id, asrama, kategori_santri
      FROM santri
      WHERE ${conditions.join(' AND ')}
      ORDER BY nama_lengkap ASC`,
@@ -249,7 +256,7 @@ export async function generateLifetimeObligationsForNewStudents(
   }
 
   const students = await query<ActiveSantriRow>(
-    `SELECT id, nama_lengkap, status_global, tempat_makan_id, tempat_mencuci_id, asrama
+    `SELECT id, nama_lengkap, status_global, tempat_makan_id, tempat_mencuci_id, asrama, kategori_santri
      FROM santri
      WHERE ${conditions.join(' AND ')}
      ORDER BY nama_lengkap ASC`,

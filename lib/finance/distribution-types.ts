@@ -86,6 +86,30 @@ export interface BendaharaDistributionSummaryRow {
   sisaSiapSalur: number
 }
 
+/** Rincian per santri untuk drill-down pos Bendahara Pesantren. */
+export interface BendaharaItemStudentRow {
+  santriId: string
+  nis: string
+  namaLengkap: string
+  asrama: string | null
+  kamar: string | null
+  kelas: string | null
+  status: string
+  statusBayar: 'SUDAH_BAYAR' | 'BELUM_BAYAR'
+  amountExpected: number
+  amountExempted: number
+  amountPaid: number
+  remaining: number
+}
+
+export interface BendaharaItemStudentsResult {
+  items: BendaharaItemStudentRow[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
 export interface CreateDistributionInput {
   recipientType: FinanceDistributionRecipientType
   recipientId?: string | null
