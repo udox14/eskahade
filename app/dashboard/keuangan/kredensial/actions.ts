@@ -586,7 +586,7 @@ export async function getCardsForBatchPrint(
     fotoUrl: r.foto_url,
     cardToken: r.card_token,
     qrSvg: generateQrSvg(r.card_token, {
-      size: 96,
+      size: 160,
       margin: 1,
       darkColor: '#0f172a',
       lightColor: '#ffffff',

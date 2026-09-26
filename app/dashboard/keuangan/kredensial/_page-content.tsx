@@ -232,6 +232,23 @@ export default function KredensialContent({ initialData }: KredensialContentProp
     }
   }
 
+  // Print Single Card
+  const handlePrintSingleCard = async (santriId: string) => {
+    setIsLoadingPrint(true)
+    try {
+      const cards = await getCardsForBatchPrint([santriId])
+      if (cards.length === 0) {
+        alert('Data kartu santri aktif tidak ditemukan.')
+        return
+      }
+      setPrintItems(cards)
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Gagal menyiapkan data cetak kartu.')
+    } finally {
+      setIsLoadingPrint(false)
+    }
+  }
+
   // Save PIN
   const handleSavePin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -913,6 +930,16 @@ export default function KredensialContent({ initialData }: KredensialContentProp
 
                             {row.cardStatus === 'ACTIVE' && (
                               <>
+                                <button
+                                  type="button"
+                                  onClick={() => handlePrintSingleCard(row.id)}
+                                  disabled={isLoadingPrint}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-50 hover:text-emerald-700 transition"
+                                  title="Cetak Kartu Santri"
+                                >
+                                  <Printer className="h-3 w-3" />
+                                  Cetak
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => handleReportLost(row)}
