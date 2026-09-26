@@ -3,6 +3,10 @@
 
 import { query, queryOne, execute, generateId, now } from '@/lib/db'
 import { computeObligationStatus } from '@/lib/finance/types'
+import {
+  assertSantriBillable,
+  nonBillableSantriSqlPredicate,
+} from '@/lib/finance/non-billable-santri'
 import type {
   FinanceExemption,
   FinanceItemType,
@@ -42,8 +46,8 @@ export async function grantExemption(
   input: CreateExemptionInput
 ): Promise<FinanceExemption> {
   // 1. Validasi santri aktif
-  const santri = await queryOne<{ id: string; nama_lengkap: string; status_global: string }>(
-    `SELECT id, nama_lengkap, status_global FROM santri WHERE id = ?`,
+  const santri = await queryOne<{ id: string; nama_lengkap: string; status_global: string; asrama: string | null }>(
+    `SELECT id, nama_lengkap, status_global, asrama FROM santri WHERE id = ?`,
     [input.santri_id]
   )
 
@@ -56,6 +60,8 @@ export async function grantExemption(
       `Pembebasan biaya hanya dapat diberikan kepada santri berstatus 'aktif'. Santri "${santri.nama_lengkap}" berstatus '${santri.status_global}'.`
     )
   }
+
+  assertSantriBillable(santri.asrama, santri.nama_lengkap)
 
   // 2. Validasi rentang periode jika keduanya diisi
   if (input.period_start && input.period_end && input.period_start > input.period_end) {
@@ -469,6 +475,7 @@ export async function previewGroupExemption(params: {
     SELECT id, nis, nama_lengkap, kelas_sekolah AS kelas, asrama, kamar
     FROM santri
     WHERE status_global = 'aktif'
+      AND ${nonBillableSantriSqlPredicate('asrama')}
   `
   const queryParams: unknown[] = []
 
@@ -583,6 +590,7 @@ export async function applyGroupExemption(params: {
     SELECT id, nama_lengkap, kelas_sekolah AS kelas
     FROM santri
     WHERE status_global = 'aktif'
+      AND ${nonBillableSantriSqlPredicate('asrama')}
   `
   const queryParams: unknown[] = []
 
@@ -694,8 +702,10 @@ export async function migrateLegacySppExemptions(
 
   try {
     legacyRows = await query<{ santri_id: string; alasan: string | null }>(
-      `SELECT santri_id, alasan FROM santri_pembebasan_biaya
-       WHERE service_kind = 'SPP' AND is_active = 1`
+      `SELECT spb.santri_id, spb.alasan FROM santri_pembebasan_biaya spb
+       JOIN santri s ON s.id = spb.santri_id
+       WHERE spb.service_kind = 'SPP' AND spb.is_active = 1
+         AND ${nonBillableSantriSqlPredicate('s.asrama')}`
     )
   } catch {
     // Fallback jika tabel santri_pembebasan_biaya tidak ada
@@ -704,7 +714,9 @@ export async function migrateLegacySppExemptions(
 
   if (legacyRows.length === 0) {
     const santriBebas = await query<{ id: string }>(
-      `SELECT id FROM santri WHERE bebas_spp = 1 AND status_global = 'aktif'`
+      `SELECT id FROM santri
+       WHERE bebas_spp = 1 AND status_global = 'aktif'
+         AND ${nonBillableSantriSqlPredicate('asrama')}`
     )
     legacyRows = santriBebas.map((s) => ({
       santri_id: s.id,

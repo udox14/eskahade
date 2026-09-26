@@ -6,6 +6,7 @@
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
 import { recordCorrection } from '@/lib/finance/corrections'
 import { getPaymentByExternalReference } from '@/lib/finance/payments'
+import { assertSantriBillable, nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import type { FinanceItemType, FinanceObligation } from '@/lib/finance/types'
 
 export type LegacySourceType = 'SPP_LOG' | 'PEMBAYARAN_TAHUNAN' | 'SPP_TUNGGAKAN_HISTORIS'
@@ -381,10 +382,11 @@ async function materializeLegacyHistoricalObligation(
     id: string
     nama_lengkap: string
     status_global: string
+    asrama: string | null
     tahun_masuk: number | null
     created_at: string | null
   }>(
-    `SELECT id, nama_lengkap, status_global, tahun_masuk, created_at
+    `SELECT id, nama_lengkap, status_global, asrama, tahun_masuk, created_at
      FROM santri
      WHERE id = ?`,
     [santriId]
@@ -393,6 +395,8 @@ async function materializeLegacyHistoricalObligation(
   if (!santri) {
     throw new Error(`Santri dengan ID "${santriId}" tidak ditemukan.`)
   }
+
+  assertSantriBillable(santri.asrama, santri.nama_lengkap)
 
   // 3. Tentukan academic_year_id yang sesuai
   let academicYearId: number | null = null
@@ -708,6 +712,23 @@ export async function syncLegacyPayment(
       : (row.updated_at || now())
     receivedBy = row.penerima_id
     method = 'TUNAI'
+  }
+
+  // 2b. Guard bebas tagihan: santri penduduk setempat (AL-BAGHORY) tidak boleh
+  // disinkronkan ke Sistem Keuangan Baru (tidak ada tagihan, pembayaran, atau alokasi).
+  const billableSantri = await queryOne<{ asrama: string | null; nama_lengkap: string }>(
+    `SELECT asrama, nama_lengkap FROM santri
+     WHERE id = ? AND ${nonBillableSantriSqlPredicate('asrama')}`,
+    [santriId]
+  )
+  if (!billableSantri) {
+    return {
+      success: false,
+      source,
+      sourceId: strId,
+      status: 'EXCLUDED',
+      message: 'Santri asrama AL-BAGHORY (penduduk setempat) bebas dari seluruh tagihan keuangan sehingga pembayaran legacy tidak disinkronkan.',
+    }
   }
 
   // 3. Pastikan kewajiban canonical (finance_obligations) tersedia secara atomik via internal materializer

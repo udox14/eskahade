@@ -6,6 +6,10 @@
 // 3. Multi-histori kartu (status: ACTIVE, REVOKED, LOST, BLOCKED) dengan integritas data masa lalu.
 
 import { query, queryOne, execute, generateId, now } from '@/lib/db'
+import {
+  assertSantriBillable,
+  nonBillableSantriSqlPredicate,
+} from '@/lib/finance/non-billable-santri'
 
 export type CardStatus = 'ACTIVE' | 'REVOKED' | 'LOST' | 'BLOCKED'
 
@@ -57,8 +61,10 @@ export async function getActiveCard(
   const card = await queryOne<FinanceCredential>(
     `SELECT c.*, u.full_name AS issuer_name
      FROM finance_credentials c
+     JOIN santri s ON s.id = c.santri_id
      LEFT JOIN users u ON u.id = c.issued_by
      WHERE c.santri_id = ? AND c.status = 'ACTIVE'
+       AND ${nonBillableSantriSqlPredicate('s.asrama')}
      LIMIT 1`,
     [santriId]
   )
@@ -75,8 +81,10 @@ export async function getCardHistory(
   const list = await query<FinanceCredential>(
     `SELECT c.*, u.full_name AS issuer_name
      FROM finance_credentials c
+     JOIN santri s ON s.id = c.santri_id
      LEFT JOIN users u ON u.id = c.issued_by
      WHERE c.santri_id = ?
+       AND ${nonBillableSantriSqlPredicate('s.asrama')}
      ORDER BY c.issued_at DESC, c.created_at DESC`,
     [santriId]
   )
@@ -96,8 +104,8 @@ export async function issueCard(
   issuedBy?: string | null,
   options?: { reason?: string }
 ): Promise<FinanceCredential> {
-  const student = await queryOne<{ id: string; status_global: string; nama_lengkap: string }>(
-    `SELECT id, status_global, nama_lengkap FROM santri WHERE id = ?`,
+  const student = await queryOne<{ id: string; status_global: string; nama_lengkap: string; asrama: string | null }>(
+    `SELECT id, status_global, nama_lengkap, asrama FROM santri WHERE id = ?`,
     [santriId]
   )
   if (!student) {
@@ -106,6 +114,7 @@ export async function issueCard(
   if (student.status_global !== 'aktif') {
     throw new Error(`Tidak dapat menerbitkan kartu untuk santri non-aktif ("${student.nama_lengkap}").`)
   }
+  assertSantriBillable(student.asrama, student.nama_lengkap)
 
   const timestamp = now()
   const newCardId = generateId()
@@ -329,6 +338,7 @@ export async function findCardByToken(
      JOIN santri s ON s.id = c.santri_id
      LEFT JOIN users u ON u.id = c.issued_by
      WHERE c.card_token = ?
+       AND ${nonBillableSantriSqlPredicate('s.asrama')}
      LIMIT 1`,
     [cleanToken]
   )

@@ -2,6 +2,7 @@
 // Obligation Matrix Aggregator - Sistem Keuangan Baru Pesantren (Fase 2C)
 
 import { query } from '@/lib/db'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import type {
   FinanceItemType,
   FinanceObligationStatus,
@@ -78,7 +79,10 @@ export async function getStudentsObligationMatrix(
   period: string, // YYYY-MM
   filter?: StudentObligationMatrixFilter
 ): Promise<StudentObligationMatrixItem[]> {
-  const santriConditions: string[] = ["s.status_global = 'aktif'"]
+  const santriConditions: string[] = [
+    "s.status_global = 'aktif'",
+    nonBillableSantriSqlPredicate('s.asrama'),
+  ]
   const params: unknown[] = [period, period]
 
   if (filter?.asrama) {

@@ -22,8 +22,12 @@ import {
   voidOpeningBalanceNonSpp,
   voidPembayaranNonSpp,
 } from './actions'
+import { ALL_ASRAMA_LIST, ASRAMA_TANPA_KAMAR } from '@/lib/asrama'
 
-const ASRAMA_LIST = ['AL-FALAH', 'AS-SALAM', 'BAHAGIA', 'ASY-SYIFA 1', 'ASY-SYIFA 2', 'ASY-SYIFA 3', 'ASY-SYIFA 4', 'AL-BAGHORY']
+// Santri asrama bebas tagihan (penduduk setempat) tidak pernah muncul pada modul keuangan.
+const ASRAMA_LIST = ALL_ASRAMA_LIST.filter(
+  (asrama) => !(ASRAMA_TANPA_KAMAR as readonly string[]).includes(asrama)
+)
 const JENIS_ALL = ['BANGUNAN', 'KESEHATAN', 'EHB', 'EKSKUL'] as const
 const JENIS_TAHUNAN = ['KESEHATAN', 'EHB', 'EKSKUL'] as const
 

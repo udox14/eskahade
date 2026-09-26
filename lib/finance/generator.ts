@@ -7,6 +7,7 @@ import {
   ensureLifetimeObligations,
 } from '@/lib/finance/obligations'
 import { checkLegacySettlement } from '@/lib/finance/legacy'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import type {
   FinanceItemType,
   BatchGenerationResult,
@@ -47,7 +48,10 @@ export async function generateMonthlyObligationsForActiveStudents(
     asrama?: string
   }
 ): Promise<BatchGenerationResult> {
-  const conditions: string[] = ["status_global = 'aktif'"]
+  const conditions: string[] = [
+    "status_global = 'aktif'",
+    nonBillableSantriSqlPredicate('asrama'),
+  ]
   const params: unknown[] = []
 
   if (options?.asrama) {
@@ -142,7 +146,10 @@ export async function generateAnnualObligationsForActiveStudents(
     asrama?: string
   }
 ): Promise<BatchGenerationResult> {
-  const conditions: string[] = ["status_global = 'aktif'"]
+  const conditions: string[] = [
+    "status_global = 'aktif'",
+    nonBillableSantriSqlPredicate('asrama'),
+  ]
   const params: unknown[] = []
 
   if (options?.asrama) {
@@ -228,6 +235,7 @@ export async function generateLifetimeObligationsForNewStudents(
 ): Promise<BatchGenerationResult> {
   const conditions: string[] = [
     "status_global = 'aktif'",
+    nonBillableSantriSqlPredicate('asrama'),
     `NOT EXISTS (
       SELECT 1 FROM finance_obligations
       WHERE santri_id = santri.id AND item_type = 'USPP' AND period = 'LIFETIME'

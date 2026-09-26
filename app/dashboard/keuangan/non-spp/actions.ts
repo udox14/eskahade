@@ -6,6 +6,11 @@ import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 import { syncLegacyPayment, syncLegacyPaymentReversal } from '@/lib/finance/bridge'
+import {
+  assertSantriBillable,
+  isAsramaBebasTagihan,
+  nonBillableSantriSqlPredicate,
+} from '@/lib/finance/non-billable-santri'
 
 const PATH = '/dashboard/keuangan/non-spp'
 const JENIS_TAHUNAN = ['KESEHATAN', 'EHB', 'EKSKUL'] as const
@@ -362,6 +367,7 @@ async function loadMonitoringRows(filters: {
     FROM santri s
     LEFT JOIN psb_flow pf ON pf.santri_id = s.id
     WHERE s.status_global = 'aktif'
+      AND ${nonBillableSantriSqlPredicate('s.asrama')}
   `
   const santriParams: unknown[] = []
   const santriFilters = buildSantriFilterSql(filters)
@@ -369,7 +375,7 @@ async function loadMonitoringRows(filters: {
   santriParams.push(...santriFilters.params)
   santriSql += ' ORDER BY s.nama_lengkap'
 
-  let santri = await query<SantriRow & { kategori_efektif?: string }>(santriSql, santriParams)
+  const santri = await query<SantriRow & { kategori_efektif?: string }>(santriSql, santriParams)
 
   const tarifMap = await loadTarifMap(filters.tahunAjaranId)
   const openingRows = legacyMode ? await query<OpeningBalanceRow>(`
@@ -386,6 +392,7 @@ async function loadMonitoringRows(filters: {
     FROM pembayaran_tahunan p
     JOIN santri s ON s.id = p.santri_id
     WHERE s.status_global = 'aktif'
+      AND ${nonBillableSantriSqlPredicate('s.asrama')}
       AND ${activeCondition('p')}
       AND (
         p.jenis_biaya = 'BANGUNAN'
@@ -756,13 +763,14 @@ export async function simpanOpeningBalanceNonSpp(input: {
   const cutoffTanggal = await getLegacyCutoffTanggal()
   const tahunTagihan = inferTahunTagihan(tahunAjaran)
   const santri = await queryOne<SantriRow>(`
-    SELECT s.id, s.nama_lengkap, s.nis, s.tahun_masuk, s.tanggal_masuk, s.created_at,
+    SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.tahun_masuk, s.tanggal_masuk, s.created_at,
            pf.id AS psb_flow_id
     FROM santri s
     LEFT JOIN psb_flow pf ON pf.santri_id = s.id
     WHERE s.id = ? AND s.status_global = 'aktif'
   `, [input.santriId])
   if (!santri) return { error: 'Santri tidak ditemukan.' }
+  assertSantriBillable(santri.asrama, santri.nama_lengkap)
   if (!usesLegacyOpeningBalance(tahunTagihan)) {
     return { error: 'Mulai Tahun Ajaran 2026/2027, semua santri memakai tarif normal sesuai angkatan.' }
   }
@@ -860,6 +868,7 @@ export async function getBukuBesarSantri(santriId: string, tahunAjaranId?: numbe
     WHERE s.id = ?
   `, [santriId])
   if (!santri) return null
+  if (isAsramaBebasTagihan(santri.asrama)) return null
 
   const payments = await query<PaymentRow>(`
     SELECT p.*, ta.nama AS tahun_ajaran_nama, u.full_name AS penerima_nama, vu.full_name AS voided_by_name
@@ -928,6 +937,7 @@ export async function getBukuBesarDetailNonSpp(santriId: string) {
     WHERE s.id = ?
   `, [santriId])
   if (!santri) return null
+  if (isAsramaBebasTagihan(santri.asrama)) return null
 
   const tahunMasuk = effectiveYear(santri)
   const tahunAjaranList = await getTahunAjaranOptions()
@@ -1019,7 +1029,9 @@ export async function searchSantriNonSpp(keyword: string) {
            pf.id AS psb_flow_id
     FROM santri s
     LEFT JOIN psb_flow pf ON pf.santri_id = s.id
-    WHERE s.status_global = 'aktif' AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?)
+    WHERE s.status_global = 'aktif'
+      AND ${nonBillableSantriSqlPredicate('s.asrama')}
+      AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?)
     ORDER BY s.nama_lengkap
     LIMIT 12
   `, [like, like])
@@ -1044,7 +1056,8 @@ export async function getLaporanNonSpp(tahunAjaranId: number, filters: NonSppFil
     JOIN santri s ON s.id = p.santri_id
     LEFT JOIN users u ON u.id = p.penerima_id
     LEFT JOIN users vu ON vu.id = p.voided_by
-    WHERE (
+    WHERE ${nonBillableSantriSqlPredicate('s.asrama')}
+      AND (
       p.jenis_biaya = 'BANGUNAN'
       OR ${annualTaCondition('p')}
     )

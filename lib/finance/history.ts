@@ -10,6 +10,7 @@
 import { query, queryOne } from '@/lib/db'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
 import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 
 export type TransactionCategory =
   | 'PAYMENT'
@@ -228,6 +229,7 @@ export async function getGlobalTransactionHistory(
       FROM finance_payments p
       LEFT JOIN santri s ON s.id = p.santri_id
       LEFT JOIN users u ON u.id = p.received_by
+      WHERE ${nonBillableSantriSqlPredicate('s.asrama')}
 
       UNION ALL
 
@@ -270,13 +272,16 @@ export async function getGlobalTransactionHistory(
       LEFT JOIN santri s ON s.id = wl.santri_id
       LEFT JOIN users u ON u.id = wl.operator_id
       WHERE
-        (wl.direction = 'OUT' AND wl.movement_type = 'WITHDRAWAL_LOKET')
-        OR
-        (wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_CASH', 'TOPUP_ONLINE')
-         AND NOT EXISTS (SELECT 1 FROM finance_payments p WHERE p.id = wl.reference_id OR p.payment_number = wl.reference_id))
-        OR
-        (wl.movement_type = 'REVERSAL'
-         AND NOT EXISTS (SELECT 1 FROM finance_corrections c WHERE c.id = wl.reference_id OR c.correction_number = wl.reference_id))
+        ${nonBillableSantriSqlPredicate('s.asrama')}
+        AND (
+          (wl.direction = 'OUT' AND wl.movement_type = 'WITHDRAWAL_LOKET')
+          OR
+          (wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_CASH', 'TOPUP_ONLINE')
+           AND NOT EXISTS (SELECT 1 FROM finance_payments p WHERE p.id = wl.reference_id OR p.payment_number = wl.reference_id))
+          OR
+          (wl.movement_type = 'REVERSAL'
+           AND NOT EXISTS (SELECT 1 FROM finance_corrections c WHERE c.id = wl.reference_id OR c.correction_number = wl.reference_id))
+        )
 
       UNION ALL
 
@@ -346,6 +351,7 @@ export async function getGlobalTransactionHistory(
       JOIN finance_payments p ON p.id = c.target_payment_id
       LEFT JOIN santri s ON s.id = p.santri_id
       LEFT JOIN users u ON u.id = c.created_by
+      WHERE ${nonBillableSantriSqlPredicate('s.asrama')}
     )
   `
 
@@ -537,7 +543,8 @@ export async function getTransactionDetail(
        LEFT JOIN santri s ON s.id = p.santri_id
        LEFT JOIN finance_cash_sessions cs ON cs.id = p.cash_session_id
        LEFT JOIN users u ON u.id = p.received_by
-       WHERE p.id = ?`,
+       WHERE p.id = ?
+         AND ${nonBillableSantriSqlPredicate('s.asrama')}`,
       [id]
     )
 
@@ -884,7 +891,8 @@ export async function getTransactionDetail(
        LEFT JOIN finance_cash_sessions cs ON cs.id = c.cash_session_id
        LEFT JOIN users u1 ON u1.id = c.created_by
        LEFT JOIN users u2 ON u2.id = c.approved_by
-       WHERE c.id = ?`,
+       WHERE c.id = ?
+         AND ${nonBillableSantriSqlPredicate('s.asrama')}`,
       [id]
     )
 
@@ -961,7 +969,10 @@ export async function getTransactionDetail(
  */
 export async function getHistoryFilterOptions(): Promise<FilterOptionsData> {
   const asramaRows = await query<{ asrama: string }>(
-    `SELECT DISTINCT asrama FROM santri WHERE asrama IS NOT NULL AND TRIM(asrama) != '' ORDER BY asrama ASC`,
+    `SELECT DISTINCT asrama FROM santri
+     WHERE asrama IS NOT NULL AND TRIM(asrama) != ''
+       AND ${nonBillableSantriSqlPredicate('asrama')}
+     ORDER BY asrama ASC`,
     []
   )
 

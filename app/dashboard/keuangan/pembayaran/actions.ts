@@ -4,12 +4,18 @@ import { query, queryOne, execute, generateId } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
+import {
+  assertSantriBillable,
+  nonBillableSantriSqlPredicate,
+} from '@/lib/finance/non-billable-santri'
 
 export async function cariSantriKeuangan(keyword: string) {
   const data = await query<any>(`
     SELECT id, nama_lengkap, nis, asrama, kamar, tahun_masuk, created_at
     FROM santri
-    WHERE status_global = 'aktif' AND nama_lengkap LIKE ?
+    WHERE status_global = 'aktif'
+      AND ${nonBillableSantriSqlPredicate('asrama')}
+      AND nama_lengkap LIKE ?
     LIMIT 5
   `, [`%${keyword}%`])
 
@@ -63,10 +69,11 @@ export async function bayarTagihan(
   keterangan: string
 ) {
   const session = await getSession()
-  const santri = await queryOne<{ nama_lengkap: string; nis: string | null }>(
-    'SELECT nama_lengkap, nis FROM santri WHERE id = ?',
+  const santri = await queryOne<{ nama_lengkap: string; nis: string | null; asrama: string | null }>(
+    'SELECT nama_lengkap, nis, asrama FROM santri WHERE id = ?',
     [santriId]
   )
+  assertSantriBillable(santri?.asrama ?? null, santri?.nama_lengkap)
 
   if (jenis !== 'BANGUNAN' && tahunTagihan) {
     const exist = await queryOne<{ id: string }>(
@@ -118,7 +125,8 @@ export async function getMonitoringPembayaran(
   })
 
   let sql = `SELECT id, nama_lengkap, nis, asrama, kamar, tahun_masuk, created_at
-             FROM santri WHERE status_global = 'aktif'`
+             FROM santri WHERE status_global = 'aktif'
+               AND ${nonBillableSantriSqlPredicate('asrama')}`
   const params: any[] = []
 
   if (asrama && asrama !== 'SEMUA') { sql += ' AND asrama = ?'; params.push(asrama) }
@@ -133,7 +141,8 @@ export async function getMonitoringPembayaran(
   let paySQL = `SELECT p.santri_id, p.jenis_biaya, p.nominal_bayar, p.tahun_tagihan
                 FROM pembayaran_tahunan p
                 INNER JOIN santri s ON s.id = p.santri_id
-                WHERE s.status_global = 'aktif'`
+                WHERE s.status_global = 'aktif'
+                  AND ${nonBillableSantriSqlPredicate('s.asrama')}`
   const payParams: any[] = []
 
   if (asrama && asrama !== 'SEMUA') { paySQL += ' AND s.asrama = ?'; payParams.push(asrama) }
@@ -179,10 +188,11 @@ export async function getMonitoringPembayaran(
 
 export async function bayarLunasSetahun(santriId: string, tahunTagihan: number, tahunMasuk: number) {
   const session = await getSession()
-  const santri = await queryOne<{ nama_lengkap: string; nis: string | null }>(
-    'SELECT nama_lengkap, nis FROM santri WHERE id = ?',
+  const santri = await queryOne<{ nama_lengkap: string; nis: string | null; asrama: string | null }>(
+    'SELECT nama_lengkap, nis, asrama FROM santri WHERE id = ?',
     [santriId]
   )
+  assertSantriBillable(santri?.asrama ?? null, santri?.nama_lengkap)
 
   const tarif = await query<any>(
     `SELECT jenis_biaya, nominal FROM biaya_settings

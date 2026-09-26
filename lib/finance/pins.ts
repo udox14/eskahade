@@ -8,6 +8,7 @@
 
 import { query, queryOne, execute, generateId, now } from '@/lib/db'
 import { hashPassword, verifyPassword } from '@/lib/auth/password'
+import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
 
 export const MAX_PIN_FAILED_ATTEMPTS = 3
 export const PIN_LOCKOUT_MINUTES = 15
@@ -142,13 +143,14 @@ export async function resetStudentPin(
 ): Promise<void> {
   validatePinFormat(newPin)
 
-  const student = await queryOne<{ id: string; status_global: string }>(
-    `SELECT id, status_global FROM santri WHERE id = ?`,
+  const student = await queryOne<{ id: string; status_global: string; asrama: string | null; nama_lengkap: string }>(
+    `SELECT id, status_global, asrama, nama_lengkap FROM santri WHERE id = ?`,
     [santriId]
   )
   if (!student) {
     throw new Error(`Santri dengan ID "${santriId}" tidak ditemukan.`)
   }
+  assertSantriBillable(student.asrama, student.nama_lengkap)
 
   const existing = await queryOne<FinanceStudentPin>(
     `SELECT santri_id FROM finance_student_pins WHERE santri_id = ?`,
@@ -202,13 +204,14 @@ export async function setStudentPin(
 
   validatePinFormat(pin)
 
-  const student = await queryOne<{ id: string; status_global: string }>(
-    `SELECT id, status_global FROM santri WHERE id = ?`,
+  const student = await queryOne<{ id: string; status_global: string; asrama: string | null; nama_lengkap: string }>(
+    `SELECT id, status_global, asrama, nama_lengkap FROM santri WHERE id = ?`,
     [santriId]
   )
   if (!student) {
     throw new Error(`Santri dengan ID "${santriId}" tidak ditemukan.`)
   }
+  assertSantriBillable(student.asrama, student.nama_lengkap)
 
   const existing = await queryOne<FinanceStudentPin>(
     `SELECT santri_id FROM finance_student_pins WHERE santri_id = ?`,

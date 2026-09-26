@@ -10,6 +10,7 @@
 // 7. Modul rekalkulasi authoritatif (recalculateAllocationDisbursement).
 
 import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import type {
   FinanceDistribution,
   FinanceDistributionRecipientType,
@@ -302,6 +303,7 @@ export async function getDistributionSummary(
         0 AS effective_paid
       FROM santri s
       WHERE s.status_global = 'aktif'
+        AND ${nonBillableSantriSqlPredicate('s.asrama')}
         AND ${allowCurrentAssignmentFallback ? '1=1' : '1=0'}
         AND ${serviceCol} IS NOT NULL ${provClauseB}
         AND NOT EXISTS (
@@ -1448,6 +1450,7 @@ export async function getProviderOperationalDetail(
         0 AS dana_disalurkan
       FROM santri s
       WHERE s.status_global = 'aktif'
+        AND ${nonBillableSantriSqlPredicate('s.asrama')}
         AND ${allowCurrentAssignmentFallback ? '1=1' : '1=0'}
         AND ${serviceCol} = ?
         AND NOT EXISTS (
@@ -1509,6 +1512,7 @@ export async function getProviderOperationalDetail(
     FROM assigned_students a
     JOIN santri s ON s.id = a.santri_id
     WHERE ${whereSql}
+      AND ${nonBillableSantriSqlPredicate('s.asrama')}
     `,
     [...cteParams, ...filterParams]
   )
@@ -1549,6 +1553,7 @@ export async function getProviderOperationalDetail(
     FROM assigned_students a
     JOIN santri s ON s.id = a.santri_id
     WHERE ${whereSql}
+      AND ${nonBillableSantriSqlPredicate('s.asrama')}
     ORDER BY s.nama_lengkap COLLATE NOCASE ASC
     LIMIT ? OFFSET ?
     `,

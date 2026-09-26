@@ -6,6 +6,7 @@ import { getActiveTariff } from '@/lib/finance/tariffs'
 import { checkExemption } from '@/lib/finance/exemptions'
 import { checkLegacySettlement, checkLegacyUsppStatus } from '@/lib/finance/legacy'
 import { computeObligationStatus } from '@/lib/finance/types'
+import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
 import type {
   FinanceObligation,
   FinanceItemType,
@@ -29,6 +30,7 @@ interface SantriSnapshotRow {
   id: string
   nama_lengkap: string
   status_global: string
+  asrama: string | null
   tempat_makan_id: string | null
   tempat_mencuci_id: string | null
 }
@@ -127,7 +129,7 @@ export async function ensureObligation(
 
   // 3. Ambil data santri existing untuk verifikasi status aktif dan snapshot provider
   const santri = await queryOne<SantriSnapshotRow>(
-    `SELECT id, nama_lengkap, status_global, tempat_makan_id, tempat_mencuci_id
+    `SELECT id, nama_lengkap, status_global, asrama, tempat_makan_id, tempat_mencuci_id
      FROM santri
      WHERE id = ?`,
     [santriId]
@@ -143,6 +145,9 @@ export async function ensureObligation(
       `Hanya santri berstatus 'aktif' yang dapat dimaterialisasi kewajibannya. Santri "${santri.nama_lengkap}" berstatus '${santri.status_global}'.`
     )
   }
+
+  // Guard bebas tagihan: santri penduduk setempat (AL-BAGHORY) tidak boleh memiliki kewajiban apa pun
+  assertSantriBillable(santri.asrama, santri.nama_lengkap)
 
   // Wajibkan provider valid untuk Makan dan Nyuci dari master_jasa
   let providerId: string | null = null

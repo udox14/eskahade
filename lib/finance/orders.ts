@@ -4,6 +4,7 @@
 
 import { query, queryOne, batch, execute, generateId, now } from '@/lib/db'
 import { getStudentFixedVa } from '@/lib/finance/va'
+import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
 import type {
   FinancePaymentOrder,
   FinanceOrderItem,
@@ -51,8 +52,8 @@ export async function createPaymentOrder(
   }
 
   // 1. Validasi Santri Aktif
-  const student = await queryOne<{ id: string; status_global: string }>(
-    `SELECT id, status_global FROM santri WHERE id = ?`,
+  const student = await queryOne<{ id: string; status_global: string; asrama: string | null; nama_lengkap: string }>(
+    `SELECT id, status_global, asrama, nama_lengkap FROM santri WHERE id = ?`,
     [santriId]
   )
   if (!student) {
@@ -63,6 +64,7 @@ export async function createPaymentOrder(
       `Tidak dapat membuat order pembayaran untuk santri berstatus "${student.status_global}".`
     )
   }
+  assertSantriBillable(student.asrama, student.nama_lengkap)
 
   // 2. Validasi Item-Item & Kewajiban
   let grossAmount = 0

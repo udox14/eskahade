@@ -13,6 +13,10 @@ import {
   openCashSession,
   recordCashInToSession,
 } from '@/lib/finance/cash-session'
+import {
+  assertSantriBillable,
+  nonBillableSantriSqlPredicate,
+} from '@/lib/finance/non-billable-santri'
 
 export interface EnrichedStudentObligationMatrixItem extends StudentObligationMatrixItem {
   legacyTunggakanSpp: number
@@ -763,7 +767,10 @@ async function fetchRingkasanData(options: {
   page: number
   pageSize: number
 }): Promise<{ items: RingkasanRowItem[]; totalCount: number }> {
-  const whereClauses: string[] = ["s.status_global = 'aktif'"]
+  const whereClauses: string[] = [
+    "s.status_global = 'aktif'",
+    nonBillableSantriSqlPredicate('s.asrama'),
+  ]
   const params: unknown[] = []
 
   if (options.asramaFilter && options.asramaFilter !== 'ALL') {
@@ -1009,6 +1016,7 @@ async function fetchBulananData(options: {
     "s.status_global = 'aktif'",
     "o.item_type IN ('SPP', 'UANG_MAKAN', 'UANG_NYUCI')",
     "o.period = ?",
+    nonBillableSantriSqlPredicate('s.asrama'),
   ]
   const params: unknown[] = [options.selectedPeriod]
 
@@ -1243,6 +1251,7 @@ async function fetchTahunanData(options: {
     "s.status_global = 'aktif'",
     "o.item_type IN ('EHB', 'KESEHATAN', 'EKSKUL')",
     "o.period = ?",
+    nonBillableSantriSqlPredicate('s.asrama'),
   ]
   const params: unknown[] = [annualPeriod]
 
@@ -1473,7 +1482,10 @@ async function fetchUsppData(options: {
   page: number
   pageSize: number
 }): Promise<{ items: UsppRowItem[]; totalCount: number; kpi: UsppKpi }> {
-  const whereClauses: string[] = ["s.status_global = 'aktif'"]
+  const whereClauses: string[] = [
+    "s.status_global = 'aktif'",
+    nonBillableSantriSqlPredicate('s.asrama'),
+  ]
   const params: unknown[] = []
 
   if (options.asramaFilter && options.asramaFilter !== 'ALL') {
@@ -1684,6 +1696,7 @@ async function fetchTunggakanData(options: {
     "s.status_global = 'aktif'",
     "o.item_type IN ('SPP', 'UANG_MAKAN', 'UANG_NYUCI')",
     "o.period < ?",
+    nonBillableSantriSqlPredicate('s.asrama'),
   ]
   const params: unknown[] = [options.currentPeriod]
 
@@ -2109,12 +2122,14 @@ export async function getStatusPembayaranFilterOptions(): Promise<FilterOptionsR
       `SELECT DISTINCT asrama
        FROM santri
        WHERE status_global = 'aktif' AND asrama IS NOT NULL AND TRIM(asrama) != ''
+         AND ${nonBillableSantriSqlPredicate('asrama')}
        ORDER BY asrama ASC`
     ).catch(() => []),
     query<{ kelas_sekolah: string }>(
       `SELECT DISTINCT kelas_sekolah
        FROM santri
        WHERE status_global = 'aktif' AND kelas_sekolah IS NOT NULL AND TRIM(kelas_sekolah) != ''
+         AND ${nonBillableSantriSqlPredicate('asrama')}
        ORDER BY kelas_sekolah ASC`
     ).catch(() => []),
     query<{ id: number; nama: string; is_active: number }>(
@@ -2226,6 +2241,8 @@ export async function getStudentPaymentDetail(
   if (!santriRow) {
     throw new Error('Data santri tidak ditemukan.')
   }
+
+  assertSantriBillable(santriRow.asrama, santriRow.nama_lengkap)
 
   const santri: StudentIdentityDetail = {
     id: santriRow.id,
@@ -2553,6 +2570,7 @@ export async function searchStudentsForPayment(
     `SELECT id, nis, nama_lengkap, foto_url, asrama, kamar
      FROM santri
      WHERE status_global = 'aktif'
+       AND ${nonBillableSantriSqlPredicate('asrama')}
        AND (nama_lengkap LIKE ? OR nis LIKE ?)
      ORDER BY nama_lengkap ASC
      LIMIT 10`,
@@ -2631,6 +2649,7 @@ export async function getUnpaidObligationsForCashPayment(
   if (santriRow.status_global !== 'aktif') {
     throw new Error(`Santri berstatus "${santriRow.status_global}", tidak dapat menerima pembayaran.`)
   }
+  assertSantriBillable(santriRow.asrama, santriRow.nama_lengkap)
 
   const rows = await query<{
     id: string
@@ -2971,6 +2990,7 @@ export async function recordCashPayment(
       if (student.status_global !== 'aktif') {
         throw new Error(`Santri berstatus "${student.status_global}", tidak dapat melakukan pembayaran.`)
       }
+      assertSantriBillable(student.asrama, student.nama_lengkap)
 
       // 6. Buat Payment Order HANYA jika belum ada order yang terbentuk sebelumnya
       if (!orderToUse) {

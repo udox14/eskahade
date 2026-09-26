@@ -4,6 +4,7 @@
 // penegakan invariant PAID != SETTLED, pencocokan 1-to-1, dan deteksi selisih nominal.
 
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import type {
   FinanceSettlement,
   FinanceSettlementItem,
@@ -48,6 +49,7 @@ export async function getCandidatePaymentsForSettlement(
       AND p.status = 'PAID'
       AND si.id IS NULL
       AND p.correction_status != 'FULLY_CORRECTED'
+      AND ${nonBillableSantriSqlPredicate('s.asrama')}
   `
 
   if (period) {
@@ -323,6 +325,7 @@ export async function getSettlementDetail(
      JOIN finance_payments p ON p.id = si.payment_id
      JOIN santri san ON san.id = p.santri_id
      WHERE si.settlement_id = ?
+       AND ${nonBillableSantriSqlPredicate('san.asrama')}
      ORDER BY p.paid_at ASC`,
     [settlementId]
   )

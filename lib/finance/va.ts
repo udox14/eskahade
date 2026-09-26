@@ -2,6 +2,7 @@
 // Modul manajemen Fixed Virtual Account permanen santri (Fase 3A)
 
 import { query, queryOne, execute, now } from '@/lib/db'
+import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
 import type { FinanceStudentVa } from '@/lib/finance/types'
 
 /**
@@ -51,13 +52,14 @@ export async function assignStudentFixedVa(
   }
 
   // Validasi santri terdaftar
-  const student = await queryOne<{ id: string; status_global: string }>(
-    `SELECT id, status_global FROM santri WHERE id = ?`,
+  const student = await queryOne<{ id: string; status_global: string; asrama: string | null; nama_lengkap: string }>(
+    `SELECT id, status_global, asrama, nama_lengkap FROM santri WHERE id = ?`,
     [santriId]
   )
   if (!student) {
     throw new Error(`Santri dengan ID "${santriId}" tidak ditemukan.`)
   }
+  assertSantriBillable(student.asrama, student.nama_lengkap)
 
   // Periksa apakah nomor VA sudah dipakai oleh santri lain
   const existingVa = await findStudentByFixedVa(cleanVa)

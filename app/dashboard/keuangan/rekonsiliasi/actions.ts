@@ -6,6 +6,7 @@
 import { getSession, getEffectiveRoles, type SessionUser } from '@/lib/auth/session'
 import { canAccessFeatureForSession } from '@/lib/auth/feature'
 import { query } from '@/lib/db'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import {
   getReconciliationOverview,
   getUnallocatedReconciliationItems,
@@ -537,6 +538,7 @@ export async function findPaymentForCorrection(paymentNumber: string): Promise<{
      FROM finance_payments p
      JOIN santri s ON p.santri_id = s.id
      WHERE p.payment_number = ?
+       AND ${nonBillableSantriSqlPredicate('s.asrama')}
      LIMIT 1`,
     [paymentNumber.trim()]
   )

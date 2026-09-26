@@ -19,6 +19,7 @@ import { query, queryOne } from '@/lib/db'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
 import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
 import { getGlobalDailyLimit } from '@/lib/finance/wallet'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 
 // ── TYPES & INTERFACES ────────────────────────────────────────────────────────
 
@@ -564,7 +565,10 @@ export async function getReceiptsReport(
   const pageSize = Math.max(1, Math.min(200, filters.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
   const offset = (page - 1) * pageSize
 
-  const conditions: string[] = ["fp.status IN ('PAID', 'SETTLED')"]
+  const conditions: string[] = [
+    "fp.status IN ('PAID', 'SETTLED')",
+    nonBillableSantriSqlPredicate('s.asrama'),
+  ]
   const params: unknown[] = []
 
   if (filters.startDate) {
@@ -936,6 +940,7 @@ export async function getArrearsReport(
   const conditions: string[] = [
     "fo.status != 'EXEMPTED'",
     `${remainingExpr} > 0`,
+    nonBillableSantriSqlPredicate('s.asrama'),
   ]
   const params: unknown[] = []
 
@@ -1112,7 +1117,10 @@ export async function getExemptionsReport(
   const pageSize = Math.max(1, Math.min(200, filters.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
   const offset = (page - 1) * pageSize
 
-  const conditions: string[] = ['1 = 1']
+  const conditions: string[] = [
+    '1 = 1',
+    nonBillableSantriSqlPredicate('s.asrama'),
+  ]
   const params: unknown[] = []
 
   if (filters.status && filters.status !== 'ALL') {
@@ -1290,7 +1298,9 @@ export async function getStudentDetailReport(
   // Jika tidak diberikan santriId spesifik, ambil santri aktif pertama
   if (!targetSantriId) {
     const firstSantri = await queryOne<{ id: string }>(
-      "SELECT id FROM santri WHERE status_global = 'aktif' ORDER BY nama_lengkap ASC LIMIT 1"
+      `SELECT id FROM santri WHERE status_global = 'aktif'
+         AND ${nonBillableSantriSqlPredicate('asrama')}
+       ORDER BY nama_lengkap ASC LIMIT 1`
     )
     if (!firstSantri) {
       return {
@@ -1341,7 +1351,8 @@ export async function getStudentDetailReport(
      LEFT JOIN finance_wallet_limits fwl ON fwl.santri_id = s.id
      LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
      LEFT JOIN kelas k ON k.id = rp.kelas_id
-     WHERE s.id = ?`,
+     WHERE s.id = ?
+       AND ${nonBillableSantriSqlPredicate('s.asrama')}`,
     [targetSantriId]
   )
 
@@ -1590,10 +1601,12 @@ export async function getWalletReport(
     total_mutations: number
   }>(
     `SELECT
-       COALESCE(SUM(CASE WHEN direction = 'IN' THEN amount ELSE 0 END), 0) AS total_in,
-       COALESCE(SUM(CASE WHEN direction = 'OUT' THEN amount ELSE 0 END), 0) AS total_out,
+       COALESCE(SUM(CASE WHEN wl.direction = 'IN' THEN wl.amount ELSE 0 END), 0) AS total_in,
+       COALESCE(SUM(CASE WHEN wl.direction = 'OUT' THEN wl.amount ELSE 0 END), 0) AS total_out,
        COUNT(*) AS total_mutations
-     FROM finance_wallet_ledger`
+     FROM finance_wallet_ledger wl
+     JOIN santri s ON s.id = wl.santri_id
+     WHERE ${nonBillableSantriSqlPredicate('s.asrama')}`
   )
 
   const totalDepositIn = kpiRow?.total_in || 0
@@ -1607,7 +1620,10 @@ export async function getWalletReport(
     // (Limit Global Pesantren ∪ Limit Orang Tua → ambil yang paling ketat), bukan nilai tetap.
     const globalDailyLimit = await getGlobalDailyLimit()
 
-    const conditions: string[] = ["s.status_global = 'aktif'"]
+    const conditions: string[] = [
+      "s.status_global = 'aktif'",
+      nonBillableSantriSqlPredicate('s.asrama'),
+    ]
     const params: unknown[] = []
 
     if (filters.asrama && filters.asrama !== 'ALL') {
@@ -1722,7 +1738,10 @@ export async function getWalletReport(
     }
   } else {
     // Mode Buku Besar Mutasi (Jurnal)
-    const conditions: string[] = ['1 = 1']
+    const conditions: string[] = [
+      '1 = 1',
+      nonBillableSantriSqlPredicate('s.asrama'),
+    ]
     const params: unknown[] = []
 
     if (filters.startDate) {
@@ -2535,7 +2554,10 @@ export async function getReportFilterOptions(): Promise<ReportFilterOptions> {
   const [asramaRows, kelasRows, taRows, operatorRows, providerRows, studentRows] =
     await Promise.all([
       query<{ asrama: string }>(
-        "SELECT DISTINCT asrama FROM santri WHERE asrama IS NOT NULL AND asrama != '' ORDER BY asrama ASC"
+        `SELECT DISTINCT asrama FROM santri
+         WHERE asrama IS NOT NULL AND asrama != ''
+           AND ${nonBillableSantriSqlPredicate('asrama')}
+         ORDER BY asrama ASC`
       ),
       query<{ nama_kelas: string }>(
         "SELECT DISTINCT nama_kelas FROM kelas WHERE nama_kelas IS NOT NULL AND nama_kelas != '' ORDER BY nama_kelas ASC"
@@ -2550,7 +2572,10 @@ export async function getReportFilterOptions(): Promise<ReportFilterOptions> {
         'SELECT id, nama_jasa, jenis FROM master_jasa ORDER BY nama_jasa ASC'
       ),
       query<{ id: string; nis: string; nama_lengkap: string; asrama: string | null; kelas_sekolah: string | null }>(
-        "SELECT id, nis, nama_lengkap, asrama, kelas_sekolah FROM santri WHERE status_global = 'aktif' ORDER BY nama_lengkap ASC LIMIT 500"
+        `SELECT id, nis, nama_lengkap, asrama, kelas_sekolah FROM santri
+         WHERE status_global = 'aktif'
+           AND ${nonBillableSantriSqlPredicate('asrama')}
+         ORDER BY nama_lengkap ASC LIMIT 500`
       ),
     ])
 

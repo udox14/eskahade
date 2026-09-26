@@ -19,6 +19,7 @@ import {
 } from '@/lib/finance/payments'
 import { getPaymentOrderByNumber } from '@/lib/finance/orders'
 import { findStudentByFixedVa } from '@/lib/finance/va'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import type {
   DuitkuSnapConfig,
   SnapTokenResponse,
@@ -692,8 +693,8 @@ export async function processSnapPaymentNotification(
   let studentId = student ? student.santri_id : ''
 
   if (!studentId && customerNo) {
-    const studentByNis = await queryOne<{ id: string }>(
-      `SELECT id FROM santri WHERE id = ? OR nis = ?`,
+    const studentByNis = await queryOne<{ id: string; asrama: string | null; nama_lengkap: string }>(
+      `SELECT id, asrama, nama_lengkap FROM santri WHERE id = ? OR nis = ?`,
       [customerNo, customerNo]
     )
     if (studentByNis) {
@@ -714,6 +715,38 @@ export async function processSnapPaymentNotification(
 
     throw new Error(
       `Santri pemilik Virtual Account "${virtualAccountNo}" / customerNo "${customerNo}" tidak ditemukan dalam sistem.`
+    )
+  }
+
+  // 3b. Guard bebas tagihan: santri penduduk setempat (AL-BAGHORY) tidak boleh
+  // diproses pada sistem keuangan baru. Dana yang terlanjur masuk TIDAK dialokasikan
+  // dan dicatat ke finance_gateway_events untuk ditinjau Modul Rekonsiliasi.
+  const billableStudent = await queryOne<{ asrama: string | null; nama_lengkap: string }>(
+    `SELECT asrama, nama_lengkap FROM santri WHERE id = ? AND ${nonBillableSantriSqlPredicate('asrama')}`,
+    [studentId]
+  )
+
+  if (!billableStudent) {
+    const blockedId = generateId()
+    await execute(
+      `INSERT INTO finance_gateway_events (
+        id, provider, event_key, merchant_order_id, signature_valid, payload_json, processing_status, created_at
+      ) VALUES (?, 'DUITKU_SNAP', ?, ?, 1, ?, 'ERROR', ?)
+      ON CONFLICT(event_key) DO UPDATE SET processing_status = 'ERROR'`,
+      [
+        blockedId,
+        eventKey,
+        trxId || null,
+        JSON.stringify({
+          ...payload,
+          eskahade_blocked_reason: 'Santri bebas tagihan (penduduk setempat / AL-BAGHORY) - dana tidak dialokasikan',
+        }),
+        now(),
+      ]
+    )
+
+    throw new Error(
+      `Pembayaran ditolak: santri pemilik Virtual Account "${virtualAccountNo}" berasrama AL-BAGHORY (penduduk setempat) sehingga bebas dari seluruh tagihan keuangan. Dana tidak dialokasikan otomatis dan dicatat untuk peninjauan Bendahara.`
     )
   }
 
@@ -890,14 +923,16 @@ export async function processSnapVaInquiry(
 
   if (studentVa) {
     student = await queryOne<{ id: string; nama_lengkap: string }>(
-      `SELECT id, nama_lengkap FROM santri WHERE id = ?`,
+      `SELECT id, nama_lengkap FROM santri WHERE id = ?
+         AND ${nonBillableSantriSqlPredicate('asrama')}`,
       [studentVa.santri_id]
     )
   }
 
   if (!student && customerNo) {
     student = await queryOne<{ id: string; nama_lengkap: string }>(
-      `SELECT id, nama_lengkap FROM santri WHERE id = ? OR nis = ?`,
+      `SELECT id, nama_lengkap FROM santri WHERE (id = ? OR nis = ?)
+         AND ${nonBillableSantriSqlPredicate('asrama')}`,
       [customerNo, customerNo]
     )
   }

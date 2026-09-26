@@ -12,6 +12,7 @@
 import { query, queryOne, execute, generateId, now } from '@/lib/db'
 import { getActiveTariff } from '@/lib/finance/tariffs'
 import { computeObligationStatus } from '@/lib/finance/types'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import type { FinanceItemType, FinanceObligationStatus } from '@/lib/finance/types'
 
 export interface BackfillStats {
@@ -115,6 +116,7 @@ async function getUsppLiableStudents(): Promise<Set<string>> {
     const newStudents = await query<{ id: string }>(
       `SELECT id FROM santri
        WHERE status_global = 'aktif'
+         AND ${nonBillableSantriSqlPredicate('asrama')}
          AND (
            tahun_masuk >= 2026
            OR (tanggal_masuk IS NOT NULL AND tanggal_masuk >= '2026-06-01')
@@ -200,6 +202,7 @@ export async function runHistoricalBackfill(
            tanggal_masuk, created_at, tahun_masuk
     FROM santri
     WHERE status_global = 'aktif'
+      AND ${nonBillableSantriSqlPredicate('asrama')}
   `
   const santriParams: unknown[] = []
   if (options.targetSantriId) {

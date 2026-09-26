@@ -5,6 +5,7 @@
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
 import { computeObligationStatus } from '@/lib/finance/types'
 import { recordWalletMutation } from '@/lib/finance/wallet'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import type {
   ReconciliationKpiOverview,
   UnallocatedReconciliationRow,
@@ -125,7 +126,7 @@ export async function getUnallocatedReconciliationItems(filters?: {
   const pageSize = Math.max(1, filters?.pageSize ?? 10)
   const offset = (page - 1) * pageSize
 
-  const conditions: string[] = []
+  const conditions: string[] = [nonBillableSantriSqlPredicate('s.asrama')]
   const params: unknown[] = []
 
   const resolvedFilter = filters?.resolved ?? 'UNRESOLVED'
@@ -626,7 +627,10 @@ export async function getPendingRecoveryCases(filters?: {
     }
   >
 > {
-  const conditions: string[] = ['c.is_recovery_case = 1']
+  const conditions: string[] = [
+    'c.is_recovery_case = 1',
+    nonBillableSantriSqlPredicate('s.asrama'),
+  ]
   const params: unknown[] = []
 
   if (filters?.status && filters.status !== 'ALL') {

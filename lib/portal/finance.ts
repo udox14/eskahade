@@ -21,6 +21,7 @@ import {
   getGlobalDailyLimit,
 } from '@/lib/finance/wallet'
 import { ensureObligation } from '@/lib/finance/obligations'
+import { isAsramaBebasTagihan } from '@/lib/finance/non-billable-santri'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
 import { toWibDateInputValue } from '@/lib/date/wib'
 
@@ -196,6 +197,10 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
     throw new Error('Data santri tidak ditemukan atau santri sudah tidak berstatus aktif.')
   }
 
+  // Guard bebas tagihan: santri penduduk setempat (AL-BAGHORY) tidak memiliki
+  // kewajiban apa pun, sehingga materialisasi kewajiban tidak perlu dijalankan.
+  const santriBebasTagihan = isAsramaBebasTagihan(santri.asrama)
+
   // 2. On-demand materialisasi kewajiban (past, current, upcoming) secara aman & idempotent
   const todayWib = toWibDateInputValue()
   const currentMonthlyPeriod = todayWib.slice(0, 7) // 'YYYY-MM'
@@ -238,33 +243,36 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
   const existingSet = new Set(existingRecords.map(r => `${r.item_type}:${r.period}`))
 
   const missingTasks: Array<Promise<unknown>> = []
+  // Santri bebas tagihan (penduduk setempat, AL-BAGHORY) tidak boleh memiliki
+  // kewajiban apa pun, sehingga materialisasi kewajiban dilewati sepenuhnya.
+  const bisaDimaterialisasi = !santriBebasTagihan
 
   // Hanya jalankan ensureObligation untuk kewajiban yang BELUM ada di database
   for (const p of candidatePeriods) {
-    if (!existingSet.has(`SPP:${p}`)) {
+    if (bisaDimaterialisasi && !existingSet.has(`SPP:${p}`)) {
       missingTasks.push(ensureObligation(santriId, 'SPP', p).catch(() => null))
     }
-    if (santri.tempat_makan_id && !existingSet.has(`UANG_MAKAN:${p}`)) {
+    if (bisaDimaterialisasi && santri.tempat_makan_id && !existingSet.has(`UANG_MAKAN:${p}`)) {
       missingTasks.push(ensureObligation(santriId, 'UANG_MAKAN', p).catch(() => null))
     }
-    if (santri.tempat_mencuci_id && !existingSet.has(`UANG_NYUCI:${p}`)) {
+    if (bisaDimaterialisasi && santri.tempat_mencuci_id && !existingSet.has(`UANG_NYUCI:${p}`)) {
       missingTasks.push(ensureObligation(santriId, 'UANG_NYUCI', p).catch(() => null))
     }
   }
 
   // Materialisasi tahunan periode berjalan jika belum ada
-  if (!existingSet.has(`EHB:${currentAnnualPeriod}`)) {
+  if (bisaDimaterialisasi && !existingSet.has(`EHB:${currentAnnualPeriod}`)) {
     missingTasks.push(ensureObligation(santriId, 'EHB', currentAnnualPeriod).catch(() => null))
   }
-  if (!existingSet.has(`EKSKUL:${currentAnnualPeriod}`)) {
+  if (bisaDimaterialisasi && !existingSet.has(`EKSKUL:${currentAnnualPeriod}`)) {
     missingTasks.push(ensureObligation(santriId, 'EKSKUL', currentAnnualPeriod).catch(() => null))
   }
-  if (!existingSet.has(`KESEHATAN:${currentAnnualPeriod}`)) {
+  if (bisaDimaterialisasi && !existingSet.has(`KESEHATAN:${currentAnnualPeriod}`)) {
     missingTasks.push(ensureObligation(santriId, 'KESEHATAN', currentAnnualPeriod).catch(() => null))
   }
 
   // Materialisasi USPP (Lifetime) jika belum ada
-  if (!existingSet.has('USPP:LIFETIME')) {
+  if (bisaDimaterialisasi && !existingSet.has('USPP:LIFETIME')) {
     missingTasks.push(ensureObligation(santriId, 'USPP', 'LIFETIME').catch(() => null))
   }
 

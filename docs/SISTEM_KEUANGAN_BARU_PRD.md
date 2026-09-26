@@ -250,6 +250,32 @@ sesuai kebutuhan.
 
 ---
 
+## 5.8 Santri Bebas Tagihan (Penduduk Setempat)
+
+Santri yang berasrama **AL-BAGHORY** adalah penduduk setempat, bukan santri bermukim.
+Mereka **tidak dikenai tagihan apa pun** pada Sistem Keuangan Baru:
+
+- tidak memiliki SPP, Uang Makan, Uang Nyuci, EHB, Ekstrakurikuler, Kesehatan, maupun USPP;
+- tidak memiliki Uang Jajan, kartu QR, PIN, maupun Fixed VA;
+- tidak pernah ditampilkan pada daftar, tabel, filter, ekspor, atau laporan modul keuangan
+  (Status Pembayaran, Uang Jajan, Kredensial, Loket, Penyaluran, Rekonsiliasi, Riwayat, Laporan);
+- tidak dapat menerima pembayaran, allocation, penyaluran, atau koreksi baru.
+
+Sumber aturan tunggal: `lib/finance/non-billable-santri.ts` (turunan dari
+`ASRAMA_TANPA_KAMAR` pada `lib/asrama.ts`). Seluruh modul wajib memakai helper
+`nonBillableSantriSqlPredicate()` / `excludeNonBillableSantriSql()` pada query dan
+`assertSantriBillable()` pada operasi per santri.
+
+Penanganan dana yang terlanjur masuk (mis. callback Duitku menggunakan NIS/customerNo
+santri bebas tagihan): callback **ditolak dan tidak dialokasikan**, lalu dicatat ke
+`finance_gateway_events` dengan alasan pemblokiran agar ditinjau pada Modul Rekonsiliasi.
+Tidak ada hard delete dan tidak ada perubahan historis.
+
+Pengecualian ini bersifat **menyeluruh dan bukan pengganti mekanisme Pembebasan Pembayaran
+(Bab 14)**: pembebasan tetap dipakai untuk santri bermukim yang perlu dibebaskan per item/per periode.
+
+---
+
 # 6. Tahun Ajaran dan Periode
 
 Sistem menggunakan konsep Tahun Ajaran.
@@ -1399,6 +1425,7 @@ Tetapkan sumber data:
 | Dana tersedia disalurkan | Payment Allocation - Distribution |
 | Settlement | Settlement records |
 | Tarif | Versioned tariff configuration |
+| Santri bebas tagihan | Asrama AL-BAGHORY — `lib/finance/non-billable-santri.ts` |
 
 Jangan membuat angka summary independen yang tidak dapat ditelusuri ke transaksi asal.
 

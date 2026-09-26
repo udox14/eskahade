@@ -4,6 +4,7 @@
 // rekalkulasi derived cache, serta kalkulasi limit penarikan bertingkat.
 
 import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
+import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
 
 export type WalletDirection = 'IN' | 'OUT'
 export type WalletMovementType =
@@ -136,13 +137,14 @@ export async function recordWalletMutation(
   }
 
   // 1. Verifikasi santri aktif
-  const student = await queryOne<{ id: string; status_global: string }>(
-    `SELECT id, status_global FROM santri WHERE id = ?`,
+  const student = await queryOne<{ id: string; status_global: string; asrama: string | null; nama_lengkap: string }>(
+    `SELECT id, status_global, asrama, nama_lengkap FROM santri WHERE id = ?`,
     [input.santriId]
   )
   if (!student) {
     throw new Error(`Santri dengan ID "${input.santriId}" tidak ditemukan.`)
   }
+  assertSantriBillable(student.asrama, student.nama_lengkap)
 
   const maxRetries = 5
   let lastError: unknown = null

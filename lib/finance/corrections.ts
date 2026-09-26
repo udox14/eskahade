@@ -8,6 +8,7 @@ import { query, queryOne, batch, generateId, now } from '@/lib/db'
 import { computeObligationStatus } from '@/lib/finance/types'
 import { getStudentWalletBalance, recordWalletMutation } from '@/lib/finance/wallet'
 import { getCashSessionById } from '@/lib/finance/cash-session'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import type { FinancePaymentChannel } from '@/lib/finance/payment-types'
 import type {
   FinanceCorrection,
@@ -437,7 +438,7 @@ export async function getCorrectionHistory(filters?: {
   const pageSize = Math.max(1, filters?.pageSize ?? 10)
   const offset = (page - 1) * pageSize
 
-  const conditions: string[] = []
+  const conditions: string[] = [nonBillableSantriSqlPredicate('s.asrama')]
   const params: unknown[] = []
 
   if (filters?.type && filters.type !== 'ALL') {
@@ -532,7 +533,8 @@ export async function getCorrectionDetail(
      JOIN santri s ON s.id = p.santri_id
      LEFT JOIN users u ON u.id = c.created_by
      LEFT JOIN users appr ON appr.id = c.approved_by
-     WHERE c.id = ?`,
+     WHERE c.id = ?
+       AND ${nonBillableSantriSqlPredicate('s.asrama')}`,
     [correctionId]
   )
 

@@ -10,6 +10,7 @@
 
 import { query, queryOne } from '@/lib/db'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 
 export interface PesantrenKpi {
   totalPenerimaan: number
@@ -244,14 +245,17 @@ export async function getExecutiveFinanceKpi(periodInput?: string): Promise<Fina
          COUNT(DISTINCT santri_id) AS santri_menunggak_count
        FROM finance_obligations
        WHERE status IN ('UNPAID', 'PARTIALLY_PAID')
-         AND (period <= ? OR period = 'LIFETIME')`,
+         AND (period <= ? OR period = 'LIFETIME')
+         AND ${nonBillableSantriSqlPredicate('(SELECT s.asrama FROM santri s WHERE s.id = finance_obligations.santri_id)')}`,
       [period]
     ),
 
     // 4. DANA TITIPAN SANTRI (UANG JAJAN) — TERPISAH DARI KAS PESANTREN
     queryOne<{ total_balance: number }>(
-      `SELECT COALESCE(SUM(CASE WHEN direction = 'IN' THEN amount ELSE -amount END), 0) AS total_balance
-       FROM finance_wallet_ledger`,
+      `SELECT COALESCE(SUM(CASE WHEN wl.direction = 'IN' THEN wl.amount ELSE -wl.amount END), 0) AS total_balance
+       FROM finance_wallet_ledger wl
+       JOIN santri s ON s.id = wl.santri_id
+       WHERE ${nonBillableSantriSqlPredicate('s.asrama')}`,
       []
     ),
 
@@ -262,18 +266,22 @@ export async function getExecutiveFinanceKpi(periodInput?: string): Promise<Fina
       withdrawal_period: number
     }>(
       `SELECT
-         COALESCE(SUM(CASE WHEN direction = 'IN' AND movement_type IN ('TOPUP_ONLINE', 'TOPUP_CASH') THEN amount ELSE 0 END), 0) AS topup_period,
-         COALESCE(SUM(CASE WHEN direction = 'IN' AND movement_type = 'TOPUP_ONLINE' THEN amount ELSE 0 END), 0) AS topup_online,
-         COALESCE(SUM(CASE WHEN direction = 'IN' AND movement_type = 'TOPUP_CASH' THEN amount ELSE 0 END), 0) AS topup_cash,
-         COALESCE(SUM(CASE WHEN direction = 'OUT' AND movement_type = 'WITHDRAWAL_LOKET' THEN amount ELSE 0 END), 0) AS withdrawal_period
-       FROM finance_wallet_ledger
-       WHERE created_at LIKE ?`,
+         COALESCE(SUM(CASE WHEN wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_ONLINE', 'TOPUP_CASH') THEN wl.amount ELSE 0 END), 0) AS topup_period,
+         COALESCE(SUM(CASE WHEN wl.direction = 'IN' AND wl.movement_type = 'TOPUP_ONLINE' THEN wl.amount ELSE 0 END), 0) AS topup_online,
+         COALESCE(SUM(CASE WHEN wl.direction = 'IN' AND wl.movement_type = 'TOPUP_CASH' THEN wl.amount ELSE 0 END), 0) AS topup_cash,
+         COALESCE(SUM(CASE WHEN wl.direction = 'OUT' AND wl.movement_type = 'WITHDRAWAL_LOKET' THEN wl.amount ELSE 0 END), 0) AS withdrawal_period
+       FROM finance_wallet_ledger wl
+       JOIN santri s ON s.id = wl.santri_id
+       WHERE wl.created_at LIKE ?
+         AND ${nonBillableSantriSqlPredicate('s.asrama')}`,
       [periodPrefix]
     ),
 
     queryOne<{ active_count: number }>(
-      `SELECT COUNT(DISTINCT santri_id) AS active_count
-       FROM finance_wallet_ledger`,
+      `SELECT COUNT(DISTINCT wl.santri_id) AS active_count
+       FROM finance_wallet_ledger wl
+       JOIN santri s ON s.id = wl.santri_id
+       WHERE ${nonBillableSantriSqlPredicate('s.asrama')}`,
       []
     ),
 
@@ -597,14 +605,16 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
     FROM finance_wallet_ledger wl
     LEFT JOIN santri s ON s.id = wl.santri_id
     LEFT JOIN users u ON u.id = wl.operator_id
-    WHERE
-      (wl.direction = 'OUT' AND wl.movement_type = 'WITHDRAWAL_LOKET')
-      OR
-      (wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_CASH', 'TOPUP_ONLINE')
-       AND NOT EXISTS (SELECT 1 FROM finance_payments p WHERE p.id = wl.reference_id OR p.payment_number = wl.reference_id))
-      OR
-      (wl.movement_type = 'REVERSAL'
-       AND NOT EXISTS (SELECT 1 FROM finance_corrections c WHERE c.id = wl.reference_id OR c.correction_number = wl.reference_id))
+    WHERE ${nonBillableSantriSqlPredicate('s.asrama')}
+      AND (
+        (wl.direction = 'OUT' AND wl.movement_type = 'WITHDRAWAL_LOKET')
+        OR
+        (wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_CASH', 'TOPUP_ONLINE')
+         AND NOT EXISTS (SELECT 1 FROM finance_payments p WHERE p.id = wl.reference_id OR p.payment_number = wl.reference_id))
+        OR
+        (wl.movement_type = 'REVERSAL'
+         AND NOT EXISTS (SELECT 1 FROM finance_corrections c WHERE c.id = wl.reference_id OR c.correction_number = wl.reference_id))
+      )
 
     UNION ALL
 

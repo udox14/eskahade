@@ -20,6 +20,10 @@ import {
 } from '@/lib/finance/pins'
 import { hashPassword } from '@/lib/auth/password'
 import { generateQrSvg } from '@/lib/finance/qr'
+import {
+  isAsramaBebasTagihan,
+  nonBillableSantriSqlPredicate,
+} from '@/lib/finance/non-billable-santri'
 
 export interface BulkCandidateScope {
   type: 'ALL_UNISSUED' | 'BY_ASRAMA' | 'FILTERED' | 'SELECTED_IDS'
@@ -207,21 +211,32 @@ export async function getKredensialData(
     asramaRows,
   ] = await Promise.all([
     queryOne<{ total: number }>(
-      `SELECT COUNT(*) AS total FROM santri WHERE status_global = 'aktif'`
+      `SELECT COUNT(*) AS total FROM santri
+       WHERE status_global = 'aktif'
+         AND ${nonBillableSantriSqlPredicate('asrama')}`
     ),
     queryOne<{ total: number }>(
-      `SELECT COUNT(*) AS total FROM finance_credentials WHERE status = 'ACTIVE'`
+      `SELECT COUNT(*) AS total FROM finance_credentials c
+       JOIN santri s ON s.id = c.santri_id
+       WHERE c.status = 'ACTIVE'
+         AND ${nonBillableSantriSqlPredicate('s.asrama')}`
     ),
     queryOne<{ total: number }>(
-      `SELECT COUNT(*) AS total FROM finance_credentials WHERE status = 'LOST'`
+      `SELECT COUNT(*) AS total FROM finance_credentials c
+       JOIN santri s ON s.id = c.santri_id
+       WHERE c.status = 'LOST'
+         AND ${nonBillableSantriSqlPredicate('s.asrama')}`
     ),
     queryOne<{ total: number }>(
-      `SELECT COUNT(*) AS total FROM finance_student_pins
-       WHERE locked_until IS NOT NULL AND datetime(locked_until) > datetime('now')`
+      `SELECT COUNT(*) AS total FROM finance_student_pins p
+       JOIN santri s ON s.id = p.santri_id
+       WHERE p.locked_until IS NOT NULL AND datetime(p.locked_until) > datetime('now')
+         AND ${nonBillableSantriSqlPredicate('s.asrama')}`
     ),
     query<{ asrama: string }>(
       `SELECT DISTINCT asrama FROM santri
        WHERE status_global = 'aktif' AND asrama IS NOT NULL AND TRIM(asrama) != ''
+         AND ${nonBillableSantriSqlPredicate('asrama')}
        ORDER BY asrama ASC`
     ),
   ])
@@ -236,7 +251,10 @@ export async function getKredensialData(
   const asramaList = asramaRows.map(r => r.asrama)
 
   // 3. Bangun query filter
-  const conditions: string[] = ["s.status_global = 'aktif'"]
+  const conditions: string[] = [
+    "s.status_global = 'aktif'",
+    nonBillableSantriSqlPredicate('s.asrama'),
+  ]
   const queryParams: unknown[] = []
 
   if (search) {
@@ -517,7 +535,11 @@ export async function getCardsForBatchPrint(
 ): Promise<CardPrintItem[]> {
   await authorizeUser()
 
-  const conditions: string[] = ["s.status_global = 'aktif'", "c.status = 'ACTIVE'"]
+  const conditions: string[] = [
+    "s.status_global = 'aktif'",
+    "c.status = 'ACTIVE'",
+    nonBillableSantriSqlPredicate('s.asrama'),
+  ]
   const params: unknown[] = []
 
   if (santriIds && santriIds.length > 0) {
@@ -581,7 +603,10 @@ export async function getBulkIssuanceCandidatesAction(
 ): Promise<BulkCandidatesSummary> {
   await authorizeUser()
 
-  const conditions: string[] = ["s.status_global = 'aktif'"]
+  const conditions: string[] = [
+    "s.status_global = 'aktif'",
+    nonBillableSantriSqlPredicate('s.asrama'),
+  ]
   const params: unknown[] = []
 
   if (scope.type === 'BY_ASRAMA' && scope.asrama && scope.asrama !== 'ALL') {
@@ -702,6 +727,20 @@ export async function issueCardBatchChunkAction(
           kamar: student.kamar,
           status: 'SKIPPED',
           reason: `Santri berstatus "${student.status_global}" (tidak aktif).`,
+        })
+        skippedCount++
+        continue
+      }
+
+      if (isAsramaBebasTagihan(student.asrama)) {
+        items.push({
+          santriId,
+          namaLengkap: student.nama_lengkap,
+          nis: student.nis,
+          asrama: student.asrama,
+          kamar: student.kamar,
+          status: 'SKIPPED',
+          reason: `Santri asrama ${String(student.asrama ?? '').trim().toUpperCase()} (penduduk setempat) bebas dari seluruh tagihan keuangan.`,
         })
         skippedCount++
         continue
@@ -884,6 +923,20 @@ export async function recoverStudentPinsBatchChunkAction(
           kamar: null,
           status: 'FAILED',
           reason: 'Santri tidak ditemukan di database.',
+        })
+        failedCount++
+        continue
+      }
+
+      if (isAsramaBebasTagihan(student.asrama)) {
+        items.push({
+          santriId,
+          namaLengkap: student.nama_lengkap,
+          nis: student.nis,
+          asrama: student.asrama,
+          kamar: student.kamar,
+          status: 'FAILED',
+          reason: `Santri asrama ${String(student.asrama ?? '').trim().toUpperCase()} (penduduk setempat) bebas dari seluruh tagihan keuangan.`,
         })
         failedCount++
         continue

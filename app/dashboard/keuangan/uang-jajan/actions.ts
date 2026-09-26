@@ -11,6 +11,10 @@ import {
   type FinanceWalletLedgerEntry,
   type WalletLimitEvaluation,
 } from '@/lib/finance/wallet'
+import {
+  assertSantriBillable,
+  nonBillableSantriSqlPredicate,
+} from '@/lib/finance/non-billable-santri'
 
 export interface StudentWalletRow {
   id: string
@@ -146,7 +150,10 @@ export async function getUangJajanData(
   const offset = (page - 1) * pageSize
 
   // 1. Bangun query filter untuk count & paginasi
-  const conditions: string[] = ["s.status_global = 'aktif'"]
+  const conditions: string[] = [
+    "s.status_global = 'aktif'",
+    nonBillableSantriSqlPredicate('s.asrama'),
+  ]
   const queryParams: unknown[] = []
 
   if (search) {
@@ -181,7 +188,8 @@ export async function getUangJajanData(
          COALESCE(SUM(saldo_uang_jajan), 0) AS total,
          COALESCE(SUM(CASE WHEN saldo_uang_jajan > 0 THEN 1 ELSE 0 END), 0) AS count_bersaldo
        FROM santri
-       WHERE status_global = 'aktif'`
+       WHERE status_global = 'aktif'
+         AND ${nonBillableSantriSqlPredicate('asrama')}`
     ),
     queryOne<{ total_in: number; total_out: number }>(
       `SELECT
@@ -194,6 +202,7 @@ export async function getUangJajanData(
     query<{ asrama: string }>(
       `SELECT DISTINCT asrama FROM santri
        WHERE status_global = 'aktif' AND asrama IS NOT NULL AND TRIM(asrama) != ''
+         AND ${nonBillableSantriSqlPredicate('asrama')}
        ORDER BY asrama ASC`
     ),
     queryOne<{ total: number }>(
@@ -349,6 +358,7 @@ export async function getStudentWalletDetail(
   if (!student) {
     throw new Error(`Santri dengan ID "${santriId}" tidak ditemukan.`)
   }
+  assertSantriBillable(student.asrama, student.nama_lengkap)
 
   const { balance, cachedBalance } = await getStudentWalletBalance(santriId)
   const limits = await evaluateWalletLimit(santriId)

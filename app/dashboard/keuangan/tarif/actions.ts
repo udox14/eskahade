@@ -41,6 +41,7 @@ import {
   DEFAULT_GLOBAL_DAILY_LIMIT,
 } from '@/lib/finance/wallet'
 import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import {
   getDuitkuV2Config,
 } from '@/lib/finance/gateway/duitku-v2'
@@ -567,12 +568,14 @@ export async function getStudentWalletLimitsAction(
     query<{ asrama: string }>(
       `SELECT DISTINCT asrama FROM santri
        WHERE status_global = 'aktif' AND asrama IS NOT NULL AND TRIM(asrama) != ''
+         AND ${nonBillableSantriSqlPredicate('asrama')}
        ORDER BY asrama ASC`
     ).catch(() => []),
     query<{ kelas_sekolah: string }>(
       `SELECT DISTINCT kelas_sekolah
        FROM santri
        WHERE status_global = 'aktif' AND kelas_sekolah IS NOT NULL AND TRIM(kelas_sekolah) != ''
+         AND ${nonBillableSantriSqlPredicate('asrama')}
        ORDER BY CAST(kelas_sekolah AS INTEGER), kelas_sekolah ASC`
     ).catch(() => []),
   ])
@@ -581,7 +584,10 @@ export async function getStudentWalletLimitsAction(
   const kelasList = kelasRows.map(r => r.kelas_sekolah)
 
   // Filter conditions
-  const conditions: string[] = ["s.status_global = 'aktif'"]
+  const conditions: string[] = [
+    "s.status_global = 'aktif'",
+    nonBillableSantriSqlPredicate('s.asrama'),
+  ]
   const queryParams: unknown[] = []
 
   if (search) {
@@ -794,6 +800,7 @@ export async function searchActiveStudents(
     `SELECT id, nis, nama_lengkap, asrama, kamar
      FROM santri
      WHERE status_global = 'aktif'
+       AND ${nonBillableSantriSqlPredicate('asrama')}
        AND (nama_lengkap LIKE ? OR nis LIKE ?)
      ORDER BY nama_lengkap ASC
      LIMIT 20`,
