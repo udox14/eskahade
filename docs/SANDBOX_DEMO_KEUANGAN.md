@@ -1,0 +1,131 @@
+# Sandbox Demo — Sistem Keuangan Baru
+
+Dokumen ini menjelaskan cara memakai **akun demo** untuk mencoba-coba modul keuangan
+(terbit kartu, cetak, reset PIN, dan lainnya) **tanpa menyentuh database produksi**,
+serta batasan yang masih ada.
+
+---
+
+## 1. Kenapa akun demo aman dipakai untuk uji coba
+
+`lib/db/index.ts` mengarahkan **seluruh** query dari session dengan role `demo`
+ke binding `DEMO_DB` (database `eskahade-demo-db`), bukan ke `DB` (produksi):
+
+```
+// lib/db/index.ts
+if (await isDemoRequest()) return env.DEMO_DB
+...
+return env.DB
+```
+
+Konsekuensinya: apa pun yang Anda terbitkan, cetak, atau ubah saat login sebagai
+akun demo **tidak pernah masuk ke data pesantren yang sebenarnya**.
+
+---
+
+## 2. Status sandbox (per sinkronisasi terakhir)
+
+Database `eskahade-demo-db` diselaraskan dengan skema Sistem Keuangan Baru memakai
+`scripts/sync-demo-db-finance.cjs`.
+
+| Aspek | Nilai |
+| --- | --- |
+| Tabel `finance_*` | 27 (setara produksi) |
+| Trigger keuangan | 7 |
+| Santri demo aktif | 6 (`demo-s-1` … `demo-s-6`) |
+| Asrama | AL-FALAH, AS-SALAM, BAHAGIA |
+| Kartu / PIN | 0 (baseline bersih) |
+| Tarif baseline | 5 (SPP, USPP, EHB, EKSKUL, KESEHATAN) |
+
+Karena kartu masih 0, modul **Kredensial** menampilkan seluruh 6 santri sebagai
+"Belum Ada Kartu" — kondisi ideal untuk mencoba *Terbitkan Kartu Massal* dan cetak.
+
+---
+
+## 3. Cara memakai
+
+1. Login memakai **akun demo** (role `demo`).
+2. Buka `/dashboard/keuangan/kredensial`.
+3. Semua aksi (terbitkan, cetak, PIN) hanya menyentuh `eskahade-demo-db`.
+
+Untuk mengembalikan sandbox ke kondisi bersih:
+
+```bash
+node scripts/reset-kredensial-cards.cjs --db eskahade-demo-db
+node scripts/reset-kredensial-cards.cjs --db eskahade-demo-db --apply --confirm eskahade-demo-db
+```
+
+Perintah pertama adalah dry-run (tidak mengubah apa pun). Untuk melatih ulang
+skema dari nol, jalankan `scripts/sync-demo-db-finance.cjs`.
+
+---
+
+## 4. Batasan yang perlu diketahui
+
+### 4.1 Tahun ajaran
+
+Demo hanya punya satu tahun ajaran aktif: `id=1, '1446-1447 H'`. Nama ini
+**bukan** format Gregorian yang dicari modul keuangan
+(`lib/finance/bridge.ts` dan `lib/finance/obligations.ts` mencari nama seperti
+`2026/2027`). Akibatnya:
+
+- **Kredensial / kartu / PIN: tidak terpengaruh** — modul ini tidak menyentuh tahun ajaran.
+- **Materialisasi kewajiban (tagihan) akan gagal** dengan pesan jelas
+  ("Tahun ajaran ... belum terdaftar di master tahun_ajaran").
+
+Sinkronisasi menambahkan `id=2, '2026/2027'` dengan `is_active = 0` **khusus**
+untuk memenuhi foreign key seed tarif di migrasi `0167`. Angka itu sengaja tidak
+diaktifkan: kelas demo terikat ke tahun ajaran aktif (`id=1`), sehingga
+mengaktifkan `2026/2027` akan mengosongkan dashboard dan rekap akademik demo.
+
+Bila Anda ingin mencoba alur tagihan/pembayaran penuh di demo, aktifkan tahun
+ajaran Gregorian secara sadar:
+
+```sql
+UPDATE tahun_ajaran SET is_active = 0 WHERE id = 1;
+UPDATE tahun_ajaran SET is_active = 1 WHERE id = 2;
+-- lalu daftarkan kelas demo ke tahun ajaran 2 agar filter tetap menemukan data
+```
+
+### 4.2 Provider katering & laundry
+
+`master_jasa` belum di-seed di demo. Kewajiban **UANG_MAKAN** dan **UANG_NYUCI**
+membutuhkan `santri.tempat_makan_id` / `tempat_mencuci_id` yang menunjuk ke
+`master_jasa` dengan `jenis` yang sesuai. Alur tagihan penuh perlu data ini;
+alur kartu tidak.
+
+### 4.3 `app/api/demo/reset/route.ts` belum sadar-finance
+
+Route reset demo (`DATA_TABLES`) **belum memuat satu pun tabel `finance_*`**,
+padahal ia menjalankan `DELETE FROM santri` dan `DELETE FROM tahun_ajaran` di
+dalam `try/catch` yang menelan error. Begitu ada baris `finance_*` yang mengacu
+ke `santri`, delete tersebut gagal karena foreign key, error-nya tertelan, dan
+baris lama tertinggal — sehingga insert ulang berisiko `UNIQUE constraint failed`.
+
+Route itu juga tidak menyemai `finance_tariffs`, jadi setelah reset demo modul
+keuangan tidak punya tarif yang bisa dipakai.
+
+**Ini belum diperbaiki** dan sebaiknya dikerjakan sebelum sandbox dipakai
+sebagai alat uji rutin. Perbaikannya: tambahkan tabel `finance_*` ke
+`DATA_TABLES` dengan urutan aman terhadap FK, dan semai ulang tarif baseline.
+
+### 4.4 Migrasi 0169 & 0170 tidak diterapkan
+
+Keduanya bukan bagian fitur keuangan: `0169` membuat tabel `absensi_guru_kunci*`
+dan `0170` membuat tabel `dashboard_*`, yang keduanya belum ada di demo.
+Melewatkannya tidak memengaruhi modul kredensial. Modul terkait (mis. Dashboard
+Home) belum bisa dipakai di sandbox sampai migrasinya diterapkan.
+
+---
+
+## 5. Catatan operasional
+
+- Migrasi `ALTER TABLE ... ADD COLUMN` **tidak idempoten** (SQLite tidak punya
+  `ADD COLUMN IF NOT EXISTS`), sehingga `scripts/sync-demo-db-finance.cjs` tidak
+  dirancang untuk dijalankan ulang penuh. Script mendeteksi bila sinkronisasi
+  sudah selesai dan berhenti dengan pesan jelas. Untuk memaksa satu berkas,
+  gunakan `--only <prefix>`.
+- Migrasi `0167` menyeed tarif dengan `academic_year_id = 2` yang di-hardcode.
+  Ini asumsi data produksi; di lingkungan lain angka itu bisa tidak ada dan
+  `INSERT OR IGNORE` **tidak** menolong karena pelanggaran foreign key tidak
+  di-suppress oleh `OR IGNORE`.

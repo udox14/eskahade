@@ -701,6 +701,17 @@ Saldo berkurang melalui:
 
 Saldo tidak boleh diedit langsung.
 
+## 15.1 Aturan Cutover: Non-Migrasi Saldo Uang Jajan Lama
+
+Saldo uang jajan dari modul lama ("Uang Jajan" pada menu Keuangan Santri / `tabungan_log` / `santri.saldo_uang_jajan` lama) **TIDAK dimigrasikan** ke Sistem Keuangan Baru:
+
+1. **Saldo Awal Nol**: Seluruh santri memulai saldo uang jajan dari **Rp 0 (nol)** di Sistem Keuangan Baru.
+2. **Tidak Ada Opening Balance**: Tidak ada saldo awal (*opening balance*) ataupun mutasi pembuka yang diimpor dari tabel historis `tabungan_log` ke dalam buku besar `finance_wallet_ledger`.
+3. **Buku Besar Baru Bersih**: Buku besar mutasi `finance_wallet_ledger` memulai riwayat bersih baru. Saldo hanya tercipta jika ada transaksi baru yang sah di era Sistem Keuangan Baru (Top-up online melalui Duitku atau setoran tunai loket koperasi setelah cutover).
+4. **Sinkronisasi Derived Cache**: Kolom proyeksi cepat `santri.saldo_uang_jajan` diselaraskan murni dari akumulasi `finance_wallet_ledger` (bernilai 0 bagi seluruh santri yang belum bertransaksi).
+5. **Histori Lama Tetap Utuh**: Data transaksi di `tabungan_log` tetap dipertahankan untuk kebutuhan arsip dan audit, tetapi tidak memengaruhi sistem keuangan baru.
+
+
 ---
 
 # 16. Limit Uang Jajan

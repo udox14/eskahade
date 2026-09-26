@@ -445,7 +445,15 @@ erDiagram
   4. Hapus label `petugas_loket` dari `ROLE_LABEL` di `lib/menu/config.ts`.
   5. Tidak ada data user yang dihapus.
 
+### 4.8 Rencana Cutover & Non-Migrasi Saldo Uang Jajan Lama
+- Saldo uang jajan modul lama (Keuangan Santri / Uang Jajan / `tabungan_log`) **TIDAK dimigrasikan** ke Sistem Keuangan Baru.
+- Seluruh santri memulai saldo uang jajan dari **Rp 0** pada buku besar `finance_wallet_ledger`.
+- Tidak ada saldo awal (*opening balance*) ataupun backfill dari data historis `tabungan_log`.
+- Kolom derived cache `santri.saldo_uang_jajan` diselaraskan murni dengan akumulasi `finance_wallet_ledger` melalui `0173_finance_zero_wallet_balance_cutover.sql` (bernilai 0 bagi seluruh santri yang belum bertransaksi).
+- Data historis `tabungan_log` modul lama tetap dipertahankan untuk kebutuhan audit, tanpa dihapus (non-destruktif).
+
 ---
+
 
 ## 5. UI Benchmark Strategy: Modul Status Pembayaran
 
