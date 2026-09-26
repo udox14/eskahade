@@ -71,3 +71,7 @@ next-env.d.ts
 # POSKESTREN browser test screenshots
 /tmp/poskestren-ui/
 
+# Backup lokal dari script reset kredensial (berisi token kartu & hash PIN)
+/scratch/reset-kredensial/
+/scratch/reset-test/
+

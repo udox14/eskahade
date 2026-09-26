@@ -14,15 +14,20 @@ import {
   CheckCircle2,
   X,
   CheckSquare,
-  Square,
   Layers,
   RefreshCw,
+  KeyRound,
 } from 'lucide-react'
 
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 import Pagination from '@/components/ui/pagination'
 import { StatCardSkeleton, TableSkeleton } from '@/components/ui/skeletons'
+import {
+  RowActionItem,
+  RowActionMenu,
+  RowActionSeparator,
+} from '@/components/ui/dropdown-menu'
 import { CardPrintSheet } from './card-print-sheet'
 import { PinSlipPrintSheet, type PinSlipItem } from './pin-slip-print-sheet'
 import {
@@ -51,11 +56,8 @@ interface KredensialContentProps {
   initialData: KredensialResponse
 }
 
-type TabType = 'LIST' | 'BATCH_PRINT'
-
 export default function KredensialContent({ initialData }: KredensialContentProps) {
   const [data, setData] = useState<KredensialResponse>(initialData)
-  const [activeTab, setActiveTab] = useState<TabType>('LIST')
   const [isPending, startTransition] = useTransition()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -535,6 +537,27 @@ export default function KredensialContent({ initialData }: KredensialContentProp
     }
   }
 
+  // Hanya kartu ACTIVE yang dapat dicetak (selaras dengan filter di getCardsForBatchPrint).
+  const selectableInPageIds = data.items
+    .filter((row) => row.cardStatus === 'ACTIVE')
+    .map((row) => row.id)
+  const selectedInPageCount = selectableInPageIds.filter((id) =>
+    selectedSantriIds.has(id)
+  ).length
+  const isAllSelectableInPageSelected =
+    selectableInPageIds.length > 0 && selectedInPageCount === selectableInPageIds.length
+
+  const formatIssuedAt = (value: string | null) => {
+    if (!value) return '-'
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return '-'
+    return parsed.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    })
+  }
+
   return (
     <div className="space-y-6">
       <DashboardPageHeader
@@ -615,55 +638,9 @@ export default function KredensialContent({ initialData }: KredensialContentProp
         )}
       </div>
 
-      {/* Tabs & Bulk Action Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 gap-2 pb-1 sm:pb-0">
-        <div className="flex">
-          <button
-            type="button"
-            onClick={() => setActiveTab('LIST')}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition ${
-              activeTab === 'LIST'
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <CreditCard className="h-4 w-4" />
-            Daftar Kartu &amp; Santri
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('BATCH_PRINT')}
-            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-bold transition ${
-              activeTab === 'BATCH_PRINT'
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Printer className="h-4 w-4" />
-            Cetak Kartu (Batch Print)
-            {selectedSantriIds.size > 0 && (
-              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700">
-                {selectedSantriIds.size}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {data.userPermissions.canMutate && (
-          <button
-            type="button"
-            onClick={handleOpenBulkModal}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors self-start sm:self-auto mb-2 sm:mb-0"
-          >
-            <Layers className="h-4 w-4" />
-            <span>Terbitkan Kartu Massal</span>
-          </button>
-        )}
-      </div>
-
-      {/* Filter Toolbar */}
+      {/* Toolbar: Filter + Aksi Utama */}
       <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs space-y-3">
-        <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-3">
+        <form onSubmit={handleSearchSubmit} className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
@@ -749,56 +726,112 @@ export default function KredensialContent({ initialData }: KredensialContentProp
           </div>
         </form>
 
-        {activeTab === 'BATCH_PRINT' && (
-          <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={toggleSelectAllInPage}
-                className="inline-flex items-center gap-1.5 font-semibold text-slate-700 hover:text-indigo-600"
-              >
-                <CheckSquare className="h-4 w-4" />
-                Pilih Semua Kartu Aktif di Halaman Ini
-              </button>
-              <span className="text-slate-400">•</span>
-              <span className="text-slate-500">
-                {selectedSantriIds.size} kartu terpilih
-              </span>
-            </div>
+        {/* Baris aksi: seleksi cetak + aksi massal (satu tempat, tidak lagi dipisah per tab) */}
+        <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 text-xs lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleSelectAllInPage}
+              className="inline-flex items-center gap-1.5 font-semibold text-slate-700 hover:text-indigo-600"
+            >
+              <CheckSquare className="h-4 w-4" />
+              Pilih Semua Kartu Aktif di Halaman Ini
+            </button>
+            <span className="text-slate-300">•</span>
+            <span className="text-slate-500">
+              {selectedSantriIds.size > 0
+                ? `${selectedSantriIds.size} kartu terpilih untuk dicetak`
+                : 'Pilih kartu aktif pada kolom Pilih untuk mencetak'}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleStartBatchPrint}
-              disabled={isLoadingPrint}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-60"
+              disabled={isLoadingPrint || selectedSantriIds.size === 0}
+              title={
+                selectedSantriIds.size === 0
+                  ? 'Pilih minimal satu kartu aktif terlebih dahulu.'
+                  : undefined
+              }
+              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white shadow-xs hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Printer className="h-4 w-4" />
-              {isLoadingPrint ? 'Menyiapkan...' : `Pratinjau & Cetak Kartu (${selectedSantriIds.size || 'Semua Filter'})`}
+              {isLoadingPrint
+                ? 'Menyiapkan...'
+                : `Pratinjau & Cetak Kartu${selectedSantriIds.size > 0 ? ` (${selectedSantriIds.size})` : ''}`}
             </button>
+
+            {data.userPermissions.canMutate && (
+              <button
+                type="button"
+                onClick={handleOpenBulkModal}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600 bg-emerald-50 px-4 py-2 font-bold text-emerald-700 shadow-xs transition-colors hover:bg-emerald-100"
+              >
+                <Layers className="h-4 w-4" />
+                <span>Terbitkan Kartu Massal</span>
+              </button>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Main Table */}
       <div className="rounded-xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
         {isPending ? (
-          <TableSkeleton rows={8} cols={5} />
+          <TableSkeleton rows={8} cols={7} />
         ) : data.items.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 text-sm">
-            Tidak ada data santri yang cocok dengan filter pencarian.
+          <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+              <CreditCard className="h-6 w-6" />
+            </div>
+            <h3 className="text-base font-semibold text-slate-800">
+              {hasActiveFilters ? 'Tidak ada santri yang cocok' : 'Belum ada data santri'}
+            </h3>
+            <p className="mt-1 max-w-md text-sm text-slate-500">
+              {hasActiveFilters
+                ? 'Kriteria pencarian atau filter yang Anda gunakan tidak menghasilkan data. Coba longgarkan filter.'
+                : 'Belum ada data santri aktif yang dapat ditampilkan pada modul kredensial.'}
+            </p>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-900"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Reset Semua Filter</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 text-xs font-semibold text-slate-600 uppercase tracking-wider">
                 <tr>
-                  {activeTab === 'BATCH_PRINT' && (
-                    <th className="px-3 py-3.5 text-center w-10">Pilih</th>
-                  )}
+                  <th className="w-10 px-3 py-3.5 text-center">
+                    <span className="sr-only">Pilih untuk dicetak</span>
+                    <input
+                      type="checkbox"
+                      aria-label="Pilih semua kartu aktif di halaman ini"
+                      checked={isAllSelectableInPageSelected}
+                      ref={(el) => {
+                        if (el) {
+                          el.indeterminate =
+                            selectedInPageCount > 0 && !isAllSelectableInPageSelected
+                        }
+                      }}
+                      onChange={toggleSelectAllInPage}
+                      className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                  </th>
                   <th className="px-5 py-3.5 text-left">Santri</th>
                   <th className="px-5 py-3.5 text-left">Status Kartu</th>
                   <th className="px-5 py-3.5 text-left">Token QR</th>
                   <th className="px-5 py-3.5 text-left">Status PIN</th>
-                  <th className="px-5 py-3.5 text-center">Aksi</th>
+                  <th className="px-5 py-3.5 text-left">Diterbitkan</th>
+                  <th className="px-5 py-3.5 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
@@ -807,25 +840,21 @@ export default function KredensialContent({ initialData }: KredensialContentProp
                   const hasActiveCard = row.cardStatus === 'ACTIVE'
                   return (
                     <tr key={row.id} className="hover:bg-slate-50/70 transition">
-                      {activeTab === 'BATCH_PRINT' && (
-                        <td className="px-3 py-3.5 text-center">
-                          {hasActiveCard ? (
-                            <button
-                              type="button"
-                              onClick={() => toggleSelectSantri(row.id)}
-                              className="text-indigo-600 hover:text-indigo-800"
-                            >
-                              {isSelected ? (
-                                <CheckSquare className="h-4 w-4" />
-                              ) : (
-                                <Square className="h-4 w-4 text-slate-300" />
-                              )}
-                            </button>
-                          ) : (
-                            <span className="text-slate-300 text-xs">-</span>
-                          )}
-                        </td>
-                      )}
+                      <td className="px-3 py-3.5 text-center">
+                        {hasActiveCard ? (
+                          <input
+                            type="checkbox"
+                            aria-label={`Pilih kartu ${row.namaLengkap} untuk dicetak`}
+                            checked={isSelected}
+                            onChange={() => toggleSelectSantri(row.id)}
+                            className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                        ) : (
+                          <span className="text-slate-300 text-xs" title="Hanya kartu aktif yang dapat dicetak">
+                            -
+                          </span>
+                        )}
+                      </td>
 
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
@@ -902,85 +931,98 @@ export default function KredensialContent({ initialData }: KredensialContentProp
                         )}
                       </td>
 
-                      <td className="px-5 py-3.5 text-center text-xs">
+                      <td className="px-5 py-3.5 text-xs text-slate-600">
+                        {row.cardIssuedAt ? (
+                          formatIssuedAt(row.cardIssuedAt)
+                        ) : (
+                          <span className="text-slate-300">-</span>
+                        )}
+                      </td>
+
+                      <td className="px-5 py-3.5 text-right text-xs">
                         {data.userPermissions.canMutate ? (
-                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIssueModalSantri(row)
-                                setIssueReason(row.cardStatus === 'ACTIVE' ? 'Penggantian kartu santri' : '')
-                              }}
-                              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition"
-                            >
-                              {row.cardStatus === 'ACTIVE' ? 'Ganti Kartu' : 'Terbitkan Kartu'}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setPinModalSantri(row)
-                                setPinInput('')
-                                setPinReason(row.hasPin ? 'Reset PIN oleh admin/koperasi' : 'Inisialisasi PIN santri')
-                              }}
-                              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition"
-                            >
-                              {row.hasPin ? 'Reset PIN' : 'Buat PIN'}
-                            </button>
-
-                            {row.cardStatus === 'ACTIVE' && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handlePrintSingleCard(row.id)}
-                                  disabled={isLoadingPrint}
-                                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-semibold text-slate-700 hover:bg-slate-50 hover:text-emerald-700 transition"
-                                  title="Cetak Kartu Santri"
-                                >
-                                  <Printer className="h-3 w-3" />
-                                  Cetak
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleReportLost(row)}
-                                  className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 font-semibold text-amber-800 hover:bg-amber-100 transition"
-                                  title="Lapor Kartu Hilang"
-                                >
-                                  Hilang
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleBlockCard(row)}
-                                  className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 font-semibold text-rose-800 hover:bg-rose-100 transition"
-                                  title="Blokir Kartu"
-                                >
-                                  Blokir
-                                </button>
-                              </>
-                            )}
-
-                            {row.cardStatus === 'BLOCKED' && (
-                              <button
-                                type="button"
-                                onClick={() => handleUnblockCard(row)}
-                                className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 font-semibold text-emerald-800 hover:bg-emerald-100 transition"
-                                title="Buka Blokir Kartu"
+                          <div className="flex items-center justify-end">
+                            <RowActionMenu label={`Aksi kredensial untuk ${row.namaLengkap}`}>
+                              <RowActionItem
+                                icon={<CreditCard />}
+                                onSelect={() => {
+                                  setIssueModalSantri(row)
+                                  setIssueReason(
+                                    row.cardStatus === 'ACTIVE' ? 'Penggantian kartu santri' : ''
+                                  )
+                                }}
                               >
-                                Buka Blokir
-                              </button>
-                            )}
+                                {row.cardStatus === 'ACTIVE' ? 'Ganti Kartu' : 'Terbitkan Kartu'}
+                              </RowActionItem>
 
-                            {row.isPinLocked && (
-                              <button
-                                type="button"
-                                onClick={() => handleUnlockPin(row)}
-                                className="inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200 px-2 py-1 font-bold text-amber-800 hover:bg-amber-100 transition"
-                                title="Buka Kunci PIN"
+                              <RowActionItem
+                                icon={<KeyRound />}
+                                onSelect={() => {
+                                  setPinModalSantri(row)
+                                  setPinInput('')
+                                  setPinReason(
+                                    row.hasPin
+                                      ? 'Reset PIN oleh admin/koperasi'
+                                      : 'Inisialisasi PIN santri'
+                                  )
+                                }}
                               >
-                                <Unlock className="h-3 w-3" />
-                                Buka Kunci
-                              </button>
-                            )}
+                                {row.hasPin ? 'Reset PIN' : 'Buat PIN'}
+                              </RowActionItem>
+
+                              {hasActiveCard && (
+                                <>
+                                  <RowActionItem
+                                    icon={<Printer />}
+                                    disabled={isLoadingPrint}
+                                    onSelect={() => handlePrintSingleCard(row.id)}
+                                  >
+                                    Cetak Kartu
+                                  </RowActionItem>
+                                  <RowActionSeparator />
+                                  <RowActionItem
+                                    icon={<AlertCircle />}
+                                    tone="warning"
+                                    onSelect={() => handleReportLost(row)}
+                                  >
+                                    Lapor Kartu Hilang
+                                  </RowActionItem>
+                                  <RowActionItem
+                                    icon={<Ban />}
+                                    tone="danger"
+                                    onSelect={() => handleBlockCard(row)}
+                                  >
+                                    Blokir Kartu
+                                  </RowActionItem>
+                                </>
+                              )}
+
+                              {row.cardStatus === 'BLOCKED' && (
+                                <>
+                                  <RowActionSeparator />
+                                  <RowActionItem
+                                    icon={<CheckCircle2 />}
+                                    tone="success"
+                                    onSelect={() => handleUnblockCard(row)}
+                                  >
+                                    Buka Blokir Kartu
+                                  </RowActionItem>
+                                </>
+                              )}
+
+                              {row.isPinLocked && (
+                                <>
+                                  <RowActionSeparator />
+                                  <RowActionItem
+                                    icon={<Unlock />}
+                                    tone="warning"
+                                    onSelect={() => handleUnlockPin(row)}
+                                  >
+                                    Buka Kunci PIN
+                                  </RowActionItem>
+                                </>
+                              )}
+                            </RowActionMenu>
                           </div>
                         ) : (
                           <span className="text-slate-400 text-xs">View Only</span>
