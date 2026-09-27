@@ -1,7 +1,12 @@
-'use server'
+﻿'use server'
 
 import { query, queryOne } from '@/lib/db'
-import { getSession, getEffectiveRoles } from '@/lib/auth/session'
+import {
+  getSession,
+  getEffectiveRoles,
+  hasFinanceMutateRole,
+  isDemoSandboxRequest,
+} from '@/lib/auth/session'
 import {
   getStudentWalletBalance,
   recalculateStudentWallet,
@@ -97,13 +102,7 @@ const ALLOWED_VIEW_ROLES = [
   'petugas_koperasi',
   'pimpinan',
   'tester',
-]
-
-const ALLOWED_MUTATE_ROLES = [
-  'admin',
-  'bendahara',
-  'admin_koperasi',
-  'petugas_koperasi',
+  'demo',
 ]
 
 async function authorizeUser(): Promise<{
@@ -122,8 +121,10 @@ async function authorizeUser(): Promise<{
     throw new Error('Akses ditolak: Anda tidak memiliki hak akses modul Uang Jajan.')
   }
 
+  // Role 'demo' hanya boleh menulis bila request benar-benar dilayani DEMO_DB.
+  const demoRunsInSandbox = isDemoSandboxRequest(session)
   const isViewOnly = roles.includes('pimpinan') || roles.includes('tester')
-  const canMutate = !isViewOnly && roles.some(r => ALLOWED_MUTATE_ROLES.includes(r))
+  const canMutate = !isViewOnly && hasFinanceMutateRole(roles, demoRunsInSandbox)
 
   return {
     userId: session.id,

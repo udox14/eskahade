@@ -1,7 +1,12 @@
-'use server'
+﻿'use server'
 
 import { query, queryOne, generateId, now } from '@/lib/db'
-import { getSession, getEffectiveRoles } from '@/lib/auth/session'
+import {
+  getSession,
+  getEffectiveRoles,
+  hasFinanceMutateRole,
+  isDemoSandboxRequest,
+} from '@/lib/auth/session'
 import { canAccessFeatureForSession } from '@/lib/auth/feature'
 import {
   getActiveCashSession,
@@ -39,7 +44,7 @@ import { createPaymentOrder } from '@/lib/finance/orders'
 import { recordOrderPayment } from '@/lib/finance/payments'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
 
-// ─── TIPE DATA INTERFACE LOKET ──────────────────────────────────────────────
+// â”€â”€â”€ TIPE DATA INTERFACE LOKET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface StudentLoketProfile {
   id: string
@@ -156,7 +161,7 @@ export interface LoketSessionTransactionItem {
 const inFlightTransactions = new Map<string, Promise<unknown>>()
 const verifiedPinSessions = new Map<string, { santriId: string; expiresAt: number }>()
 
-// ─── OTORISASI OPERATOR LOKET (SERVER-SIDE RBAC) ────────────────────────────
+// â”€â”€â”€ OTORISASI OPERATOR LOKET (SERVER-SIDE RBAC) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ALLOWED_VIEW_ROLES = [
   'admin',
@@ -165,13 +170,7 @@ const ALLOWED_VIEW_ROLES = [
   'petugas_koperasi',
   'pimpinan',
   'tester',
-]
-
-const ALLOWED_MUTATE_ROLES = [
-  'admin',
-  'bendahara',
-  'admin_koperasi',
-  'petugas_koperasi',
+  'demo',
 ]
 
 export async function authorizeLoketOperator(requireMutate = false): Promise<{
@@ -199,7 +198,7 @@ export async function authorizeLoketOperator(requireMutate = false): Promise<{
   // Cek fitur akses jika rute sudah terdaftar
   try {
     const hasFeature = await canAccessFeatureForSession(session, '/dashboard/koperasi/loket')
-    if (!hasFeature && !roles.includes('admin') && !roles.includes('admin_koperasi') && !roles.includes('petugas_koperasi')) {
+    if (!hasFeature && !roles.includes('admin') && !roles.includes('admin_koperasi') && !roles.includes('petugas_koperasi') && !roles.includes('demo')) {
       throw new Error('Akses ditolak: Anda tidak memiliki wewenang untuk membuka Loket Kasir.')
     }
   } catch (err: unknown) {
@@ -208,7 +207,10 @@ export async function authorizeLoketOperator(requireMutate = false): Promise<{
     if (!hasAllowedRole) throw err
   }
 
-  const isViewOnly = roles.includes('pimpinan') || roles.includes('tester') || !roles.some(r => ALLOWED_MUTATE_ROLES.includes(r))
+  // Role 'demo' hanya boleh menulis bila request benar-benar dilayani DEMO_DB.
+  const demoRunsInSandbox = isDemoSandboxRequest(session)
+  const isViewOnly =
+    roles.includes('pimpinan') || roles.includes('tester') || !hasFinanceMutateRole(roles, demoRunsInSandbox)
   if (requireMutate && isViewOnly) {
     throw new Error('Akses ditolak: Akun dengan peran ini hanya memiliki hak melihat (view-only).')
   }
@@ -223,7 +225,7 @@ export async function authorizeLoketOperator(requireMutate = false): Promise<{
   }
 }
 
-// ─── INITIAL DATA & CASH SESSION ───────────────────────────────────────────
+// â”€â”€â”€ INITIAL DATA & CASH SESSION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Mengambil initial state untuk halaman Loket Kasir:
@@ -280,7 +282,7 @@ export async function closeLoketCashSession(
   return closeCashSession(sessionId, userId, actualClosingBalance, notes)
 }
 
-// ─── PENCARIAN SANTRI & IDENTIFIKASI ───────────────────────────────────────
+// â”€â”€â”€ PENCARIAN SANTRI & IDENTIFIKASI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Mencari santri untuk loket:
@@ -364,7 +366,7 @@ export async function lookupStudentForLoket(
   }
 }
 
-// ─── VERIFIKASI PIN SANTRI ──────────────────────────────────────────────────
+// â”€â”€â”€ VERIFIKASI PIN SANTRI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Memverifikasi PIN santri di loket:
@@ -409,7 +411,7 @@ export async function verifyStudentLoketPin(
   }
 }
 
-// ─── UBAH & RESET PIN SANTRI DI LOKET ──────────────────────────────────────
+// â”€â”€â”€ UBAH & RESET PIN SANTRI DI LOKET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Santri mengubah PIN di loket secara mandiri dengan memasukkan PIN lama.
@@ -500,7 +502,7 @@ export async function resetStudentPinAtLoketAction(
   }
 }
 
-// ─── KEUANGAN & OBLIGASI SANTRI DI LOKET ───────────────────────────────────
+// â”€â”€â”€ KEUANGAN & OBLIGASI SANTRI DI LOKET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 /**
@@ -568,7 +570,7 @@ export async function getStudentLoketAccountData(
   }
 }
 
-// ─── EKSEKUSI PENCAIRAN UANG JAJAN (WITHDRAWAL) ──────────────────────────────
+// â”€â”€â”€ EKSEKUSI PENCAIRAN UANG JAJAN (WITHDRAWAL) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Mengeksekusi penarikan uang jajan santri di loket:
@@ -690,7 +692,7 @@ export async function executeLoketWithdrawal(
   }
 }
 
-// ─── EKSEKUSI PENYETORAN / PEMBAYARAN LOKET ────────────────────────────────
+// â”€â”€â”€ EKSEKUSI PENYETORAN / PEMBAYARAN LOKET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Mengeksekusi penerimaan setoran uang jajan tunai atau pembayaran tagihan di loket:
@@ -931,7 +933,7 @@ export async function executeLoketDepositOrPayment(
   }
 }
 
-// ─── RIWAYAT TRANSAKSI SESI INI & SESI SEBELUMNYA ──────────────────────────
+// â”€â”€â”€ RIWAYAT TRANSAKSI SESI INI & SESI SEBELUMNYA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Mengambil histori seluruh transaksi (penarikan, pembayaran, setoran) yang terjadi dalam sesi kas ini.

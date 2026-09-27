@@ -1,4 +1,4 @@
-'use server'
+﻿'use server'
 
 // app/dashboard/keuangan/tarif/actions.ts
 // Server Actions untuk Modul Pengaturan Keuangan SPA (Patch B: PRD Bab 31 & Implementation Plan)
@@ -11,7 +11,13 @@
 // 5. Otorisasi Mutasi Server-side (Admin & Bendahara mutasi, Pimpinan view-only)
 
 import { query, queryOne, execute, now } from '@/lib/db'
-import { getSession, getEffectiveRoles } from '@/lib/auth/session'
+import {
+  getSession,
+  getEffectiveRoles,
+  hasFinanceMutateRole,
+  getPrimaryFinanceRole,
+  isDemoSandboxRequest,
+} from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 import {
   listTariffs,
@@ -65,7 +71,7 @@ import {
   saveDocumentPrintConfigs,
 } from '@/lib/print/letterhead-server'
 
-// ─── TYPES ──────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ TYPES Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export interface UserFinancePermissions {
   canMutate: boolean
@@ -212,7 +218,7 @@ export interface GatewaySettingsUpdateInput {
   settlementAccountHolder?: string
 }
 
-// ─── HELPER OTORISASI SERVER-SIDE ───────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ HELPER OTORISASI SERVER-SIDE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 async function assertMutationPermission(): Promise<{ userId: string; role: string }> {
   const session = await getSession()
@@ -221,7 +227,9 @@ async function assertMutationPermission(): Promise<{ userId: string; role: strin
   }
 
   const roles = getEffectiveRoles(session)
-  const canMutate = roles.includes('admin') || roles.includes('bendahara')
+  // Role 'demo' hanya boleh menulis bila request benar-benar dilayani DEMO_DB.
+  const demoRunsInSandbox = isDemoSandboxRequest(session)
+  const canMutate = hasFinanceMutateRole(roles, demoRunsInSandbox)
 
   if (!canMutate) {
     throw new Error('Akses ditolak: role Anda (misal Pimpinan) hanya memiliki izin view-only untuk pengaturan keuangan.')
@@ -229,17 +237,18 @@ async function assertMutationPermission(): Promise<{ userId: string; role: strin
 
   return {
     userId: session.id,
-    role: roles.includes('admin') ? 'admin' : 'bendahara',
+    role: getPrimaryFinanceRole(roles),
   }
 }
 
-// ─── QUERY DATA LENGKAP PENGATURAN KE UANGAN ────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ QUERY DATA LENGKAP PENGATURAN KE UANGAN Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganData> {
   const session = await getSession()
   const roles = session ? getEffectiveRoles(session) : []
-  const canMutate = roles.includes('admin') || roles.includes('bendahara')
-  const userRole = roles.includes('admin') ? 'admin' : roles.includes('bendahara') ? 'bendahara' : roles[0] || 'viewer'
+  const demoRunsInSandbox = isDemoSandboxRequest(session)
+  const canMutate = hasFinanceMutateRole(roles, demoRunsInSandbox)
+  const userRole = getPrimaryFinanceRole(roles)
   const fullName = session?.full_name || 'Pengguna'
 
   // Konfigurasi Gateway & Fixed VA + Kop/Print Settings + Tariffs & Overrides + Cutover
@@ -371,7 +380,7 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
     returnUrl: duitkuV2.returnUrl || '/portal-ortu/tagihan',
     defaultExpiryMinutes: duitkuV2.defaultExpiryMinutes,
     apiKeyConfigured: hasApiKey,
-    apiKeyMasked: hasApiKey ? '••••••••••••••••••••••••' : '',
+    apiKeyMasked: hasApiKey ? 'Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢' : '',
     feePayer,
     defaultVaFee,
     defaultQrisFeePercent,
@@ -380,7 +389,7 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
     snapPartnerServiceId: snapConfig.partnerServiceId,
     snapDefaultTrxType: snapConfig.defaultTrxType,
     snapClientSecretConfigured: hasSnapSecret,
-    snapClientSecretMasked: hasSnapSecret ? '••••••••••••••••••••••••' : '',
+    snapClientSecretMasked: hasSnapSecret ? 'Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢' : '',
     snapPrivateKeyConfigured: hasSnapPrivateKey,
     snapPublicKeyConfigured: hasSnapPublicKey,
     settlementDestinationBank,
@@ -419,7 +428,7 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
   }
 }
 
-// ─── SERVER ACTIONS: TARIF & CICILAN ────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ SERVER ACTIONS: TARIF & CICILAN Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export async function createTariffAction(input: {
   item_type: FinanceItemType
@@ -458,7 +467,7 @@ export async function createTariffAction(input: {
   }
 }
 
-// ─── SERVER ACTIONS: PEMBEBASAN BIAYA ────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ SERVER ACTIONS: PEMBEBASAN BIAYA Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export async function grantExemptionAction(input: {
   santri_id: string
@@ -525,7 +534,7 @@ export async function revokeExemptionAction(
   }
 }
 
-// ─── SERVER ACTIONS: LIMIT UANG JAJAN ───────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ SERVER ACTIONS: LIMIT UANG JAJAN Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export async function updateGlobalDailyLimitAction(
   limit: number
@@ -707,7 +716,7 @@ export async function updateStudentParentLimitAction(
   }
 }
 
-// ─── SERVER ACTIONS: PAYMENT GATEWAY DUITKU & SETTLEMENT ───────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ SERVER ACTIONS: PAYMENT GATEWAY DUITKU & SETTLEMENT Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export async function saveGatewaySettingsAction(
   input: GatewaySettingsUpdateInput
@@ -790,7 +799,7 @@ export async function saveGatewaySettingsAction(
   }
 }
 
-// ─── SEARCH SANTRI AKTIF UNTUK DROPDOWN PICKER ──────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ SEARCH SANTRI AKTIF UNTUK DROPDOWN PICKER Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export async function searchActiveStudents(
   searchTerm: string
@@ -808,7 +817,7 @@ export async function searchActiveStudents(
   ).catch(() => [])
 }
 
-// ─── KOP SURAT & PRINT CONFIG SERVER ACTIONS ────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ KOP SURAT & PRINT CONFIG SERVER ACTIONS Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export async function saveLetterheadProfilesAction(
   profiles: LetterheadProfile[]
@@ -836,7 +845,7 @@ export async function saveDocumentPrintConfigsAction(
   }
 }
 
-// ─── SERVER ACTIONS: TARIF KHUSUS PERIODE (OVERRIDES) ────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ SERVER ACTIONS: TARIF KHUSUS PERIODE (OVERRIDES) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export async function listTariffOverridesAction(): Promise<{
   success: boolean
@@ -897,7 +906,7 @@ export async function deleteTariffOverrideAction(
   }
 }
 
-// ─── SERVER ACTIONS: GROUP & ADVANCED EXEMPTIONS ────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ SERVER ACTIONS: GROUP & ADVANCED EXEMPTIONS Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export async function previewExemptionRuleAction(input: {
   target: 'INDIVIDUAL' | 'KELAS'
@@ -982,7 +991,7 @@ export async function migrateLegacySppExemptionsAction(): Promise<{
   }
 }
 
-// ─── SERVER ACTIONS: KOPERASI CUTOVER CONTROL ───────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ SERVER ACTIONS: KOPERASI CUTOVER CONTROL Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export async function getKoperasiCutoverStatusAction(): Promise<{
   effectiveAt: string | null

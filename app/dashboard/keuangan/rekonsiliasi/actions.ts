@@ -1,9 +1,15 @@
-'use server'
+﻿'use server'
 
 // app/dashboard/keuangan/rekonsiliasi/actions.ts
 // Server actions untuk antarmuka modul Rekonsiliasi & Koreksi (Fase 8)
 
-import { getSession, getEffectiveRoles, type SessionUser } from '@/lib/auth/session'
+import {
+  getSession,
+  getEffectiveRoles,
+  hasFinanceMutateRole,
+  isDemoSandboxRequest,
+  type SessionUser,
+} from '@/lib/auth/session'
 import { canAccessFeatureForSession } from '@/lib/auth/feature'
 import { query } from '@/lib/db'
 import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
@@ -173,10 +179,9 @@ async function checkUserPermissions(): Promise<{
 
   const isPimpinan = effectiveRoles.includes('pimpinan')
   const isTester = effectiveRoles.includes('tester')
-  const isBendaharaOrAdmin =
-    effectiveRoles.includes('bendahara') ||
-    effectiveRoles.includes('admin') ||
-    session.role === 'admin'
+  // Role 'demo' hanya boleh menulis bila request benar-benar dilayani DEMO_DB.
+  const demoRunsInSandbox = isDemoSandboxRequest(session)
+  const isBendaharaOrAdmin = hasFinanceMutateRole(effectiveRoles, demoRunsInSandbox)
 
   const canView = hasFeatureAccess || isPimpinan || isTester || isBendaharaOrAdmin
   const canMutate = canView && isBendaharaOrAdmin && !isPimpinan && !isTester

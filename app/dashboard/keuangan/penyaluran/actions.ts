@@ -1,6 +1,11 @@
-'use server'
+﻿'use server'
 
-import { getSession, getEffectiveRoles } from '@/lib/auth/session'
+import {
+  getSession,
+  getEffectiveRoles,
+  hasFinanceMutateRole,
+  isDemoSandboxRequest,
+} from '@/lib/auth/session'
 import { canAccessFeatureForSession } from '@/lib/auth/feature'
 import {
   getDistributionSummary,
@@ -128,14 +133,18 @@ export async function authorizeUser(): Promise<{
   }
 
   const hasAccess = await canAccessFeatureForSession(session, '/dashboard/keuangan/penyaluran')
-  const isAllowedRole = roles.some((r) => ['admin', 'bendahara', 'pimpinan', 'tester'].includes(r))
+  const isAllowedRole = roles.some((r) =>
+    ['admin', 'bendahara', 'pimpinan', 'tester', 'demo'].includes(r)
+  )
 
   if (!hasAccess && !isAllowedRole) {
     throw new Error('Akses ditolak: Anda tidak memiliki hak akses untuk membuka modul Penyaluran Dana.')
   }
 
+  // Role 'demo' hanya boleh menulis bila request benar-benar dilayani DEMO_DB.
+  const demoRunsInSandbox = isDemoSandboxRequest(session)
   const isViewOnly = roles.includes('pimpinan') || roles.includes('tester')
-  const canDisburse = !isViewOnly && (roles.includes('admin') || roles.includes('bendahara'))
+  const canDisburse = !isViewOnly && hasFinanceMutateRole(roles, demoRunsInSandbox)
 
   return {
     userId: session.id,

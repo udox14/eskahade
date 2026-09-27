@@ -44,7 +44,8 @@ Karena kartu masih 0, modul **Kredensial** menampilkan seluruh 6 santri sebagai
 
 ## 3. Cara memakai
 
-1. Login memakai **akun demo** (role `demo`).
+1. Login memakai **akun demo** — email `demo@eskahade.com`, role `demo`
+   (akun ini hanya ada di `eskahade-demo-db`).
 2. Buka `/dashboard/keuangan/kredensial`.
 3. Semua aksi (terbitkan, cetak, PIN) hanya menyentuh `eskahade-demo-db`.
 
@@ -57,6 +58,65 @@ node scripts/reset-kredensial-cards.cjs --db eskahade-demo-db --apply --confirm 
 
 Perintah pertama adalah dry-run (tidak mengubah apa pun). Untuk melatih ulang
 skema dari nol, jalankan `scripts/sync-demo-db-finance.cjs`.
+
+---
+
+## 3a. Tiga perbaikan yang membuat akun demo benar-benar bisa dipakai (dan aman)
+
+### (a) Rute login tidak menemukan akun demo
+
+`getDB()` hanya mengarahkan query ke `DEMO_DB` ketika request sudah membawa cookie
+session ber-role `demo`. Pada saat login cookie itu belum ada, sehingga query
+`SELECT ... FROM users WHERE email = ?` selalu membaca DB produksi — dan akun demo
+tidak ada di sana. Ini masalah ayam-telur.
+
+Perbaikan di `app/api/auth/login/route.ts`: bila akun tidak ditemukan di DB utama,
+login mencari ke `DEMO_DB` lewat `findDemoAccount()`, dengan pengaman **akun itu
+wajib ber-role `demo`**. Akun non-demo di `DEMO_DB` ditolak, sehingga sandbox tidak
+bisa dipakai untuk masuk sebagai admin/bendahara asli.
+
+### (b) Modul keuangan tidak mengenal role `demo`
+
+Gerbang halaman (`lib/auth/guard.ts`) memperlakukan `demo` setara admin, tetapi
+fungsi `authorizeUser()` di modul-modul keuangan tidak menyertakan `demo` pada
+daftar role-nya. Akibatnya `canMutate = false` dan UI menampilkan "View Only".
+
+Perbaikan: konsep "akses penuh untuk demo" dipusatkan di `lib/auth/session.ts`
+(`FINANCE_MUTATE_ROLES`, `hasFinanceMutateRole`, `getPrimaryFinanceRole`) dan
+dipakai oleh modul: kredensial, uang jajan, status pembayaran, rekonsiliasi,
+tarif, penyaluran, serta loket koperasi.
+
+### (c) Akun ber-role `demo` di DB PRODUKSI harus tetap read-only
+
+Ada dua akun berbeda di lingkungan ini, dan ini mudah tertukar:
+
+| Akun | Ada di | Efek |
+| --- | --- | --- |
+| `demo@eskahade.com` | **DEMO_DB** saja | login → diarahkan ke sandbox → boleh menulis |
+| `demo@sukahideng.or.id` | **DB produksi** saja | login → tetap di DB produksi → wajib read-only |
+
+Karena `guardPage()` memperlakukan role `demo` setara admin, akun demo produksi itu
+bisa menembus gerbang halaman. Sebelum (c) dikerjakan, langkah (b) sempat membuat
+akun tersebut memperoleh hak tulis ke **data pesantren sebenarnya** — persis yang
+ingin dihindari.
+
+Penyelesaiannya: hak tulis untuk role `demo` tidak lagi ditentukan oleh nama role,
+melainkan oleh **klaim `demoSandbox` pada token sesi**. Klaim itu diisi oleh rute
+login **hanya** ketika akun benar-benar ditemukan di `DEMO_DB`. Akibatnya:
+
+- `demo@eskahade.com` → `demoSandbox: true` → boleh menulis (di sandbox);
+- `demo@sukahideng.or.id` → `demoSandbox: false` → read-only di produksi;
+- sesi lama tanpa klaim → dianggap `false` (default paling aman).
+
+Hasil verifikasi:
+
+- Uji unit 12 kasus kombinasi sesi (`scratch/uji-guard.cjs`, sudah dihapus):
+  demo sandbox `true`, demo produksi `false`, sesi lama tanpa klaim `false`,
+  admin/bendahara/koperasi tetap `true`, pimpinan/tester tetap `false`.
+- Login demo sandbox sungguhan lewat HTTP: halaman kredensial merender 6 dropdown
+  aksi dan **tidak ada** teks "View Only"; `issueCardAction` berhasil
+  (HTTP 200, `{"success":true}`) dan kartu tercatat di `eskahade-demo-db`
+  dengan `issued_by` = id akun demo; database produksi tidak berubah.
 
 ---
 

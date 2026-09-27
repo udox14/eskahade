@@ -34,6 +34,12 @@ export type SessionUser = {
   psb_asrama_akses?: boolean
   psb_bayar_akses?: boolean
   upk_panitia_akses?: boolean
+  /**
+   * Ditandai true oleh rute login HANYA bila akun demo ini berasal dari DEMO_DB.
+   * Akun ber-role 'demo' yang kebetulan ada di DB produksi tidak mendapat tanda
+   * ini, sehingga tidak pernah memperoleh hak tulis ke data pesantren sebenarnya.
+   */
+  demoSandbox?: boolean
 }
 
 type SessionUserRow = {
@@ -305,9 +311,85 @@ export function isDemo(session: SessionUser | null): boolean {
   return hasRole(session, 'demo')
 }
 
+/**
+ * True hanya bila request ini adalah sesi demo yang BENAR-BENAR login dari
+ * database sandbox (DEMO_DB).
+ *
+ * Dipakai sebagai syarat tambahan sebelum memberi hak tulis ke role 'demo'.
+ *
+ * Kenapa tidak sekadar mencocokkan nama role: sebuah database produksi bisa saja
+ * ikut memiliki akun ber-role 'demo' (contoh nyata: demo@sukahideng.or.id ada di
+ * DB produksi). Akun seperti itu TIDAK boleh mendapat akses tulis ke data
+ * pesantren sebenarnya. Karena itu penanda `demoSandbox` diisi oleh rute login
+ * hanya ketika akun ditemukan di DEMO_DB.
+ *
+ * Catatan: menjaga kompatibilitas sesi lama -> bila penanda tidak ada, hasilnya
+ * false (read-only), yang merupakan default paling aman.
+ */
+export function isDemoSandboxRequest(session: SessionUser | null): boolean {
+  return isDemo(session) && session?.demoSandbox === true
+}
+
 // Akses super: admin asli ATAU akun demo. Dipakai di titik bypass akses fitur.
 export function isSuperAccess(session: SessionUser | null): boolean {
   return isAdmin(session) || isDemo(session)
+}
+
+/**
+ * Role yang boleh MENGUBAH data keuangan: admin, bendahara, pengelola koperasi,
+ * atau akun demo **yang benar-benar berjalan di sandbox**.
+ *
+ * PENTING soal akun demo:
+ * Role 'demo' hanya boleh menulis bila query-nya diarahkan ke DEMO_DB. Ada
+ * kemungkinan nyata sebuah database produksi ikut memiliki akun ber-role 'demo'
+ * (mis. demo@sukahideng.or.id pernah dibuat di DB produksi). Akun seperti itu
+ * TIDAK boleh mendapat akses tulis ke data pesantren sebenarnya, sehingga
+ * pemanggil wajib memverifikasi konteks sandbox lebih dulu lewat
+ * isDemoSandboxRequest(), bukan hanya mencocokkan nama role.
+ *
+ * Helper ini ada supaya aturan tersebut tidak ditulis ulang secara manual di
+ * tiap modul (sebelumnya beberapa modul lupa menyertakan 'demo' sehingga akun
+ * demo malah terkunci read-only).
+ */
+export const FINANCE_MUTATE_ROLES: readonly string[] = [
+  'admin',
+  'bendahara',
+  'admin_koperasi',
+  'petugas_koperasi',
+]
+
+/**
+ * @param roles  role efektif pengguna
+ * @param demoRunsInSandbox  true hanya bila request demo sudah dipastikan
+ *        diarahkan ke DEMO_DB. Default false = paling aman (demo read-only).
+ */
+export function hasFinanceMutateRole(
+  roles: readonly string[],
+  demoRunsInSandbox = false
+): boolean {
+  return roles.some((role) => {
+    if (role === 'demo') return demoRunsInSandbox
+    return FINANCE_MUTATE_ROLES.includes(role)
+  })
+}
+
+/** Role yang hanya boleh MELIHAT data keuangan. */
+export function isFinanceViewOnlyRole(
+  roles: readonly string[],
+  demoRunsInSandbox = false
+): boolean {
+  return !hasFinanceMutateRole(roles, demoRunsInSandbox)
+}
+
+/** Role finance utama untuk ditampilkan di UI (bukan label teknis 'demo'). */
+export function getPrimaryFinanceRole(roles: readonly string[]): string {
+  if (roles.includes('admin')) return 'admin'
+  if (roles.includes('bendahara')) return 'bendahara'
+  if (roles.includes('admin_koperasi')) return 'admin_koperasi'
+  if (roles.includes('petugas_koperasi')) return 'petugas_koperasi'
+  if (roles.includes('demo')) return 'demo'
+  if (roles.includes('pimpinan')) return 'pimpinan'
+  return roles[0] || 'viewer'
 }
 
 export function getEffectiveRoles(session: SessionUser | null): string[] {

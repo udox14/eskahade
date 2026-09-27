@@ -1,7 +1,12 @@
-'use server'
+﻿'use server'
 
 import { query, queryOne, execute } from '@/lib/db'
-import { getSession, getEffectiveRoles } from '@/lib/auth/session'
+import {
+  getSession,
+  getEffectiveRoles,
+  hasFinanceMutateRole,
+  isDemoSandboxRequest,
+} from '@/lib/auth/session'
 import { canAccessFeatureForSession } from '@/lib/auth/feature'
 import { getStudentsObligationMatrix } from '@/lib/finance/matrix'
 import { FINANCE_CUTOVER_START_MONTHLY } from '@/lib/finance/legacy'
@@ -285,7 +290,7 @@ export interface FilterOptionsResponse {
   userPermissions: UserFinancePermissions
 }
 
-// ─── TIPE DATA FASE 4B: DETAIL & DRILLDOWN SANTRI ────────────────────────────
+// â”€â”€â”€ TIPE DATA FASE 4B: DETAIL & DRILLDOWN SANTRI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface StudentIdentityDetail {
   id: string
@@ -394,7 +399,7 @@ export interface StudentPaymentDetailResponse {
   userPermissions: UserFinancePermissions
 }
 
-// ─── TIPE DATA FASE 4C: CATAT PEMBAYARAN TUNAI ─────────────────────────────
+// â”€â”€â”€ TIPE DATA FASE 4C: CATAT PEMBAYARAN TUNAI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface PayableObligationItem {
   id: string
@@ -567,8 +572,10 @@ export async function authorizeUser(): Promise<{
     throw new Error('Akses ditolak: Anda tidak memiliki hak akses untuk membuka data Status Pembayaran.')
   }
 
+  // Role 'demo' hanya boleh menulis bila request benar-benar dilayani DEMO_DB.
+  const demoRunsInSandbox = isDemoSandboxRequest(session)
   const isViewOnly = roles.includes('pimpinan') || roles.includes('tester')
-  const canMutate = !isViewOnly && (roles.includes('admin') || roles.includes('bendahara'))
+  const canMutate = !isViewOnly && hasFinanceMutateRole(roles, demoRunsInSandbox)
 
   const permissions: UserFinancePermissions = {
     canView: true,
@@ -756,7 +763,7 @@ async function fetchUsppInstallmentStats(
   return map
 }
 
-// ─── QUERY ENGINE PER TAB (C3 REDESIGN) ──────────────────────────────────────
+// â”€â”€â”€ QUERY ENGINE PER TAB (C3 REDESIGN) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function fetchRingkasanData(options: {
   selectedPeriod: string
@@ -2195,7 +2202,7 @@ export async function getStatusPembayaranFilterOptions(): Promise<FilterOptionsR
   }
 }
 
-// ─── SERVER ACTION FASE 4B: DETAIL & DRILLDOWN SANTRI ─────────────────────────
+// â”€â”€â”€ SERVER ACTION FASE 4B: DETAIL & DRILLDOWN SANTRI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface RawObligationDetailRow {
   id: string
@@ -2557,7 +2564,7 @@ export async function getStudentPaymentDetail(
   }
 }
 
-// ─── SERVER ACTIONS FASE 4C: CATAT PEMBAYARAN TUNAI ─────────────────────────
+// â”€â”€â”€ SERVER ACTIONS FASE 4C: CATAT PEMBAYARAN TUNAI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Mencari santri aktif berdasarkan nama atau NIS untuk form penerimaan pembayaran tunai.
