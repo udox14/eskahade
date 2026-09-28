@@ -4,7 +4,7 @@
   "description": "Sistem Informasi Manajemen Terpadu Pondok Pesantren Sukahideng",
   "start_url": "/dashboard",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
   "scope": "/",
