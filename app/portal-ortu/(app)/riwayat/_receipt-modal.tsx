@@ -77,19 +77,19 @@ export function ReceiptModal({ item, santri, onClose }: ReceiptModalProps) {
       {/* Meta Kuitansi */}
       <div className="grid grid-cols-2 gap-2 text-[11px] border-b border-slate-100 pb-3">
         <div>
-          <p className="text-slate-400 font-medium">Nomor Bukti</p>
+          <p className="text-slate-600 font-medium">Nomor Bukti</p>
           <p className="font-mono font-bold text-slate-900">{item.referenceNumber}</p>
         </div>
         <div className="text-right">
-          <p className="text-slate-400 font-medium">Tanggal / Waktu</p>
+          <p className="text-slate-600 font-medium">Tanggal / Waktu</p>
           <p className="font-semibold text-slate-900">{dateFormatted} WIB</p>
         </div>
         <div>
-          <p className="text-slate-400 font-medium">Nama Santri</p>
+          <p className="text-slate-600 font-medium">Nama Santri</p>
           <p className="font-bold text-slate-900">{santri.nama}</p>
         </div>
         <div className="text-right">
-          <p className="text-slate-400 font-medium">NIS & Asrama</p>
+          <p className="text-slate-600 font-medium">NIS & Asrama</p>
           <p className="font-semibold text-slate-900">
             {santri.nis} {santri.asrama ? `· ${santri.asrama}` : ''}
           </p>
@@ -152,11 +152,11 @@ export function ReceiptModal({ item, santri, onClose }: ReceiptModalProps) {
       </div>
 
       {/* Footer Dokumen */}
-      <div className="border-t border-slate-200 pt-3 text-[10px] text-slate-400 text-center space-y-0.5">
+      <div className="border-t border-slate-200 pt-3 text-[10px] text-slate-600 text-center space-y-0.5">
         <p>
           Tanda terima ini diunduh melalui Portal Orang Tua Pesantren Sukahideng.
         </p>
-        <p className="font-mono text-[9px] text-slate-400">
+        <p className="font-mono text-[9px] text-slate-600">
           No. Transaksi: {item.referenceNumber}
         </p>
       </div>

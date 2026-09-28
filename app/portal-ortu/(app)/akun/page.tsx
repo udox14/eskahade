@@ -2,6 +2,7 @@ import { requirePortalSession } from '@/lib/portal/session'
 import { getParentWalletLimits, getGlobalDailyLimit } from '@/lib/finance/wallet'
 import { getStudentPinStatus } from '@/lib/finance/pins'
 import { AkunClient } from './_akun-client'
+import { PortalPageHeader } from '../../_components/page-header'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,19 +16,16 @@ export default async function AkunPage() {
   ])
 
   return (
-    <div className="px-5 pt-5 pb-32 space-y-5">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-950">Akun</h1>
-      </div>
-
-      <AkunClient
+    <div className="pb-32">
+      <PortalPageHeader title="Akun" />
+      <div className="px-5 pt-5"><AkunClient
         mustChangePassword={session.must_change_password}
         nis={session.nis}
         session={session}
         parentLimits={parentLimits}
         globalDailyLimit={globalDailyLimit}
         pinStatus={pinStatus}
-      />
+      /></div>
     </div>
   )
 }

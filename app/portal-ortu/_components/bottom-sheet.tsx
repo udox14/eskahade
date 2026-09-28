@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useId, useRef } from 'react'
 import { X } from '@phosphor-icons/react'
 
 export interface BottomSheetProps {
@@ -34,15 +34,33 @@ export function BottomSheet({
   footerClassName = '',
   contentRef,
 }: BottomSheetProps) {
+  const titleId = useId()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
   useEffect(() => {
     if (!open) return
 
     const prevOverflow = document.body.style.overflow
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
     document.body.style.overflow = 'hidden'
+    dialogRef.current?.querySelector<HTMLElement>('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])')?.focus()
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+        onCloseRef.current()
+      } else if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'))
+        if (focusable.length === 0) {
+          e.preventDefault()
+          dialogRef.current.focus()
+        } else if (e.shiftKey && document.activeElement === focusable[0]) {
+          e.preventDefault()
+          focusable[focusable.length - 1].focus()
+        } else if (!e.shiftKey && document.activeElement === focusable[focusable.length - 1]) {
+          e.preventDefault()
+          focusable[0].focus()
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -50,8 +68,9 @@ export function BottomSheet({
     return () => {
       document.body.style.overflow = prevOverflow
       window.removeEventListener('keydown', handleKeyDown)
+      previousFocus?.focus()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 
@@ -66,9 +85,11 @@ export function BottomSheet({
 
       {/* Sheet / Dialog Panel: responsif mobile bottom-sheet & desktop modal dialog */}
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="bottom-sheet-title"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className={`relative w-full ${maxWidth} max-h-[90dvh] flex flex-col rounded-t-[28px] sm:rounded-[22px] bg-white shadow-2xl border border-slate-200/80 overflow-hidden animate-in slide-in-from-bottom sm:slide-in-from-bottom-2 duration-200 z-10 print:shadow-none print:max-w-none print:max-h-none print:border-none print:w-full print:rounded-none ${className}`}
       >
         {/* Mobile Drag Handle */}
@@ -85,7 +106,7 @@ export function BottomSheet({
               </div>
             )}
             <div className="min-w-0">
-              <h3 id="bottom-sheet-title" className="text-base font-bold text-slate-950 truncate leading-snug">
+              <h3 id={titleId} className="text-base font-bold text-slate-950 truncate leading-snug">
                 {title}
               </h3>
               {subtitle && (
@@ -96,7 +117,7 @@ export function BottomSheet({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition active:scale-95 cursor-pointer print:hidden"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition active:scale-95 cursor-pointer print:hidden"
             aria-label="Tutup"
           >
             <X className="w-4 h-4" />

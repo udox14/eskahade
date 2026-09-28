@@ -37,12 +37,12 @@ export function BottomNav() {
               href={tab.href}
               prefetch={true}
               className={`relative flex min-h-[54px] flex-col items-center justify-center gap-0.5 py-1 transition-transform duration-150 active:scale-[0.92] ${
-                active ? 'text-emerald-950' : 'text-slate-400 hover:text-slate-600'
+                active ? 'text-emerald-950' : 'text-slate-600 hover:text-slate-600'
               }`}
             >
               <div
                 className={`flex items-center justify-center px-3 py-1 rounded-full transition-colors duration-150 ${
-                  active ? 'bg-emerald-100/80 text-emerald-900' : 'text-slate-400'
+                  active ? 'bg-emerald-100/80 text-emerald-900' : 'text-slate-600'
                 }`}
               >
                 <Icon className="w-[20px] h-[20px]" weight={active ? 'bold' : 'regular'} />

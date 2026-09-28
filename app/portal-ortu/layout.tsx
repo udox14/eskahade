@@ -1,5 +1,6 @@
 import React from 'react'
 import type { Metadata } from 'next'
+import './portal-accessibility.css'
 
 export const metadata: Metadata = {
   title: 'Portal Orang Tua — ESKAHADE',

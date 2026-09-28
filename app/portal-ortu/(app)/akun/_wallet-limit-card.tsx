@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Wallet, ShieldCheck, Loader2 } from 'lucide-react'
@@ -25,6 +25,7 @@ export function WalletLimitCard({
   onSuccess,
 }: WalletLimitCardProps) {
   const router = useRouter()
+  const formId = useId()
   const [daily, setDaily] = useState<string>(initialDaily !== null ? String(initialDaily) : '')
   const [weekly, setWeekly] = useState<string>(initialWeekly !== null ? String(initialWeekly) : '')
   const [monthly, setMonthly] = useState<string>(initialMonthly !== null ? String(initialMonthly) : '')
@@ -93,10 +94,11 @@ export function WalletLimitCard({
 
       <form onSubmit={handleSave} className="space-y-3 pt-1">
         <div>
-          <label className="block text-xs font-bold text-slate-700">
+          <label htmlFor={`${formId}-daily`} className="block text-xs font-bold text-slate-700">
             Batas Penarikan Harian (Rp)
           </label>
           <input
+            id={`${formId}-daily`}
             type="number"
             min={0}
             step={5000}
@@ -105,14 +107,15 @@ export function WalletLimitCard({
             placeholder={`Kosongkan untuk ikut limit pesantren (${formatRupiah(globalDailyLimit)})`}
             className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
           />
-          <p className="mt-1 text-[11px] text-slate-400">Contoh: 30000 untuk maksimal Rp30.000/hari</p>
+          <p className="mt-1 text-[11px] text-slate-600">Contoh: 30000 untuk maksimal Rp30.000/hari</p>
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-700">
+          <label htmlFor={`${formId}-weekly`} className="block text-xs font-bold text-slate-700">
             Batas Penarikan Mingguan (Rp) — Opsional
           </label>
           <input
+            id={`${formId}-weekly`}
             type="number"
             min={0}
             step={10000}
@@ -124,10 +127,11 @@ export function WalletLimitCard({
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-700">
+          <label htmlFor={`${formId}-monthly`} className="block text-xs font-bold text-slate-700">
             Batas Penarikan Bulanan (Rp) — Opsional
           </label>
           <input
+            id={`${formId}-monthly`}
             type="number"
             min={0}
             step={50000}

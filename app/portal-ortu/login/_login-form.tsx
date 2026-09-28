@@ -30,8 +30,9 @@ export function LoginForm() {
     <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-slate-700">NIS Santri</label>
+          <label htmlFor="portal-login-nis" className="block text-xs font-semibold text-slate-700">NIS Santri</label>
           <input
+            id="portal-login-nis"
             inputMode="numeric"
             autoComplete="username"
             value={nis}
@@ -44,9 +45,10 @@ export function LoginForm() {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700">Password</label>
+          <label htmlFor="portal-login-password" className="block text-xs font-semibold text-slate-700">Password</label>
           <div className="relative mt-1">
             <input
+              id="portal-login-password"
               type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               value={password}
@@ -59,7 +61,7 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => setShowPassword(v => !v)}
-              className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:text-slate-600 focus:outline-hidden"
+              className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-slate-600 transition hover:text-slate-900 focus:outline-hidden"
               aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
             >
               {showPassword ? <EyeSlash aria-hidden className="h-4 w-4" /> : <Eye aria-hidden className="h-4 w-4" />}

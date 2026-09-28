@@ -83,9 +83,10 @@ interface RiwayatClientProps {
     kamar?: string | null
   }
   legacyItems?: LegacyRiwayatItem[]
+  loadError?: boolean
 }
 
-export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClientProps) {
+export function RiwayatClient({ history, santri, legacyItems = [], loadError = false }: RiwayatClientProps) {
   const router = useRouter()
   const [filter, setFilter] = useState<'ALL' | 'TAGIHAN' | 'UANG_JAJAN' | 'LEGACY'>('ALL')
   const [selectedReceipt, setSelectedReceipt] = useState<PortalTransactionHistoryItem | null>(null)
@@ -115,6 +116,13 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
 
   return (
     <div className="space-y-4">
+      {loadError && (
+        <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-semibold">Sebagian riwayat belum dapat dimuat.</p>
+          <p className="mt-1">Coba muat ulang untuk melihat data terbaru.</p>
+          <button type="button" onClick={() => router.refresh()} className="mt-2 min-h-11 font-bold text-amber-900 underline underline-offset-2">Coba lagi</button>
+        </div>
+      )}
       {/* 1. Filter Pills Native (Compact) */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs font-bold">
         <button
@@ -168,9 +176,9 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
       {/* 2. Native Transaction List: Flat List (Tanpa Card Pembungkus Per Transaksi) */}
       {filter !== 'LEGACY' && (
         <>
-          {filteredHistory.length === 0 ? (
+          {filteredHistory.length === 0 && !loadError ? (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center">
                 <FileQuestion className="w-6 h-6" />
               </div>
               <p className="text-xs font-semibold text-slate-600">
@@ -183,7 +191,7 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
                 Buka Tagihan
               </Link>
             </div>
-          ) : (
+          ) : filteredHistory.length > 0 ? (
             <div className="divide-y divide-slate-100">
               {filteredHistory.map(item => {
                 const isPaid = item.status === 'PAID' || item.status === 'COMPLETED'
@@ -194,12 +202,7 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
                 return (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between py-3.5 active:bg-slate-50/80 transition cursor-pointer"
-                    onClick={() => {
-                      if (isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP')) {
-                        setSelectedReceipt(item)
-                      }
-                    }}
+                    className="flex items-center justify-between py-3.5"
                   >
                     {/* Sisi Kiri: Icon Tile Color-Role & Detail */}
                     <div className="flex items-center gap-3 min-w-0 pr-2">
@@ -229,7 +232,7 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
                         <p className="text-sm font-bold text-slate-900 truncate leading-snug">
                           {item.title}
                         </p>
-                        <p className="text-xs text-slate-400 truncate mt-0.5 font-medium">
+                        <p className="text-xs text-slate-600 truncate mt-0.5 font-medium">
                           {formatTanggalId(item.createdAt)}
                           {item.method ? ` · ${item.method}` : ''}
                         </p>
@@ -247,14 +250,14 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
                       </p>
 
                       <div className="mt-1 flex items-center gap-1.5">
-                        {isPaid ? (
+                        {isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP') ? (
                           <button
                             type="button"
                             onClick={e => {
                               e.stopPropagation()
                               setSelectedReceipt(item)
                             }}
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer active:scale-95 transition"
+                            className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer active:scale-95 transition"
                           >
                             <Printer className="w-3 h-3" />
                             <span>Kuitansi</span>
@@ -263,7 +266,7 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
                           <Link
                             href="/portal-ortu/tagihan"
                             onClick={e => e.stopPropagation()}
-                            className="inline-flex items-center gap-0.5 text-[11px] font-bold text-amber-700 hover:underline"
+                            className="inline-flex min-h-11 items-center gap-0.5 text-xs font-bold text-amber-700 hover:underline"
                           >
                             <span>Bayar</span>
                             <ChevronRight className="w-3 h-3" />
@@ -279,7 +282,7 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
                 )
               })}
             </div>
-          )}
+          ) : null}
         </>
       )}
 
@@ -319,7 +322,7 @@ export function RiwayatClient({ history, santri, legacyItems = [] }: RiwayatClie
                     {formatRupiah(item.jumlah)}
                   </p>
                   <p className="text-xs text-slate-600">{item.rincian.join(', ')}</p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-slate-600">
                     {item.metode === 'TRANSFER'
                       ? item.bank
                         ? `Transfer · ${item.bank}`

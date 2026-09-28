@@ -70,7 +70,7 @@ export default async function PelanggaranPage() {
                   >
                     {item.jenis}
                   </span>
-                  <span className="text-xs text-slate-400 font-medium">
+                  <span className="text-xs text-slate-600 font-medium">
                     {formatTanggalId(item.tanggal)}
                   </span>
                 </div>

@@ -239,7 +239,7 @@ export function AktivitasClient({
                 <div className="text-center">
                   <span className="text-sm font-bold text-slate-900">{namaBulanId(currentMonth)} {currentYear}</span>
                   {rekapBulan.totalSesi > 0 && (
-                    <p className="text-[11px] text-slate-400">{rekapBulan.hadir} dari {rekapBulan.totalSesi} sesi</p>
+                    <p className="text-[11px] text-slate-600">{rekapBulan.hadir} dari {rekapBulan.totalSesi} sesi</p>
                   )}
                 </div>
                 <Link
@@ -332,7 +332,7 @@ export function AktivitasClient({
             </div>
           )}
 
-          <p className="text-[11px] text-slate-400 text-center pt-1">
+          <p className="text-[11px] text-slate-600 text-center pt-1">
             Data kehadiran diperbarui secara berkala.
           </p>
         </div>
@@ -393,7 +393,7 @@ export function AktivitasClient({
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap shrink-0 ${JENIS_STYLE[String(item.jenis).toUpperCase()] || 'bg-slate-100 text-slate-700'}`}>
                         {item.jenis}
                       </span>
-                      <span className="text-xs font-medium text-slate-400">
+                      <span className="text-xs font-medium text-slate-600">
                         {formatTanggalId(item.tanggal)}
                       </span>
                     </div>

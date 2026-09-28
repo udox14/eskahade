@@ -102,7 +102,7 @@ export function UploadBukti({
           <img src={preview} alt="Pratinjau bukti" className="mx-auto max-h-56 rounded-lg object-contain" />
         ) : (
           <div className="py-5">
-            <Camera className="mx-auto w-7 h-7 text-slate-400" />
+            <Camera className="mx-auto w-7 h-7 text-slate-600" />
             <p className="mt-2 text-sm font-semibold text-slate-800">Pilih foto bukti</p>
             <p className="mt-0.5 text-xs text-slate-500">
               Screenshot m-banking atau foto struk transfer/QRIS

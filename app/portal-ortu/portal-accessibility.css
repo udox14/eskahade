@@ -1,0 +1,8 @@
+.portal-theme :is(a, button, input, select, textarea, [role="button"]):focus-visible {
+  outline: 3px solid #047857;
+  outline-offset: 2px;
+}
+
+.portal-theme :is(button, a)[aria-pressed="true"] {
+  font-weight: 700;
+}

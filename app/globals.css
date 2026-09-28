@@ -435,6 +435,39 @@ body {
     outline-color: #b4233d;
   }
 }
+.staff-app .mobile-menu-search input:focus-visible {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mobile-menu-dialog[open]::backdrop {
+    animation: mobile-menu-backdrop-in 220ms ease-out both;
+  }
+
+  .mobile-menu-dialog[open] .mobile-menu-panel {
+    animation: mobile-menu-panel-in 260ms cubic-bezier(.2, .8, .2, 1) both;
+  }
+
+  .mobile-menu-dialog[open] .mobile-menu-panel-closing {
+    animation: mobile-menu-panel-out 180ms ease-in both;
+  }
+
+  @keyframes mobile-menu-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes mobile-menu-panel-in {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  @keyframes mobile-menu-panel-out {
+    from { transform: translateY(0); opacity: 1; }
+    to { transform: translateY(100%); opacity: 1; }
+  }
+}
+
 /* ── PRINT STYLES ─────────────────────────────────────────── */
 @media print {
   /* Sembunyikan header app, sidebar, dan elemen non-print */

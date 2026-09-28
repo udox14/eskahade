@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   Clock,
   ArrowRight,
-  Loader2,
   AlertCircle,
   Building2,
 } from 'lucide-react'
@@ -81,6 +80,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
   })
   const [vaBank, setVaBank] = useState<string>('BR') // default BRI
   const [checkoutResult, setCheckoutResult] = useState<PortalCheckoutResponse | null>(null)
+  const [isReviewOpen, setIsReviewOpen] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
   const [copied, setCopied] = useState<boolean>(false)
 
@@ -160,7 +160,10 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
     }
 
     const grossAmount = items.reduce((sum, it) => sum + it.amount, 0)
-    const gatewayFee = paymentMethod === 'DUITKU_VA' ? 4000 : Math.ceil(grossAmount * 0.007)
+    const configuredFee = paymentMethod === 'DUITKU_VA'
+      ? (billingData.gatewayInfo?.defaultVaFee ?? 4000)
+      : Math.ceil(grossAmount * ((billingData.gatewayInfo?.defaultQrisFeePercent ?? 0.7) / 100))
+    const gatewayFee = billingData.gatewayInfo?.feePayer === 'INSTITUTION' ? 0 : configuredFee
     const totalCharged = grossAmount > 0 ? grossAmount + gatewayFee : 0
 
     return {
@@ -179,6 +182,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
     isTopUpSelected,
     topUpAmount,
     paymentMethod,
+    billingData.gatewayInfo,
   ])
 
   const handleCopyVa = (vaText: string) => {
@@ -216,6 +220,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
       }
 
       setCheckoutResult(res)
+      setIsReviewOpen(false)
       setIsModalOpen(true)
       setSelectedIds(new Set())
       setIsUsppSelected(false)
@@ -245,13 +250,13 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
         <div className="relative z-10 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-[#bef264]">
-              {isSelectionActive ? 'Total Dipilih' : 'Total Belum Dibayar'}
+              {isSelectionActive ? 'Subtotal Dipilih' : 'Total Belum Dibayar'}
             </span>
             {activeObligations.length > 0 && (
               <button
                 type="button"
                 onClick={selectAllActive}
-                className="text-xs font-bold text-white/90 hover:text-white bg-white/15 hover:bg-white/20 px-2.5 py-1 rounded-lg transition active:scale-95 cursor-pointer"
+                className="min-h-11 text-xs font-bold text-white/90 hover:text-white bg-white/15 hover:bg-white/20 px-3 rounded-lg transition active:scale-95 cursor-pointer"
               >
                 {allActiveSelected ? 'Batal Semua' : 'Pilih Semua'}
               </button>
@@ -260,7 +265,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
 
           <div className="space-y-0.5">
             <p className="text-3xl font-black font-mono tracking-tight text-white">
-              {formatRupiah(isSelectionActive ? selectedItemsSummary.totalCharged : billingData.obligations.totalRemaining)}
+              {formatRupiah(isSelectionActive ? selectedItemsSummary.grossAmount : billingData.obligations.totalRemaining)}
             </p>
             <p className="text-xs text-emerald-100/80 font-medium">
               {isSelectionActive
@@ -401,7 +406,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
         </div>
 
         {currentObligations.length === 0 ? (
-          <div className="py-4 text-center text-xs text-slate-400">
+          <div className="py-4 text-center text-xs text-slate-600">
             Alhamdulillah, seluruh tagihan bulan ini sudah lunas.
           </div>
         ) : (
@@ -600,109 +605,88 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
         )}
       </div>
 
-      {/* 7. STICKY PAYMENT CTA BAR (Hanya tampil jika selection > 0) */}
+      {/* 7. Ringkasan pilihan sebelum langkah review */}
       {selectedItemsSummary.count > 0 && (
         <div className="fixed bottom-[calc(60px+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-3 pb-2 animate-in slide-in-from-bottom-2 duration-200">
           <div className="rounded-[22px] bg-white/95 backdrop-blur-md border border-slate-200/80 p-3.5 shadow-[0_8px_32px_rgba(0,0,0,0.14)] space-y-2.5">
-            {/* Tier 1: Method Selector & Bank Chips */}
-            <div className="space-y-2 border-b border-slate-100 pb-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Metode Pembayaran
-                </span>
-                <span className="text-[11px] font-semibold text-emerald-800">
-                  {selectedItemsSummary.count} item dipilih
-                </span>
-              </div>
-
-              {/* Segmented Toggle: VA vs QRIS */}
-              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-100/90 text-xs font-bold">
-                {isVaEnabled && (
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('DUITKU_VA')}
-                    className={`min-h-[38px] rounded-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center ${
-                      paymentMethod === 'DUITKU_VA'
-                        ? 'bg-white text-slate-950 shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    Virtual Account
-                  </button>
-                )}
-                {isQrisEnabled && (
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('DUITKU_QRIS')}
-                    className={`min-h-[38px] rounded-lg transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center ${
-                      paymentMethod === 'DUITKU_QRIS'
-                        ? 'bg-white text-slate-950 shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    QRIS
-                  </button>
-                )}
-              </div>
-
-              {/* Bank Selector (if VA): horizontal selector chips */}
-              {isVaEnabled && paymentMethod === 'DUITKU_VA' && (
-                <div className="pt-0.5">
-                  <div className="grid grid-cols-5 gap-1.5 text-xs font-bold font-mono">
-                    {[
-                      { code: 'BR', label: 'BRI' },
-                      { code: 'NC', label: 'BNI' },
-                      { code: 'M2', label: 'Mandiri' },
-                      { code: 'BT', label: 'Permata' },
-                      { code: 'BC', label: 'BCA' },
-                    ].map(b => (
-                      <button
-                        key={b.code}
-                        type="button"
-                        onClick={() => setVaBank(b.code)}
-                        className={`min-h-[34px] py-1 px-1 rounded-lg border text-center transition active:scale-95 cursor-pointer ${
-                          vaBank === b.code
-                            ? 'bg-emerald-800 text-white border-emerald-800 shadow-2xs'
-                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        {b.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+            <div className="flex items-center justify-between gap-3 text-xs text-slate-700">
+              <span>{selectedItemsSummary.count} item dipilih</span>
+              <span className="font-bold font-mono text-slate-950">{formatRupiah(selectedItemsSummary.grossAmount)}</span>
             </div>
-
-            {/* Tier 2: Primary Payment CTA Button */}
             <button
               type="button"
-              disabled={isCheckingOut}
-              onClick={handleProceedCheckout}
+              onClick={() => setIsReviewOpen(true)}
               className="w-full min-h-[48px] flex items-center justify-center gap-2 rounded-xl bg-[#064e3b] hover:bg-[#047857] py-3 text-sm font-bold text-[#bef264] shadow-xs active:scale-[0.98] transition cursor-pointer"
             >
-              {isCheckingOut ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin text-[#bef264]" />
-                  <span>Memproses Pembayaran…</span>
-                </>
-              ) : (
-                <>
-                  <span>Bayar {formatRupiah(selectedItemsSummary.totalCharged)}</span>
-                  <ArrowRight className="h-4 w-4 text-[#bef264]" />
-                </>
-              )}
+              Tinjau pembayaran
+              <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>
       )}
+
+      <BottomSheet
+        open={isReviewOpen}
+        onClose={() => { if (!isCheckingOut) setIsReviewOpen(false) }}
+        title="Tinjau pembayaran"
+        subtitle="Periksa item dan total sebelum membuat pembayaran"
+        footer={
+          <button
+            type="button"
+            disabled={isCheckingOut || (!isVaEnabled && !isQrisEnabled)}
+            onClick={handleProceedCheckout}
+            className="w-full min-h-12 rounded-xl bg-[#064e3b] px-4 py-3 text-sm font-bold text-[#bef264] disabled:opacity-50"
+          >
+            {isCheckingOut ? 'Membuat pembayaran…' : `Buat pembayaran ${formatRupiah(selectedItemsSummary.totalCharged)}`}
+          </button>
+        }
+      >
+        <div className="space-y-5 text-sm">
+          <div>
+            <h4 className="font-bold text-slate-900">Item yang dipilih</h4>
+            <div className="mt-2 divide-y divide-slate-100 border-y border-slate-200">
+              {selectedItemsSummary.items.map((item, index) => (
+                <div key={`${item.obligationId ?? item.itemType}-${index}`} className="flex justify-between gap-3 py-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900">{item.label}</p>
+                    <p className="text-xs text-slate-600">{item.periodLabel}</p>
+                  </div>
+                  <span className="shrink-0 font-mono font-semibold text-slate-900">{formatRupiah(item.amount)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <fieldset className="space-y-2">
+            <legend className="font-bold text-slate-900">Metode pembayaran</legend>
+            <div className="grid grid-cols-2 gap-2">
+              {isVaEnabled && <button type="button" aria-pressed={paymentMethod === 'DUITKU_VA'} onClick={() => setPaymentMethod('DUITKU_VA')} className={`min-h-11 rounded-xl border px-2 text-xs font-bold ${paymentMethod === 'DUITKU_VA' ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'border-slate-300 text-slate-700'}`}>Virtual Account</button>}
+              {isQrisEnabled && <button type="button" aria-pressed={paymentMethod === 'DUITKU_QRIS'} onClick={() => setPaymentMethod('DUITKU_QRIS')} className={`min-h-11 rounded-xl border px-2 text-xs font-bold ${paymentMethod === 'DUITKU_QRIS' ? 'border-emerald-700 bg-emerald-50 text-emerald-900' : 'border-slate-300 text-slate-700'}`}>QRIS</button>}
+            </div>
+            {paymentMethod === 'DUITKU_VA' && isVaEnabled && (
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                {[
+                  { code: 'BR', label: 'BRI' }, { code: 'NC', label: 'BNI' },
+                  { code: 'M2', label: 'Mandiri' }, { code: 'BT', label: 'Permata' },
+                  { code: 'BC', label: 'BCA' },
+                ].map(bank => <button key={bank.code} type="button" aria-pressed={vaBank === bank.code} onClick={() => setVaBank(bank.code)} className={`min-h-11 rounded-xl border px-2 text-xs font-bold ${vaBank === bank.code ? 'border-emerald-700 bg-emerald-800 text-white' : 'border-slate-300 text-slate-700'}`}>{bank.label}</button>)}
+              </div>
+            )}
+          </fieldset>
+          <div className="space-y-2 border-t border-slate-200 pt-3">
+            <div className="flex justify-between text-slate-700"><span>Subtotal</span><span className="font-mono">{formatRupiah(selectedItemsSummary.grossAmount)}</span></div>
+            <div className="flex justify-between text-slate-700"><span>Biaya admin (perkiraan)</span><span className="font-mono">{formatRupiah(selectedItemsSummary.gatewayFee)}</span></div>
+            <div className="flex justify-between border-t border-slate-200 pt-2 font-bold text-slate-950"><span>Total dibayar</span><span className="font-mono">{formatRupiah(selectedItemsSummary.totalCharged)}</span></div>
+            <p className="text-xs text-slate-600">Nominal final dikonfirmasi oleh server sebelum instruksi pembayaran diterbitkan.</p>
+          </div>
+        </div>
+      </BottomSheet>
 
       {/* 8. MODAL INSTRUKSI PEMBAYARAN DUITKU */}
       <BottomSheet
         open={Boolean(isModalOpen && checkoutResult)}
         onClose={() => setIsModalOpen(false)}
         title="Petunjuk Pembayaran"
-        subtitle="Selesaikan pembayaran sesuai instruksi di bawah"
+        subtitle="Menunggu pembayaran — selesaikan sesuai instruksi di bawah"
         icon={<CheckCircle2 className="h-5 w-5 text-emerald-600" />}
         footer={
           <>
@@ -721,7 +705,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
               onClick={() => setIsModalOpen(false)}
               className="flex-1 min-h-[44px] rounded-xl bg-[#064e3b] hover:bg-[#047857] py-2.5 px-3 text-xs font-bold text-[#bef264] shadow-xs cursor-pointer active:scale-95 transition"
             >
-              Selesai
+              Tutup petunjuk
             </button>
           </>
         }

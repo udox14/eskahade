@@ -128,7 +128,7 @@ export function AkunClient({
 
       {/* 2. SECTION: UANG JAJAN (Android Settings Style) */}
       <div className="space-y-1">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 pb-1">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 pb-1">
           Uang Jajan
         </h3>
         <div className="divide-y divide-slate-100">
@@ -148,14 +148,14 @@ export function AkunClient({
                 </p>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
           </button>
         </div>
       </div>
 
       {/* 3. SECTION: KEAMANAN */}
       <div className="space-y-1">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 pb-1">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 pb-1">
           Keamanan
         </h3>
         <div className="divide-y divide-slate-100">
@@ -179,7 +179,7 @@ export function AkunClient({
                 </p>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
           </button>
 
           <button
@@ -198,14 +198,14 @@ export function AkunClient({
                 </p>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
           </button>
         </div>
       </div>
 
       {/* 4. SECTION: AKUN */}
       <div className="space-y-1">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 pb-1">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 pb-1">
           Akun
         </h3>
         <div className="divide-y divide-slate-100">
@@ -277,8 +277,9 @@ export function AkunClient({
       >
         <form onSubmit={handleGantiPassword} className="space-y-3.5 pt-1">
           <div>
-            <label className="block text-xs font-bold text-slate-700">Password Lama</label>
+            <label htmlFor="portal-password-old" className="block text-xs font-bold text-slate-700">Password Lama</label>
             <input
+              id="portal-password-old"
               type="password"
               autoComplete="current-password"
               value={passwordLama}
@@ -289,8 +290,9 @@ export function AkunClient({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700">Password Baru</label>
+            <label htmlFor="portal-password-new" className="block text-xs font-bold text-slate-700">Password Baru</label>
             <input
+              id="portal-password-new"
               type="password"
               autoComplete="new-password"
               value={passwordBaru}
@@ -302,8 +304,9 @@ export function AkunClient({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700">Ulangi Password Baru</label>
+            <label htmlFor="portal-password-confirm" className="block text-xs font-bold text-slate-700">Ulangi Password Baru</label>
             <input
+              id="portal-password-confirm"
               type="password"
               autoComplete="new-password"
               value={konfirmasi}

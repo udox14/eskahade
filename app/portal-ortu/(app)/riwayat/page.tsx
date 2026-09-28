@@ -3,6 +3,7 @@ import { getPortalFinancialHistory, getPortalStudentBilling } from '@/lib/portal
 import { getRiwayatSubmissions } from '@/lib/portal/data'
 import { namaBulanId } from '@/lib/portal/format'
 import { RiwayatClient, type LegacyRiwayatItem } from './_riwayat-client'
+import { PortalPageHeader } from '../../_components/page-header'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,12 +37,12 @@ export default async function RiwayatPage() {
   const session = await requirePortalSessionStrict()
 
   const [history, billing, rows] = await Promise.all([
-    getPortalFinancialHistory(session.santri_id).catch(() => []),
+    getPortalFinancialHistory(session.santri_id).catch(() => null),
     getPortalStudentBilling(session.santri_id),
-    getRiwayatSubmissions(session.santri_id).catch(() => []),
+    getRiwayatSubmissions(session.santri_id).catch(() => null),
   ])
 
-  const legacyItems: LegacyRiwayatItem[] = rows.map(row => ({
+  const legacyItems: LegacyRiwayatItem[] = (rows ?? []).map(row => ({
     id: row.id,
     kategori: row.kategori,
     rincian: parseDetail(row.kategori, row.detail_json),
@@ -62,16 +63,16 @@ export default async function RiwayatPage() {
   }))
 
   return (
-    <div className="px-5 pt-5 pb-32 space-y-4">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-950">Riwayat</h1>
-      </div>
-
+    <div className="pb-32">
+      <PortalPageHeader title="Riwayat" />
+      <div className="px-5 pt-5">
       <RiwayatClient
-        history={history}
+        history={history ?? []}
         santri={billing.santri}
         legacyItems={legacyItems}
+        loadError={history === null || rows === null}
       />
+      </div>
     </div>
   )
 }

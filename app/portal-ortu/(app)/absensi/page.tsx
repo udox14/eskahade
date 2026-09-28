@@ -78,7 +78,7 @@ export default async function AbsensiPage({
 
       {/* Info data */}
       <div className="flex items-center gap-2 text-xs text-slate-500">
-        <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        <Clock className="w-3.5 h-3.5 text-slate-600 shrink-0" />
         <span>Data kehadiran disinkronisasi setiap Selasa malam oleh tim akademik.</span>
       </div>
 
@@ -125,7 +125,7 @@ export default async function AbsensiPage({
         </h2>
         {!rekap.punyaKelas ? (
           <div className="flex items-center gap-2.5 py-4 text-xs text-slate-500">
-            <CalendarX className="w-4 h-4 text-slate-400" />
+            <CalendarX className="w-4 h-4 text-slate-600" />
             <span>Data kelas aktif belum ditemukan untuk santri ini.</span>
           </div>
         ) : rekap.detail.length === 0 ? (

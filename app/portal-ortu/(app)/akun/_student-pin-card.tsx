@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { KeyRound, ShieldAlert, ShieldCheck, Eye, EyeOff, Loader2 } from 'lucide-react'
@@ -24,6 +24,7 @@ export function StudentPinCard({
   onSuccess,
 }: StudentPinCardProps) {
   const router = useRouter()
+  const formId = useId()
   const [passwordPortal, setPasswordPortal] = useState('')
   const [pinBaru, setPinBaru] = useState('')
   const [konfirmasiPin, setKonfirmasiPin] = useState('')
@@ -131,10 +132,11 @@ export function StudentPinCard({
       {/* Form Ubah PIN */}
       <form onSubmit={handleSubmit} className="space-y-3 pt-1">
         <div>
-          <label className="block text-xs font-bold text-slate-700">
+          <label htmlFor={`${formId}-password`} className="block text-xs font-bold text-slate-700">
             Password Akun Portal Orang Tua
           </label>
           <input
+            id={`${formId}-password`}
             type="password"
             autoComplete="current-password"
             value={passwordPortal}
@@ -143,7 +145,7 @@ export function StudentPinCard({
             className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
             required
           />
-          <p className="mt-1 text-[11px] text-slate-400">
+          <p className="mt-1 text-[11px] text-slate-600">
             Verifikasi identitas orang tua diperlukan demi keamanan rekening uang jajan.
           </p>
         </div>
@@ -151,7 +153,7 @@ export function StudentPinCard({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-slate-700">
+              <label htmlFor={`${formId}-pin`} className="block text-xs font-bold text-slate-700">
                 PIN Baru Santri (6 Digit)
               </label>
               <button
@@ -164,6 +166,7 @@ export function StudentPinCard({
               </button>
             </div>
             <input
+              id={`${formId}-pin`}
               type={showPin ? 'text' : 'password'}
               inputMode="numeric"
               pattern="[0-9]{6}"
@@ -180,10 +183,11 @@ export function StudentPinCard({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700">
+            <label htmlFor={`${formId}-confirm`} className="block text-xs font-bold text-slate-700">
               Ulangi PIN Baru
             </label>
             <input
+              id={`${formId}-confirm`}
               type={showPin ? 'text' : 'password'}
               inputMode="numeric"
               pattern="[0-9]{6}"

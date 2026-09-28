@@ -253,7 +253,7 @@ export default async function BerandaPage() {
                 </p>
               </div>
             </div>
-            <CaretRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition shrink-0" />
+            <CaretRight className="w-4 h-4 text-slate-600 group-hover:text-slate-600 transition shrink-0" />
           </Link>
 
           <Link
@@ -279,7 +279,7 @@ export default async function BerandaPage() {
                 </p>
               </div>
             </div>
-            <CaretRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition shrink-0" />
+            <CaretRight className="w-4 h-4 text-slate-600 group-hover:text-slate-600 transition shrink-0" />
           </Link>
         </div>
       </div>
