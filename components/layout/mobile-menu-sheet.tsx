@@ -9,7 +9,6 @@ import {
   getActiveMenu,
   getIcon,
   getMenuTitle,
-  GROUP_ICON,
   GROUP_ORDER,
   sortFiturItems,
 } from '@/lib/menu/config'
@@ -172,13 +171,12 @@ export function MobileMenuSheet({ open, items, groups, onClose }: Props) {
           {groupedItems.length === 0 ? (
             <p className="px-2 py-8 text-center text-sm text-[#66736c]">Menu tidak ditemukan.</p>
           ) : groupedItems.map(({ group, label, items: groupItems }) => {
-            const GroupIcon = GROUP_ICON[group]
             return (
               <section key={group} aria-labelledby={'menu-group-' + group.replace(/[^a-zA-Z0-9_-]/g, '-') } className="mb-4 last:mb-2">
                 {group !== '_standalone' && (
-                  <h3 id={'menu-group-' + group.replace(/[^a-zA-Z0-9_-]/g, '-') } className="mb-1.5 flex items-center gap-2 px-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[#66736c]">
-                    {GroupIcon ? <GroupIcon className="h-4 w-4 text-[#247451]" aria-hidden="true" /> : null}
-                    {label}
+                  <h3 id={'menu-group-' + group.replace(/[^a-zA-Z0-9_-]/g, '-') } className="mb-2 flex items-center gap-3 text-[13px] font-semibold leading-5 text-[#34483c]">
+                    <span>{label}</span>
+                    <span className="h-px flex-1 bg-[#e4ddcf]" aria-hidden="true" />
                   </h3>
                 )}
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

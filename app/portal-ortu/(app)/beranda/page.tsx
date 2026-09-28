@@ -52,9 +52,12 @@ export default async function BerandaPage() {
 
   // Evaluasi kondisi actionable untuk SATU Hero Surface
   const tagihanRemaining = billing?.obligations.totalRemaining ?? 0
+  const usppRemaining = billing?.obligations.uspp?.remaining ?? 0
   const pendingOrders = billing?.pendingOrders ?? []
   const hasPendingOrder = pendingOrders.length > 0
-  const hasUnpaidBills = tagihanRemaining > 0
+  const hasRoutineBills = tagihanRemaining > 0
+  const hasUsppBills = usppRemaining > 0
+  const hasUnpaidBills = hasRoutineBills || hasUsppBills
   const hasAlfa = absen.alfa > 0
   const hasNewViolations = pelanggaranBulanIni.length > 0
 
@@ -104,8 +107,10 @@ export default async function BerandaPage() {
               <span className="text-xs font-bold uppercase tracking-wider text-[#bef264]">
                 {hasPendingOrder
                   ? 'Pesanan Menunggu Pembayaran'
-                  : hasUnpaidBills
+                  : hasRoutineBills
                   ? 'Yang Perlu Diselesaikan'
+                  : hasUsppBills
+                  ? 'Sisa Cicilan USPP'
                   : hasAlfa
                   ? 'Presensi Perlu Perhatian'
                   : 'Catatan Kedisiplinan'}
@@ -121,8 +126,10 @@ export default async function BerandaPage() {
               <p className="text-3xl font-black font-mono tracking-tight text-white">
                 {hasPendingOrder
                   ? formatRupiah(pendingOrders[0].totalCharged)
-                  : hasUnpaidBills
+                  : hasRoutineBills
                   ? formatRupiah(tagihanRemaining)
+                  : hasUsppBills
+                  ? formatRupiah(usppRemaining)
                   : hasAlfa
                   ? `${absen.alfa} Sesi Alfa`
                   : `${pelanggaranBulanIni.length} Catatan Baru`}
@@ -130,8 +137,10 @@ export default async function BerandaPage() {
               <p className="text-xs text-emerald-100/80 font-medium">
                 {hasPendingOrder
                   ? `Pesanan #${pendingOrders[0].orderNumber} · Batas waktu pembayaran aktif`
-                  : hasUnpaidBills
-                  ? `${unpaidCount} tagihan belum dibayar`
+                  : hasRoutineBills
+                  ? `${unpaidCount} tagihan belum dibayar${hasUsppBills ? ` · Sisa USPP: ${formatRupiah(usppRemaining)}` : ''}`
+                  : hasUsppBills
+                  ? 'Sisa uang bangunan santri (dapat dicicil berkala)'
                   : hasAlfa
                   ? 'Ada sesi pengajian tanpa keterangan bulan ini'
                   : 'Catatan kedisiplinan baru pada bulan berjalan'}

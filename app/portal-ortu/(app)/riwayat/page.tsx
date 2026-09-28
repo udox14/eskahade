@@ -3,7 +3,6 @@ import { getPortalFinancialHistory, getPortalStudentBilling } from '@/lib/portal
 import { getRiwayatSubmissions } from '@/lib/portal/data'
 import { namaBulanId } from '@/lib/portal/format'
 import { RiwayatClient, type LegacyRiwayatItem } from './_riwayat-client'
-import { PortalPageHeader } from '../../_components/page-header'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,16 +62,17 @@ export default async function RiwayatPage() {
   }))
 
   return (
-    <div className="pb-32">
-      <PortalPageHeader title="Riwayat" />
-      <div className="px-5 pt-5">
+    <div className="px-5 pt-5 pb-32 space-y-4">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-slate-950">Riwayat</h1>
+      </div>
+
       <RiwayatClient
         history={history ?? []}
         santri={billing.santri}
         legacyItems={legacyItems}
         loadError={history === null || rows === null}
       />
-      </div>
     </div>
   )
 }

@@ -2,7 +2,6 @@ import { requirePortalSessionStrict } from '@/lib/portal/session'
 import { getPelanggaranAnak, getRekapAbsensiAnak } from '@/lib/portal/data'
 import { toWibDateInputValue } from '@/lib/date/wib'
 import { AktivitasClient } from './_aktivitas-client'
-import { PortalPageHeader } from '../../_components/page-header'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,16 +38,19 @@ export default async function AktivitasPage({
   ])
 
   return (
-    <div className="pb-32">
-      <PortalPageHeader title="Aktivitas" />
-      <div className="px-5 pt-5"><AktivitasClient
+    <div className="px-5 pt-5 pb-32 space-y-5">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-slate-950">Aktivitas</h1>
+      </div>
+
+      <AktivitasClient
         rekapBulan={rekapBulan}
         rekap7Hari={rekap7Hari}
         pelanggaran={pelanggaran}
         currentYear={tahun}
         currentMonth={bulan}
         todayStr={todayStr}
-      /></div>
+      />
     </div>
   )
 }

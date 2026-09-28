@@ -377,18 +377,19 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
       isTunggakan,
     }
 
-    totalRemaining += remaining
-
     if (r.item_type === 'USPP') {
       uspp = item
     } else if (r.item_type === 'EHB' || r.item_type === 'EKSKUL' || r.item_type === 'KESEHATAN') {
       annual.push(item)
+      totalRemaining += remaining
     } else {
       monthly.push(item)
       if (periodType === 'PAST') {
         past.push(item)
+        totalRemaining += remaining
       } else if (periodType === 'CURRENT') {
         current.push(item)
+        totalRemaining += remaining
       } else {
         upcoming.push(item)
       }

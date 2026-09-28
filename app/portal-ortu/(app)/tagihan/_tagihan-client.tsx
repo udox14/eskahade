@@ -47,11 +47,9 @@ interface TagihanClientProps {
 export function TagihanClient({ billingData }: TagihanClientProps) {
   const router = useRouter()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
-    // Default: pilih seluruh tagihan yang perlu segera dibayar (tunggakan) dan bulan ini
-    const initial = new Set<string>()
-    billingData.obligations.past.forEach(ob => initial.add(ob.id))
-    billingData.obligations.current.forEach(ob => initial.add(ob.id))
-    return initial
+    // Default kosong agar orang tua secara sadar memilih tagihan yang ingin dibayar,
+    // atau menggunakan tombol 'Pilih Semua' untuk mencentang seluruh tagihan sekaligus.
+    return new Set<string>()
   })
 
   // USPP (Cicilan)
@@ -250,7 +248,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
         <div className="relative z-10 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-[#bef264]">
-              {isSelectionActive ? 'Subtotal Dipilih' : 'Total Belum Dibayar'}
+              {isSelectionActive ? 'Subtotal Dipilih' : 'Tagihan Dipilih'}
             </span>
             {activeObligations.length > 0 && (
               <button
@@ -263,15 +261,36 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
             )}
           </div>
 
-          <div className="space-y-0.5">
+          <div className="space-y-1.5">
             <p className="text-3xl font-black font-mono tracking-tight text-white">
-              {formatRupiah(isSelectionActive ? selectedItemsSummary.grossAmount : billingData.obligations.totalRemaining)}
+              {formatRupiah(selectedItemsSummary.grossAmount)}
             </p>
-            <p className="text-xs text-emerald-100/80 font-medium">
-              {isSelectionActive
-                ? `${selectedItemsSummary.count} item dipilih`
-                : 'Pilih tagihan yang ingin dibayar'}
-            </p>
+            <div className="flex items-center justify-between text-xs text-emerald-100/80 font-medium">
+              <span>
+                {isSelectionActive
+                  ? `${selectedItemsSummary.count} item dipilih untuk dibayar`
+                  : (billingData.obligations.totalRemaining > 0 || (billingData.obligations.uspp && billingData.obligations.uspp.remaining > 0))
+                  ? 'Belum ada tagihan yang dipilih'
+                  : 'Alhamdulillah, seluruh tagihan telah lunas'}
+              </span>
+              {billingData.obligations.totalRemaining > 0 && (
+                <span className="text-emerald-200/90 text-[11px] font-semibold">
+                  Tagihan rutin: {formatRupiah(billingData.obligations.totalRemaining)}
+                </span>
+              )}
+            </div>
+
+            {billingData.obligations.uspp && billingData.obligations.uspp.remaining > 0 && (
+              <div className="pt-2 mt-0.5 border-t border-white/15 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5 text-emerald-100 font-medium">
+                  <Building2 className="w-3.5 h-3.5 text-[#bef264]" />
+                  <span>Sisa USPP (Uang Bangunan):</span>
+                </div>
+                <span className="font-mono font-bold text-white tracking-tight">
+                  {formatRupiah(billingData.obligations.uspp.remaining)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

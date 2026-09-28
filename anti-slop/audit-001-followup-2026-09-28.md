@@ -12,6 +12,6 @@ Temuan 1–9 pada `audit-001-2026-09-28.md` disetujui untuk dikerjakan.
 | 6 | Label formulir login, password, PIN, dan limit dihubungkan ke input. |
 | 7 | Kesalahan mengambil riwayat dipisahkan dari keadaan kosong dan menampilkan aksi coba lagi. |
 | 8 | Petunjuk setelah checkout menyatakan “Menunggu pembayaran” dan tombol penutupnya bernama “Tutup petunjuk”. |
-| 9 | Empat halaman utama menggunakan komponen header portal yang sama; beranda dan halaman detail mempertahankan konteksnya masing-masing. |
+| 9 | Sempat memakai komponen header bersama. Atas masukan pengguna, header Tagihan, Aktivitas, Riwayat, dan Akun dikembalikan ke tampilan sebelumnya. Konsistensi header tidak dipaksakan karena hasil visualnya kurang cocok. |
 
 Pemeriksaan: `npx tsc --noEmit`, `npx eslint app/portal-ortu`, dan `git diff --check -- app/portal-ortu` lulus; `python3 scripts/test-finance-portal-ortu.py` lulus 14 suite. Pemeriksaan visual dengan akun orang tua dan data nyata belum dilakukan.
