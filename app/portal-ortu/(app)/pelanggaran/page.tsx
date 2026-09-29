@@ -26,7 +26,7 @@ export default async function PelanggaranPage() {
         >
           &larr; Kembali ke Aktivitas
         </Link>
-        <h1 className="text-xl font-bold tracking-tight text-slate-950">Catatan Kedisiplinan</h1>
+        <h1 className="text-4xl font-bold tracking-tight text-slate-950">Catatan Kedisiplinan</h1>
         <p className="text-xs text-slate-500 mt-0.5">
           Catatan kedisiplinan dan pelanggaran dari bagian keamanan pesantren.
         </p>

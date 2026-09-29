@@ -1,6 +1,7 @@
 import { requirePortalSessionStrict } from '@/lib/portal/session'
 import { getPortalFinancialHistory, getPortalStudentBilling } from '@/lib/portal/finance'
 import { getRiwayatSubmissions } from '@/lib/portal/data'
+import { resolveDocumentLetterhead } from '@/lib/print/letterhead-server'
 import { namaBulanId } from '@/lib/portal/format'
 import { RiwayatClient, type LegacyRiwayatItem } from './_riwayat-client'
 
@@ -35,10 +36,11 @@ function parseDetail(kategori: string, detailJson: string): string[] {
 export default async function RiwayatPage() {
   const session = await requirePortalSessionStrict()
 
-  const [history, billing, rows] = await Promise.all([
+  const [history, billing, rows, letterhead] = await Promise.all([
     getPortalFinancialHistory(session.santri_id).catch(() => null),
     getPortalStudentBilling(session.santri_id),
     getRiwayatSubmissions(session.santri_id).catch(() => null),
+    resolveDocumentLetterhead('receipt_pembayaran').catch(() => null),
   ])
 
   const legacyItems: LegacyRiwayatItem[] = (rows ?? []).map(row => ({
@@ -64,12 +66,13 @@ export default async function RiwayatPage() {
   return (
     <div className="px-5 pt-5 pb-32 space-y-4">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-950">Riwayat</h1>
+        <h1 className="text-4xl font-bold tracking-tight text-slate-950">Riwayat</h1>
       </div>
 
       <RiwayatClient
         history={history ?? []}
         santri={billing.santri}
+        letterheadProfile={letterhead?.profile ?? null}
         legacyItems={legacyItems}
         loadError={history === null || rows === null}
       />

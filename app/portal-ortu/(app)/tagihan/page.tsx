@@ -13,7 +13,7 @@ export default async function TagihanPage() {
   return (
     <div className="px-5 pt-5 pb-40 space-y-4">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-950">Tagihan</h1>
+        <h1 className="text-4xl font-bold tracking-tight text-slate-950">Tagihan</h1>
       </div>
 
       <TagihanClient billingData={billingData} />

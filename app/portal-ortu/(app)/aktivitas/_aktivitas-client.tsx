@@ -608,51 +608,45 @@ export function AktivitasClient({
       {/* 3. TAB CONTENT: PELANGGARAN (REDESIGNED TOTAL!) */}
       {activeTab === 'PELANGGARAN' && (
         <section className="space-y-4">
-          {/* KARTU STATUS KEDISIPLINAN */}
+          {/* KARTU STATUS KEDISIPLINAN (HERO BANNER) */}
           {totalPoin === 0 ? (
-            <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100 shadow-2xs">
-                  <ShieldCheck className="w-5 h-5 text-emerald-700" />
-                </div>
-                <p className="text-sm font-bold text-emerald-950">
-                  Tidak ada pelanggaran tercatat
-                </p>
+            <div className="rounded-[22px] bg-[#064e3b] p-5 text-white shadow-[0_8px_24px_rgba(6,78,59,0.16)] flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-[#bef264] shrink-0 border border-white/10">
+                <ShieldCheck className="w-6 h-6 text-[#bef264]" />
               </div>
-              <span className="px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-white text-emerald-800 border border-emerald-200 shadow-2xs">
-                0 Poin
-              </span>
+              <p className="text-base sm:text-lg font-bold text-white tracking-tight">
+                Tidak ada pelanggaran tercatat
+              </p>
             </div>
           ) : (
-            <div className="rounded-2xl border border-red-200/90 bg-red-50/70 p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-white text-red-600 flex items-center justify-center shrink-0 border border-red-100 shadow-2xs">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-red-950">Catatan Pelanggaran</p>
-                  <p className="text-[11px] text-red-700/80 mt-0.5">
-                    {pelanggaran.length} catatan kedisiplinan
-                  </p>
-                </div>
+            <div className="rounded-[22px] bg-red-950 p-5 text-white shadow-xs space-y-2 border border-red-900/60">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-red-300">
+                  Total Poin Pelanggaran
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300">
+                  <AlertTriangle className="w-3 h-3 text-red-300" />
+                  <span>Perlu Perhatian</span>
+                </span>
               </div>
-              <span className="px-3 py-1 rounded-xl text-xs font-mono font-bold bg-white text-red-700 border border-red-200 shadow-2xs">
-                {totalPoin} Poin
-              </span>
+              <div className="flex items-baseline justify-between pt-1">
+                <p className="text-3xl font-black font-mono text-white">
+                  {totalPoin} Poin
+                </p>
+                <span className="text-xs text-red-200/80">
+                  {pelanggaran.length} catatan kedisiplinan
+                </span>
+              </div>
             </div>
           )}
 
-          {/* DAFTAR CATATAN KEDISIPLINAN */}
-          <div className="space-y-2 pt-1">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Riwayat Catatan Kedisiplinan
-            </h3>
+          {/* DAFTAR CATATAN KEDISIPLINAN (HANYA MUNCUL JIKA ADA PELANGGARAN) */}
+          {pelanggaran.length > 0 && (
+            <div className="space-y-2 pt-1">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Riwayat Catatan Kedisiplinan
+              </h3>
 
-            {pelanggaran.length === 0 ? (
-              <div className="py-8 text-center rounded-2xl bg-slate-50 border border-slate-100 text-xs text-slate-500">
-                Tidak ada riwayat pelanggaran.
-              </div>
-            ) : (
               <div className="space-y-2">
                 {pelanggaran.map(item => {
                   const jenisKey = String(item.jenis).toUpperCase()
@@ -691,8 +685,8 @@ export function AktivitasClient({
                   )
                 })}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </section>
       )}
     </div>

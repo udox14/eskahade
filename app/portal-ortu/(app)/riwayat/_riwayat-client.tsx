@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { formatRupiah, formatTanggalId } from '@/lib/portal/format'
 import type { PortalTransactionHistoryItem } from '@/lib/portal/finance'
+import type { LetterheadProfile } from '@/lib/print/letterhead'
 import { cancelSubmission } from '../tagihan/actions'
 import { UploadBukti } from '../tagihan/_upload-bukti'
 import { ReceiptModal } from './_receipt-modal'
@@ -74,6 +75,21 @@ function formatPortalStatus(status: string): string {
   }
 }
 
+function formatTanggalDmy(dateStr: string): string {
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const year = d.getFullYear()
+  return `${day}/${month}/${year}`
+}
+
+function getMonthYearHeader(dateStr: string): string {
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return 'Lainnya'
+  return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+}
+
 interface RiwayatClientProps {
   history: PortalTransactionHistoryItem[]
   santri: {
@@ -82,11 +98,18 @@ interface RiwayatClientProps {
     asrama?: string | null
     kamar?: string | null
   }
+  letterheadProfile?: LetterheadProfile | null
   legacyItems?: LegacyRiwayatItem[]
   loadError?: boolean
 }
 
-export function RiwayatClient({ history, santri, legacyItems = [], loadError = false }: RiwayatClientProps) {
+export function RiwayatClient({
+  history,
+  santri,
+  letterheadProfile,
+  legacyItems = [],
+  loadError = false,
+}: RiwayatClientProps) {
   const router = useRouter()
   const [filter, setFilter] = useState<'ALL' | 'TAGIHAN' | 'UANG_JAJAN' | 'LEGACY'>('ALL')
   const [selectedReceipt, setSelectedReceipt] = useState<PortalTransactionHistoryItem | null>(null)
@@ -107,12 +130,23 @@ export function RiwayatClient({ history, santri, legacyItems = [], loadError = f
     router.refresh()
   }
 
-  const filteredHistory = history.filter(item => {
+  const filteredHistory = history.filter((item) => {
     if (filter === 'ALL') return true
     if (filter === 'TAGIHAN') return item.category === 'TAGIHAN'
     if (filter === 'UANG_JAJAN') return item.category === 'UANG_JAJAN'
     return false
   })
+
+  // Grouping riwayat berdasarkan Bulan & Tahun
+  const groupedHistory = filteredHistory.reduce<Record<string, PortalTransactionHistoryItem[]>>(
+    (acc, item) => {
+      const groupKey = getMonthYearHeader(item.createdAt)
+      if (!acc[groupKey]) acc[groupKey] = []
+      acc[groupKey].push(item)
+      return acc
+    },
+    {}
+  )
 
   return (
     <div className="space-y-4">
@@ -120,18 +154,28 @@ export function RiwayatClient({ history, santri, legacyItems = [], loadError = f
         <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
           <p className="font-semibold">Sebagian riwayat belum dapat dimuat.</p>
           <p className="mt-1">Coba muat ulang untuk melihat data terbaru.</p>
-          <button type="button" onClick={() => router.refresh()} className="mt-2 min-h-11 font-bold text-amber-900 underline underline-offset-2">Coba lagi</button>
+          <button
+            type="button"
+            onClick={() => router.refresh()}
+            className="mt-2 min-h-11 font-bold text-amber-900 underline underline-offset-2"
+          >
+            Coba lagi
+          </button>
         </div>
       )}
-      {/* 1. Filter Pills Native (Compact) */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs font-bold">
+
+      {/* 1. Segmented Filter Control */}
+      <nav
+        aria-label="Filter Kategori Riwayat"
+        className="p-1 rounded-2xl bg-slate-100/90 flex gap-1 text-xs font-bold text-slate-500"
+      >
         <button
           type="button"
           onClick={() => setFilter('ALL')}
-          className={`shrink-0 rounded-full px-3.5 py-1.5 transition active:scale-95 cursor-pointer ${
+          className={`flex-1 min-h-[38px] rounded-xl font-bold transition-all duration-200 active:scale-[0.98] cursor-pointer flex items-center justify-center ${
             filter === 'ALL'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
+              ? 'bg-white text-slate-950 shadow-2xs'
+              : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           Semua
@@ -139,21 +183,21 @@ export function RiwayatClient({ history, santri, legacyItems = [], loadError = f
         <button
           type="button"
           onClick={() => setFilter('TAGIHAN')}
-          className={`shrink-0 rounded-full px-3.5 py-1.5 transition active:scale-95 cursor-pointer ${
+          className={`flex-1 min-h-[38px] rounded-xl font-bold transition-all duration-200 active:scale-[0.98] cursor-pointer flex items-center justify-center ${
             filter === 'TAGIHAN'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
+              ? 'bg-white text-slate-950 shadow-2xs'
+              : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          Tagihan &amp; USPP
+          Tagihan
         </button>
         <button
           type="button"
           onClick={() => setFilter('UANG_JAJAN')}
-          className={`shrink-0 rounded-full px-3.5 py-1.5 transition active:scale-95 cursor-pointer ${
+          className={`flex-1 min-h-[38px] rounded-xl font-bold transition-all duration-200 active:scale-[0.98] cursor-pointer flex items-center justify-center ${
             filter === 'UANG_JAJAN'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
+              ? 'bg-white text-slate-950 shadow-2xs'
+              : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           Uang Jajan
@@ -162,127 +206,152 @@ export function RiwayatClient({ history, santri, legacyItems = [], loadError = f
           <button
             type="button"
             onClick={() => setFilter('LEGACY')}
-            className={`shrink-0 rounded-full px-3.5 py-1.5 transition active:scale-95 cursor-pointer ${
+            className={`flex-1 min-h-[38px] rounded-xl font-bold transition-all duration-200 active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1 ${
               filter === 'LEGACY'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
+                ? 'bg-white text-slate-950 shadow-2xs'
+                : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            Pengajuan Manual ({legacyItems.length})
+            <span>Manual</span>
+            <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-amber-100 text-amber-800 font-bold">
+              {legacyItems.length}
+            </span>
           </button>
         )}
-      </div>
+      </nav>
 
-      {/* 2. Native Transaction List: Flat List (Tanpa Card Pembungkus Per Transaksi) */}
+      {/* 2. Daftar Transaksi Riwayat Berdasarkan Grup Bulan */}
       {filter !== 'LEGACY' && (
         <>
           {filteredHistory.length === 0 && !loadError ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center">
-                <FileQuestion className="w-6 h-6" />
+            <div className="flex flex-col items-center justify-center gap-2 py-14 text-center">
+              <div className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200/60">
+                <FileQuestion className="w-5 h-5" />
               </div>
-              <p className="text-xs font-semibold text-slate-600">
-                Belum ada transaksi pada kategori ini.
-              </p>
+              <p className="text-sm font-bold text-slate-800">Belum ada riwayat transaksi</p>
+              <p className="text-xs text-slate-500">Tidak ada transaksi pada kategori yang dipilih.</p>
               <Link
                 href="/portal-ortu/tagihan"
-                className="mt-1 text-xs font-bold text-emerald-700 hover:underline"
+                className="pt-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline"
               >
-                Buka Tagihan
+                Lihat Tagihan Aktif &rarr;
               </Link>
             </div>
-          ) : filteredHistory.length > 0 ? (
-            <div className="divide-y divide-slate-100">
-              {filteredHistory.map(item => {
-                const isPaid = item.status === 'PAID' || item.status === 'COMPLETED'
-                const isPending = item.status === 'PENDING'
-                const isTopUp = item.type === 'TOPUP'
-                const isWithdrawal = item.type === 'WITHDRAWAL'
-
-                return (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between py-3.5"
-                  >
-                    {/* Sisi Kiri: Icon Tile Color-Role & Detail */}
-                    <div className="flex items-center gap-3 min-w-0 pr-2">
-                      <div
-                        className={`w-10 h-10 shrink-0 rounded-2xl flex items-center justify-center ${
-                          isTopUp
-                            ? 'bg-cyan-50 text-cyan-700'
-                            : isWithdrawal
-                            ? 'bg-slate-100 text-slate-700'
-                            : isPending
-                            ? 'bg-amber-50 text-amber-700'
-                            : 'bg-emerald-50 text-emerald-700'
-                        }`}
-                      >
-                        {isTopUp ? (
-                          <ArrowDownLeft className="h-5 w-5" />
-                        ) : isWithdrawal ? (
-                          <ArrowUpRight className="h-5 w-5" />
-                        ) : isPending ? (
-                          <Clock3 className="h-5 w-5" />
-                        ) : (
-                          <Receipt className="h-5 w-5" />
-                        )}
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-900 truncate leading-snug">
-                          {item.title}
-                        </p>
-                        <p className="text-xs text-slate-600 truncate mt-0.5 font-medium">
-                          {formatTanggalId(item.createdAt)}
-                          {item.method ? ` · ${item.method}` : ''}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Sisi Kanan: Nominal & Kuitansi / Status */}
-                    <div className="text-right shrink-0 flex flex-col items-end">
-                      <p
-                        className={`text-sm font-black font-mono leading-none ${
-                          isTopUp ? 'text-cyan-800' : 'text-slate-900'
-                        }`}
-                      >
-                        {isTopUp ? `+${formatRupiah(item.amount)}` : formatRupiah(item.amount)}
-                      </p>
-
-                      <div className="mt-1 flex items-center gap-1.5">
-                        {isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP') ? (
-                          <button
-                            type="button"
-                            onClick={e => {
-                              e.stopPropagation()
-                              setSelectedReceipt(item)
-                            }}
-                            className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer active:scale-95 transition"
-                          >
-                            <Printer className="w-3 h-3" />
-                            <span>Kuitansi</span>
-                          </button>
-                        ) : isPending ? (
-                          <Link
-                            href="/portal-ortu/tagihan"
-                            onClick={e => e.stopPropagation()}
-                            className="inline-flex min-h-11 items-center gap-0.5 text-xs font-bold text-amber-700 hover:underline"
-                          >
-                            <span>Bayar</span>
-                            <ChevronRight className="w-3 h-3" />
-                          </Link>
-                        ) : (
-                          <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap shrink-0">
-                            {formatPortalStatus(item.status)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+          ) : (
+            <div className="space-y-4">
+              {Object.entries(groupedHistory).map(([monthYear, items]) => (
+                <div key={monthYear} className="space-y-2">
+                  <div className="px-1 pt-2">
+                    <h2 className="text-sm font-bold text-slate-900 tracking-tight">{monthYear}</h2>
                   </div>
-                )
-              })}
+                  <div className="divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+                    {items.map((item) => {
+                      const isPaid = item.status === 'PAID' || item.status === 'COMPLETED'
+                      const isPending = item.status === 'PENDING'
+                      const isTopUp = item.type === 'TOPUP'
+                      const isWithdrawal = item.type === 'WITHDRAWAL'
+                      const dateStr = formatTanggalDmy(item.createdAt)
+
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => {
+                            if (isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP')) {
+                              setSelectedReceipt(item)
+                            }
+                          }}
+                          className={`p-3.5 flex items-center justify-between gap-3 transition ${
+                            isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP')
+                              ? 'cursor-pointer hover:bg-slate-50/70 active:bg-slate-50'
+                              : ''
+                          }`}
+                        >
+                          {/* Sisi Kiri: Icon Tile Color-Role & Detail */}
+                          <div className="flex items-center gap-3 min-w-0 pr-1">
+                            <div
+                              className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center ${
+                                isTopUp
+                                  ? 'bg-cyan-50 text-cyan-700'
+                                  : isWithdrawal
+                                  ? 'bg-slate-100 text-slate-700'
+                                  : isPending
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : 'bg-emerald-50 text-emerald-700'
+                              }`}
+                            >
+                              {isTopUp ? (
+                                <ArrowDownLeft className="h-4 w-4" />
+                              ) : isWithdrawal ? (
+                                <ArrowUpRight className="h-4 w-4" />
+                              ) : isPending ? (
+                                <Clock3 className="h-4 w-4" />
+                              ) : (
+                                <Receipt className="h-4 w-4" />
+                              )}
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="text-xs sm:text-sm font-bold text-slate-900 truncate leading-snug">
+                                {item.title}
+                              </p>
+                              <p className="text-xs text-slate-500 truncate mt-0.5 font-medium font-mono">
+                                {dateStr}
+                                {item.method ? ` · ${item.method}` : item.channel ? ` · ${item.channel}` : ''}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Sisi Kanan: Nominal & Kuitansi / Status */}
+                          <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                            <p
+                              className={`text-xs sm:text-sm font-bold font-mono leading-none ${
+                                isTopUp ? 'text-cyan-800' : 'text-slate-950'
+                              }`}
+                            >
+                              {isTopUp
+                                ? `+${formatRupiah(item.amount)}`
+                                : isWithdrawal
+                                ? `-${formatRupiah(item.amount)}`
+                                : formatRupiah(item.amount)}
+                            </p>
+
+                            <div className="flex items-center gap-1.5">
+                              {isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP') ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setSelectedReceipt(item)
+                                  }}
+                                  className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer active:scale-95 transition"
+                                >
+                                  <Printer className="w-3.5 h-3.5" />
+                                  <span>Kuitansi</span>
+                                </button>
+                              ) : isPending ? (
+                                <Link
+                                  href="/portal-ortu/tagihan"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-0.5 text-xs font-bold text-amber-700 hover:underline"
+                                >
+                                  <span>Bayar</span>
+                                  <ChevronRight className="w-3 h-3" />
+                                </Link>
+                              ) : (
+                                <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap shrink-0">
+                                  {formatPortalStatus(item.status)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
-          ) : null}
+          )}
         </>
       )}
 
@@ -292,12 +361,12 @@ export function RiwayatClient({ history, santri, legacyItems = [], loadError = f
           <div className="rounded-2xl bg-amber-50/70 p-3.5 text-xs text-amber-900 border border-amber-200/50">
             <p className="font-bold">Arsip Pengajuan Manual</p>
             <p className="mt-0.5 text-[11px] text-amber-800 leading-relaxed">
-              Daftar pengajuan bukti transfer bank dari periode sebelum pembayaran otomatis diaktifkan.
+              Daftar pengajuan bukti transfer bank dari periode sebelum pembayaran online otomatis diaktifkan.
             </p>
           </div>
 
-          <div className="divide-y divide-slate-100">
-            {legacyItems.map(item => {
+          <div className="space-y-2.5">
+            {legacyItems.map((item) => {
               const meta = LEGACY_STATUS_META[item.status]
               const StatusIcon = meta.icon
               const bisaBatal = item.status === 'menunggu_konfirmasi' || item.status === 'ditolak'
@@ -305,9 +374,12 @@ export function RiwayatClient({ history, santri, legacyItems = [], loadError = f
                 item.status === 'ditolak' || (item.status === 'menunggu_konfirmasi' && !item.buktiUrl)
 
               return (
-                <div key={item.id} className="py-3.5 space-y-2">
+                <div
+                  key={item.id}
+                  className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2.5"
+                >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700">
+                    <span className="text-xs font-bold text-slate-900">
                       {item.kategori === 'SPP' ? 'SPP Bulanan' : 'Non-SPP'}
                     </span>
                     <span
@@ -318,23 +390,26 @@ export function RiwayatClient({ history, santri, legacyItems = [], loadError = f
                     </span>
                   </div>
 
-                  <p className="text-base font-black font-mono text-slate-900">
-                    {formatRupiah(item.jumlah)}
-                  </p>
-                  <p className="text-xs text-slate-600">{item.rincian.join(', ')}</p>
-                  <p className="text-[11px] text-slate-600">
-                    {item.metode === 'TRANSFER'
-                      ? item.bank
-                        ? `Transfer · ${item.bank}`
-                        : 'Transfer bank'
-                      : 'QRIS'}
-                    {' · '}Diajukan {formatTanggalId(item.createdAt)}
-                  </p>
+                  <div>
+                    <p className="text-base font-bold font-mono text-slate-950">
+                      {formatRupiah(item.jumlah)}
+                    </p>
+                    <p className="text-xs text-slate-600 mt-0.5">{item.rincian.join(', ')}</p>
+                    <p className="text-xs text-slate-400 mt-0.5 font-medium font-mono">
+                      {item.metode === 'TRANSFER'
+                        ? item.bank
+                          ? `Transfer · ${item.bank}`
+                          : 'Transfer bank'
+                        : 'QRIS'}
+                      {' · '}Diajukan {formatTanggalId(item.createdAt)}
+                    </p>
+                  </div>
 
                   {item.status === 'ditolak' && item.rejectReason && (
-                    <p className="rounded-xl bg-rose-50 p-2.5 text-xs text-rose-800">
-                      <span className="font-bold">Alasan:</span> {item.rejectReason}
-                    </p>
+                    <div className="rounded-xl bg-red-50 p-2.5 text-xs text-red-900 border border-red-200/80 space-y-1">
+                      <span className="font-bold text-red-800 block text-[11px]">Alasan Penolakan:</span>
+                      <p className="text-xs text-red-700 leading-relaxed">{item.rejectReason}</p>
+                    </div>
                   )}
 
                   {item.status === 'menunggu_konfirmasi' && !item.buktiUrl && (
@@ -362,7 +437,7 @@ export function RiwayatClient({ history, santri, legacyItems = [], loadError = f
                             <button
                               type="button"
                               onClick={() => setUploadFor(item.id)}
-                              className="flex-1 rounded-xl bg-[#064e3b] hover:bg-[#047857] py-2 text-xs font-bold text-[#bef264] active:scale-95 transition cursor-pointer"
+                              className="flex-1 rounded-xl bg-[#064e3b] hover:bg-[#047857] py-2 text-xs font-bold text-[#bef264] active:scale-95 transition cursor-pointer min-h-[38px]"
                             >
                               {item.status === 'ditolak' ? 'Upload Ulang Bukti' : 'Upload Bukti'}
                             </button>
@@ -372,7 +447,7 @@ export function RiwayatClient({ history, santri, legacyItems = [], loadError = f
                               type="button"
                               onClick={() => handleCancelLegacy(item.id)}
                               disabled={cancelling === item.id}
-                              className="flex-1 rounded-xl bg-rose-50 hover:bg-rose-100 py-2 text-xs font-bold text-rose-700 disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition"
+                              className="flex-1 rounded-xl bg-rose-50 hover:bg-rose-100 py-2 text-xs font-bold text-rose-700 disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition min-h-[38px] border border-rose-200"
                             >
                               {cancelling === item.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                               Batalkan
@@ -389,11 +464,12 @@ export function RiwayatClient({ history, santri, legacyItems = [], loadError = f
         </div>
       )}
 
-      {/* 4. Modal Kuitansi Resmi Sah Pesantren */}
+      {/* 4. Modal Kuitansi Resmi Modern Sah */}
       {selectedReceipt && (
         <ReceiptModal
           item={selectedReceipt}
           santri={santri}
+          letterheadProfile={letterheadProfile}
           onClose={() => setSelectedReceipt(null)}
         />
       )}

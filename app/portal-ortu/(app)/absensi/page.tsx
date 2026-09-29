@@ -51,8 +51,8 @@ export default async function AbsensiPage({
         >
           &larr; Kembali ke Aktivitas
         </Link>
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold tracking-tight text-slate-950">Kehadiran Pengajian</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-950">Kehadiran Pengajian</h1>
           <div className="flex items-center gap-1 text-xs font-bold text-slate-700">
             <Link
               href={`/portal-ortu/absensi?bulan=${shiftBulan(tahun, bulan, -1)}`}
