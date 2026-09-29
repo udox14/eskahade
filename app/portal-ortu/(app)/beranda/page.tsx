@@ -1,12 +1,9 @@
 import Link from 'next/link'
 import {
   CalendarCheck,
-  CheckCircle,
-  ClockCounterClockwise,
-  CreditCard,
-  Wallet,
-  ArrowRight,
   ShieldCheck,
+  CreditCard,
+  ClockCounterClockwise,
   CaretRight,
 } from '@phosphor-icons/react/dist/ssr'
 import { requirePortalSessionStrict } from '@/lib/portal/session'
@@ -15,8 +12,9 @@ import {
   getRekapAbsensiAnak,
 } from '@/lib/portal/data'
 import { getPortalStudentBilling } from '@/lib/portal/finance'
-import { formatRupiah } from '@/lib/portal/format'
+import { formatRupiah, namaBulanId } from '@/lib/portal/format'
 import { toWibDateInputValue } from '@/lib/date/wib'
+import { VaCopyButton } from './_va-copy-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +23,7 @@ function monthRange() {
   const start = `${y}-${String(m).padStart(2, '0')}-01`
   const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate()
   const end = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-  return { start, end }
+  return { start, end, year: y, month: m }
 }
 
 function getGreeting(): string {
@@ -39,7 +37,7 @@ function getGreeting(): string {
 
 export default async function BerandaPage() {
   const session = await requirePortalSessionStrict()
-  const { start, end } = monthRange()
+  const { start, end, year, month } = monthRange()
 
   const [absen, pelanggaran, billing] = await Promise.all([
     getRekapAbsensiAnak(session.santri_id, start, end),
@@ -48,9 +46,10 @@ export default async function BerandaPage() {
   ])
 
   const totalPoin = pelanggaran.reduce((sum, p) => sum + p.poin, 0)
-  const pelanggaranBulanIni = pelanggaran.filter(p => p.tanggal >= start && p.tanggal <= end)
+  const currentMonthName = namaBulanId(month)
+  const currentPeriodLabel = `Bulan ${currentMonthName} ${year}`
 
-  // Evaluasi kondisi actionable untuk SATU Hero Surface
+  // Evaluasi finansial
   const tagihanRemaining = billing?.obligations.totalRemaining ?? 0
   const usppRemaining = billing?.obligations.uspp?.remaining ?? 0
   const pendingOrders = billing?.pendingOrders ?? []
@@ -58,20 +57,17 @@ export default async function BerandaPage() {
   const hasRoutineBills = tagihanRemaining > 0
   const hasUsppBills = usppRemaining > 0
   const hasUnpaidBills = hasRoutineBills || hasUsppBills
-  const hasAlfa = absen.alfa > 0
-  const hasNewViolations = pelanggaranBulanIni.length > 0
 
-  const unpaidCount = (billing?.obligations.past.length ?? 0) +
+  const unpaidCount =
+    (billing?.obligations.past.length ?? 0) +
     (billing?.obligations.current.length ?? 0) +
     (billing?.obligations.annual.length ?? 0)
-
-  const isHeroActionable = hasPendingOrder || hasUnpaidBills || hasAlfa || hasNewViolations
 
   const greeting = getGreeting()
 
   return (
-    <div className="px-5 space-y-6 pb-12">
-      {/* 1. TOP AREA: COMPACT GREETING (Tanpa Profile Card Besar) */}
+    <div className="px-5 space-y-4 pb-20 pt-1">
+      {/* 1. TOP AREA: COMPACT GREETING & IDENTITAS SANTRI */}
       <div className="flex items-center justify-between pt-5 pb-1">
         <div className="min-w-0 flex-1 pr-3">
           <p className="text-xs font-semibold text-emerald-800 tracking-tight">
@@ -98,239 +94,324 @@ export default async function BerandaPage() {
         </div>
       </div>
 
-      {/* 2. HERO ACTION SURFACE (SATU Surface Utama dengan Visual Anchor Kuat) */}
-      {isHeroActionable ? (
-        <div className="rounded-[22px] bg-[#064e3b] p-5 text-white shadow-[0_8px_24px_rgba(6,78,59,0.16)] relative overflow-hidden">
-          <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-emerald-500/15 blur-xl pointer-events-none" />
-          <div className="relative z-10 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#bef264]">
-                {hasPendingOrder
-                  ? 'Pesanan Menunggu Pembayaran'
-                  : hasRoutineBills
-                  ? 'Yang Perlu Diselesaikan'
-                  : hasUsppBills
-                  ? 'Sisa Cicilan USPP'
-                  : hasAlfa
-                  ? 'Presensi Perlu Perhatian'
-                  : 'Catatan Kedisiplinan'}
+      {/* 2. HERO UTAMA: SALDO UANG JAJAN SANTRI */}
+      <div className="rounded-[22px] bg-[#064e3b] p-5 text-white shadow-[0_8px_24px_rgba(6,78,59,0.16)] relative overflow-hidden">
+        <div className="relative z-10 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#bef264]">
+              Dompet Uang Jajan
+            </span>
+            <span className="text-[11px] text-emerald-200/90 font-medium">
+              Saldo di loket
+            </span>
+          </div>
+
+          <div className="space-y-0.5">
+            <p className="text-3xl font-black font-mono tracking-tight text-white">
+              {billing ? formatRupiah(billing.wallet.balance) : 'Rp0'}
+            </p>
+            <p className="text-xs text-emerald-100/80 font-medium">
+              Limit belanja hari ini:{' '}
+              <span className="font-bold font-mono text-[#bef264]">
+                {billing ? formatRupiah(billing.wallet.effectiveDailyLimit) : 'Rp0'}
               </span>
-              {hasPendingOrder && (
-                <span className="inline-flex items-center rounded-full bg-amber-400/25 px-2.5 py-0.5 text-[10px] font-bold text-amber-300 whitespace-nowrap shrink-0">
-                  Menunggu Bayar
-                </span>
-              )}
-            </div>
+            </p>
+          </div>
 
-            <div className="space-y-0.5">
-              <p className="text-3xl font-black font-mono tracking-tight text-white">
-                {hasPendingOrder
-                  ? formatRupiah(pendingOrders[0].totalCharged)
-                  : hasRoutineBills
-                  ? formatRupiah(tagihanRemaining)
-                  : hasUsppBills
-                  ? formatRupiah(usppRemaining)
-                  : hasAlfa
-                  ? `${absen.alfa} Sesi Alfa`
-                  : `${pelanggaranBulanIni.length} Catatan Baru`}
-              </p>
-              <p className="text-xs text-emerald-100/80 font-medium">
-                {hasPendingOrder
-                  ? `Pesanan #${pendingOrders[0].orderNumber} · Batas waktu pembayaran aktif`
-                  : hasRoutineBills
-                  ? `${unpaidCount} tagihan belum dibayar${hasUsppBills ? ` · Sisa USPP: ${formatRupiah(usppRemaining)}` : ''}`
-                  : hasUsppBills
-                  ? 'Sisa uang bangunan santri (dapat dicicil berkala)'
-                  : hasAlfa
-                  ? 'Ada sesi pengajian tanpa keterangan bulan ini'
-                  : 'Catatan kedisiplinan baru pada bulan berjalan'}
-              </p>
-            </div>
-
-            <div className="pt-1">
-              <Link
-                href={hasPendingOrder || hasUnpaidBills ? '/portal-ortu/tagihan' : '/portal-ortu/aktivitas'}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#bef264] px-4 py-2.5 text-xs font-bold text-[#064e3b] shadow-xs hover:bg-[#a3e635] active:scale-[0.98] transition"
-              >
-                <span>{hasPendingOrder || hasUnpaidBills ? 'Bayar sekarang' : 'Lihat detail'}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
+          {/* Aksi Langsung pada Hero: Isi Saldo & Atur Limit */}
+          <div className="pt-1 flex items-center gap-2">
+            <Link
+              href="/portal-ortu/tagihan"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#bef264] px-4 py-2.5 text-xs font-bold text-[#064e3b] shadow-xs hover:bg-[#a3e635] active:scale-[0.98] transition"
+            >
+              <span>+ Isi saldo jajan</span>
+            </Link>
+            <Link
+              href="/portal-ortu/akun"
+              className="inline-flex items-center justify-center gap-1 rounded-xl bg-emerald-800/80 px-3.5 py-2.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-800 hover:text-white active:scale-[0.98] transition"
+            >
+              <span>Atur limit</span>
+            </Link>
           </div>
         </div>
-      ) : (
-        <div className="rounded-[22px] bg-gradient-to-br from-[#064e3b] to-[#047857] p-5 text-white shadow-[0_6px_20px_rgba(6,78,59,0.12)] relative overflow-hidden">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-[#bef264]/20 text-[#bef264] flex items-center justify-center shrink-0">
-              <CheckCircle className="w-6 h-6" weight="fill" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-sm font-bold text-white">Semua beres</h3>
-              <p className="text-xs text-emerald-100/90 mt-0.5 leading-relaxed">
-                Tidak ada hal yang perlu ditindaklanjuti saat ini.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
 
-      {/* 3. QUICK ACTIONS (4 Kolom Pastel Tiles Langsung di Canvas, Tanpa Outer Card) */}
+      {/* 3. TOMBOL SHORTCUT DI BAWAH HERO (Format Pastel Tiles, Aksi Spesifik Non-Navbar) */}
       <div>
         <div className="grid grid-cols-4 gap-2.5">
+          {/* Shortcut 1: Presensi Pengajian */}
           <Link
-            href="/portal-ortu/tagihan"
-            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-lime-50/90 p-2.5 text-center active:scale-95 transition hover:bg-lime-100/70"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-lime-200/60 text-lime-900">
-              <CreditCard className="w-5 h-5" weight="duotone" />
-            </div>
-            <span className="text-[11px] font-bold text-lime-950 tracking-tight leading-none">
-              Bayar
-            </span>
-          </Link>
-
-          <Link
-            href="/portal-ortu/akun"
-            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-cyan-50/90 p-2.5 text-center active:scale-95 transition hover:bg-cyan-100/70"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-200/60 text-cyan-900">
-              <Wallet className="w-5 h-5" weight="duotone" />
-            </div>
-            <span className="text-[11px] font-bold text-cyan-950 tracking-tight leading-none">
-              Uang Jajan
-            </span>
-          </Link>
-
-          <Link
-            href="/portal-ortu/aktivitas"
+            href="/portal-ortu/absensi"
             className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-emerald-50/90 p-2.5 text-center active:scale-95 transition hover:bg-emerald-100/70"
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-200/60 text-emerald-900">
               <CalendarCheck className="w-5 h-5" weight="duotone" />
             </div>
             <span className="text-[11px] font-bold text-emerald-950 tracking-tight leading-none">
-              Aktivitas
+              Presensi
             </span>
           </Link>
 
+          {/* Shortcut 2: Kedisiplinan / Poin Pelanggaran */}
+          <Link
+            href="/portal-ortu/pelanggaran"
+            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-blue-50/90 p-2.5 text-center active:scale-95 transition hover:bg-blue-100/70"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-200/60 text-blue-900">
+              <ShieldCheck className="w-5 h-5" weight="duotone" />
+            </div>
+            <span className="text-[11px] font-bold text-blue-950 tracking-tight leading-none">
+              Kedisiplinan
+            </span>
+          </Link>
+
+          {/* Shortcut 3: Cicilan USPP (Uang Gedung) */}
+          <Link
+            href="/portal-ortu/tagihan"
+            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-amber-50/90 p-2.5 text-center active:scale-95 transition hover:bg-amber-100/70"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-200/60 text-amber-900">
+              <CreditCard className="w-5 h-5" weight="duotone" />
+            </div>
+            <span className="text-[11px] font-bold text-amber-950 tracking-tight leading-none">
+              Cicil USPP
+            </span>
+          </Link>
+
+          {/* Shortcut 4: Kuitansi Resmi / Bukti Bayar */}
           <Link
             href="/portal-ortu/riwayat"
-            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-orange-50/90 p-2.5 text-center active:scale-95 transition hover:bg-orange-100/70"
+            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-teal-50/90 p-2.5 text-center active:scale-95 transition hover:bg-teal-100/70"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-200/60 text-orange-900">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-200/60 text-teal-900">
               <ClockCounterClockwise className="w-5 h-5" weight="duotone" />
             </div>
-            <span className="text-[11px] font-bold text-orange-950 tracking-tight leading-none">
-              Riwayat
+            <span className="text-[11px] font-bold text-teal-950 tracking-tight leading-none">
+              Kuitansi
             </span>
           </Link>
         </div>
       </div>
 
-      {/* 4. KONDISI ANAK (FLAT LIST, Tanpa Outer Card Pembungkus) */}
+      {/* 4. STATUS TAGIHAN PESANTREN (Two-Tone Split Card: Bagian Bawah Putih Solid) */}
       <div className="space-y-2 pt-1">
-        <div className="flex items-center justify-between pb-1">
+        <div className="flex items-center justify-between pb-0.5">
           <h2 className="text-sm font-bold text-slate-900">
-            Kondisi anak
+            Tagihan pesantren
           </h2>
           <Link
-            href="/portal-ortu/aktivitas"
+            href="/portal-ortu/tagihan"
             className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 flex items-center gap-0.5"
           >
-            <span>Lihat semua</span>
+            <span>Rincian & riwayat</span>
             <CaretRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
-        <div className="divide-y divide-slate-100">
+        {!billing ? (
+          <div className="rounded-[18px] bg-slate-50 border border-slate-200/80 p-4 space-y-1 text-slate-600">
+            <p className="text-xs font-semibold text-slate-800">Informasi Tagihan Belum Dapat Dimuat</p>
+            <p className="text-[11px] text-slate-500">Tarik ke bawah atau muat ulang halaman untuk memeriksa status tagihan santri.</p>
+          </div>
+        ) : hasPendingOrder ? (
+          /* KONDISI: MENUNGGU PEMBAYARAN VA (AMBER + DOCK BAWAH PUTIH) */
+          <div className="rounded-[18px] border border-amber-200/90 overflow-hidden shadow-2xs">
+            {(() => {
+              const po = pendingOrders[0]
+              const vaNumber = billing.fixedVa?.vaNumber || po.orderNumber
+              const bankLabel = billing.fixedVa?.bankCode ? `Virtual Account ${billing.fixedVa.bankCode}` : 'Virtual Account'
+
+              return (
+                <>
+                  <div className="bg-amber-50/90 p-4 space-y-1.5">
+                    <div className="flex items-start justify-between">
+                      <div className="min-w-0 flex-1 pr-2">
+                        <div className="flex items-center gap-1.5 text-xs text-amber-900 font-bold">
+                          <span>{bankLabel}</span>
+                          <span>·</span>
+                          <span className="text-slate-500 font-normal">Batas aktif</span>
+                        </div>
+                        <p className="text-xl sm:text-2xl font-black font-mono tracking-wide text-slate-950 mt-0.5 truncate">
+                          {vaNumber}
+                        </p>
+                      </div>
+                      <span className="inline-flex items-center rounded-full bg-amber-100 border border-amber-200 px-2.5 py-0.5 text-[11px] font-bold text-amber-900 shrink-0">
+                        Menunggu Bayar
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      Total transfer tepat: <strong className="font-mono text-slate-900">{formatRupiah(po.totalCharged)}</strong>
+                    </p>
+                  </div>
+
+                  <div className="bg-white border-t border-amber-200/80 px-4 py-3 flex items-center justify-between gap-2">
+                    <VaCopyButton vaNumber={vaNumber} />
+                    <Link
+                      href="/portal-ortu/tagihan"
+                      className="rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 px-3.5 py-2 text-xs font-semibold active:scale-95 transition shrink-0"
+                    >
+                      Petunjuk
+                    </Link>
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        ) : hasUnpaidBills ? (
+          /* KONDISI: ADA TAGIHAN (MERAH MURNI + DOCK BAWAH PUTIH) */
+          <div className="rounded-[18px] border border-red-200/90 overflow-hidden shadow-2xs">
+            <div className="bg-red-50/90 p-4 space-y-1.5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs text-red-700 font-bold">{currentPeriodLabel}</p>
+                  <p className="text-2xl font-black font-mono text-slate-950 mt-0.5">
+                    {formatRupiah(hasRoutineBills ? tagihanRemaining : usppRemaining)}
+                  </p>
+                </div>
+                <span className="inline-flex items-center rounded-full bg-red-100 border border-red-200 px-2.5 py-0.5 text-[11px] font-bold text-red-700">
+                  Belum Lunas
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                {hasRoutineBills
+                  ? `${unpaidCount} tagihan belum dibayar`
+                  : 'Sisa uang bangunan santri (dapat dicicil berkala)'}
+              </p>
+            </div>
+
+            <div className="bg-white border-t border-red-200/80 px-4 py-3 flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-600">
+                {hasUsppBills ? (
+                  <>Sisa USPP: <strong className="font-mono text-slate-900">{formatRupiah(usppRemaining)}</strong></>
+                ) : (
+                  <span>Status: Perlu Diselesaikan</span>
+                )}
+              </span>
+              <Link
+                href="/portal-ortu/tagihan"
+                className="rounded-xl bg-red-600 hover:bg-red-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs active:scale-95 transition"
+              >
+                Bayar sekarang &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : (
+          /* KONDISI: TAGIHAN LUNAS (EMERALD + DOCK BAWAH PUTIH) */
+          <div className="rounded-[18px] border border-emerald-200/90 overflow-hidden shadow-2xs">
+            <div className="bg-emerald-50/90 p-4 space-y-1.5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs text-emerald-800 font-bold">{currentPeriodLabel}</p>
+                  <p className="text-2xl font-black font-mono text-emerald-800 mt-0.5">
+                    Lunas
+                  </p>
+                </div>
+                <span className="inline-flex items-center rounded-full bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-bold text-emerald-900">
+                  Lunas
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Seluruh tagihan rutin bulan ini telah diselesaikan
+              </p>
+            </div>
+
+            <div className="bg-white border-t border-emerald-200/80 px-4 py-3 flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-600">
+                {hasUsppBills ? (
+                  <>Sisa USPP: <strong className="font-mono text-slate-900">{formatRupiah(usppRemaining)}</strong></>
+                ) : (
+                  <span>Semua kewajiban beres</span>
+                )}
+              </span>
+              <Link
+                href="/portal-ortu/riwayat"
+                className="rounded-xl bg-emerald-700 hover:bg-emerald-800 px-3.5 py-2 text-xs font-bold text-white shadow-xs active:scale-95 transition"
+              >
+                Bukti bayar &rarr;
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 5. KONDISI ANAK (LIST RAPI, TANPA TULISAN "BUKU AKTIVITAS") */}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center justify-between pb-0.5">
+          <h2 className="text-sm font-bold text-slate-900">
+            Kondisi anak
+          </h2>
+        </div>
+
+        <div className="divide-y divide-slate-100 bg-white rounded-[18px] border border-slate-200/80 px-4 shadow-2xs">
+          {/* Baris 1: Presensi Pengajian */}
           <Link
-            href="/portal-ortu/aktivitas"
+            href="/portal-ortu/absensi"
             className="flex items-center justify-between py-3.5 group active:scale-[0.99] transition"
           >
             <div className="flex items-center gap-3 min-w-0 pr-2">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
                 <CalendarCheck className="w-5 h-5" weight="duotone" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900 truncate">
-                  Pengajian hari ini
+                <p className="text-xs font-bold text-slate-900 truncate">
+                  Presensi pengajian bulan ini
                 </p>
-                <p className="text-xs text-slate-500 truncate mt-0.5">
+                <p className="text-[11px] text-slate-500 truncate mt-0.5">
                   {absen.totalSesi > 0
-                    ? `Hadir ${absen.hadir} dari ${absen.totalSesi} sesi`
+                    ? `${absen.hadir} dari ${absen.totalSesi} sesi hadir${absen.alfa > 0 ? ` · ${absen.alfa} sesi alfa` : ''}`
                     : 'Belum ada jadwal sesi aktif'}
                 </p>
               </div>
             </div>
-            <CaretRight className="w-4 h-4 text-slate-600 group-hover:text-slate-600 transition shrink-0" />
+            <div className="flex items-center gap-2 shrink-0">
+              {absen.totalSesi > 0 && (
+                <span className="text-xs font-bold font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md">
+                  {Math.round((absen.hadir / absen.totalSesi) * 100)}%
+                </span>
+              )}
+              <CaretRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition" />
+            </div>
           </Link>
 
+          {/* Baris 2: Kedisiplinan & Asrama */}
           <Link
-            href="/portal-ortu/aktivitas"
+            href="/portal-ortu/pelanggaran"
             className="flex items-center justify-between py-3.5 group active:scale-[0.99] transition"
           >
             <div className="flex items-center gap-3 min-w-0 pr-2">
               <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
-                  totalPoin > 0 ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                  totalPoin > 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-700'
                 }`}
               >
                 <ShieldCheck className="w-5 h-5" weight="duotone" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900 truncate">
-                  Kedisiplinan
+                <p className="text-xs font-bold text-slate-900 truncate">
+                  Kedisiplinan & asrama
                 </p>
-                <p className="text-xs text-slate-500 truncate mt-0.5">
+                <p className="text-[11px] text-slate-500 truncate mt-0.5">
                   {pelanggaran.length === 0
-                    ? 'Tidak ada catatan'
-                    : `${totalPoin} poin pelanggaran tercatat`}
+                    ? 'Tertib · Tidak ada catatan pelanggaran'
+                    : `${pelanggaran.length} catatan kedisiplinan tercatat`}
                 </p>
               </div>
             </div>
-            <CaretRight className="w-4 h-4 text-slate-600 group-hover:text-slate-600 transition shrink-0" />
+            <div className="flex items-center gap-2 shrink-0">
+              <span
+                className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                  totalPoin > 0
+                    ? 'text-rose-700 bg-rose-50 font-mono'
+                    : 'text-slate-600 bg-slate-100 font-mono'
+                }`}
+              >
+                {totalPoin} Poin
+              </span>
+              <CaretRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition" />
+            </div>
           </Link>
         </div>
       </div>
-
-      {/* 5. UANG JAJAN (Feature Card dengan Identitas Visual Soft Aqua/Turquoise) */}
-      {billing && (
-        <div className="rounded-[22px] bg-gradient-to-br from-cyan-50/90 via-teal-50/70 to-cyan-50/80 p-5 text-cyan-950 relative overflow-hidden">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-cyan-100/80 text-cyan-800 flex items-center justify-center">
-                <Wallet className="w-4 h-4" weight="duotone" />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-wider text-cyan-900/80">
-                Uang Jajan
-              </span>
-            </div>
-            <Link
-              href="/portal-ortu/akun"
-              className="text-xs font-bold text-cyan-800 hover:text-cyan-950 inline-flex items-center gap-0.5 active:scale-95 transition"
-            >
-              <span>Atur limit</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="space-y-1">
-            <p className="text-2xl font-black font-mono tracking-tight text-cyan-950">
-              {formatRupiah(billing.wallet.balance)}
-            </p>
-            <p className="text-xs font-medium text-cyan-800/80">
-              Saldo tersedia di loket
-            </p>
-          </div>
-
-          <div className="mt-4 pt-3 border-t border-cyan-200/50 flex items-center justify-between text-xs text-cyan-900/90">
-            <span className="font-medium">Limit hari ini</span>
-            <span className="font-bold font-mono text-cyan-950">
-              {formatRupiah(billing.wallet.effectiveDailyLimit)}
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
