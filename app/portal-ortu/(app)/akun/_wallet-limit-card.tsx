@@ -3,50 +3,52 @@
 import { useId, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Wallet, ShieldCheck, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { formatRupiah } from '@/lib/portal/format'
 import { updateParentLimitsAction } from '../tagihan/actions'
 
 interface WalletLimitCardProps {
   initialDaily: number | null
-  initialWeekly: number | null
-  initialMonthly: number | null
+  initialWeekly?: number | null
+  initialMonthly?: number | null
   globalDailyLimit: number
   isModal?: boolean
   onSuccess?: () => void
+  onCancel?: () => void
 }
 
 export function WalletLimitCard({
   initialDaily,
-  initialWeekly,
-  initialMonthly,
+  initialWeekly = null,
+  initialMonthly = null,
   globalDailyLimit,
   isModal = false,
   onSuccess,
+  onCancel,
 }: WalletLimitCardProps) {
   const router = useRouter()
   const formId = useId()
   const [daily, setDaily] = useState<string>(initialDaily !== null ? String(initialDaily) : '')
-  const [weekly, setWeekly] = useState<string>(initialWeekly !== null ? String(initialWeekly) : '')
-  const [monthly, setMonthly] = useState<string>(initialMonthly !== null ? String(initialMonthly) : '')
   const [isSaving, setIsSaving] = useState(false)
 
   const effectiveDaily = daily !== '' && !isNaN(Number(daily))
     ? Math.min(globalDailyLimit, Math.max(0, Number(daily)))
     : globalDailyLimit
 
+  function setPreset(amount: number) {
+    setDaily(String(amount))
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setIsSaving(true)
     try {
       const parsedDaily = daily.trim() !== '' ? Math.max(0, parseInt(daily, 10)) : null
-      const parsedWeekly = weekly.trim() !== '' ? Math.max(0, parseInt(weekly, 10)) : null
-      const parsedMonthly = monthly.trim() !== '' ? Math.max(0, parseInt(monthly, 10)) : null
 
       const res = await updateParentLimitsAction({
         daily: parsedDaily,
-        weekly: parsedWeekly,
-        monthly: parsedMonthly,
+        weekly: initialWeekly,
+        monthly: initialMonthly,
       })
 
       if ('error' in res) {
@@ -54,7 +56,7 @@ export function WalletLimitCard({
         return
       }
 
-      toast.success('Batas limit uang jajan berhasil diperbarui!')
+      toast.success('Limit uang jajan harian berhasil diperbarui!')
       onSuccess?.()
       router.refresh()
     } catch (err: unknown) {
@@ -65,92 +67,85 @@ export function WalletLimitCard({
   }
 
   return (
-    <div className={isModal ? 'space-y-4' : 'rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4'}>
-      {!isModal && (
-        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-            <Wallet className="h-4 w-4" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900">Limit Penarikan Uang Jajan</h3>
-            <p className="text-xs text-slate-500">Batasi penarikan uang saku santri di loket koperasi.</p>
-          </div>
+    <form onSubmit={handleSave} className="space-y-4 pt-1">
+      {/* Metric Display Card (Tanpa tulisan "Limit Aktif Santri", Bersih & Menonjol) */}
+      <div className="rounded-2xl bg-emerald-50/70 border border-emerald-200/80 p-3.5 flex items-center justify-between">
+        <div>
+          <p className="text-2xl font-extrabold text-emerald-950 font-mono tracking-tight">
+            {formatRupiah(effectiveDaily)}{' '}
+            <span className="text-xs font-semibold text-emerald-700 font-sans">/hari</span>
+          </p>
         </div>
-      )}
-
-      <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/60 p-3.5 text-xs text-slate-700 space-y-1.5">
-        <div className="flex items-center gap-1.5 font-bold text-emerald-950">
-          <ShieldCheck className="h-4 w-4 text-emerald-700" />
-          <span>Aturan Limit Efektif</span>
+        <div className="text-right">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white text-slate-700 border border-emerald-200/60 font-mono shadow-2xs">
+            Maksimal {formatRupiah(globalDailyLimit)}
+          </span>
         </div>
-        <p className="text-slate-600 leading-relaxed">
-          Pesantren memberlakukan batas maksimal harian <strong className="text-slate-900">{formatRupiah(globalDailyLimit)}</strong>.
-          Sistem akan menggunakan batas terkecil antara limit Anda dan limit pesantren.
-        </p>
-        <p className="pt-0.5 font-bold text-emerald-800">
-          Limit Harian Efektif Saat Ini: {formatRupiah(effectiveDaily)}/hari
-        </p>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-3 pt-1">
-        <div>
-          <label htmlFor={`${formId}-daily`} className="block text-xs font-bold text-slate-700">
-            Batas Penarikan Harian (Rp)
-          </label>
+      {/* Quick Preset Chips */}
+      <div className="space-y-1.5">
+        <span className="text-[11px] font-bold text-slate-700 block">Pilihan Cepat:</span>
+        <div className="grid grid-cols-4 gap-1.5 font-mono text-xs">
+          {[20000, 30000, 50000, 100000].map(val => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setPreset(val)}
+              className="py-2 rounded-xl bg-slate-100 hover:bg-emerald-100 hover:text-emerald-900 font-bold text-slate-700 transition active:scale-95 cursor-pointer text-center"
+            >
+              {val >= 1000 ? `${val / 1000}rb` : val}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Input Manual Nominal */}
+      <div>
+        <label htmlFor={`${formId}-daily`} className="block font-bold text-slate-700 text-xs mb-1">
+          Nominal Batas Harian (Rp)
+        </label>
+        <div className="relative">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono font-bold text-slate-400 text-xs">
+            Rp
+          </span>
           <input
             id={`${formId}-daily`}
             type="number"
-            min={0}
-            step={5000}
+            step="5000"
+            min="0"
+            max={globalDailyLimit}
             value={daily}
             onChange={e => setDaily(e.target.value)}
-            placeholder={`Kosongkan untuk ikut limit pesantren (${formatRupiah(globalDailyLimit)})`}
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
-          />
-          <p className="mt-1 text-[11px] text-slate-600">Contoh: 30000 untuk maksimal Rp30.000/hari</p>
-        </div>
-
-        <div>
-          <label htmlFor={`${formId}-weekly`} className="block text-xs font-bold text-slate-700">
-            Batas Penarikan Mingguan (Rp) — Opsional
-          </label>
-          <input
-            id={`${formId}-weekly`}
-            type="number"
-            min={0}
-            step={10000}
-            value={weekly}
-            onChange={e => setWeekly(e.target.value)}
-            placeholder="Tidak dibatasi mingguan"
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
+            placeholder={String(globalDailyLimit)}
+            className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3.5 py-2.5 text-sm font-bold font-mono text-slate-950 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
           />
         </div>
+        <p className="text-[11px] text-slate-500 mt-1">
+          Kosongkan untuk mengikuti batas maksimal yang ditetapkan pesantren ({formatRupiah(globalDailyLimit)}).
+        </p>
+      </div>
 
-        <div>
-          <label htmlFor={`${formId}-monthly`} className="block text-xs font-bold text-slate-700">
-            Batas Penarikan Bulanan (Rp) — Opsional
-          </label>
-          <input
-            id={`${formId}-monthly`}
-            type="number"
-            min={0}
-            step={50000}
-            value={monthly}
-            onChange={e => setMonthly(e.target.value)}
-            placeholder="Tidak dibatasi bulanan"
-            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
-          />
-        </div>
-
+      {/* Action Buttons */}
+      <div className="pt-2 flex items-center gap-2">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 min-h-[44px] rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer active:scale-95 transition"
+          >
+            Batal
+          </button>
+        )}
         <button
           type="submit"
           disabled={isSaving}
-          className="inline-flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#064e3b] hover:bg-[#047857] py-2.5 text-xs font-bold text-[#bef264] shadow-xs disabled:opacity-50 active:scale-95 transition cursor-pointer"
+          className="flex-1 min-h-[44px] rounded-xl bg-[#064e3b] hover:bg-[#047857] text-[#bef264] text-xs font-bold shadow-xs cursor-pointer active:scale-95 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
         >
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin text-[#bef264]" /> : null}
-          <span>Simpan Batas Limit</span>
+          {isSaving ? <Loader2 className="w-4 h-4 animate-spin text-[#bef264]" /> : null}
+          <span>Simpan Limit</span>
         </button>
-      </form>
-    </div>
+      </div>
+    </form>
   )
 }

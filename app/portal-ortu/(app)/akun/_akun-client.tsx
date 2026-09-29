@@ -11,6 +11,8 @@ import {
   ChevronRight,
   ShieldAlert,
   Loader2,
+  X,
+  ZoomIn,
 } from 'lucide-react'
 import { formatRupiah } from '@/lib/portal/format'
 import { BottomSheet } from '../../_components/bottom-sheet'
@@ -29,6 +31,7 @@ interface AkunClientProps {
     foto_url?: string | null
     must_change_password?: boolean
   }
+  namaKelas?: string | null
   parentLimits?: {
     parent_daily_limit: number | null
     parent_weekly_limit: number | null
@@ -45,12 +48,14 @@ export function AkunClient({
   mustChangePassword = false,
   nis,
   session,
+  namaKelas,
   parentLimits,
   globalDailyLimit = 100000,
   pinStatus,
 }: AkunClientProps) {
   const router = useRouter()
   const [activeSheet, setActiveSheet] = useState<'LIMIT' | 'PIN' | 'PASSWORD' | 'LOGOUT' | null>(null)
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false)
 
   // Password Form State
   const [passwordLama, setPasswordLama] = useState('')
@@ -61,6 +66,29 @@ export function AkunClient({
 
   const parentDaily = parentLimits?.parent_daily_limit ?? null
   const effectiveDaily = parentDaily !== null ? Math.min(globalDailyLimit, parentDaily) : globalDailyLimit
+
+  const asramaKamar = session?.asrama
+    ? session.kamar
+      ? `${session.asrama}/${session.kamar}`
+      : session.asrama
+    : '-'
+
+  const namaSantri = session?.nama || 'Santri'
+  const namaLen = namaSantri.length
+  const nameFontSizeClass =
+    namaLen > 40
+      ? 'text-lg sm:text-xl'
+      : namaLen > 22
+      ? 'text-xl sm:text-2xl'
+      : 'text-2xl sm:text-3xl'
+
+  const initials = namaSantri
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(p => p[0])
+    .join('')
+    .toUpperCase() || 'SN'
 
   async function handleGantiPassword(e: React.FormEvent) {
     e.preventDefault()
@@ -94,27 +122,68 @@ export function AkunClient({
 
   return (
     <div className="space-y-6">
-      {/* 1. TOP: PROFILE SUMMARY SEDERHANA (Tanpa Card Pembungkus Besar) */}
-      <div className="flex items-center gap-3.5 py-1">
-        <div className="w-12 h-12 shrink-0 rounded-full overflow-hidden bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-lg shadow-2xs">
+      {/* =============================================================== */}
+      {/* 1. HERO PROFILE: SOFT CARD DENGAN FOTO 3:4 & 3 KOLOM HALUS     */}
+      {/* =============================================================== */}
+      <section className="rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-2xs flex flex-col items-center text-center transition-all duration-300">
+        {/* Foto 3:4 Besar di Tengah (Klik untuk Fullscreen Lightbox) */}
+        <button
+          type="button"
+          onClick={() => setIsPhotoModalOpen(true)}
+          className="relative w-32 sm:w-36 aspect-3/4 rounded-2xl overflow-hidden ring-1 ring-black/5 shadow-md bg-slate-900 group cursor-pointer active:scale-95 transition-all duration-200 mx-auto"
+          aria-label="Foto santri, klik untuk perbesar layar penuh"
+          title="Klik foto untuk melihat ukuran penuh"
+        >
           {session?.foto_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={session.foto_url} alt={session.nama} className="w-full h-full object-cover" />
+            <img
+              src={session.foto_url}
+              alt={namaSantri}
+              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+            />
           ) : (
-            <span>{session?.nama ? session.nama.charAt(0) : 'S'}</span>
+            <div className="w-full h-full bg-emerald-950 text-[#bef264] font-black text-4xl flex items-center justify-center font-mono">
+              {initials}
+            </div>
           )}
+
+          {/* Subtle Zoom Hint Icon (Discreet di Pojok Bawah) */}
+          <span className="absolute bottom-2 right-2 bg-black/50 backdrop-blur-xs text-white p-1 rounded-md opacity-70 group-hover:opacity-100 transition">
+            <ZoomIn className="w-3.5 h-3.5" />
+          </span>
+        </button>
+
+        {/* Nama Santri GEDE di Tengah (Maksimal 2 Baris, Auto-size) */}
+        <h2
+          className={`font-black text-slate-950 tracking-tight leading-tight line-clamp-2 mt-4 max-w-xs sm:max-w-sm break-words ${nameFontSizeClass}`}
+        >
+          {namaSantri}
+        </h2>
+
+        {/* ============================================================= */}
+        {/* IDENTITAS SANTRI: TIGA KOLOM HALUS (NOWRAP, AUTO FIT LEBAR)   */}
+        {/* ============================================================= */}
+        <div className="mt-4 pt-3.5 border-t border-slate-100 w-full flex items-center justify-center divide-x divide-slate-150 text-center">
+          <div className="px-2.5 sm:px-3.5 text-center flex-initial">
+            <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">NIS</span>
+            <span className="font-mono text-xs font-bold text-slate-900 whitespace-nowrap">
+              {session?.nis || nis}
+            </span>
+          </div>
+          <div className="px-2.5 sm:px-3.5 text-center flex-initial">
+            <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">Asrama</span>
+            <span className="text-xs font-bold text-slate-900 whitespace-nowrap">
+              {asramaKamar}
+            </span>
+          </div>
+          <div className="px-2.5 sm:px-3.5 text-center flex-initial">
+            <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider">Kelas</span>
+            <span className="text-xs font-bold text-slate-900 uppercase whitespace-nowrap">
+              {namaKelas || '-'}
+            </span>
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-base font-bold text-slate-900 truncate">
-            {session?.nama || 'Wali Santri'}
-          </h2>
-          <p className="text-xs text-slate-500 truncate mt-0.5">
-            NIS {session?.nis || nis}
-            {session?.asrama ? ` · Asrama ${session.asrama}` : ''}
-            {session?.kamar ? ` (${session.kamar})` : ''}
-          </p>
-        </div>
-      </div>
+      </section>
 
       {/* Peringatan Wajib Ganti Password jika masih default */}
       {mustChangePassword && (
@@ -126,117 +195,200 @@ export function AkunClient({
         </div>
       )}
 
-      {/* 2. SECTION: UANG JAJAN (Android Settings Style) */}
-      <div className="space-y-1">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 pb-1">
+      {/* =============================================================== */}
+      {/* 2. SECTION: UANG JAJAN                                         */}
+      {/* =============================================================== */}
+      <section className="space-y-1.5">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
           Uang Jajan
         </h3>
-        <div className="divide-y divide-slate-100">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs divide-y divide-slate-100 overflow-hidden">
           <button
             type="button"
             onClick={() => setActiveSheet('LIMIT')}
-            className="w-full flex items-center justify-between py-3.5 hover:bg-slate-50/70 active:scale-[0.99] transition cursor-pointer text-left"
+            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 active:bg-slate-100/70 transition cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3.5 min-w-0 pr-2">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-800">
-                <Wallet className="h-5 w-5" />
+            <div className="flex items-center gap-3 min-w-0 pr-2">
+              <div className="w-9 h-9 shrink-0 rounded-xl bg-cyan-50 text-cyan-700 flex items-center justify-center">
+                <Wallet className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900">Atur limit</p>
+                <p className="text-sm font-semibold text-slate-900 leading-snug">Limit Uang Jajan Harian</p>
                 <p className="text-xs text-slate-500 truncate mt-0.5">
-                  {formatRupiah(effectiveDaily)}/hari
+                  Maksimal <span className="font-bold text-slate-800 font-mono">{formatRupiah(effectiveDaily)}</span> / hari
                 </p>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+            <div className="flex items-center gap-1 text-slate-400">
+              <span className="text-xs font-semibold text-slate-500 hidden sm:inline">Ubah</span>
+              <ChevronRight className="w-4 h-4" />
+            </div>
           </button>
         </div>
-      </div>
+      </section>
 
-      {/* 3. SECTION: KEAMANAN */}
-      <div className="space-y-1">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 pb-1">
-          Keamanan
+      {/* =============================================================== */}
+      {/* 3. SECTION: KEAMANAN & AKSES                                   */}
+      {/* =============================================================== */}
+      <section className="space-y-1.5">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
+          Keamanan &amp; Akses
         </h3>
-        <div className="divide-y divide-slate-100">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs divide-y divide-slate-100 overflow-hidden">
+          {/* PIN Santri */}
           <button
             type="button"
             onClick={() => setActiveSheet('PIN')}
-            className="w-full flex items-center justify-between py-3.5 hover:bg-slate-50/70 active:scale-[0.99] transition cursor-pointer text-left"
+            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 active:bg-slate-100/70 transition cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3.5 min-w-0 pr-2">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-800">
-                <KeyRound className="h-5 w-5" />
+            <div className="flex items-center gap-3 min-w-0 pr-2">
+              <div className="w-9 h-9 shrink-0 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                <KeyRound className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900">Ubah PIN transaksi</p>
+                <p className="text-sm font-semibold text-slate-900 leading-snug">PIN Santri</p>
                 <p className="text-xs text-slate-500 truncate mt-0.5">
-                  {pinStatus?.isLocked
-                    ? 'PIN santri sedang terkunci'
-                    : pinStatus?.hasPin
-                    ? 'PIN aktif'
-                    : 'Belum diatur'}
+                  untuk penarikan uang jajan di koperasi
                 </p>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                  pinStatus?.isLocked
+                    ? 'bg-rose-50 text-rose-800 border-rose-200'
+                    : pinStatus?.hasPin
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                }`}
+              >
+                {pinStatus?.isLocked ? 'Terkunci' : pinStatus?.hasPin ? 'Aktif' : 'Belum Diatur'}
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+            </div>
           </button>
 
+          {/* Ganti Password Portal */}
           <button
             type="button"
             onClick={() => setActiveSheet('PASSWORD')}
-            className="w-full flex items-center justify-between py-3.5 hover:bg-slate-50/70 active:scale-[0.99] transition cursor-pointer text-left"
+            className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 active:bg-slate-100/70 transition cursor-pointer text-left"
           >
-            <div className="flex items-center gap-3.5 min-w-0 pr-2">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
-                <Lock className="h-5 w-5" />
+            <div className="flex items-center gap-3 min-w-0 pr-2">
+              <div className="w-9 h-9 shrink-0 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                <Lock className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900">Ganti password</p>
+                <p className="text-sm font-semibold text-slate-900 leading-snug">Password Portal</p>
                 <p className="text-xs text-slate-500 truncate mt-0.5">
-                  Password portal orang tua
+                  Kata sandi login akun orang tua
                 </p>
               </div>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+            <ChevronRight className="w-4 h-4 text-slate-400" />
           </button>
         </div>
-      </div>
+      </section>
 
-      {/* 4. SECTION: AKUN */}
-      <div className="space-y-1">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 pb-1">
-          Akun
+      {/* =============================================================== */}
+      {/* 4. SECTION: AKUN / KELUAR                                      */}
+      {/* =============================================================== */}
+      <section className="space-y-1.5">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">
+          Sesi Akun
         </h3>
-        <div className="divide-y divide-slate-100">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
           <button
             type="button"
             onClick={() => setActiveSheet('LOGOUT')}
-            className="w-full flex items-center justify-between py-3.5 hover:bg-rose-50/40 active:scale-[0.99] transition cursor-pointer text-left"
+            className="w-full flex items-center justify-between p-3.5 hover:bg-rose-50/60 active:bg-rose-100/70 transition cursor-pointer text-left group"
           >
-            <div className="flex items-center gap-3.5 min-w-0 pr-2">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-700">
-                <LogOut className="h-5 w-5" />
+            <div className="flex items-center gap-3 min-w-0 pr-2">
+              <div className="w-9 h-9 shrink-0 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center group-hover:bg-rose-100 transition">
+                <LogOut className="w-5 h-5" />
               </div>
-              <span className="text-sm font-semibold text-rose-700">
-                Keluar
+              <span className="text-sm font-semibold text-rose-700 group-hover:text-rose-800">
+                Keluar dari Portal
               </span>
             </div>
-            <ChevronRight className="w-4 h-4 text-rose-300 shrink-0" />
+            <ChevronRight className="w-4 h-4 text-rose-300 group-hover:text-rose-500 transition" />
           </button>
         </div>
-      </div>
+      </section>
 
-      {/* ─────────────────────────────────────────────────────────────
-          CONTEXTUAL BOTTOM SHEETS (Progressive Disclosure)
-          ───────────────────────────────────────────────────────────── */}
+      {/* =============================================================== */}
+      {/* FULLSCREEN PHOTO LIGHTBOX MODAL                                */}
+      {/* =============================================================== */}
+      {isPhotoModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/92 backdrop-blur-md flex flex-col items-center justify-between p-5 transition-opacity duration-300 animate-in fade-in"
+          onClick={() => setIsPhotoModalOpen(false)}
+        >
+          {/* Top Action Bar */}
+          <div className="w-full flex items-center justify-between text-white pt-2 max-w-md mx-auto">
+            <span className="text-xs font-semibold text-slate-300">Foto Profil Santri</span>
+            <button
+              type="button"
+              onClick={() => setIsPhotoModalOpen(false)}
+              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer active:scale-95"
+              aria-label="Tutup foto"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Photo Display Container */}
+          <div
+            className="flex-1 flex flex-col items-center justify-center w-full max-w-xs sm:max-w-sm py-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="relative w-full aspect-3/4 max-h-[62vh] rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/20 bg-slate-900">
+              {session?.foto_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={session.foto_url}
+                  alt={namaSantri}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-emerald-950 text-[#bef264] font-black text-6xl flex items-center justify-center font-mono">
+                  {initials}
+                </div>
+              )}
+            </div>
+
+            {/* Caption Ringkas */}
+            <div className="mt-4 text-center space-y-0.5 text-white">
+              <h3 className="text-base font-bold tracking-tight">{namaSantri}</h3>
+              <p className="text-xs text-slate-400 font-mono">
+                NIS: {session?.nis || nis} · {asramaKamar} · {namaKelas || '-'}
+              </p>
+            </div>
+          </div>
+
+          {/* Bottom Close Button */}
+          <div className="w-full max-w-xs pb-3 mx-auto">
+            <button
+              type="button"
+              onClick={() => setIsPhotoModalOpen(false)}
+              className="w-full min-h-[44px] rounded-2xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold transition active:scale-95 cursor-pointer backdrop-blur-xs"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* =============================================================== */}
+      {/* CONTEXTUAL BOTTOM SHEETS                                        */}
+      {/* =============================================================== */}
 
       {/* Sheet 1: Atur Limit */}
       <BottomSheet
         open={activeSheet === 'LIMIT'}
         onClose={() => setActiveSheet(null)}
-        title="Batas Limit Uang Jajan"
-        subtitle="Atur batas belanja & penarikan di koperasi"
+        title="Limit Uang Jajan Harian"
+        subtitle="Batasi penarikan & belanja di kantin/koperasi"
         icon={<Wallet className="h-5 w-5 text-emerald-600" />}
       >
         <WalletLimitCard
@@ -246,6 +398,7 @@ export function AkunClient({
           globalDailyLimit={globalDailyLimit}
           isModal
           onSuccess={() => setActiveSheet(null)}
+          onCancel={() => setActiveSheet(null)}
         />
       </BottomSheet>
 
@@ -253,17 +406,18 @@ export function AkunClient({
       <BottomSheet
         open={activeSheet === 'PIN'}
         onClose={() => setActiveSheet(null)}
-        title="PIN Transaksi Santri"
-        subtitle="Keamanan transaksi loket santri di koperasi"
+        title="PIN Santri"
+        subtitle="untuk penarikan uang jajan di koperasi"
         icon={<KeyRound className="h-5 w-5 text-emerald-600" />}
       >
         <StudentPinCard
           hasPin={pinStatus?.hasPin ?? false}
           isLocked={pinStatus?.isLocked ?? false}
-          santriNama={session?.nama || 'Santri'}
+          santriNama={namaSantri}
           nis={session?.nis || nis}
           isModal
           onSuccess={() => setActiveSheet(null)}
+          onCancel={() => setActiveSheet(null)}
         />
       </BottomSheet>
 
@@ -271,26 +425,31 @@ export function AkunClient({
       <BottomSheet
         open={activeSheet === 'PASSWORD'}
         onClose={() => setActiveSheet(null)}
-        title="Ganti Password Portal"
-        subtitle="Perbarui kata sandi akun demi keamanan"
+        title="Ganti Password"
+        subtitle="Kata sandi login portal orang tua"
         icon={<Lock className="h-5 w-5 text-emerald-600" />}
       >
         <form onSubmit={handleGantiPassword} className="space-y-3.5 pt-1">
           <div>
-            <label htmlFor="portal-password-old" className="block text-xs font-bold text-slate-700">Password Lama</label>
+            <label htmlFor="portal-password-old" className="block text-xs font-bold text-slate-700 mb-1">
+              Password Saat Ini
+            </label>
             <input
               id="portal-password-old"
               type="password"
               autoComplete="current-password"
               value={passwordLama}
               onChange={e => setPasswordLama(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
+              placeholder="Masukkan password lama"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
               required
             />
           </div>
 
           <div>
-            <label htmlFor="portal-password-new" className="block text-xs font-bold text-slate-700">Password Baru</label>
+            <label htmlFor="portal-password-new" className="block text-xs font-bold text-slate-700 mb-1">
+              Password Baru (Min. 6 Karakter)
+            </label>
             <input
               id="portal-password-new"
               type="password"
@@ -298,13 +457,16 @@ export function AkunClient({
               value={passwordBaru}
               onChange={e => setPasswordBaru(e.target.value)}
               minLength={6}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
+              placeholder="Buat password baru"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
               required
             />
           </div>
 
           <div>
-            <label htmlFor="portal-password-confirm" className="block text-xs font-bold text-slate-700">Ulangi Password Baru</label>
+            <label htmlFor="portal-password-confirm" className="block text-xs font-bold text-slate-700 mb-1">
+              Ulangi Password Baru
+            </label>
             <input
               id="portal-password-confirm"
               type="password"
@@ -312,19 +474,29 @@ export function AkunClient({
               value={konfirmasi}
               onChange={e => setKonfirmasi(e.target.value)}
               minLength={6}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
+              placeholder="Ketik ulang password baru"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
               required
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={savingPassword}
-            className="w-full min-h-[44px] rounded-xl bg-[#064e3b] hover:bg-[#047857] py-2.5 text-xs font-bold text-[#bef264] shadow-xs transition flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer active:scale-[0.98]"
-          >
-            {savingPassword ? <Loader2 className="w-4 h-4 animate-spin text-[#bef264]" /> : null}
-            <span>Simpan Password Baru</span>
-          </button>
+          <div className="pt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveSheet(null)}
+              className="flex-1 min-h-[44px] rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer active:scale-95 transition"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              disabled={savingPassword}
+              className="flex-1 min-h-[44px] rounded-xl bg-[#064e3b] hover:bg-[#047857] text-[#bef264] text-xs font-bold shadow-xs cursor-pointer active:scale-95 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              {savingPassword ? <Loader2 className="w-4 h-4 animate-spin text-[#bef264]" /> : null}
+              <span>Perbarui Password</span>
+            </button>
+          </div>
         </form>
       </BottomSheet>
 
@@ -332,8 +504,8 @@ export function AkunClient({
       <BottomSheet
         open={activeSheet === 'LOGOUT'}
         onClose={() => setActiveSheet(null)}
-        title="Keluar dari Portal"
-        subtitle="Konfirmasi pengakhiran sesi"
+        title="Keluar dari Portal?"
+        subtitle="Sesi login santri ini akan berakhir. Anda bisa masuk kembali kapan saja dengan NIS dan password."
         icon={<LogOut className="h-5 w-5 text-rose-600" />}
         footer={
           <>
@@ -348,17 +520,17 @@ export function AkunClient({
               type="button"
               onClick={handleLogout}
               disabled={loggingOut}
-              className="flex-1 min-h-[44px] rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-bold text-white shadow-xs flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer active:scale-95 transition"
+              className="flex-1 min-h-[44px] rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-bold text-white shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer active:scale-95 transition"
             >
               {loggingOut ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : null}
-              <span>Keluar</span>
+              <span>Ya, Keluar</span>
             </button>
           </>
         }
       >
-        <div className="space-y-3 pt-1">
-          <p className="text-xs text-slate-600 leading-relaxed">
-            Apakah Anda yakin ingin mengakhiri sesi login Portal Orang Tua untuk santri ini? Anda dapat masuk kembali kapan saja menggunakan NIS dan password Anda.
+        <div className="py-2 text-center">
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Pastikan Anda telah menyimpan atau mencatat kuitansi dan transaksi yang diperlukan sebelum keluar.
           </p>
         </div>
       </BottomSheet>
