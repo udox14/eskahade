@@ -15,6 +15,7 @@ import { getPortalStudentBilling } from '@/lib/portal/finance'
 import { formatRupiah, namaBulanId } from '@/lib/portal/format'
 import { toWibDateInputValue } from '@/lib/date/wib'
 import { VaCopyButton } from './_va-copy-button'
+import { BerandaWalletCard } from './_beranda-wallet-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -94,47 +95,20 @@ export default async function BerandaPage() {
         </div>
       </div>
 
-      {/* 2. HERO UTAMA: SALDO UANG JAJAN SANTRI */}
-      <div className="rounded-[22px] bg-[#064e3b] p-5 text-white shadow-[0_8px_24px_rgba(6,78,59,0.16)] relative overflow-hidden">
-        <div className="relative z-10 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#bef264]">
-              Dompet Uang Jajan
-            </span>
-            <span className="text-[11px] text-emerald-200/90 font-medium">
-              Saldo di loket
-            </span>
-          </div>
-
-          <div className="space-y-0.5">
-            <p className="text-3xl font-black font-mono tracking-tight text-white">
-              {billing ? formatRupiah(billing.wallet.balance) : 'Rp0'}
-            </p>
-            <p className="text-xs text-emerald-100/80 font-medium">
-              Limit belanja hari ini:{' '}
-              <span className="font-bold font-mono text-[#bef264]">
-                {billing ? formatRupiah(billing.wallet.effectiveDailyLimit) : 'Rp0'}
-              </span>
-            </p>
-          </div>
-
-          {/* Aksi Langsung pada Hero: Isi Saldo & Atur Limit */}
-          <div className="pt-1 flex items-center gap-2">
-            <Link
-              href="/portal-ortu/tagihan"
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#bef264] px-4 py-2.5 text-xs font-bold text-[#064e3b] shadow-xs hover:bg-[#a3e635] active:scale-[0.98] transition"
-            >
-              <span>+ Isi saldo jajan</span>
-            </Link>
-            <Link
-              href="/portal-ortu/akun"
-              className="inline-flex items-center justify-center gap-1 rounded-xl bg-emerald-800/80 px-3.5 py-2.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-800 hover:text-white active:scale-[0.98] transition"
-            >
-              <span>Atur limit</span>
-            </Link>
-          </div>
-        </div>
-      </div>
+      {/* 2. HERO UTAMA: SALDO UANG JAJAN SANTRI (INTERAKTIF DENGAN DRAWER TOP-UP & LIMIT LANGSUNG DARI BERANDA) */}
+      <BerandaWalletCard
+        santriId={session.santri_id}
+        balance={billing?.wallet.balance ?? 0}
+        effectiveDailyLimit={billing?.wallet.effectiveDailyLimit ?? 0}
+        parentLimits={{
+          parentDailyLimit: billing?.wallet.parentDailyLimit ?? null,
+          parentWeeklyLimit: billing?.wallet.parentWeeklyLimit ?? null,
+          parentMonthlyLimit: billing?.wallet.parentMonthlyLimit ?? null,
+          globalDailyLimit: billing?.wallet.globalDailyLimit ?? 100000,
+        }}
+        gatewayInfo={billing?.gatewayInfo ?? null}
+        fixedVa={billing?.fixedVa ?? null}
+      />
 
       {/* 3. TOMBOL SHORTCUT DI BAWAH HERO (Format Pastel Tiles, Aksi Spesifik Non-Navbar) */}
       <div>
@@ -215,7 +189,12 @@ export default async function BerandaPage() {
           </div>
         ) : hasPendingOrder ? (
           /* KONDISI: MENUNGGU PEMBAYARAN VA (AMBER + DOCK BAWAH PUTIH) */
-          <div className="rounded-[18px] border border-amber-200/90 overflow-hidden shadow-2xs">
+          <div className="rounded-[18px] border border-amber-200/90 overflow-hidden shadow-2xs relative">
+            {/* Corner Ribbon Flush Sudut Kanan Atas */}
+            <div className="absolute top-0 right-0 bg-amber-600 text-white font-bold text-[11px] px-3.5 py-1.5 rounded-bl-xl tracking-tight shadow-xs z-10">
+              Menunggu Bayar
+            </div>
+
             {(() => {
               const po = pendingOrders[0]
               const vaNumber = billing.fixedVa?.vaNumber || po.orderNumber
@@ -224,20 +203,15 @@ export default async function BerandaPage() {
               return (
                 <>
                   <div className="bg-amber-50/90 p-4 space-y-1.5">
-                    <div className="flex items-start justify-between">
-                      <div className="min-w-0 flex-1 pr-2">
-                        <div className="flex items-center gap-1.5 text-xs text-amber-900 font-bold">
-                          <span>{bankLabel}</span>
-                          <span>·</span>
-                          <span className="text-slate-500 font-normal">Batas aktif</span>
-                        </div>
-                        <p className="text-xl sm:text-2xl font-black font-mono tracking-wide text-slate-950 mt-0.5 truncate">
-                          {vaNumber}
-                        </p>
+                    <div className="min-w-0 pr-28">
+                      <div className="flex items-center gap-1.5 text-xs text-amber-900 font-bold">
+                        <span>{bankLabel}</span>
+                        <span>·</span>
+                        <span className="text-slate-500 font-normal">Batas aktif</span>
                       </div>
-                      <span className="inline-flex items-center rounded-full bg-amber-100 border border-amber-200 px-2.5 py-0.5 text-[11px] font-bold text-amber-900 shrink-0">
-                        Menunggu Bayar
-                      </span>
+                      <p className="text-xl sm:text-2xl font-black font-mono tracking-wider text-slate-950 mt-0.5 whitespace-nowrap overflow-x-auto no-scrollbar py-0.5">
+                        {vaNumber}
+                      </p>
                     </div>
                     <p className="text-[11px] text-slate-600">
                       Total transfer tepat: <strong className="font-mono text-slate-900">{formatRupiah(po.totalCharged)}</strong>
@@ -259,18 +233,18 @@ export default async function BerandaPage() {
           </div>
         ) : hasUnpaidBills ? (
           /* KONDISI: ADA TAGIHAN (MERAH MURNI + DOCK BAWAH PUTIH) */
-          <div className="rounded-[18px] border border-red-200/90 overflow-hidden shadow-2xs">
+          <div className="rounded-[18px] border border-red-200/90 overflow-hidden shadow-2xs relative">
+            {/* Corner Ribbon Flush Sudut Kanan Atas */}
+            <div className="absolute top-0 right-0 bg-red-600 text-white font-bold text-[11px] px-3.5 py-1.5 rounded-bl-xl tracking-tight shadow-xs z-10">
+              Belum Lunas
+            </div>
+
             <div className="bg-red-50/90 p-4 space-y-1.5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-red-700 font-bold">{currentPeriodLabel}</p>
-                  <p className="text-2xl font-black font-mono text-slate-950 mt-0.5">
-                    {formatRupiah(hasRoutineBills ? tagihanRemaining : usppRemaining)}
-                  </p>
-                </div>
-                <span className="inline-flex items-center rounded-full bg-red-100 border border-red-200 px-2.5 py-0.5 text-[11px] font-bold text-red-700">
-                  Belum Lunas
-                </span>
+              <div className="pr-24">
+                <p className="text-xs text-red-700 font-bold">{currentPeriodLabel}</p>
+                <p className="text-2xl font-black font-mono text-slate-950 mt-0.5">
+                  {formatRupiah(hasRoutineBills ? tagihanRemaining : usppRemaining)}
+                </p>
               </div>
               <p className="text-[11px] text-slate-600">
                 {hasRoutineBills
@@ -297,18 +271,18 @@ export default async function BerandaPage() {
           </div>
         ) : (
           /* KONDISI: TAGIHAN LUNAS (EMERALD + DOCK BAWAH PUTIH) */
-          <div className="rounded-[18px] border border-emerald-200/90 overflow-hidden shadow-2xs">
+          <div className="rounded-[18px] border border-emerald-200/90 overflow-hidden shadow-2xs relative">
+            {/* Corner Ribbon Flush Sudut Kanan Atas */}
+            <div className="absolute top-0 right-0 bg-emerald-700 text-white font-bold text-[11px] px-3.5 py-1.5 rounded-bl-xl tracking-tight shadow-xs z-10">
+              Lunas
+            </div>
+
             <div className="bg-emerald-50/90 p-4 space-y-1.5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-emerald-800 font-bold">{currentPeriodLabel}</p>
-                  <p className="text-2xl font-black font-mono text-emerald-800 mt-0.5">
-                    Lunas
-                  </p>
-                </div>
-                <span className="inline-flex items-center rounded-full bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-bold text-emerald-900">
+              <div className="pr-20">
+                <p className="text-xs text-emerald-800 font-bold">{currentPeriodLabel}</p>
+                <p className="text-2xl font-black font-mono text-emerald-800 mt-0.5">
                   Lunas
-                </span>
+                </p>
               </div>
               <p className="text-[11px] text-slate-600">
                 Seluruh tagihan rutin bulan ini telah diselesaikan
