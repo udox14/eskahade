@@ -237,14 +237,14 @@ export function BerandaWalletCard({
           /* FORM TOP-UP */
           <div className="space-y-4 text-sm">
             {/* Informasi Saldo Saat Ini */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-xs">
-              <span className="text-emerald-950 font-semibold">Saldo Dompet Saat Ini</span>
-              <span className="font-mono font-bold text-emerald-900 text-sm">{formatRupiah(balance)}</span>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 text-xs">
+              <span className="text-emerald-950 dark:text-emerald-200 font-semibold">Saldo Dompet Saat Ini</span>
+              <span className="font-mono font-bold text-emerald-900 dark:text-emerald-300 text-sm">{formatRupiah(balance)}</span>
             </div>
 
             {/* Pilihan Cepat Nominal */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                 Pilih Nominal Top-Up
               </label>
               <div className="grid grid-cols-4 gap-1.5">
@@ -255,8 +255,8 @@ export function BerandaWalletCard({
                     onClick={() => setTopUpAmount(val)}
                     className={`py-2 text-xs font-bold font-mono rounded-xl border transition active:scale-95 cursor-pointer ${
                       topUpAmount === val
-                        ? 'bg-emerald-800 text-white border-emerald-800 shadow-xs'
-                        : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50'
+                        ? 'bg-emerald-800 text-white border-emerald-800 dark:bg-emerald-600 dark:border-emerald-500 shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700'
                     }`}
                   >
                     {val >= 1000000 ? `${val / 1000000}jt` : `${val / 1000}rb`}
@@ -267,11 +267,11 @@ export function BerandaWalletCard({
 
             {/* Input Nominal Manual */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                 Atau Masukkan Nominal Lainnya
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 font-mono">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-slate-500 font-mono">
                   Rp
                 </span>
                 <input
@@ -284,14 +284,14 @@ export function BerandaWalletCard({
                     setTopUpAmount(Math.max(0, parsed))
                   }}
                   placeholder="isi nominal (min. Rp10.000)"
-                  className="w-full pl-10 pr-4 py-2.5 text-sm font-mono font-bold border border-slate-300 rounded-xl bg-white text-slate-900 shadow-2xs focus:border-emerald-600 focus:outline-hidden placeholder:font-sans placeholder:font-normal placeholder:text-slate-400"
+                  className="w-full pl-10 pr-4 py-2.5 text-sm font-mono font-bold border border-slate-300 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-850 dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs focus:border-emerald-600 dark:focus:border-emerald-500 focus:outline-hidden placeholder:font-sans placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 />
               </div>
             </div>
 
             {/* Metode Pembayaran */}
-            <fieldset className="space-y-2 pt-1 border-t border-slate-100">
-              <legend className="text-xs font-bold text-slate-700">Metode Pembayaran</legend>
+            <fieldset className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+              <legend className="text-xs font-bold text-slate-700 dark:text-slate-300">Metode Pembayaran</legend>
               <div className="grid grid-cols-2 gap-2">
                 {isVaEnabled && (
                   <button
@@ -300,8 +300,8 @@ export function BerandaWalletCard({
                     onClick={() => setPaymentMethod('DUITKU_VA')}
                     className={`min-h-11 rounded-xl border px-2 text-xs font-bold transition cursor-pointer ${
                       paymentMethod === 'DUITKU_VA'
-                        ? 'border-emerald-700 bg-emerald-50 text-emerald-900'
-                        : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                        ? 'border-emerald-700 bg-emerald-50 text-emerald-900 dark:border-emerald-500 dark:bg-emerald-950/60 dark:text-emerald-200'
+                        : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60'
                     }`}
                   >
                     Virtual Account
@@ -314,8 +314,8 @@ export function BerandaWalletCard({
                     onClick={() => setPaymentMethod('DUITKU_QRIS')}
                     className={`min-h-11 rounded-xl border px-2 text-xs font-bold transition cursor-pointer ${
                       paymentMethod === 'DUITKU_QRIS'
-                        ? 'border-emerald-700 bg-emerald-50 text-emerald-900'
-                        : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                        ? 'border-emerald-700 bg-emerald-50 text-emerald-900 dark:border-emerald-500 dark:bg-emerald-950/60 dark:text-emerald-200'
+                        : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60'
                     }`}
                   >
                     QRIS
@@ -334,8 +334,8 @@ export function BerandaWalletCard({
                       onClick={() => setVaBank(bank.code)}
                       className={`min-h-10 rounded-xl border px-2 text-xs font-bold transition cursor-pointer active:scale-95 ${
                         vaBank === bank.code
-                          ? 'border-emerald-700 bg-emerald-800 text-white'
-                          : 'border-slate-200 text-slate-700 hover:bg-slate-50 bg-white'
+                          ? 'border-emerald-700 bg-emerald-800 text-white dark:border-emerald-500 dark:bg-emerald-600'
+                          : 'border-slate-200 text-slate-700 hover:bg-slate-50 bg-white dark:border-slate-700 dark:text-slate-300 dark:bg-slate-800/60 dark:hover:bg-slate-800'
                       }`}
                     >
                       {bank.label}
@@ -346,18 +346,18 @@ export function BerandaWalletCard({
             </fieldset>
 
             {/* Rincian Subtotal & Biaya */}
-            <div className="space-y-1.5 border-t border-slate-100 pt-3 text-xs text-slate-600">
+            <div className="space-y-1.5 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs text-slate-600 dark:text-slate-400">
               <div className="flex justify-between">
                 <span>Nominal Top-Up</span>
-                <span className="font-mono font-semibold text-slate-900">{formatRupiah(topUpAmount)}</span>
+                <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{formatRupiah(topUpAmount)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Biaya Admin</span>
-                <span className="font-mono font-semibold text-slate-900">{formatRupiah(gatewayFee)}</span>
+                <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{formatRupiah(gatewayFee)}</span>
               </div>
-              <div className="flex justify-between border-t border-slate-100 pt-2 font-bold text-slate-950 text-sm">
+              <div className="flex justify-between border-t border-slate-100 dark:border-slate-800 pt-2 font-bold text-slate-950 dark:text-slate-100 text-sm">
                 <span>Total Pembayaran</span>
-                <span className="font-mono text-emerald-800">{formatRupiah(totalCharged)}</span>
+                <span className="font-mono text-emerald-800 dark:text-emerald-400">{formatRupiah(totalCharged)}</span>
               </div>
             </div>
           </div>
@@ -365,36 +365,36 @@ export function BerandaWalletCard({
           /* RESULT PETUNJUK PEMBAYARAN */
           <div className="space-y-4">
             {/* Total Transfer */}
-            <div className="rounded-2xl bg-slate-50/90 p-4 border border-slate-200/80 text-center space-y-1">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <div className="rounded-2xl bg-slate-50/90 dark:bg-slate-800/60 p-4 border border-slate-200/80 dark:border-slate-700 text-center space-y-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Total yang Harus Ditransfer
               </p>
-              <p className="text-2xl font-black text-slate-950 font-mono tracking-tight">
+              <p className="text-2xl font-black text-slate-950 dark:text-slate-100 font-mono tracking-tight">
                 {formatRupiah(checkoutResult.order.totalCharged)}
               </p>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Termasuk biaya admin {formatRupiah(checkoutResult.order.gatewayFee)}
               </p>
             </div>
 
             {/* Virtual Account Number */}
             {checkoutResult.checkout.vaNumber ? (
-              <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-center space-y-2">
-                <span className="text-xs font-bold text-emerald-950">Nomor Virtual Account</span>
+              <div className="rounded-2xl border border-emerald-200/80 dark:border-emerald-800/60 bg-emerald-50/60 dark:bg-emerald-950/40 p-4 text-center space-y-2">
+                <span className="text-xs font-bold text-emerald-950 dark:text-emerald-200">Nomor Virtual Account</span>
                 <div className="flex items-center justify-center gap-2">
-                  <span className="font-mono text-xl sm:text-2xl font-black text-emerald-950 tracking-wider whitespace-nowrap overflow-x-auto no-scrollbar py-0.5">
+                  <span className="font-mono text-xl sm:text-2xl font-black text-emerald-950 dark:text-emerald-100 tracking-wider whitespace-nowrap overflow-x-auto no-scrollbar py-0.5">
                     {checkoutResult.checkout.vaNumber}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleCopyVa(checkoutResult.checkout.vaNumber!)}
-                    className="rounded-lg bg-white p-1.5 border border-emerald-200 text-emerald-700 hover:bg-emerald-50 shadow-2xs cursor-pointer active:scale-95 transition"
+                    className="rounded-lg bg-white dark:bg-slate-800 p-1.5 border border-emerald-200 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-slate-700 shadow-2xs cursor-pointer active:scale-95 transition"
                     aria-label="Salin nomor Virtual Account"
                   >
-                    {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                    {copied ? <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" /> : <Copy className="h-4 w-4" />}
                   </button>
                 </div>
-                <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-800 font-medium">
+                <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-800 dark:text-emerald-300 font-medium">
                   <Clock className="w-3.5 h-3.5 shrink-0" />
                   <span>
                     Berlaku 24 jam (sampai{' '}
@@ -412,7 +412,7 @@ export function BerandaWalletCard({
                   href={checkoutResult.checkout.paymentUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center w-full min-h-[44px] rounded-xl bg-[#064e3b] py-3 text-xs font-bold text-[#bef264] shadow-xs hover:bg-[#047857] active:scale-[0.98] transition"
+                  className="inline-flex items-center justify-center w-full min-h-[44px] rounded-xl bg-[#064e3b] hover:bg-[#047857] py-3 text-xs font-bold text-[#bef264] shadow-xs active:scale-[0.98] transition"
                 >
                   Buka Halaman Pembayaran Duitku
                 </a>
@@ -420,9 +420,9 @@ export function BerandaWalletCard({
             ) : null}
 
             {/* Petunjuk Pembayaran Singkat */}
-            <div className="text-xs text-slate-600 space-y-2 border-t border-slate-100 pt-3">
-              <p className="font-bold text-slate-900">Langkah Pembayaran:</p>
-              <ul className="list-disc pl-4 space-y-1 text-slate-600 leading-relaxed">
+            <div className="text-xs text-slate-600 dark:text-slate-400 space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+              <p className="font-bold text-slate-900 dark:text-slate-200">Langkah Pembayaran:</p>
+              <ul className="list-disc pl-4 space-y-1 text-slate-600 dark:text-slate-400 leading-relaxed">
                 <li>Buka m-Banking atau ATM bank Anda.</li>
                 <li>Pilih menu <strong>Transfer Virtual Account / Bayar Tagihan</strong>.</li>
                 <li>Masukkan nomor Virtual Account di atas.</li>

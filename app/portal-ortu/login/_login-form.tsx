@@ -27,10 +27,10 @@ export function LoginForm() {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xs">
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-xs">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="portal-login-nis" className="block text-xs font-semibold text-slate-700">NIS Santri</label>
+          <label htmlFor="portal-login-nis" className="block text-xs font-semibold text-slate-700 dark:text-slate-300">NIS Santri</label>
           <input
             id="portal-login-nis"
             inputMode="numeric"
@@ -39,13 +39,13 @@ export function LoginForm() {
             onChange={e => setNis(e.target.value.replace(/\s/g, ''))}
             placeholder="Contoh: 20240123"
             disabled={loading}
-            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden disabled:bg-slate-100 transition"
+            className="mt-1 w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2.5 text-sm font-medium text-slate-900 dark:text-slate-100 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden disabled:bg-slate-100 dark:disabled:bg-slate-800/50 transition"
             required
           />
         </div>
 
         <div>
-          <label htmlFor="portal-login-password" className="block text-xs font-semibold text-slate-700">Password</label>
+          <label htmlFor="portal-login-password" className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Password</label>
           <div className="relative mt-1">
             <input
               id="portal-login-password"
@@ -55,13 +55,13 @@ export function LoginForm() {
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               disabled={loading}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 pr-11 text-sm font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden disabled:bg-slate-100 transition"
+              className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2.5 pr-11 text-sm font-medium text-slate-900 dark:text-slate-100 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden disabled:bg-slate-100 dark:disabled:bg-slate-800/50 transition"
               required
             />
             <button
               type="button"
               onClick={() => setShowPassword(v => !v)}
-              className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-slate-600 transition hover:text-slate-900 focus:outline-hidden"
+              className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-slate-600 dark:text-slate-400 transition hover:text-slate-900 dark:hover:text-slate-200 focus:outline-hidden cursor-pointer"
               aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
             >
               {showPassword ? <EyeSlash aria-hidden className="h-4 w-4" /> : <Eye aria-hidden className="h-4 w-4" />}
@@ -70,7 +70,7 @@ export function LoginForm() {
         </div>
 
         {error && (
-          <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-medium text-rose-800">
+          <p role="alert" className="rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 px-4 py-3 text-xs font-medium text-rose-800 dark:text-rose-300">
             {error}
           </p>
         )}
@@ -79,16 +79,16 @@ export function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 py-3 text-sm font-semibold text-white shadow-xs transition active:scale-[0.99] disabled:opacity-60 flex items-center justify-center gap-2"
+            className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 py-3 text-sm font-semibold text-white shadow-xs transition active:scale-[0.99] disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
           >
             {loading ? <><CircleNotch aria-hidden className="h-4 w-4 animate-spin" /> Memeriksa...</> : 'Masuk Portal Orang Tua'}
           </button>
         </div>
       </form>
 
-      <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-600 leading-relaxed">
+      <div className="mt-6 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 p-3.5 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
         <p>
-          <span className="font-semibold text-slate-800">Info Login:</span> Gunakan <span className="font-semibold text-slate-800">NIS</span> santri &amp; password default (NIS atau tanggal lahir santri).
+          <span className="font-semibold text-slate-800 dark:text-slate-200">Info Login:</span> Gunakan <span className="font-semibold text-slate-800 dark:text-slate-200">NIS</span> santri &amp; password default (NIS atau tanggal lahir santri).
         </p>
       </div>
     </div>

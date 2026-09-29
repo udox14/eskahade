@@ -151,13 +151,13 @@ export function RiwayatClient({
   return (
     <div className="space-y-4">
       {loadError && (
-        <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+        <div role="alert" className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4 text-sm text-amber-950 dark:text-amber-200">
           <p className="font-semibold">Sebagian riwayat belum dapat dimuat.</p>
           <p className="mt-1">Coba muat ulang untuk melihat data terbaru.</p>
           <button
             type="button"
             onClick={() => router.refresh()}
-            className="mt-2 min-h-11 font-bold text-amber-900 underline underline-offset-2"
+            className="mt-2 min-h-11 font-bold text-amber-900 dark:text-amber-300 underline underline-offset-2"
           >
             Coba lagi
           </button>
@@ -167,15 +167,15 @@ export function RiwayatClient({
       {/* 1. Segmented Filter Control */}
       <nav
         aria-label="Filter Kategori Riwayat"
-        className="p-1 rounded-2xl bg-slate-100/90 flex gap-1 text-xs font-bold text-slate-500"
+        className="p-1 rounded-2xl bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200/50 dark:border-slate-800 flex gap-1 text-xs font-bold text-slate-500"
       >
         <button
           type="button"
           onClick={() => setFilter('ALL')}
           className={`flex-1 min-h-[38px] rounded-xl font-bold transition-all duration-200 active:scale-[0.98] cursor-pointer flex items-center justify-center ${
             filter === 'ALL'
-              ? 'bg-white text-slate-950 shadow-2xs'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-white dark:bg-slate-800 text-slate-950 dark:text-slate-100 shadow-2xs'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           Semua
@@ -185,8 +185,8 @@ export function RiwayatClient({
           onClick={() => setFilter('TAGIHAN')}
           className={`flex-1 min-h-[38px] rounded-xl font-bold transition-all duration-200 active:scale-[0.98] cursor-pointer flex items-center justify-center ${
             filter === 'TAGIHAN'
-              ? 'bg-white text-slate-950 shadow-2xs'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-white dark:bg-slate-800 text-slate-950 dark:text-slate-100 shadow-2xs'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           Tagihan
@@ -196,8 +196,8 @@ export function RiwayatClient({
           onClick={() => setFilter('UANG_JAJAN')}
           className={`flex-1 min-h-[38px] rounded-xl font-bold transition-all duration-200 active:scale-[0.98] cursor-pointer flex items-center justify-center ${
             filter === 'UANG_JAJAN'
-              ? 'bg-white text-slate-950 shadow-2xs'
-              : 'text-slate-500 hover:text-slate-800'
+              ? 'bg-white dark:bg-slate-800 text-slate-950 dark:text-slate-100 shadow-2xs'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           Uang Jajan
@@ -208,12 +208,12 @@ export function RiwayatClient({
             onClick={() => setFilter('LEGACY')}
             className={`flex-1 min-h-[38px] rounded-xl font-bold transition-all duration-200 active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1 ${
               filter === 'LEGACY'
-                ? 'bg-white text-slate-950 shadow-2xs'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-white dark:bg-slate-800 text-slate-950 dark:text-slate-100 shadow-2xs'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <span>Manual</span>
-            <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-amber-100 text-amber-800 font-bold">
+            <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold">
               {legacyItems.length}
             </span>
           </button>
@@ -225,14 +225,14 @@ export function RiwayatClient({
         <>
           {filteredHistory.length === 0 && !loadError ? (
             <div className="flex flex-col items-center justify-center gap-2 py-14 text-center">
-              <div className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200/60">
+              <div className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center border border-slate-200/60 dark:border-slate-700">
                 <FileQuestion className="w-5 h-5" />
               </div>
-              <p className="text-sm font-bold text-slate-800">Belum ada riwayat transaksi</p>
-              <p className="text-xs text-slate-500">Tidak ada transaksi pada kategori yang dipilih.</p>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">Belum ada riwayat transaksi</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Tidak ada transaksi pada kategori yang dipilih.</p>
               <Link
                 href="/portal-ortu/tagihan"
-                className="pt-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline"
+                className="pt-1 text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 hover:underline"
               >
                 Lihat Tagihan Aktif &rarr;
               </Link>
@@ -242,9 +242,9 @@ export function RiwayatClient({
               {Object.entries(groupedHistory).map(([monthYear, items]) => (
                 <div key={monthYear} className="space-y-2">
                   <div className="px-1 pt-2">
-                    <h2 className="text-sm font-bold text-slate-900 tracking-tight">{monthYear}</h2>
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-slate-200 tracking-tight">{monthYear}</h2>
                   </div>
-                  <div className="divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
                     {items.map((item) => {
                       const isPaid = item.status === 'PAID' || item.status === 'COMPLETED'
                       const isPending = item.status === 'PENDING'
@@ -262,7 +262,7 @@ export function RiwayatClient({
                           }}
                           className={`p-3.5 flex items-center justify-between gap-3 transition ${
                             isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP')
-                              ? 'cursor-pointer hover:bg-slate-50/70 active:bg-slate-50'
+                              ? 'cursor-pointer hover:bg-slate-50/70 dark:hover:bg-slate-800/50 active:bg-slate-50 dark:active:bg-slate-800/70'
                               : ''
                           }`}
                         >
@@ -271,12 +271,12 @@ export function RiwayatClient({
                             <div
                               className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center ${
                                 isTopUp
-                                  ? 'bg-cyan-50 text-cyan-700'
+                                  ? 'bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-300'
                                   : isWithdrawal
-                                  ? 'bg-slate-100 text-slate-700'
+                                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                                   : isPending
-                                  ? 'bg-amber-50 text-amber-700'
-                                  : 'bg-emerald-50 text-emerald-700'
+                                  ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300'
+                                  : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
                               }`}
                             >
                               {isTopUp ? (
@@ -291,10 +291,10 @@ export function RiwayatClient({
                             </div>
 
                             <div className="min-w-0">
-                              <p className="text-xs sm:text-sm font-bold text-slate-900 truncate leading-snug">
+                              <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate leading-snug">
                                 {item.title}
                               </p>
-                              <p className="text-xs text-slate-500 truncate mt-0.5 font-medium font-mono">
+                              <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5 font-medium font-mono">
                                 {dateStr}
                                 {item.method ? ` · ${item.method}` : item.channel ? ` · ${item.channel}` : ''}
                               </p>
@@ -305,7 +305,7 @@ export function RiwayatClient({
                           <div className="text-right shrink-0 flex flex-col items-end gap-1">
                             <p
                               className={`text-xs sm:text-sm font-bold font-mono leading-none ${
-                                isTopUp ? 'text-cyan-800' : 'text-slate-950'
+                                isTopUp ? 'text-cyan-800 dark:text-cyan-300' : 'text-slate-950 dark:text-slate-100'
                               }`}
                             >
                               {isTopUp
@@ -323,7 +323,7 @@ export function RiwayatClient({
                                     e.stopPropagation()
                                     setSelectedReceipt(item)
                                   }}
-                                  className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer active:scale-95 transition"
+                                  className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 cursor-pointer active:scale-95 transition"
                                 >
                                   <Printer className="w-3.5 h-3.5" />
                                   <span>Kuitansi</span>
@@ -332,13 +332,13 @@ export function RiwayatClient({
                                 <Link
                                   href="/portal-ortu/tagihan"
                                   onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center gap-0.5 text-xs font-bold text-amber-700 hover:underline"
+                                  className="inline-flex items-center gap-0.5 text-xs font-bold text-amber-700 dark:text-amber-400 hover:underline"
                                 >
                                   <span>Bayar</span>
                                   <ChevronRight className="w-3 h-3" />
                                 </Link>
                               ) : (
-                                <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap shrink-0">
+                                <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
                                   {formatPortalStatus(item.status)}
                                 </span>
                               )}
@@ -358,9 +358,9 @@ export function RiwayatClient({
       {/* 3. Pengajuan Bukti Transfer Manual (Legacy Section) */}
       {filter === 'LEGACY' && (
         <div className="space-y-3 pt-1">
-          <div className="rounded-2xl bg-amber-50/70 p-3.5 text-xs text-amber-900 border border-amber-200/50">
+          <div className="rounded-2xl bg-amber-50/70 dark:bg-amber-950/40 p-3.5 text-xs text-amber-900 dark:text-amber-200 border border-amber-200/50 dark:border-amber-900/40">
             <p className="font-bold">Arsip Pengajuan Manual</p>
-            <p className="mt-0.5 text-[11px] text-amber-800 leading-relaxed">
+            <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
               Daftar pengajuan bukti transfer bank dari periode sebelum pembayaran online otomatis diaktifkan.
             </p>
           </div>
@@ -376,10 +376,10 @@ export function RiwayatClient({
               return (
                 <div
                   key={item.id}
-                  className="p-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2.5"
+                  className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-2.5"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900">
+                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
                       {item.kategori === 'SPP' ? 'SPP Bulanan' : 'Non-SPP'}
                     </span>
                     <span
@@ -391,11 +391,11 @@ export function RiwayatClient({
                   </div>
 
                   <div>
-                    <p className="text-base font-bold font-mono text-slate-950">
+                    <p className="text-base font-bold font-mono text-slate-950 dark:text-slate-100">
                       {formatRupiah(item.jumlah)}
                     </p>
-                    <p className="text-xs text-slate-600 mt-0.5">{item.rincian.join(', ')}</p>
-                    <p className="text-xs text-slate-400 mt-0.5 font-medium font-mono">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">{item.rincian.join(', ')}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 font-medium font-mono">
                       {item.metode === 'TRANSFER'
                         ? item.bank
                           ? `Transfer · ${item.bank}`
@@ -406,14 +406,14 @@ export function RiwayatClient({
                   </div>
 
                   {item.status === 'ditolak' && item.rejectReason && (
-                    <div className="rounded-xl bg-red-50 p-2.5 text-xs text-red-900 border border-red-200/80 space-y-1">
-                      <span className="font-bold text-red-800 block text-[11px]">Alasan Penolakan:</span>
-                      <p className="text-xs text-red-700 leading-relaxed">{item.rejectReason}</p>
+                    <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-2.5 text-xs text-red-900 dark:text-red-200 border border-red-200/80 dark:border-red-900/40 space-y-1">
+                      <span className="font-bold text-red-800 dark:text-red-300 block text-[11px]">Alasan Penolakan:</span>
+                      <p className="text-xs text-red-700 dark:text-red-400 leading-relaxed">{item.rejectReason}</p>
                     </div>
                   )}
 
                   {item.status === 'menunggu_konfirmasi' && !item.buktiUrl && (
-                    <p className="rounded-xl bg-amber-50 p-2.5 text-xs text-amber-800">
+                    <p className="rounded-xl bg-amber-50 dark:bg-amber-950/40 p-2.5 text-xs text-amber-800 dark:text-amber-300">
                       Bukti transfer belum diunggah.
                     </p>
                   )}
@@ -447,7 +447,7 @@ export function RiwayatClient({
                               type="button"
                               onClick={() => handleCancelLegacy(item.id)}
                               disabled={cancelling === item.id}
-                              className="flex-1 rounded-xl bg-rose-50 hover:bg-rose-100 py-2 text-xs font-bold text-rose-700 disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition min-h-[38px] border border-rose-200"
+                              className="flex-1 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 py-2 text-xs font-bold text-rose-700 dark:text-rose-300 disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition min-h-[38px] border border-rose-200 dark:border-rose-900/50"
                             >
                               {cancelling === item.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                               Batalkan

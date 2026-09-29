@@ -40,7 +40,7 @@ export default async function AktivitasPage({
   return (
     <div className="px-5 pt-5 pb-32 space-y-5">
       <div>
-        <h1 className="text-4xl font-bold tracking-tight text-slate-950">Aktivitas</h1>
+        <h1 className="text-4xl font-bold tracking-tight text-slate-950 dark:text-slate-100">Aktivitas</h1>
       </div>
 
       <AktivitasClient

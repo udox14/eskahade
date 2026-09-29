@@ -12,19 +12,19 @@ export default async function PortalLoginPage() {
   if (session) redirect('/portal-ortu/beranda')
 
   return (
-    <main className="portal-theme min-h-dvh flex flex-col justify-center items-center bg-slate-50 px-4 py-8 relative selection:bg-emerald-600 selection:text-white overflow-hidden">
+    <main className="portal-theme min-h-dvh flex flex-col justify-center items-center bg-slate-50 dark:bg-slate-950 px-4 py-8 relative selection:bg-emerald-600 selection:text-white overflow-hidden">
       <div className="w-full max-w-sm relative z-10 portal-rise">
         {/* Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-3 mb-5 transition-opacity hover:opacity-80">
             <Image src="/logo.png" alt="Logo" width={44} height={44} className="h-11 w-11 object-contain" priority />
             <div className="text-left">
-              <span className="block text-xs font-bold uppercase tracking-wider text-emerald-700">ESKAHADE</span>
-              <span className="block text-sm font-extrabold text-slate-900">Pesantren Sukahideng</span>
+              <span className="block text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">ESKAHADE</span>
+              <span className="block text-sm font-extrabold text-slate-900 dark:text-slate-100">Pesantren Sukahideng</span>
             </div>
           </Link>
-          <h1 className="portal-display text-2xl font-bold text-slate-900 tracking-tight">Portal Orang Tua</h1>
-          <p className="mt-1.5 text-xs text-slate-500">Pantau presensi, keuangan &amp; kegiatan santri dari mana saja.</p>
+          <h1 className="portal-display text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Portal Orang Tua</h1>
+          <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Pantau presensi, keuangan &amp; kegiatan santri dari mana saja.</p>
         </div>
 
         {/* Form Component */}
@@ -32,10 +32,10 @@ export default async function PortalLoginPage() {
 
         {/* Footer Navigation */}
         <div className="mt-8 flex flex-col items-center gap-3.5 text-sm">
-          <Link href="/login" className="group flex items-center gap-1 text-slate-800 font-semibold hover:text-emerald-700 transition-colors text-xs">
+          <Link href="/login" className="group flex items-center gap-1 text-slate-800 dark:text-slate-200 font-semibold hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors text-xs">
             Masuk Portal Internal Staf <CaretRight aria-hidden className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
-          <Link href="/" className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 transition-colors text-xs font-medium">
+          <Link href="/" className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors text-xs font-medium">
             <ArrowLeft aria-hidden className="h-3.5 w-3.5" /> Kembali ke Beranda
           </Link>
         </div>

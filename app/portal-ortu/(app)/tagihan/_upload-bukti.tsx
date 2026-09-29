@@ -95,16 +95,16 @@ export function UploadBukti({
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="w-full rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100/80 p-4 text-center active:scale-[0.99] transition"
+        className="w-full rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100/80 dark:hover:bg-slate-800/80 p-4 text-center active:scale-[0.99] transition cursor-pointer"
       >
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={preview} alt="Pratinjau bukti" className="mx-auto max-h-56 rounded-lg object-contain" />
         ) : (
           <div className="py-5">
-            <Camera className="mx-auto w-7 h-7 text-slate-600" />
-            <p className="mt-2 text-sm font-semibold text-slate-800">Pilih foto bukti</p>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <Camera className="mx-auto w-7 h-7 text-slate-600 dark:text-slate-400" />
+            <p className="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-200">Pilih foto bukti</p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               Screenshot m-banking atau foto struk transfer/QRIS
             </p>
           </div>
@@ -114,7 +114,7 @@ export function UploadBukti({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="mt-2 w-full text-center text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+          className="mt-2 w-full text-center text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 cursor-pointer"
         >
           Ganti foto
         </button>

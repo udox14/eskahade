@@ -19,18 +19,18 @@ export function PortalPageHeader({
   tabs?: React.ReactNode
 }) {
   return (
-    <div className="bg-white border-b border-slate-200/80 px-5 pt-6 pb-5">
+    <div className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 px-5 pt-6 pb-5">
       <div className="portal-rise">
         {kicker && (
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
             {kicker}
           </p>
         )}
-        <h1 className="portal-display mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+        <h1 className="portal-display mt-1 text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">
           {title}
         </h1>
         {subtitle && (
-          <p className="mt-1 text-xs text-slate-500 leading-relaxed max-w-md">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-md">
             {subtitle}
           </p>
         )}

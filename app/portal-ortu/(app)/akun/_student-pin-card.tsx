@@ -76,12 +76,12 @@ export function StudentPinCard({
     <form onSubmit={handleSubmit} className="space-y-3.5 pt-1">
       {/* Alert jika terkunci */}
       {isLocked && (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-3 text-rose-950 space-y-1">
-          <p className="font-bold flex items-center gap-1.5 text-xs text-rose-800">
-            <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+        <div className="rounded-2xl border border-rose-200 dark:border-rose-800/60 bg-rose-50/80 dark:bg-rose-950/40 p-3 text-rose-950 dark:text-rose-200 space-y-1">
+          <p className="font-bold flex items-center gap-1.5 text-xs text-rose-800 dark:text-rose-300">
+            <ShieldAlert className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
             <span>PIN Sedang Terkunci</span>
           </p>
-          <p className="text-[11px] text-rose-700 leading-relaxed">
+          <p className="text-[11px] text-rose-700 dark:text-rose-400 leading-relaxed">
             Santri salah memasukkan PIN 3 kali di loket. Buat PIN baru di bawah ini untuk langsung membuka kunci.
           </p>
         </div>
@@ -89,7 +89,7 @@ export function StudentPinCard({
 
       {/* Input 1: Password Ortu (Verifikasi) */}
       <div>
-        <label htmlFor={`${formId}-password`} className="block font-bold text-slate-700 text-xs mb-1">
+        <label htmlFor={`${formId}-password`} className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1">
           Password Portal Orang Tua
         </label>
         <input
@@ -99,14 +99,14 @@ export function StudentPinCard({
           value={passwordPortal}
           onChange={e => setPasswordPortal(e.target.value)}
           placeholder="Masukkan kata sandi akun Anda"
-          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
+          className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white focus:border-emerald-600 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
           required
         />
       </div>
 
       {/* Input 2: PIN Baru 6 Digit */}
       <div>
-        <label htmlFor={`${formId}-pin`} className="block font-bold text-slate-700 text-xs mb-1">
+        <label htmlFor={`${formId}-pin`} className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1">
           PIN Baru Santri (6 Digit Angka)
         </label>
         <input
@@ -118,14 +118,14 @@ export function StudentPinCard({
           value={pinBaru}
           onChange={e => setPinBaru(e.target.value.replace(/\D/g, ''))}
           placeholder="••••••"
-          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-mono tracking-widest text-slate-950 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
+          className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3.5 py-2.5 text-sm font-mono tracking-widest text-slate-950 dark:text-white focus:border-emerald-600 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
           required
         />
       </div>
 
       {/* Input 3: Konfirmasi PIN Baru */}
       <div>
-        <label htmlFor={`${formId}-confirm`} className="block font-bold text-slate-700 text-xs mb-1">
+        <label htmlFor={`${formId}-confirm`} className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1">
           Ulangi PIN Baru
         </label>
         <input
@@ -137,7 +137,7 @@ export function StudentPinCard({
           value={konfirmasiPin}
           onChange={e => setKonfirmasiPin(e.target.value.replace(/\D/g, ''))}
           placeholder="••••••"
-          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-mono tracking-widest text-slate-950 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
+          className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3.5 py-2.5 text-sm font-mono tracking-widest text-slate-950 dark:text-white focus:border-emerald-600 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
           required
         />
       </div>
@@ -148,7 +148,7 @@ export function StudentPinCard({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 min-h-[44px] rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer active:scale-95 transition"
+            className="flex-1 min-h-[44px] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer active:scale-95 transition"
           >
             Batal
           </button>

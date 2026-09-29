@@ -69,15 +69,15 @@ export function WalletLimitCard({
   return (
     <form onSubmit={handleSave} className="space-y-4 pt-1">
       {/* Metric Display Card (Tanpa tulisan "Limit Aktif Santri", Bersih & Menonjol) */}
-      <div className="rounded-2xl bg-emerald-50/70 border border-emerald-200/80 p-3.5 flex items-center justify-between">
+      <div className="rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 p-3.5 flex items-center justify-between">
         <div>
-          <p className="text-2xl font-extrabold text-emerald-950 font-mono tracking-tight">
+          <p className="text-2xl font-extrabold text-emerald-950 dark:text-emerald-200 font-mono tracking-tight">
             {formatRupiah(effectiveDaily)}{' '}
-            <span className="text-xs font-semibold text-emerald-700 font-sans">/hari</span>
+            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 font-sans">/hari</span>
           </p>
         </div>
         <div className="text-right">
-          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white text-slate-700 border border-emerald-200/60 font-mono shadow-2xs">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-emerald-200/60 dark:border-slate-700 font-mono shadow-2xs">
             Maksimal {formatRupiah(globalDailyLimit)}
           </span>
         </div>
@@ -85,14 +85,14 @@ export function WalletLimitCard({
 
       {/* Quick Preset Chips */}
       <div className="space-y-1.5">
-        <span className="text-[11px] font-bold text-slate-700 block">Pilihan Cepat:</span>
+        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">Pilihan Cepat:</span>
         <div className="grid grid-cols-4 gap-1.5 font-mono text-xs">
           {[20000, 30000, 50000, 100000].map(val => (
             <button
               key={val}
               type="button"
               onClick={() => setPreset(val)}
-              className="py-2 rounded-xl bg-slate-100 hover:bg-emerald-100 hover:text-emerald-900 font-bold text-slate-700 transition active:scale-95 cursor-pointer text-center"
+              className="py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 hover:text-emerald-900 dark:hover:text-emerald-200 font-bold text-slate-700 dark:text-slate-200 transition active:scale-95 cursor-pointer text-center"
             >
               {val >= 1000 ? `${val / 1000}rb` : val}
             </button>
@@ -102,11 +102,11 @@ export function WalletLimitCard({
 
       {/* Input Manual Nominal */}
       <div>
-        <label htmlFor={`${formId}-daily`} className="block font-bold text-slate-700 text-xs mb-1">
+        <label htmlFor={`${formId}-daily`} className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1">
           Nominal Batas Harian (Rp)
         </label>
         <div className="relative">
-          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono font-bold text-slate-400 text-xs">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono font-bold text-slate-400 dark:text-slate-500 text-xs">
             Rp
           </span>
           <input
@@ -118,10 +118,10 @@ export function WalletLimitCard({
             value={daily}
             onChange={e => setDaily(e.target.value)}
             placeholder={String(globalDailyLimit)}
-            className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3.5 py-2.5 text-sm font-bold font-mono text-slate-950 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
+            className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 pl-10 pr-3.5 py-2.5 text-sm font-bold font-mono text-slate-950 dark:text-white focus:border-emerald-600 dark:focus:border-emerald-500 focus:ring-1 focus:ring-emerald-600 focus:outline-hidden transition"
           />
         </div>
-        <p className="text-[11px] text-slate-500 mt-1">
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
           Kosongkan untuk mengikuti batas maksimal yang ditetapkan pesantren ({formatRupiah(globalDailyLimit)}).
         </p>
       </div>
@@ -132,7 +132,7 @@ export function WalletLimitCard({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 min-h-[44px] rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer active:scale-95 transition"
+            className="flex-1 min-h-[44px] rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer active:scale-95 transition"
           >
             Batal
           </button>

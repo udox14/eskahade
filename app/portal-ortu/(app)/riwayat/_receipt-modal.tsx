@@ -383,7 +383,7 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 min-h-[44px] rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition cursor-pointer"
+            className="flex-1 min-h-[44px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition cursor-pointer"
           >
             Tutup
           </button>

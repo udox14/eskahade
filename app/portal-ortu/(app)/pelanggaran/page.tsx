@@ -7,9 +7,9 @@ import { formatTanggalId } from '@/lib/portal/format'
 export const dynamic = 'force-dynamic'
 
 const JENIS_STYLE: Record<string, string> = {
-  RINGAN: 'bg-amber-100 text-amber-800',
-  SEDANG: 'bg-orange-100 text-orange-800',
-  BERAT: 'bg-rose-100 text-rose-800',
+  RINGAN: 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300',
+  SEDANG: 'bg-orange-100 dark:bg-orange-950/60 text-orange-800 dark:text-orange-300',
+  BERAT: 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300',
 }
 
 export default async function PelanggaranPage() {
@@ -22,12 +22,12 @@ export default async function PelanggaranPage() {
       <div>
         <Link
           href="/portal-ortu/aktivitas"
-          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 hover:text-emerald-900 transition mb-2"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-800 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300 transition mb-2"
         >
           &larr; Kembali ke Aktivitas
         </Link>
-        <h1 className="text-4xl font-bold tracking-tight text-slate-950">Catatan Kedisiplinan</h1>
-        <p className="text-xs text-slate-500 mt-0.5">
+        <h1 className="text-4xl font-bold tracking-tight text-slate-950 dark:text-slate-100">Catatan Kedisiplinan</h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
           Catatan kedisiplinan dan pelanggaran dari bagian keamanan pesantren.
         </p>
       </div>
@@ -46,38 +46,38 @@ export default async function PelanggaranPage() {
 
       {/* Flat List */}
       <div className="space-y-2 pt-1">
-        <h2 className="text-sm font-bold text-slate-900">
+        <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
           Daftar Catatan
         </h2>
 
         {daftar.length === 0 ? (
-          <div className="flex items-center gap-3 py-4 text-xs text-emerald-800">
-            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+          <div className="flex items-center gap-3 py-4 text-xs text-emerald-800 dark:text-emerald-400">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <div>
-              <p className="font-bold text-emerald-950">Alhamdulillah, bersih!</p>
-              <p className="text-slate-500">Tidak ada catatan pelanggaran yang tercatat untuk santri ini.</p>
+              <p className="font-bold text-emerald-950 dark:text-emerald-200">Alhamdulillah, bersih!</p>
+              <p className="text-slate-500 dark:text-slate-400">Tidak ada catatan pelanggaran yang tercatat untuk santri ini.</p>
             </div>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {daftar.map((item) => (
               <div key={item.id} className="py-3.5 space-y-1">
                 <div className="flex items-center justify-between">
                   <span
                     className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold ${
-                      JENIS_STYLE[String(item.jenis).toUpperCase()] || 'bg-slate-100 text-slate-700'
+                      JENIS_STYLE[String(item.jenis).toUpperCase()] || 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                     }`}
                   >
                     {item.jenis}
                   </span>
-                  <span className="text-xs text-slate-600 font-medium">
+                  <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                     {formatTanggalId(item.tanggal)}
                   </span>
                 </div>
                 {item.deskripsi && (
-                  <p className="text-xs text-slate-700 leading-relaxed pt-0.5">{item.deskripsi}</p>
+                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed pt-0.5">{item.deskripsi}</p>
                 )}
-                <p className="text-xs font-bold text-rose-600 font-mono">+{item.poin} poin</p>
+                <p className="text-xs font-bold text-rose-600 dark:text-rose-400 font-mono">+{item.poin} poin</p>
               </div>
             ))}
           </div>
