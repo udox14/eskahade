@@ -118,7 +118,7 @@ export default async function PortalBerandaPage() {
           {/* Shortcut 1: Presensi Pengajian */}
           <Link
             href="/portal-ortu/absensi"
-            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-emerald-50/90 dark:bg-emerald-950/40 p-2.5 text-center active:scale-95 transition hover:bg-emerald-100/70 dark:hover:bg-emerald-900/50"
+            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-emerald-50/90 dark:bg-emerald-950/40 border border-slate-200/60 dark:border-white/5 p-2.5 text-center active:scale-95 transition hover:bg-emerald-100/70 dark:hover:bg-emerald-900/50"
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-200/60 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-300">
               <CalendarCheck className="w-5 h-5" weight="duotone" />
@@ -131,7 +131,7 @@ export default async function PortalBerandaPage() {
           {/* Shortcut 2: Kedisiplinan / Poin Pelanggaran */}
           <Link
             href="/portal-ortu/pelanggaran"
-            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-blue-50/90 dark:bg-blue-950/40 p-2.5 text-center active:scale-95 transition hover:bg-blue-100/70 dark:hover:bg-blue-900/50"
+            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-blue-50/90 dark:bg-blue-950/40 border border-slate-200/60 dark:border-white/5 p-2.5 text-center active:scale-95 transition hover:bg-blue-100/70 dark:hover:bg-blue-900/50"
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-200/60 dark:bg-blue-900/60 text-blue-900 dark:text-blue-300">
               <ShieldCheck className="w-5 h-5" weight="duotone" />
@@ -144,7 +144,7 @@ export default async function PortalBerandaPage() {
           {/* Shortcut 3: Cicilan USPP (Uang Gedung) */}
           <Link
             href="/portal-ortu/tagihan"
-            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-amber-50/90 dark:bg-amber-950/40 p-2.5 text-center active:scale-95 transition hover:bg-amber-100/70 dark:hover:bg-amber-900/50"
+            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-amber-50/90 dark:bg-amber-950/40 border border-slate-200/60 dark:border-white/5 p-2.5 text-center active:scale-95 transition hover:bg-amber-100/70 dark:hover:bg-amber-900/50"
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-200/60 dark:bg-amber-900/60 text-amber-900 dark:text-amber-300">
               <CreditCard className="w-5 h-5" weight="duotone" />
@@ -157,7 +157,7 @@ export default async function PortalBerandaPage() {
           {/* Shortcut 4: Kuitansi Resmi / Bukti Bayar */}
           <Link
             href="/portal-ortu/riwayat"
-            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-teal-50/90 dark:bg-teal-950/40 p-2.5 text-center active:scale-95 transition hover:bg-teal-100/70 dark:hover:bg-teal-900/50"
+            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-teal-50/90 dark:bg-teal-950/40 border border-slate-200/60 dark:border-white/5 p-2.5 text-center active:scale-95 transition hover:bg-teal-100/70 dark:hover:bg-teal-900/50"
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-200/60 dark:bg-teal-900/60 text-teal-900 dark:text-teal-300">
               <ClockCounterClockwise className="w-5 h-5" weight="duotone" />

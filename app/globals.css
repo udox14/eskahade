@@ -142,7 +142,7 @@ body {
    maupun halaman publik. Sesuai UI_UX_GUIDELINES.md. */
 .portal-theme {
   --p-ink: #0f172a;
-  --p-paper: #f8fafc;
+  --p-paper: #fafaf9;
   --p-white: #ffffff;
   --p-red: #e11d48;
   --p-line: #e2e8f0;
@@ -156,7 +156,7 @@ body {
   --p-emerald: #059669;
   --p-emerald-deep: #047857;
   --p-card: #ffffff;
-  --p-cream: #f8fafc;
+  --p-cream: #fafaf9;
   --p-radius-card: 12px;
   --p-radius-sm: 8px;
   --p-radius-md: 12px;
@@ -164,7 +164,32 @@ body {
   --p-shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --p-shadow-pop: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
   color: var(--p-ink);
-  background: var(--p-paper);
+  background-color: var(--p-paper);
+}
+
+:is(.dark, .dark *) .portal-theme,
+.dark .portal-theme,
+.portal-theme.dark,
+.dark.portal-theme {
+  --p-ink: #f8fafc;
+  --p-paper: #020617;
+  --p-white: #0f172a;
+  --p-card: #0f172a;
+  --p-cream: #020617;
+  --p-line: #1e293b;
+  --p-muted: #94a3b8;
+  --p-success: #10b981;
+  --p-success-soft: rgba(5, 150, 105, 0.2);
+  --p-warning: #f59e0b;
+  --p-warning-soft: rgba(217, 119, 6, 0.2);
+  --p-danger: #f43f5e;
+  --p-danger-soft: rgba(225, 29, 72, 0.2);
+  --p-emerald: #10b981;
+  --p-emerald-deep: #059669;
+  --p-shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
+  --p-shadow-pop: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+  color: var(--p-ink);
+  background-color: var(--p-paper);
 }
 
 .portal-display {
