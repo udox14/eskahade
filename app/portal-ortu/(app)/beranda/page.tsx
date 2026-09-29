@@ -6,7 +6,7 @@ import {
   CreditCard,
   ShieldCheck,
   CaretRight,
-} from '@phosphor-icons/react'
+} from '@phosphor-icons/react/dist/ssr'
 import { requirePortalSessionStrict } from '@/lib/portal/session'
 import {
   getRekapAbsensiAnak,
