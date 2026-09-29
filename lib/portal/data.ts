@@ -17,6 +17,8 @@ export type RekapAbsensiAnak = {
   izin: number
   alfa: number
   detail: { tanggal: string; shubuh: string | null; ashar: string | null; maghrib: string | null }[]
+  validDates?: string[]
+  liburSesi?: string[]
 }
 
 // Rekap absensi authoritative untuk Portal Orang Tua:
@@ -42,6 +44,8 @@ export async function getRekapAbsensiAnak(
     izin: 0,
     alfa: 0,
     detail: [],
+    validDates: [],
+    liburSesi: [],
   }
 
   const range = getDateRange(startDate, endDate)
@@ -127,6 +131,8 @@ export async function getRekapAbsensiAnak(
       izin: 0,
       alfa: 0,
       detail: [],
+      validDates: [],
+      liburSesi: [],
     }
   }
 
@@ -211,6 +217,8 @@ export async function getRekapAbsensiAnak(
     izin,
     alfa,
     detail,
+    validDates: Array.from(validDates),
+    liburSesi: Array.from(liburSet),
   }
 }
 
