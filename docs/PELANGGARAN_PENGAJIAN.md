@@ -5,12 +5,25 @@ Modul manual berada di `/dashboard/akademik/pelanggaran-pengajian`, dalam kelomp
 ## Operasional
 
 - Input dilakukan melalui **Riwayat → Catat Pelanggaran**. Satu kejadian berisi satu santri, satu jenis, tanggal/jam UTC+7, sesi wajib, dan catatan opsional.
+- Sesi otomatis mengikuti waktu kejadian UTC+7: **04.00–07.59 Shubuh**, **15.00–17.59 Ashar**, **18.00–21.59 Malam**. Di luar rentang tersebut, sesi wajib dipilih manual. Perubahan waktu menghitung ulang sesi; server menerapkan aturan yang sama. Label Malam memakai kode histori `maghrib` existing agar kompatibel tanpa migrasi data.
+- Tampilan mengikuti benchmark **Status Pembayaran** dan `docs/UI_UX_GUIDELINES.md`: padding halaman dari shell dashboard, toolbar ringkas, tabel desktop/daftar ponsel, modal dengan header dan footer tetap serta isi bergulir. Riwayat, rekap, pencarian, dan detail menggunakan foto master santri existing dengan fallback inisial.
 - **Rekap** selalu menghitung kejadian aktif yang memenuhi filter. Batas jumlah berlaku setelah filter kejadian, bukan berdasarkan jumlah seluruh histori. Pilih santri untuk membuka detail; **Semua riwayat santri** menampilkan seluruh periode termasuk catatan batal.
 - **Analitik** default bulan berjalan hingga hari ini. Santri berulang berarti minimal dua kejadian aktif pada periode/filter yang sama. Sebaran jenis/asrama/sesi/kelas dapat diklik untuk membuka riwayat yang sesuai.
 - Asrama/kamar/kelas mengikuti penempatan saat ini, bukan penempatan ketika kejadian. Riwayat tetap ada ketika santri diarsipkan. Kelas yang dihitung adalah kelas aktif pada tahun ajaran aktif. Santri dengan beberapa kelas dapat muncul sekali di masing-masing kelompok kelas, sehingga jumlah antarkelas tidak selalu sama dengan total kejadian.
 - Sebaran menampilkan hingga 100 kelompok; daftar santri berulang menampilkan 10 teratas. Riwayat dan rekap menggunakan pagination 30 item.
 
 ## Akses dan integritas
+
+### Foto kejadian opsional
+
+- Form pencatatan baru menyediakan pemotret langsung di modal melalui `getUserMedia`, tanpa aplikasi kamera bawaan/file picker. Kamera belakang default; tersedia ganti kamera, ulangi, gunakan foto, atau tanpa foto. Kamera berhenti saat capture/close/unmount. Memerlukan HTTPS (atau localhost) dan izin kamera browser.
+- Kompresi memakai encoder existing: WebP, sisi terpanjang maksimal 960px, sasaran 80 KB, batas server 120 KB. Penurunan kualitas/resolusi bertahap dengan batas 640px menjaga keterbacaan; hasil aktual bergantung detail/pencahayaan. Server memeriksa MIME, ukuran, header WebP, dimensi, dan menolak animasi.
+- Satu foto per kejadian saat input baru; koreksi tidak mengganti foto. Foto kejadian terpisah dari foto profil santri. Riwayat/detail menyediakan **Lihat Foto Kejadian**.
+- Bucket existing `eskahade-foto`, prefix `pengajian-evidence/prod/` atau `pengajian-evidence/demo/`, disetujui eksplisit pengguna pada 30 September 2026. Endpoint foto memeriksa izin fitur/cakupan santri dan memakai `private, no-store`; prefix bukti ditolak endpoint file publik existing.
+- Retensi **30 × 24 jam sejak foto disimpan**, bukan tanggal kejadian. Foto expired langsung tidak dapat dibaca. Worker setiap 15 menit menghapus file R2 (maksimal 200 file per database/run; backlog dilanjutkan run berikutnya). Metadata expiry tetap ada; catatan/revisi pelanggaran tetap tersimpan. Kegagalan R2 dicoba ulang.
+- Metadata dipesan sebelum upload agar file tetap terlacak saat jaringan terputus. Retry memakai identitas/hash sama tanpa memperpanjang retensi. Upload pending dapat dicoba ulang selama satu jam. Jika foto gagal, catatan tetap tersimpan, formulir terkunci, dan tersedia **Coba Simpan Foto** atau **Lanjut Tanpa Foto** tanpa membuat kejadian kedua. Metadata tetap terlacak setelah reset demo.
+- Sebelum rilis foto: jalankan migrasi `0175_pengajian_violation_photos.sql` pada DB dan DEMO_DB setelah 0174, lalu deploy aplikasi dan worker menggunakan `wrangler.pengajian-photo-cleanup.jsonc`. Penghapusan fisik otomatis memerlukan worker ini aktif. Belum diterapkan ke produksi/demo. Saat rollback aplikasi, pertahankan tabel metadata dan worker cleanup.
+- Verifikasi tambahan: `npm run test:pengajian-photos` dan test Server Actions meliputi unggah, replay, kegagalan R2, izin/namespace, expiry, endpoint, cleanup/retry, dan pelacakan setelah reset demo. Browser memakai kamera simulasi; kamera perangkat sungguhan perlu diperiksa saat rilis.
 
 - Admin/sekpen/keamanan melihat semua santri. Guru/wali kelas terbatas pada santri di kelas tanggung jawabnya pada tahun ajaran aktif, termasuk untuk pencarian, opsi filter, detail, dan analitik. Guru tanpa kelas mendapatkan hasil kosong. Role lain pada akun guru tidak membuka akses semua santri, kecuali admin/sekpen/keamanan.
 - Izin baca dan CRUD tetap mengikuti konfigurasi fitur existing. Pengaturan jenis hanya untuk admin/sekpen. Pengguna lain hanya dapat mengoreksi/membatalkan catatan buatannya sendiri dalam cakupan aksesnya.

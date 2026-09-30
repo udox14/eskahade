@@ -19,6 +19,8 @@ type Stmt = { sql: string; params?: unknown[] }
 // Tabel data yang dibersihkan saat reset (urutan aman thd FK).
 // users TIDAK dihapus di sini — disinkronkan terpisah di bawah.
 const DATA_TABLES = [
+  // Photo retention metadata survives reset (FK becomes NULL), so R2 cleanup
+  // still tracks every object, including interrupted uploads.
   'pengajian_violation_revisions', 'pengajian_violations',
   'absensi_harian', 'absensi_guru', 'absen_asrama', 'absen_sakit',
   'nilai_akademik', 'nilai_akhlak', 'ranking',

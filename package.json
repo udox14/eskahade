@@ -15,7 +15,8 @@
     "test:poskestren": "node scripts/test-poskestren-clinical.cjs",
     "test:poskestren:disease": "node scripts/test-poskestren-disease-report.cjs",
     "test:poskestren:ui": "node scripts/test-poskestren-ui.cjs",
-    "test:pengajian-violations": "node scripts/test-pengajian-violations.cjs"
+    "test:pengajian-violations": "node scripts/test-pengajian-violations.cjs",
+    "test:pengajian-photos": "node scripts/test-pengajian-photos.cjs"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "latest",

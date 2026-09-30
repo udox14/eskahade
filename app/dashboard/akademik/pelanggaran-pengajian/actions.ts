@@ -1,12 +1,16 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { isDemoRequest } from '@/lib/auth/demo-context'
 import { batch, getDB, query, queryOne, now } from '@/lib/db'
 import { assertFeature, canFeatureForSession } from '@/lib/auth/feature'
 import { getEffectiveRoles, type SessionUser } from '@/lib/auth/session'
 import { getOwnKelasIds } from '@/lib/akademik/guru-access'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { parseWibDateTime, toWibDateTimeLocalValue } from '@/lib/date/wib'
+import { inferSession } from '@/lib/pengajian-violations/session'
+import { PHOTO_MAX_BYTES, PHOTO_PREFIX, PHOTO_RETENTION_MS, validateEvidenceWebP } from '@/lib/pengajian-violations/photo'
 import { ACTIVE_EDUCATION, BASE_FROM, countHaving, orderBy, studentScope, whereClause } from '@/lib/pengajian-violations/query'
 import { HREF, PAGE_SIZE, type Analytics, type Bucket, type Capabilities, type Filters, type Incident, type Options, type Page, type Recap, type Result, type Santri, type SaveInput, type ViolationType } from '@/lib/pengajian-violations/types'
 
@@ -50,7 +54,7 @@ export async function searchSantri(search: string): Promise<Result<Santri[]>> {
   const {classes}=await access(); filters({search})
   if (search.trim().length<2) return []
   const scope=studentScope(classes)
-  return query<Santri>(`SELECT s.id,s.nis,s.nama_lengkap,s.asrama,s.kamar,s.jenis_kelamin,s.status_global FROM santri s WHERE ${scope.sql} AND lower(trim(s.status_global))='aktif' AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?) ORDER BY s.nama_lengkap,s.id LIMIT 20`,[...scope.params,`%${search.trim()}%`,`%${search.trim()}%`])
+  return query<Santri>(`SELECT s.id,s.nis,s.nama_lengkap,s.foto_url,s.asrama,s.kamar,s.jenis_kelamin,s.status_global FROM santri s WHERE ${scope.sql} AND lower(trim(s.status_global))='aktif' AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?) ORDER BY s.nama_lengkap,s.id LIMIT 20`,[...scope.params,`%${search.trim()}%`,`%${search.trim()}%`])
  })
 }
 export async function getOptions(): Promise<Result<Options>> {
@@ -70,14 +74,59 @@ async function history(f: Filters, classes: string[]|null, page: number, santriI
  const w=whereClause(filters(f),classes,santriId); pageNumber(page)
  const [count,rows]=await Promise.all([
   queryOne<{n:number}>(`SELECT COUNT(*) n ${BASE_FROM} WHERE ${w.sql}`,w.params),
-  query<Incident>(`SELECT v.*,s.nama_lengkap,s.nis,s.asrama,s.kamar,u.full_name actor_name ${BASE_FROM} WHERE ${w.sql} ORDER BY ${orderBy(f)} LIMIT ? OFFSET ?`,[...w.params,PAGE_SIZE,(page-1)*PAGE_SIZE]),
+  query<Incident>(`SELECT v.*,s.nama_lengkap,s.nis,s.foto_url,s.asrama,s.kamar,u.full_name actor_name,
+   (SELECT CASE WHEN p.state='attached' AND p.expires_at>? THEN '/api/pengajian-violations/photo/'||v.id ELSE NULL END FROM pengajian_violation_photos p WHERE p.violation_id=v.id) evidence_url,
+   (SELECT CASE WHEN p.state='pending' THEN NULL ELSE p.expires_at END FROM pengajian_violation_photos p WHERE p.violation_id=v.id) evidence_expires_at
+   ${BASE_FROM} WHERE ${w.sql} ORDER BY ${orderBy(f)} LIMIT ? OFFSET ?`,[now(),...w.params,PAGE_SIZE,(page-1)*PAGE_SIZE]),
  ])
  return {rows,total:count?.n??0,page}
 }
 export async function getHistory(f: Filters={},page=1): Promise<Result<Page<Incident>>> {
  return result(async()=>{const {classes}=await access(); return history(f,classes,page)})
 }
-const RECAP_COLUMNS='s.id santri_id,s.nama_lengkap,s.nis,s.asrama,s.kamar,COUNT(*) count,COUNT(DISTINCT v.type_id) type_count,MAX(v.occurred_at) last'
+type EvidenceRow={request_id:string;object_key:string;content_hash:string;created_at:string;expires_at:string;state:'pending'|'attached'|'deleted'}
+export async function attachIncidentPhoto(incidentId:string,request:string,form:FormData):Promise<Result<{expiresAt:string}>> {
+ return result(async()=>{
+  const {session,classes}=await access('create');requestId(incidentId);requestId(request)
+  const incident=await existing(incidentId,classes)
+  if(incident.created_by!==session.id||incident.status!=='active'||incident.version!==1)throw new InputError('Foto hanya dapat dilampirkan pada catatan baru milik Anda yang belum dikoreksi.')
+  const file=form.get('photo')
+  if(!(file instanceof File)||file.type!=='image/webp'||file.size<1||file.size>PHOTO_MAX_BYTES)throw new InputError('Foto harus WebP, maksimal 120 KB.')
+  const bytes=new Uint8Array(await file.arrayBuffer())
+  try{validateEvidenceWebP(bytes)}catch(error){throw new InputError(error instanceof Error?error.message:'Foto tidak valid.')}
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(n=>n.toString(16).padStart(2,'0')).join('')
+  const timestamp=now(),expiresAt=new Date(Date.parse(timestamp)+PHOTO_RETENTION_MS).toISOString()
+  const namespace=await isDemoRequest()?'demo':'prod'
+  const key=`${PHOTO_PREFIX}${namespace}/${timestamp}/${incidentId}/${request}.webp`
+  const scope=studentScope(classes)
+  // Reserve metadata before upload. Any failed/interrupted R2 upload stays tracked for cleanup.
+  await batch([{sql:`INSERT INTO pengajian_violation_photos(violation_id,request_id,object_key,content_hash,byte_size,created_at,expires_at)
+   SELECT v.id,?,?,?,?,?,? FROM pengajian_violations v JOIN santri s ON s.id=v.santri_id WHERE v.id=? AND v.created_by=? AND v.status='active' AND v.version=1 AND ${scope.sql} ON CONFLICT(violation_id) DO NOTHING`,params:[request,key,hash,file.size,timestamp,expiresAt,incidentId,session.id,...scope.params]}])
+  const photo=await queryOne<EvidenceRow>('SELECT * FROM pengajian_violation_photos WHERE violation_id=?',[incidentId])
+  if(!photo||photo.request_id!==request||photo.content_hash!==hash)throw new InputError('Foto lain telah tersimpan. Muat ulang untuk melihat catatan terbaru.')
+  if(photo.state==='deleted'||photo.expires_at<=timestamp)throw new InputError('Masa penyimpanan foto sudah berakhir.')
+  if(photo.state==='attached')return {expiresAt:photo.expires_at}
+  if(Date.parse(timestamp)-Date.parse(photo.created_at)>60*60*1000)throw new InputError('Waktu pengunggahan foto sudah berakhir. Lanjutkan tanpa foto.')
+  const {env}=await getCloudflareContext({async:true})
+  await env.R2_BUCKET.put(photo.object_key,bytes,{httpMetadata:{contentType:'image/webp',cacheControl:'private, no-store'}})
+  await batch([{sql:`UPDATE pengajian_violation_photos SET state='attached' WHERE violation_id=? AND request_id=? AND state='pending' AND expires_at>?
+   AND EXISTS(SELECT 1 FROM pengajian_violations v JOIN santri s ON s.id=v.santri_id WHERE v.id=? AND v.created_by=? AND v.status='active' AND v.version=1 AND ${scope.sql})`,params:[incidentId,request,timestamp,incidentId,session.id,...scope.params]}])
+  const attached=await queryOne<EvidenceRow>('SELECT * FROM pengajian_violation_photos WHERE violation_id=?',[incidentId])
+  if(attached?.state!=='attached')throw new InputError('Catatan telah berubah. Lanjutkan tanpa foto; lampiran tidak ditampilkan.')
+  await activity(session,'photo_attach',incidentId)
+  return {expiresAt:photo.expires_at}
+ })
+}
+export async function getIncidentPhotoKey(incidentId:string):Promise<Result<{key:string}>> {
+ return result(async()=>{
+  const {classes}=await access();requestId(incidentId);await existing(incidentId,classes)
+  const photo=await queryOne<EvidenceRow>("SELECT * FROM pengajian_violation_photos WHERE violation_id=? AND state='attached' AND expires_at>?",[incidentId,now()])
+  const namespace=await isDemoRequest()?'demo':'prod'
+  if(!photo||!photo.object_key.startsWith(`${PHOTO_PREFIX}${namespace}/`))throw new InputError('Foto tidak tersedia atau sudah melewati 30 hari.')
+  return {key:photo.object_key}
+ })
+}
+const RECAP_COLUMNS='s.id santri_id,s.nama_lengkap,s.nis,s.foto_url,s.asrama,s.kamar,COUNT(*) count,COUNT(DISTINCT v.type_id) type_count,MAX(v.occurred_at) last'
 export async function getRecap(f: Filters={},page=1): Promise<Result<Page<Recap>>> {
  return result(async()=>{
   const {classes}=await access(); const w=whereClause(filters(f),classes,undefined,true); const h=countHaving(f); pageNumber(page)
@@ -92,7 +141,7 @@ export async function getRecap(f: Filters={},page=1): Promise<Result<Page<Recap>
 export async function getStudentDetail(santriId: string,f: Filters={},page=1): Promise<Result<{student:Santri;history:Page<Incident>}>> {
  return result(async()=>{
   const {classes}=await access(); const scope=studentScope(classes)
-  const student=await queryOne<Santri>(`SELECT s.id,s.nis,s.nama_lengkap,s.asrama,s.kamar,s.jenis_kelamin,s.status_global FROM santri s WHERE s.id=? AND ${scope.sql}`,[santriId,...scope.params])
+  const student=await queryOne<Santri>(`SELECT s.id,s.nis,s.nama_lengkap,s.foto_url,s.asrama,s.kamar,s.jenis_kelamin,s.status_global FROM santri s WHERE s.id=? AND ${scope.sql}`,[santriId,...scope.params])
   if (!student) throw new InputError('Santri tidak ditemukan atau di luar cakupan akses.')
   return {student,history:await history(f,classes,page,santriId)}
  })
@@ -123,12 +172,13 @@ function payload(input: SaveInput) {
  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(local)) throw new InputError('Waktu kejadian tidak valid.')
  const date=parseWibDateTime(local)
  if (!Number.isFinite(date.getTime()) || toWibDateTimeLocalValue(date)!==local) throw new InputError('Waktu kejadian tidak valid.')
- if (!['shubuh','ashar','maghrib'].includes(input.session)) throw new InputError('Pilih sesi pengajian.')
- return {date:date.toISOString(),note:clean(input.note,2000,'Catatan'),reason:clean(input.reason??'',500,'Alasan')}
+ const session=inferSession(local)||input.session
+ if (!['shubuh','ashar','maghrib'].includes(session)) throw new InputError('Pilih sesi pengajian.')
+ return {date:date.toISOString(),session,note:clean(input.note,2000,'Catatan'),reason:clean(input.reason??'',500,'Alasan')}
 }
 async function existing(id: string,classes: string[]|null) {
  const w=whereClause({status:'all'},classes)
- const row=await queryOne<Incident>(`SELECT v.*,s.nama_lengkap,s.nis,s.asrama,s.kamar,u.full_name actor_name ${BASE_FROM} WHERE v.id=? AND ${w.sql}`,[id,...w.params])
+ const row=await queryOne<Incident>(`SELECT v.*,s.nama_lengkap,s.nis,s.foto_url,s.asrama,s.kamar,u.full_name actor_name ${BASE_FROM} WHERE v.id=? AND ${w.sql}`,[id,...w.params])
  if (!row) throw new InputError('Catatan tidak ditemukan atau di luar cakupan akses.')
  return row
 }
@@ -144,7 +194,7 @@ export async function saveIncident(input: SaveInput): Promise<Result<{id:string}
  return result(async()=>{
   const editing=input.version!=null; const {session,classes}=await access(editing?'update':'create')
   requestId(input.id); requestId(input.requestId); const p=payload(input); const scope=studentScope(classes)
-  const expected={santri_id:input.santriId,type_id:input.typeId,occurred_at:p.date,session:input.session,note:p.note,...editing?{version:(input.version??0)+1}:{}}
+  const expected={santri_id:input.santriId,type_id:input.typeId,occurred_at:p.date,session:p.session,note:p.note,...editing?{version:(input.version??0)+1}:{}}
   if(await replay(input.requestId,input.id,session.id,editing?'update':'create',expected,editing?p.reason:'')) {
    const row=await existing(input.id,classes);if(editing)owns(session,row)
    return {id:input.id}
@@ -154,14 +204,14 @@ export async function saveIncident(input: SaveInput): Promise<Result<{id:string}
    const replay=await queryOne<Incident>('SELECT * FROM pengajian_violations WHERE id=?',[input.id])
    if (replay) {
     await existing(input.id,classes)
-    if (replay.created_by!==session.id || replay.santri_id!==input.santriId || replay.type_id!==input.typeId || replay.occurred_at!==p.date || replay.session!==input.session || replay.note!==p.note) throw new InputError('Identitas permintaan telah digunakan. Muat ulang formulir.')
+    if (replay.created_by!==session.id || replay.santri_id!==input.santriId || replay.type_id!==input.typeId || replay.occurred_at!==p.date || replay.session!==p.session || replay.note!==p.note) throw new InputError('Identitas permintaan telah digunakan. Muat ulang formulir.')
     return {id:input.id}
    }
    const mutation=await db.prepare(`INSERT INTO pengajian_violations(id,santri_id,type_id,type_name,occurred_at,session,note,created_by,created_at,updated_by,updated_at,request_id)
-    SELECT ?,s.id,t.id,t.name,?,?,?,?,?,?,?,? FROM santri s JOIN pengajian_violation_types t ON t.id=? AND t.active=1 WHERE s.id=? AND lower(trim(s.status_global))='aktif' AND ${scope.sql} ON CONFLICT(id) DO NOTHING`).bind(input.id,p.date,input.session,p.note,session.id,timestamp,session.id,timestamp,input.requestId,input.typeId,input.santriId,...scope.params).run()
+    SELECT ?,s.id,t.id,t.name,?,?,?,?,?,?,?,? FROM santri s JOIN pengajian_violation_types t ON t.id=? AND t.active=1 WHERE s.id=? AND lower(trim(s.status_global))='aktif' AND ${scope.sql} ON CONFLICT(id) DO NOTHING`).bind(input.id,p.date,p.session,p.note,session.id,timestamp,session.id,timestamp,input.requestId,input.typeId,input.santriId,...scope.params).run()
    if (!mutation.meta.changes) {
     const raced=await existing(input.id,classes).catch(()=>null)
-    if (!raced || raced.created_by!==session.id || raced.santri_id!==input.santriId || raced.type_id!==input.typeId || raced.occurred_at!==p.date || raced.note!==p.note || raced.session!==input.session) throw new InputError('Santri tidak aktif/di luar akses atau jenis pelanggaran tidak aktif.')
+    if (!raced || raced.created_by!==session.id || raced.santri_id!==input.santriId || raced.type_id!==input.typeId || raced.occurred_at!==p.date || raced.note!==p.note || raced.session!==p.session) throw new InputError('Santri tidak aktif/di luar akses atau jenis pelanggaran tidak aktif.')
    }
   } else {
    const row=await existing(input.id,classes); owns(session,row)
@@ -170,7 +220,7 @@ export async function saveIncident(input: SaveInput): Promise<Result<{id:string}
    if (input.santriId!==row.santri_id) throw new InputError('Santri pada catatan tidak dapat diganti.')
    const mutation=await db.prepare(`UPDATE pengajian_violations SET type_id=?,type_name=CASE WHEN type_id=? THEN type_name ELSE (SELECT name FROM pengajian_violation_types WHERE id=?) END,occurred_at=?,session=?,note=?,reason=?,updated_by=?,updated_at=?,request_id=?,version=version+1
     WHERE id=? AND version=? AND status='active' AND (type_id=? OR EXISTS(SELECT 1 FROM pengajian_violation_types WHERE id=? AND active=1))
-    AND EXISTS(SELECT 1 FROM santri s WHERE s.id=pengajian_violations.santri_id AND ${scope.sql})`).bind(input.typeId,input.typeId,input.typeId,p.date,input.session,p.note,p.reason,session.id,timestamp,input.requestId,input.id,input.version,input.typeId,input.typeId,...scope.params).run()
+    AND EXISTS(SELECT 1 FROM santri s WHERE s.id=pengajian_violations.santri_id AND ${scope.sql})`).bind(input.typeId,input.typeId,input.typeId,p.date,p.session,p.note,p.reason,session.id,timestamp,input.requestId,input.id,input.version,input.typeId,input.typeId,...scope.params).run()
    if (!mutation.meta.changes && !await replay(input.requestId,input.id,session.id,'update',expected,p.reason)) throw new InputError('Catatan telah berubah/dibatalkan atau jenis tidak aktif. Muat ulang sebelum mengoreksi.')
   }
   await activity(session,editing?'update':'create',input.id)

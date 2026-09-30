@@ -9,6 +9,8 @@ export async function GET(
   const { key } = await params
   const objectKey = (Array.isArray(key) ? key.join('/') : String(key || ''))
   if (!objectKey) return new Response('Not found', { status: 404 })
+  // Evidence must pass feature/santri scope and expiry checks on its dedicated route.
+  if (objectKey === 'pengajian-evidence' || objectKey.startsWith('pengajian-evidence/')) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
 
   const { env } = await getCloudflareContext({ async: true })
   // R2Bucket di-typing manual (Promise<unknown>); cast ke bentuk R2ObjectBody.
