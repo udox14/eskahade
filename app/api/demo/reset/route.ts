@@ -19,6 +19,7 @@ type Stmt = { sql: string; params?: unknown[] }
 // Tabel data yang dibersihkan saat reset (urutan aman thd FK).
 // users TIDAK dihapus di sini — disinkronkan terpisah di bawah.
 const DATA_TABLES = [
+  'pengajian_violation_revisions', 'pengajian_violations',
   'absensi_harian', 'absensi_guru', 'absen_asrama', 'absen_sakit',
   'nilai_akademik', 'nilai_akhlak', 'ranking',
   'pelanggaran', 'perizinan', 'hasil_tes_klasifikasi',

@@ -14,7 +14,8 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "test:poskestren": "node scripts/test-poskestren-clinical.cjs",
     "test:poskestren:disease": "node scripts/test-poskestren-disease-report.cjs",
-    "test:poskestren:ui": "node scripts/test-poskestren-ui.cjs"
+    "test:poskestren:ui": "node scripts/test-poskestren-ui.cjs",
+    "test:pengajian-violations": "node scripts/test-pengajian-violations.cjs"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "latest",
