@@ -10,14 +10,6 @@ export function getAbsensiWeek(dateKey: string): WeekPeriod {
   return { start, end: date.toISOString().slice(0, 10) }
 }
 
-export function singkatKelas(nama: string | null) {
-  return (nama || '-')
-    .replace(/\bIbtidaiyyah\b/gi, 'IBT')
-    .replace(/\bTamhidiyyah\b/gi, 'TMH')
-    .replace(/\bMutawassithah\b/gi, 'MTW')
-    .replace(/\bMutaqaddimah\b/gi, 'MTQ')
-}
-
 function parseTimestamp(timestamp: string) {
   const normalized = timestamp.includes('T') ? timestamp : timestamp.replace(' ', 'T')
   return new Date(/[zZ]$|[+-]\d{2}:\d{2}$/.test(normalized) ? normalized : `${normalized}Z`)
@@ -57,7 +49,7 @@ export function rekapPemanggilan(rows: AbsensiCetakSource[], pekan: WeekPeriod, 
     let item = groups.get(key)
     if (!item) {
       item = { santri_id: row.santri_id, nama: row.nama_lengkap, asrama: row.asrama || '-', kamar: row.kamar || '-',
-        kelas: singkatKelas(row.nama_kelas), pekan: week, tanggal_input: null,
+        kelas: row.nama_kelas || '-', pekan: week, tanggal_input: null,
         alfa_shubuh: 0, alfa_ashar: 0, alfa_maghrib: 0, total: 0 }
       groups.set(key, item)
     }
