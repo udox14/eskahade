@@ -5,17 +5,12 @@ import { getSession, hasRole } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { getCachedMarhalahList } from '@/lib/cache/master'
+import { assertFeature } from '@/lib/auth/feature'
+import { getAbsensiWeek } from '@/lib/absensi/pemanggilan'
 
 function getWeekRange(date: Date) {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = (day < 3 ? day + 7 : day) - 3
-  d.setDate(d.getDate() - diff)
-  d.setHours(0, 0, 0, 0)
-  const start = new Date(d)
-  const end = new Date(d)
-  end.setDate(end.getDate() + 6)
-  return { start, end }
+  const week = getAbsensiWeek(date.toISOString().slice(0, 10))
+  return { start: new Date(`${week.start}T12:00:00Z`), end: new Date(`${week.end}T12:00:00Z`) }
 }
 
 // ─── Antrian verifikasi absen ─────────────────────────────────────────────────
@@ -23,14 +18,16 @@ function getWeekRange(date: Date) {
 // 1. Tambah filter verif IS NULL atau verif = 'BELUM' — tidak fetch yang sudah OK
 // 2. Tambah LIMIT 3 bulan terakhir — tidak scan data lama yang harusnya sudah diverifikasi
 // 3. Pakai INNER JOIN ke santri aktif — tidak fetch data santri yang sudah arsip
-export async function getAntrianVerifikasi(tanggalRef?: string, filters: { kelasId?: string, asrama?: string, marhalahId?: string } = {}) {
+export async function getAntrianVerifikasi(tanggalRef?: string, filters: { kelasId?: string, asrama?: string, marhalahId?: string, kategori?: 'REGULER' | 'SADESA' } = {}) {
+  const access = await assertFeature('/dashboard/akademik/absensi/verifikasi')
+  if ('error' in access) throw new Error(access.error)
   const whereClauses = []
   const params = []
 
   if (tanggalRef) {
-    const { start, end } = getWeekRange(new Date(tanggalRef))
+    const { start, end } = getAbsensiWeek(tanggalRef)
     whereClauses.push("ah.tanggal >= ? AND ah.tanggal <= ?")
-    params.push(start.toISOString().split('T')[0], end.toISOString().split('T')[0])
+    params.push(start, end)
   } else {
     const batas = new Date()
     batas.setMonth(batas.getMonth() - 3)
@@ -51,9 +48,15 @@ export async function getAntrianVerifikasi(tanggalRef?: string, filters: { kelas
     params.push(filters.marhalahId)
   }
 
+  if (filters.kategori) {
+    if (!['REGULER', 'SADESA'].includes(filters.kategori)) throw new Error('Kategori tidak valid')
+    whereClauses.push("UPPER(TRIM(COALESCE(s.kategori_santri, 'REGULER'))) = ?")
+    params.push(filters.kategori)
+  }
+
   const whereSql = whereClauses.join(" AND ")
 
-  const rawData = await query<any>(`
+  const sql = `
     SELECT ah.id, ah.tanggal,
            ah.shubuh, ah.ashar, ah.maghrib,
            ah.verif_shubuh, ah.verif_ashar, ah.verif_maghrib,
@@ -72,13 +75,28 @@ export async function getAntrianVerifikasi(tanggalRef?: string, filters: { kelas
         OR
         (ah.maghrib = 'A' AND (ah.verif_maghrib IS NULL OR ah.verif_maghrib = 'BELUM'))
       )
-    ORDER BY ah.tanggal DESC, s.nama_lengkap ASC
-    LIMIT 2000
-  `, params)
+    ORDER BY ah.tanggal DESC, s.nama_lengkap ASC, ah.id ASC
+    LIMIT ? OFFSET ?
+  `
+  const rawData: {
+    id: string; tanggal: string; santri_id: string; nama_lengkap: string; nis: string; asrama: string | null; kamar: string | null
+    shubuh: string; ashar: string; maghrib: string
+    verif_shubuh: string | null; verif_ashar: string | null; verif_maghrib: string | null
+  }[] = []
+  const pageSize = 1000
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await query<typeof rawData[number]>(sql, [...params, pageSize, offset])
+    rawData.push(...page)
+    if (page.length < pageSize) break
+  }
 
-  const groupedMap = new Map<string, any>()
+  type QueueItem = {
+    santri_id: string; nama: string; nis: string; info: string
+    items: { absen_id: string; tanggal: string; sesi: string; status_verif: string | null }[]
+  }
+  const groupedMap = new Map<string, QueueItem>()
 
-  rawData.forEach((row: any) => {
+  rawData.forEach(row => {
     const sessions = ['shubuh', 'ashar', 'maghrib'] as const
     sessions.forEach(sess => {
       const isAlfa    = row[sess] === 'A'
@@ -93,7 +111,7 @@ export async function getAntrianVerifikasi(tanggalRef?: string, filters: { kelas
             items:     [],
           })
         }
-        groupedMap.get(row.santri_id).items.push({
+        groupedMap.get(row.santri_id)!.items.push({
           absen_id:    row.id,
           tanggal:     row.tanggal,
           sesi:        sess,
@@ -108,7 +126,7 @@ export async function getAntrianVerifikasi(tanggalRef?: string, filters: { kelas
 
 type VonisItem = {
   santriId: string
-  items: { absen_id: string; sesi: string; tanggal: string }[]
+  items: { absen_id: string; sesi: string; tanggal: string; status_verif: string | null }[]
   vonis: 'ALFA_MURNI' | 'SAKIT' | 'IZIN' | 'KESALAHAN' | 'BELUM'
 }
 
@@ -127,11 +145,45 @@ function getSesiColumn(sesi: string): string {
   return sesi
 }
 
-export async function simpanVerifikasiMassal(daftarVonis: VonisItem[]) {
-  const session = await getSession()
-  if (!daftarVonis || daftarVonis.length === 0) return { error: 'Tidak ada data untuk disimpan' }
+export async function simpanVerifikasiMassal(daftarVonis: VonisItem[], tanggalRef?: string) {
+  const session = await assertFeature('/dashboard/akademik/absensi/verifikasi')
+  if ('error' in session) return session
+  if (!hasRole(session, 'admin') && !hasRole(session, 'sekpen') && !hasRole(session, 'demo')) return { error: 'Akses ditolak' }
+  if (!Array.isArray(daftarVonis) || daftarVonis.length === 0) return { error: 'Tidak ada data untuk disimpan' }
+  if (daftarVonis.length > 1 && !tanggalRef) return { error: 'Pilih satu pekan untuk vonis massal' }
+  let week: ReturnType<typeof getAbsensiWeek> | undefined
+  try { if (tanggalRef) week = getAbsensiWeek(tanggalRef) }
+  catch { return { error: 'Tanggal pekan tidak valid' } }
+  const seen = new Set<string>()
+  const checks: { sql: string; params: unknown[] }[] = []
+  for (const data of daftarVonis) {
+    if (!data || typeof data.santriId !== 'string' || !['ALFA_MURNI', 'SAKIT', 'IZIN', 'KESALAHAN', 'BELUM'].includes(data.vonis)
+      || !Array.isArray(data.items) || !data.items.length) return { error: 'Data vonis tidak valid' }
+    for (const item of data.items) {
+      if (!item || typeof item.absen_id !== 'string' || !isSesiPengajian(item.sesi)
+        || (item.status_verif !== null && item.status_verif !== 'BELUM')) return { error: 'Data sesi tidak valid' }
+      try { getAbsensiWeek(item.tanggal) } catch { return { error: 'Tanggal absensi tidak valid' } }
+      if (week && (item.tanggal < week.start || item.tanggal > week.end)) return { error: 'Absensi berada di luar pekan terpilih' }
+      const key = `${item.absen_id}:${item.sesi}`
+      if (seen.has(key)) return { error: 'Sesi absensi duplikat' }
+      seen.add(key)
+      const condition = `SELECT 1 FROM absensi_harian ah
+        JOIN riwayat_pendidikan rp ON rp.id = ah.riwayat_pendidikan_id AND rp.status_riwayat = 'aktif'
+        JOIN santri s ON s.id = rp.santri_id AND s.status_global = 'aktif'
+        WHERE ah.id = ? AND s.id = ? AND ah.tanggal = ? AND ah.${getSesiColumn(item.sesi)} = 'A'
+          AND ah.${getVerifColumn(item.sesi)} IS ?
+          AND NOT EXISTS (SELECT 1 FROM absensi_verifikasi_periode p
+            WHERE p.status = 'FINAL' AND ah.tanggal BETWEEN p.tanggal_mulai AND p.tanggal_selesai)`
+      const params = [item.absen_id, data.santriId, item.tanggal, item.status_verif]
+      // The assertion runs within the same atomic batch as all writes. Invalid JSON
+      // aborts the transaction if a concurrent verification changed the snapshot.
+      checks.push({ sql: `SELECT json(CASE WHEN EXISTS (${condition}) THEN 'true' ELSE 'absensi_stale' END)`, params })
+    }
+  }
 
-  const violationsToInsert: any[] = []
+  const violationsToInsert: {
+    id: string; santri_id: string; tanggal: string; jenis: string; deskripsi: string; poin: number; penindak_id: string | null
+  }[] = []
   const statements: { sql: string; params?: unknown[] }[] = []
 
   for (const data of daftarVonis) {
@@ -187,7 +239,14 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[]) {
       params: [v.id, v.santri_id, v.tanggal, v.jenis, v.deskripsi, v.poin, v.penindak_id],
     })
   }
-  await batch(statements)
+  try {
+    await batch([...checks, ...statements])
+  } catch (error) {
+    if (error instanceof Error && /malformed JSON|absensi_stale/i.test(error.message)) {
+      return { error: 'Data absensi sudah berubah, tidak sesuai santri, atau periode sudah final. Muat ulang antrean.', code: 'STALE' }
+    }
+    throw error
+  }
 
   const alfaCount = daftarVonis.filter((item) => item.vonis === 'ALFA_MURNI').length
   const sakitCount = daftarVonis.filter((item) => item.vonis === 'SAKIT').length
@@ -206,6 +265,8 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[]) {
     summary: `Memverifikasi absensi massal untuk ${daftarVonis.length} santri`,
     details: {
       total_santri: daftarVonis.length,
+      pekan: week ?? null,
+      total_sesi: seen.size,
       total_pelanggaran: violationsToInsert.length,
       alfa_murni: alfaCount,
       sakit: sakitCount,
@@ -217,30 +278,31 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[]) {
 
   revalidatePath('/dashboard/akademik/absensi/verifikasi')
   revalidatePath('/dashboard/keamanan')
+  revalidatePath('/dashboard/akademik/absensi/cetak')
   return { success: true, count: daftarVonis.length }
 }
 
 export async function getKelasList() {
-  const data = await query<any>(`
+  const data = await query<{ id: string; nama_kelas: string; marhalah_id: string }>(`
     SELECT k.id, k.nama_kelas, k.marhalah_id
     FROM kelas k
     JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
     ORDER BY k.nama_kelas
   `)
-  return data.sort((a: any, b: any) =>
+  return data.sort((a, b) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )
 }
 
 export async function getAsramaList() {
-  const data = await query<any>(`
+  const data = await query<{ asrama: string }>(`
     SELECT DISTINCT asrama 
     FROM santri 
     WHERE status_global = 'aktif'
       AND asrama IS NOT NULL AND asrama != '' 
     ORDER BY asrama
   `)
-  return data.map((d: any) => d.asrama)
+  return data.map(d => d.asrama)
 }
 
 export async function getMarhalahList() {

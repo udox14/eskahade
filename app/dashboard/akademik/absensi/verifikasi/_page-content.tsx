@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   getAntrianVerifikasi,
   simpanVerifikasiMassal,
@@ -24,7 +24,7 @@ import { formatVerificationWeek } from '@/lib/absensi/week-period'
 type VonisType = 'ALFA_MURNI' | 'SAKIT' | 'IZIN' | 'KESALAHAN' | 'BELUM'
 type AbsenItem = {
   santri_id: string; nama: string; nis: string; info: string
-  items: { absen_id: string; tanggal: string; sesi: string; status_verif: string }[]
+  items: { absen_id: string; tanggal: string; sesi: string; status_verif: string | null }[]
 }
 
 const PAGE_SIZE = 20
@@ -123,6 +123,7 @@ export default function VerifikasiAbsenPage() {
   const [list, setList]           = useState<AbsenItem[]>([])
   const [loading, setLoading]     = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
+  const hasLoadedRef = useRef(false)
   const [drafts, setDrafts]       = useState<Record<string, VonisType>>({})
   const [isSaving, setIsSaving]   = useState(false)
   const [page, setPage]           = useState(1)
@@ -131,13 +132,14 @@ export default function VerifikasiAbsenPage() {
   const [retryRevision, setRetryRevision] = useState(0)
   const [search, setSearch]       = useState('')
 
-  const [kelasList, setKelasList] = useState<any[]>([])
+  const [kelasList, setKelasList] = useState<{ id: string; nama_kelas: string; marhalah_id: string }[]>([])
   const [asramaList, setAsramaList] = useState<string[]>([])
-  const [marhalahList, setMarhalahList] = useState<any[]>([])
+  const [marhalahList, setMarhalahList] = useState<{ id: string; nama: string }[]>([])
   
   const [selectedKelas, setSelectedKelas] = useState('')
   const [selectedAsrama, setSelectedAsrama] = useState('')
   const [selectedMarhalah, setSelectedMarhalah] = useState('')
+  const [selectedKategori, setSelectedKategori] = useState<'' | 'REGULER' | 'SADESA'>('')
   const [selectedDate, setSelectedDate] = useState('') // Kosongkan agar fetch 3 bulan terakhir defaultnya
 
   useEffect(() => {
@@ -152,31 +154,42 @@ export default function VerifikasiAbsenPage() {
       const data = await getAntrianVerifikasi(selectedDate, {
         kelasId: selectedKelas,
         asrama: selectedAsrama,
-        marhalahId: selectedMarhalah
+        marhalahId: selectedMarhalah,
+        kategori: selectedKategori || undefined
       })
       setList(data)
+      hasLoadedRef.current = true
       setHasLoaded(true)
       setPage(1) 
-    }
-    finally { setLoading(false) }
-  }, [selectedDate, selectedKelas, selectedAsrama, selectedMarhalah])
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Gagal memuat antrean')
+    } finally { setLoading(false) }
+  }, [selectedDate, selectedKelas, selectedAsrama, selectedMarhalah, selectedKategori])
 
   useEffect(() => {
-    if (hasLoaded) {
-      loadData()
+    if (hasLoadedRef.current) {
+      void loadData()
     }
-  }, [selectedDate, selectedKelas, selectedAsrama, selectedMarhalah])
+  }, [loadData])
 
-  const handleSelect = (santriId: string, v: VonisType) =>
-    setDrafts(prev => prev[santriId] === v
-      ? (({ [santriId]: _, ...rest }) => rest)(prev)
-      : { ...prev, [santriId]: v }
-    )
+  const handleSelect = (santriId: string, v: VonisType) => {
+    setDrafts(prev => {
+      const next = { ...prev }
+      if (next[santriId] === v) delete next[santriId]
+      else next[santriId] = v
+      return next
+    })
+  }
 
-  const handlePilihSemua = (v: VonisType) => {
+  const handlePilihSemua = async (v: VonisType) => {
+    if (!selectedDate || loading || isSaving || totalDrafts || !filtered.length || !periodeData || periodeData.status === 'FINAL') return
+    const label = { ALFA_MURNI: 'Alfa', SAKIT: 'Sakit', IZIN: 'Izin', BELUM: 'Mangkir', KESALAHAN: 'Salah' }[v]
+    const targets = [...filtered]
+    const totalSesi = targets.reduce((sum, item) => sum + item.items.length, 0)
+    if (!await confirm(`Vonis ${label} untuk ${targets.length} santri (${totalSesi} sesi) pada ${formatVerificationWeek({ start: periodeData.tanggalMulai, end: periodeData.tanggalSelesai })}? Berlaku untuk seluruh hasil filter di semua halaman.`)) return
     const next: Record<string, VonisType> = {}
-    filtered.forEach(i => { next[i.santri_id] = v })
-    setDrafts(prev => ({ ...prev, ...next }))
+    targets.forEach(i => { next[i.santri_id] = v })
+    setDrafts(next)
   }
 
   const [periodeData, setPeriodeData] = useState<PeriodeVerifikasiItem | null>(null)
@@ -273,7 +286,12 @@ export default function VerifikasiAbsenPage() {
     setIsSaving(true)
     setAutoSaveError(null)
     try {
-      const res = await simpanVerifikasiMassal(payload)
+      const res = await simpanVerifikasiMassal(payload, selectedDate || undefined)
+      if (res && 'code' in res && res.code === 'STALE') {
+        toast.error(res.error)
+        await Promise.all([loadData(), loadPeriodeData()])
+        return
+      }
       if (res?.error) throw new Error(res.error)
 
       setList(prev => prev.filter(item => !ids.includes(item.santri_id)))
@@ -293,7 +311,7 @@ export default function VerifikasiAbsenPage() {
     } finally {
       setIsSaving(false)
     }
-  }, [drafts, isSaving, list, loadPeriodeData])
+  }, [drafts, isSaving, list, loadPeriodeData, selectedDate, loadData])
 
 
   const filtered = list.filter(i => {
@@ -336,7 +354,7 @@ export default function VerifikasiAbsenPage() {
           <span className="text-sm font-bold">Filter Sidang</span>
         </div>
 
-          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <label className="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-wider">Marhalah</label>
               <div className="relative">
@@ -344,7 +362,7 @@ export default function VerifikasiAbsenPage() {
                   className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg outline-none appearance-none text-sm text-slate-700 cursor-pointer transition-all hover:border-slate-300"
                   value={selectedMarhalah}
                   onChange={(e) => { setSelectedMarhalah(e.target.value); setSelectedKelas('') }}
-                  disabled={totalDrafts > 0 || isSaving}
+                  disabled={totalDrafts > 0 || isSaving || loading}
                 >
                   <option value="">Semua Marhalah</option>
                   {marhalahList.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
@@ -360,7 +378,7 @@ export default function VerifikasiAbsenPage() {
                   className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg outline-none appearance-none text-sm text-slate-700 cursor-pointer transition-all hover:border-slate-300"
                   value={selectedKelas}
                   onChange={(e) => setSelectedKelas(e.target.value)}
-                  disabled={totalDrafts > 0 || isSaving}
+                  disabled={totalDrafts > 0 || isSaving || loading}
                 >
                   <option value="">Semua Kelas</option>
                   {kelasList
@@ -379,7 +397,7 @@ export default function VerifikasiAbsenPage() {
                   className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg outline-none appearance-none text-sm text-slate-700 cursor-pointer transition-all hover:border-slate-300"
                   value={selectedAsrama}
                   onChange={(e) => setSelectedAsrama(e.target.value)}
-                  disabled={totalDrafts > 0 || isSaving}
+                  disabled={totalDrafts > 0 || isSaving || loading}
                 >
                   <option value="">Semua Asrama</option>
                   {asramaList.map(a => <option key={a} value={a}>{a}</option>)}
@@ -389,13 +407,25 @@ export default function VerifikasiAbsenPage() {
             </div>
 
             <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-wider">Kategori Santri</label>
+              <select value={selectedKategori}
+                onChange={e => setSelectedKategori(e.target.value as '' | 'REGULER' | 'SADESA')}
+                disabled={totalDrafts > 0 || isSaving || loading}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700">
+                <option value="">Semua Kategori</option>
+                <option value="REGULER">REGULER</option>
+                <option value="SADESA">SADESA</option>
+              </select>
+            </div>
+
+            <div>
               <label className="text-xs font-bold text-slate-500 block mb-1 uppercase tracking-wider">Pilih Pekan (Opsional)</label>
               <input 
                 type="date" 
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none text-sm text-slate-700 transition-all hover:border-slate-300"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                disabled={totalDrafts > 0 || isSaving}
+                disabled={totalDrafts > 0 || isSaving || loading}
               />
               <p className="mt-1 text-[10px] text-slate-400">Tanggal ini menentukan periode Rabu–Selasa.</p>
             </div>
@@ -421,8 +451,11 @@ export default function VerifikasiAbsenPage() {
               { v: 'ALFA_MURNI' as VonisType, label: 'ALFA',   cls: 'bg-rose-600 text-white hover:bg-rose-700' },
               { v: 'SAKIT'      as VonisType, label: 'SAKIT',  cls: 'bg-amber-500 text-white hover:bg-amber-600' },
               { v: 'IZIN'       as VonisType, label: 'IZIN',   cls: 'bg-blue-600 text-white hover:bg-blue-700' },
+              { v: 'BELUM'      as VonisType, label: 'MANGKIR', cls: 'bg-slate-700 text-white hover:bg-slate-800' },
+              { v: 'KESALAHAN'  as VonisType, label: 'SALAH', cls: 'bg-violet-600 text-white hover:bg-violet-700' },
             ].map(({ v, label, cls }) => (
-              <button key={v} onClick={() => handlePilihSemua(v)} disabled={isSaving}
+              <button key={v} onClick={() => void handlePilihSemua(v)} disabled={!selectedDate || loading || loadingPeriode || isSaving || totalDrafts > 0 || !filtered.length || !periodeData || periodeData.status === 'FINAL'}
+                title={!selectedDate ? 'Pilih satu pekan untuk vonis massal' : 'Vonis seluruh hasil filter pada pekan ini'}
                 className={`px-5 py-2.5 rounded-lg text-[11px] font-black tracking-widest transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-wait ${cls}`}>
                 {label}
               </button>
@@ -591,7 +624,7 @@ export default function VerifikasiAbsenPage() {
                       no={(page-1)*PAGE_SIZE+i+1}
                       vonis={drafts[item.santri_id]}
                       onSelect={handleSelect}
-                      disabled={isSaving} />
+                      disabled={isSaving || (!selectedDate && totalDrafts > 0 && !drafts[item.santri_id])} />
                   ))}
                 </tbody>
               </table>
@@ -604,7 +637,7 @@ export default function VerifikasiAbsenPage() {
                   no={-1}
                   vonis={drafts[item.santri_id]}
                   onSelect={handleSelect}
-                  disabled={isSaving} />
+                  disabled={isSaving || (!selectedDate && totalDrafts > 0 && !drafts[item.santri_id])} />
               ))}
             </div>
 

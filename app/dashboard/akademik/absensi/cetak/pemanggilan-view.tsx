@@ -1,9 +1,10 @@
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { formatVerificationWeek } from '@/lib/absensi/week-period'
+import { formatFullIndonesianDate } from '@/lib/absensi/week-period'
+import { tanggalInputWib, type PemanggilanRow } from '@/lib/absensi/pemanggilan'
 
 interface PemanggilanProps {
-  data: any[];
+  data: PemanggilanRow[];
   periode: { start: Date; end: Date };
   tglPanggil: Date;
   namaAsrama: string;
@@ -11,22 +12,19 @@ interface PemanggilanProps {
 }
 
 export function PemanggilanView({ data, periode, tglPanggil, namaAsrama, isMangkir }: PemanggilanProps) {
-  const periodeLabel = formatVerificationWeek({
-    start: format(periode.start, 'yyyy-MM-dd'),
-    end: format(periode.end, 'yyyy-MM-dd'),
-  }, true)
-  
+  const periodeLabel = `${formatFullIndonesianDate(format(periode.start, 'yyyy-MM-dd'))} s.d. ${formatFullIndonesianDate(format(periode.end, 'yyyy-MM-dd'))}`
+
   // Format Tanggal Panggil Footer
   const hariPanggil = format(tglPanggil, 'EEEE', { locale: id }).toUpperCase()
   const tglPanggilStr = format(tglPanggil, 'dd MMMM yyyy', { locale: id }).toUpperCase()
 
   return (
-    <div className="w-[210mm] min-h-[297mm] bg-white p-10 mx-auto text-black font-serif text-sm relative print:shadow-none shadow-lg">
+    <div className="pemanggilan-sheet w-[210mm] min-h-[297mm] bg-white p-10 print:w-auto print:min-h-0 print:p-0 mx-auto text-black font-serif text-sm relative print:shadow-none shadow-lg">
       
       {/* 1. KOP SURAT */}
       <div className="text-center border-b-4 border-double border-black pb-4 mb-4">
         <h1 className="text-2xl font-bold uppercase tracking-widest">PONDOK PESANTREN SUKAHIDENG</h1>
-        <p className="text-xs">Sukapameungpeuk, Kec. Sukarame, Kabupaten Tasikmalaya, Jawa Barat</p>
+        <p className="text-xs">Jl. Pahlawan KHZ. Musthafa, Desa Sukarapih, Kec. Sukarame, Kab. Tasikmalaya, Prov. Jawa Barat 46461</p>
       </div>
 
       {/* 2. JUDUL DOKUMEN */}
@@ -42,29 +40,47 @@ export function PemanggilanView({ data, periode, tglPanggil, namaAsrama, isMangk
       </div>
 
       {/* 3. TABEL DATA */}
-      <table className="w-full border-collapse border border-black mb-6 text-xs">
+      <table className="pemanggilan-table w-full table-fixed border-collapse border border-black mb-6 text-[10px]">
+        <colgroup>
+          <col style={{ width: '7mm' }} /><col style={{ width: '7mm' }} />
+          <col style={{ width: '6mm' }} /><col />
+          <col style={{ width: '19mm' }} /><col style={{ width: '20mm' }} />
+          <col style={{ width: '13mm' }} />
+          <col style={{ width: '7mm' }} /><col style={{ width: '7mm' }} /><col style={{ width: '7mm' }} /><col style={{ width: '7mm' }} />
+        </colgroup>
         <thead className="bg-gray-200 text-center font-bold">
           <tr>
-            <th className="border border-black p-1 w-8" rowSpan={2}>NO</th>
-            <th className="border border-black p-1" rowSpan={2}>NAMA SANTRI</th>
-            <th className="border border-black p-1 w-20" rowSpan={2}>KAMAR</th>
-            <th className="border border-black p-1" colSpan={3}>REKAP ALFA</th>
-            <th className="border border-black p-1 w-10" rowSpan={2}>JML</th>
+            <th className="border border-black p-0.5" rowSpan={2}>KET</th>
+            <th className="border border-black p-0.5" rowSpan={2}>✓</th>
+            <th className="border border-black p-0.5" rowSpan={2}>NO</th>
+            <th className="border border-black p-0.5" rowSpan={2}>NAMA SANTRI</th>
+            <th className="border border-black p-0.5" rowSpan={2}>KELAS</th>
+            <th className="border border-black p-0.5" rowSpan={2}>TGL INPUT</th>
+            <th className="border border-black p-0.5" rowSpan={2}>KAMAR</th>
+            <th className="border border-black p-0.5" colSpan={3}>REKAP ALFA</th>
+            <th className="border border-black p-0.5" rowSpan={2}>JML</th>
           </tr>
           <tr>
-            <th className="border border-black p-1 w-8">SBH</th>
-            <th className="border border-black p-1 w-8">ASR</th>
-            <th className="border border-black p-1 w-8">MGB</th>
+            <th className="border border-black p-0.5">SBH</th>
+            <th className="border border-black p-0.5">ASR</th>
+            <th className="border border-black p-0.5">MGB</th>
           </tr>
         </thead>
         <tbody>
           {data.length === 0 ? (
-            <tr><td colSpan={7} className="border border-black p-4 text-center italic">Tidak ada data alfa minggu ini.</td></tr>
+            <tr><td colSpan={11} className="border border-black p-4 text-center italic">Tidak ada data alfa minggu ini.</td></tr>
           ) : (
             data.map((item, idx) => (
-              <tr key={idx}>
-                <td className="border border-black p-1 text-center">{idx + 1}</td>
-                <td className="border border-black p-1 px-2 font-medium">{item.nama}</td>
+              <tr key={`${item.santri_id}:${item.pekan.start}`} className="break-inside-avoid">
+                <td className="border border-black p-1" />
+                <td className="border border-black p-1" />
+                <td className="border border-black p-0.5 text-center">{idx + 1}</td>
+                <td className="border border-black p-1 px-2 break-words font-medium">
+                  {item.nama}
+                  <div className="text-[9px] font-normal mt-0.5">{format(new Date(`${item.pekan.start}T12:00:00`), 'dd/MM/yyyy')}–{format(new Date(`${item.pekan.end}T12:00:00`), 'dd/MM/yyyy')}</div>
+                </td>
+                <td className="border border-black p-1 text-center break-words">{item.kelas}</td>
+                <td className="border border-black p-1 text-center">{tanggalInputWib(item.tanggal_input)}</td>
                 <td className="border border-black p-1 text-center">{item.kamar}</td>
                 <td className="border border-black p-1 text-center">{item.alfa_shubuh || '-'}</td>
                 <td className="border border-black p-1 text-center">{item.alfa_ashar || '-'}</td>
@@ -88,25 +104,19 @@ export function PemanggilanView({ data, periode, tglPanggil, namaAsrama, isMangk
             <tbody>
               <tr><td className="w-24">HARI</td><td>: {hariPanggil}</td></tr>
               <tr><td>TANGGAL</td><td>: {tglPanggilStr}</td></tr>
-              <tr><td>PUKUL</td><td>: 20.30 WIB (BA'DA ISYA)</td></tr>
+              <tr><td>PUKUL</td><td>: 20.30 WIB (BA&apos;DA ISYA)</td></tr>
               <tr><td>TEMPAT</td><td>: GEDUNG MI LAMA LANTAI 2 (PUTRI) & LANTAI 3 (PUTRA)</td></tr>
             </tbody>
           </table>
         </div>
         <p className="font-bold">
-          CATATAN: WAJIB MEMBAWA BUKU PRIBADI (BUKU SAKU).
+          CATATAN: WAJIB MEMBAWA BUKU PRIBADI.
         </p>
         <p className="text-xs italic mt-1">
           *Bagi yang tidak hadir pada pemanggilan ini akan dikenakan sanksi disiplin lebih berat.
         </p>
       </div>
 
-      <div className="flex justify-end mt-12 text-center break-inside-avoid">
-        <div>
-          <p className="mb-16">Bagian Keamanan</p>
-          <p className="font-bold border-b border-black inline-block min-w-[150px]">..........................</p>
-        </div>
-      </div>
 
     </div>
   )

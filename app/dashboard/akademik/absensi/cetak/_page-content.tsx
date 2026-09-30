@@ -3,6 +3,8 @@
 import { useState, useRef } from 'react'
 import { getRekapAlfaMingguan } from './actions'
 import { PemanggilanView } from './pemanggilan-view'
+import { getAbsensiWeek, type PemanggilanRow } from '@/lib/absensi/pemanggilan'
+import { toast } from 'sonner'
 import { useReactToPrint } from '@/lib/pdf/client'
 import { Printer, Search, Loader2 } from 'lucide-react'
 
@@ -11,8 +13,9 @@ export default function CetakPemanggilanPage() {
   const [tglPanggil, setTglPanggil] = useState(new Date().toISOString().split('T')[0])
   
   const [onlyMangkir, setOnlyMangkir] = useState(false)
+  const [previewMangkir, setPreviewMangkir] = useState(false)
   
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<PemanggilanRow[]>([])
   const [loading, setLoading] = useState(false)
   const [periode, setPeriode] = useState<{start:Date, end:Date} | null>(null)
 
@@ -20,25 +23,24 @@ export default function CetakPemanggilanPage() {
   const handlePrint = useReactToPrint({
     contentRef: printRef, 
     documentTitle: `Pemanggilan_Alfa_${tglRef}`,
+    pageStyle: `@page { size: A4 portrait; margin: 10mm; }
+      @media print { .pemanggilan-sheet { width: auto !important; min-height: 0 !important; padding: 0 !important; } }
+      .pemanggilan-table thead { display: table-header-group; }
+      .pemanggilan-table tr { break-inside: avoid; page-break-inside: avoid; }
+      .pemanggilan-table td { overflow-wrap: anywhere; }`,
   })
-
-  const getWeekRange = (date: Date) => {
-    const d = new Date(date);
-    const day = d.getDay(); 
-    const diff = (day < 3 ? day + 7 : day) - 3;
-    d.setDate(d.getDate() - diff);
-    const start = new Date(d);
-    const end = new Date(d);
-    end.setDate(end.getDate() + 6);
-    return { start, end };
-  }
 
   const handleLoad = async () => {
     setLoading(true)
-    const res = await getRekapAlfaMingguan(tglRef, onlyMangkir)
-    setData(res)
-    setPeriode(getWeekRange(new Date(tglRef)))
-    setLoading(false)
+    try {
+      const week = getAbsensiWeek(tglRef)
+      const res = await getRekapAlfaMingguan(tglRef, onlyMangkir)
+      setData(res)
+      setPreviewMangkir(onlyMangkir)
+      setPeriode({ start: new Date(`${week.start}T12:00:00`), end: new Date(`${week.end}T12:00:00`) })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Gagal memuat pemanggilan')
+    } finally { setLoading(false) }
   }
 
   const groupedData = data.reduce((groups, item) => {
@@ -46,7 +48,7 @@ export default function CetakPemanggilanPage() {
     if (!groups[asrama]) groups[asrama] = [];
     groups[asrama].push(item);
     return groups;
-  }, {} as Record<string, any[]>);
+  }, {} as Record<string, PemanggilanRow[]>);
 
   const sortedAsramaKeys = Object.keys(groupedData).sort();
 
@@ -127,13 +129,13 @@ export default function CetakPemanggilanPage() {
         ) : (
           <div ref={printRef}>
             {sortedAsramaKeys.map((asrama) => (
-              <div key={asrama} style={{ pageBreakAfter: 'always' }} className="mb-8 last:mb-0 print:mb-0">
+              <div key={asrama} style={{ pageBreakAfter: asrama === sortedAsramaKeys[sortedAsramaKeys.length - 1] ? 'auto' : 'always' }} className="mb-8 last:mb-0 print:mb-0">
                 <PemanggilanView 
                   data={groupedData[asrama]} 
                   periode={periode} 
                   tglPanggil={new Date(tglPanggil)}
                   namaAsrama={asrama}
-                  isMangkir={onlyMangkir}
+                  isMangkir={previewMangkir}
                 />
               </div>
             ))}
