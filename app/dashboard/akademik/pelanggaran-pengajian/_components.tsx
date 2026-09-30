@@ -331,10 +331,11 @@ export function StudentIdentity({
   student,
   large = false,
   placement = true,
+  showNis = false,
 }: {
   student: {
     nama_lengkap: string
-    nis: string
+    nis?: string | null
     foto_url?: string | null
     asrama?: string | null
     kamar?: string | null
@@ -342,6 +343,7 @@ export function StudentIdentity({
   }
   large?: boolean
   placement?: boolean
+  showNis?: boolean
 }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
@@ -353,6 +355,7 @@ export function StudentIdentity({
         clickable={false}
       />
       <div className="min-w-0">
+        {/* Baris 1: Nama */}
         <p
           className={cn(
             'break-words font-semibold text-slate-900 transition group-hover:text-emerald-700',
@@ -361,12 +364,24 @@ export function StudentIdentity({
         >
           {student.nama_lengkap}
         </p>
-        <p className="mt-0.5 text-xs text-slate-500">NIS: {student.nis}</p>
+
+        {showNis && student.nis && (
+          <p className="mt-0.5 text-xs text-slate-500">NIS: {student.nis}</p>
+        )}
+
+        {/* Baris 2: Asrama / Kamar */}
         {placement && (
           <p className="mt-0.5 text-xs text-slate-500 truncate">
-            {student.asrama || 'Non-Asrama'}
-            {student.kamar ? ` / ${student.kamar}` : ''}
-            {student.nama_kelas ? ` · ${student.nama_kelas}` : ''}
+            {student.asrama
+              ? `${student.asrama}${student.kamar ? ` / ${student.kamar}` : ''}`
+              : 'Non-Asrama'}
+          </p>
+        )}
+
+        {/* Baris 3: Kelas */}
+        {placement && (
+          <p className="mt-0.5 text-xs text-slate-500 truncate">
+            {student.nama_kelas || '-'}
           </p>
         )}
       </div>

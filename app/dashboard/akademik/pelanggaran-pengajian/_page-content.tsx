@@ -43,6 +43,12 @@ import {
   SortHeading,
   StudentIdentity,
 } from './_components'
+import {
+  pelanggaranCache,
+  getHistoryCacheKey,
+  getRecapCacheKey,
+  getAnalyticsCacheKey,
+} from './_cache'
 import { CancelForm, FilterModal, IncidentForm, Settings } from './_forms'
 import { PelanggaranDetailDrawer } from './detail-drawer'
 
@@ -239,34 +245,70 @@ export default function PageContent() {
     }
   }, [refresh])
 
-  // Fetch data per tab (bounded by pageSize)
+  // Fetch data per tab (bounded by pageSize) with fast client cache
   useEffect(() => {
     let alive = true
     async function load() {
-      setLoading(true)
+      const cacheKey =
+        tab === 'riwayat'
+          ? getHistoryCacheKey(filters, page, pageSize)
+          : tab === 'rekap'
+          ? getRecapCacheKey(filters, page, pageSize)
+          : getAnalyticsCacheKey(filters)
+
+      const cached = pelanggaranCache.get(cacheKey)
+
+      if (cached) {
+        // Fast-path: Instant UI update from cache without loading skeleton!
+        if (tab === 'riwayat') setHistory(cached as Page<Incident>)
+        else if (tab === 'rekap') setRecap(cached as Page<Recap>)
+        else setAnalytics(cached as Analytics)
+        setLoading(false)
+
+        // If data is fresh (less than 60s old), skip re-fetching
+        if (pelanggaranCache.isFresh(cacheKey, 60_000)) {
+          return
+        }
+      } else {
+        // Cache miss: Show skeleton
+        setLoading(true)
+      }
+
       setError('')
       try {
         if (tab === 'riwayat') {
           const r = await getHistory(filters, page, pageSize)
           if (alive) {
-            if (r.data) setHistory(r.data)
-            else setError(r.error || 'Gagal memuat riwayat.')
+            if (r.data) {
+              setHistory(r.data)
+              pelanggaranCache.set(cacheKey, r.data)
+            } else {
+              setError(r.error || 'Gagal memuat riwayat.')
+            }
           }
         } else if (tab === 'rekap') {
           const r = await getRecap(filters, page, pageSize)
           if (alive) {
-            if (r.data) setRecap(r.data)
-            else setError(r.error || 'Gagal memuat rekap.')
+            if (r.data) {
+              setRecap(r.data)
+              pelanggaranCache.set(cacheKey, r.data)
+            } else {
+              setError(r.error || 'Gagal memuat rekap.')
+            }
           }
         } else {
           const r = await getAnalytics(filters)
           if (alive) {
-            if (r.data) setAnalytics(r.data)
-            else setError(r.error || 'Gagal memuat analitik.')
+            if (r.data) {
+              setAnalytics(r.data)
+              pelanggaranCache.set(cacheKey, r.data)
+            } else {
+              setError(r.error || 'Gagal memuat analitik.')
+            }
           }
         }
       } catch {
-        if (alive) setError('Data tidak dapat dimuat.')
+        if (alive && !cached) setError('Data tidak dapat dimuat.')
       } finally {
         if (alive) setLoading(false)
       }
@@ -285,6 +327,7 @@ export default function PageContent() {
   function saved() {
     setForm(null)
     setCancel(null)
+    pelanggaranCache.clear()
     setRefresh((n) => n + 1)
   }
 
@@ -480,7 +523,10 @@ export default function PageContent() {
         <button
           type="button"
           className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-emerald-700 transition cursor-pointer"
-          onClick={() => setRefresh((n) => n + 1)}
+          onClick={() => {
+            pelanggaranCache.clear()
+            setRefresh((n) => n + 1)
+          }}
         >
           <RotateCcw className="h-3.5 w-3.5" />
           <span>Segarkan data</span>

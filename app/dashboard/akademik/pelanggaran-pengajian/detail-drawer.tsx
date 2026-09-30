@@ -17,6 +17,7 @@ import {
   useModalHistory,
 } from './_components'
 import { FilterModal } from './_forms'
+import { pelanggaranCache, getStudentDetailCacheKey } from './_cache'
 import type {
   Capabilities,
   Filters,
@@ -57,7 +58,10 @@ export function PelanggaranDetailDrawer({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [filterOpen, setFilterOpen] = useState(false)
-  const [data, setData] = useState<{ student: Santri; history: Page<Incident> } | null>(null)
+  const initialKey = santriId ? getStudentDetailCacheKey(santriId, filters, page, pageSize) : ''
+  const [data, setData] = useState<{ student: Santri; history: Page<Incident> } | null>(
+    () => (initialKey ? pelanggaranCache.get(initialKey) ?? null : null)
+  )
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
   const [closing, setClosing] = useState(false)
@@ -91,19 +95,29 @@ export function PelanggaranDetailDrawer({
 
     let isMounted = true
     startTransition(async () => {
+      const key = getStudentDetailCacheKey(santriId, filters, page, pageSize)
+      const cached = pelanggaranCache.get<{ student: Santri; history: Page<Incident> }>(key)
+      if (cached) {
+        setData(cached)
+        if (pelanggaranCache.isFresh(key, 60_000)) {
+          return
+        }
+      }
+
       setError('')
       try {
         const res = await getStudentDetail(santriId, filters, page, pageSize)
         if (isMounted) {
           if (res.data) {
             setData(res.data)
+            pelanggaranCache.set(key, res.data)
           } else {
             setError(res.error || 'Detail tidak dapat dimuat.')
-            setData(null)
+            if (!cached) setData(null)
           }
         }
       } catch {
-        if (isMounted) {
+        if (isMounted && !cached) {
           setError('Detail riwayat tidak dapat dimuat.')
         }
       }
