@@ -400,12 +400,12 @@ export default function PageContent() {
             )}
           </div>
 
-          {/* Action buttons beside search on desktop, below search on mobile */}
-          <div className="flex items-center gap-2">
-            {cap?.create && tab === 'riwayat' && (
+          {/* Action buttons beside search on desktop, stacked on mobile */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            {tab === 'riwayat' && (!cap || cap.create) && (
               <button
                 type="button"
-                className={cn(primary, 'flex-1 sm:flex-none justify-center whitespace-nowrap')}
+                className={cn(primary, 'w-full sm:w-auto justify-center whitespace-nowrap')}
                 onClick={() => setForm({})}
               >
                 <Plus className="h-4 w-4" />
@@ -413,31 +413,33 @@ export default function PageContent() {
               </button>
             )}
 
-            <button
-              type="button"
-              className={cn(button, 'flex-1 sm:flex-none justify-center whitespace-nowrap')}
-              onClick={() => setFilterOpen(true)}
-            >
-              <Filter className="h-4 w-4 text-slate-500" />
-              <span>Filter & Urutkan</span>
-              {filterCount > 0 && (
-                <span className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[11px] font-bold text-emerald-800">
-                  {filterCount}
-                </span>
-              )}
-            </button>
-
-            {cap?.manage && (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                className={cn(button, 'shrink-0 px-2.5 sm:px-3')}
-                onClick={() => setSettingsOpen(true)}
-                title="Pengaturan Jenis Pelanggaran"
-                aria-label="Pengaturan jenis pelanggaran"
+                className={cn(button, 'flex-1 sm:flex-none justify-center whitespace-nowrap')}
+                onClick={() => setFilterOpen(true)}
               >
-                <SettingsIcon className="h-4 w-4 text-slate-600" />
+                <Filter className="h-4 w-4 text-slate-500" />
+                <span>Filter & Urutkan</span>
+                {filterCount > 0 && (
+                  <span className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[11px] font-bold text-emerald-800">
+                    {filterCount}
+                  </span>
+                )}
               </button>
-            )}
+
+              {(!cap || cap.manage) && (
+                <button
+                  type="button"
+                  className={cn(button, 'shrink-0 px-3')}
+                  onClick={() => setSettingsOpen(true)}
+                  title="Pengaturan Jenis Pelanggaran"
+                  aria-label="Pengaturan jenis pelanggaran"
+                >
+                  <SettingsIcon className="h-4 w-4 text-slate-600" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -665,11 +667,11 @@ export default function PageContent() {
         />
       )}
 
-      {settingsOpen && cap?.manage && (
+      {settingsOpen && (!cap || cap.manage) && (
         <Settings
           options={options}
-          canCreate={cap.create}
-          canUpdate={cap.update}
+          canCreate={!cap || cap.create}
+          canUpdate={!cap || cap.update}
           onClose={() => setSettingsOpen(false)}
           onSaved={() => setRefresh((n) => n + 1)}
         />

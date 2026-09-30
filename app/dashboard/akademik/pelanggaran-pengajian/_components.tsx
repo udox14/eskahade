@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
   AlertCircle,
@@ -39,33 +39,63 @@ export const ghost =
 
 const dialogs: HTMLElement[] = []
 let originalOverflow = ''
+let programmaticBackCount = 0
 
 /**
  * Intercept mobile back button / swipe gesture to close modal/drawer
  * instead of navigating away from the dashboard page.
  */
 export function useModalHistory(isOpen: boolean, onClose: () => void) {
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
     if (!isOpen || typeof window === 'undefined') return
 
     const key = `modal_${Math.random().toString(36).slice(2, 9)}`
-    window.history.pushState({ [key]: true }, '')
-
     let closedByPop = false
-    const handlePopState = () => {
+
+    try {
+      const currentState =
+        typeof window.history.state === 'object' && window.history.state !== null
+          ? window.history.state
+          : {}
+      window.history.pushState({ ...currentState, [key]: true }, '')
+    } catch {
+      // In case pushState fails in restricted sandbox
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      if (programmaticBackCount > 0) {
+        programmaticBackCount--
+        return
+      }
+
+      // Check if this modal's entry was popped
+      if (event.state && event.state[key]) {
+        return
+      }
+
       closedByPop = true
-      onClose()
+      onCloseRef.current()
     }
 
     window.addEventListener('popstate', handlePopState)
 
     return () => {
       window.removeEventListener('popstate', handlePopState)
-      if (!closedByPop && window.history.state && window.history.state[key]) {
-        window.history.back()
+      if (!closedByPop) {
+        try {
+          if (window.history.state && window.history.state[key]) {
+            programmaticBackCount++
+            window.history.back()
+          }
+        } catch {
+          // ignore
+        }
       }
     }
-  }, [isOpen, onClose])
+  }, [isOpen])
 }
 
 export function Modal({
@@ -89,13 +119,13 @@ export function Modal({
   const id = useId()
   const [closing, setClosing] = useState(false)
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     if (busyRef.current || closing) return
     setClosing(true)
     setTimeout(() => {
       closeRef.current()
     }, 240)
-  }
+  }, [closing])
 
   const handleCloseRef = useRef(handleClose)
   useEffect(() => {
