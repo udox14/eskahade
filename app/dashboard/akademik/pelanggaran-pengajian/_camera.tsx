@@ -128,8 +128,6 @@ export function EvidenceCamera({
   return (
     <Modal
       title={file ? 'Pratinjau Foto Kejadian' : 'Ambil Foto Kejadian'}
-      description="Foto bukti opsional. Pastikan objek kejadian terlihat jelas dan cukup terang."
-      icon={<Camera className="h-5 w-5" />}
       busy={busy}
       onClose={onClose}
       footer={

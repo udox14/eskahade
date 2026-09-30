@@ -54,7 +54,9 @@ export async function searchSantri(search: string): Promise<Result<Santri[]>> {
   const {classes}=await access(); filters({search})
   if (search.trim().length<2) return []
   const scope=studentScope(classes)
-  return query<Santri>(`SELECT s.id,s.nis,s.nama_lengkap,s.foto_url,s.asrama,s.kamar,s.jenis_kelamin,s.status_global FROM santri s WHERE ${scope.sql} AND lower(trim(s.status_global))='aktif' AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?) ORDER BY s.nama_lengkap,s.id LIMIT 20`,[...scope.params,`%${search.trim()}%`,`%${search.trim()}%`])
+  return query<Santri>(`SELECT s.id,s.nis,s.nama_lengkap,s.foto_url,s.asrama,s.kamar,s.jenis_kelamin,s.status_global,
+   (SELECT k.nama_kelas FROM riwayat_pendidikan rp JOIN kelas k ON k.id=rp.kelas_id JOIN tahun_ajaran ta ON ta.id=k.tahun_ajaran_id AND ta.is_active=1 WHERE rp.santri_id=s.id AND ${ACTIVE_EDUCATION} LIMIT 1) nama_kelas
+   FROM santri s WHERE ${scope.sql} AND lower(trim(s.status_global))='aktif' AND (s.nama_lengkap LIKE ? OR s.nis LIKE ?) ORDER BY s.nama_lengkap,s.id LIMIT 20`,[...scope.params,`%${search.trim()}%`,`%${search.trim()}%`])
  })
 }
 export async function getOptions(): Promise<Result<Options>> {
@@ -70,19 +72,21 @@ export async function getOptions(): Promise<Result<Options>> {
   return {asramas:asramas.map(r=>r.value),kamars:kamars.map(r=>r.value),classes:classRows,actors,types}
  })
 }
-async function history(f: Filters, classes: string[]|null, page: number, santriId?: string): Promise<Page<Incident>> {
+async function history(f: Filters, classes: string[]|null, page: number, santriId?: string, pageSize?: number): Promise<Page<Incident>> {
  const w=whereClause(filters(f),classes,santriId); pageNumber(page)
+ const limit = pageSize ? Math.min(Math.max(pageSize, 5), 100) : PAGE_SIZE
  const [count,rows]=await Promise.all([
   queryOne<{n:number}>(`SELECT COUNT(*) n ${BASE_FROM} WHERE ${w.sql}`,w.params),
   query<Incident>(`SELECT v.*,s.nama_lengkap,s.nis,s.foto_url,s.asrama,s.kamar,u.full_name actor_name,
+   (SELECT k.nama_kelas FROM riwayat_pendidikan rp JOIN kelas k ON k.id=rp.kelas_id JOIN tahun_ajaran ta ON ta.id=k.tahun_ajaran_id AND ta.is_active=1 WHERE rp.santri_id=s.id AND ${ACTIVE_EDUCATION} LIMIT 1) nama_kelas,
    (SELECT CASE WHEN p.state='attached' AND p.expires_at>? THEN '/api/pengajian-violations/photo/'||v.id ELSE NULL END FROM pengajian_violation_photos p WHERE p.violation_id=v.id) evidence_url,
    (SELECT CASE WHEN p.state='pending' THEN NULL ELSE p.expires_at END FROM pengajian_violation_photos p WHERE p.violation_id=v.id) evidence_expires_at
-   ${BASE_FROM} WHERE ${w.sql} ORDER BY ${orderBy(f)} LIMIT ? OFFSET ?`,[now(),...w.params,PAGE_SIZE,(page-1)*PAGE_SIZE]),
+   ${BASE_FROM} WHERE ${w.sql} ORDER BY ${orderBy(f)} LIMIT ? OFFSET ?`,[now(),...w.params,limit,(page-1)*limit]),
  ])
  return {rows,total:count?.n??0,page}
 }
-export async function getHistory(f: Filters={},page=1): Promise<Result<Page<Incident>>> {
- return result(async()=>{const {classes}=await access(); return history(f,classes,page)})
+export async function getHistory(f: Filters={},page=1,pageSize?: number): Promise<Result<Page<Incident>>> {
+ return result(async()=>{const {classes}=await access(); return history(f,classes,page,undefined,pageSize)})
 }
 type EvidenceRow={request_id:string;object_key:string;content_hash:string;created_at:string;expires_at:string;state:'pending'|'attached'|'deleted'}
 export async function attachIncidentPhoto(incidentId:string,request:string,form:FormData):Promise<Result<{expiresAt:string}>> {
@@ -126,24 +130,27 @@ export async function getIncidentPhotoKey(incidentId:string):Promise<Result<{key
   return {key:photo.object_key}
  })
 }
-const RECAP_COLUMNS='s.id santri_id,s.nama_lengkap,s.nis,s.foto_url,s.asrama,s.kamar,COUNT(*) count,COUNT(DISTINCT v.type_id) type_count,MAX(v.occurred_at) last'
-export async function getRecap(f: Filters={},page=1): Promise<Result<Page<Recap>>> {
+const RECAP_COLUMNS="s.id santri_id,s.nama_lengkap,s.nis,s.foto_url,s.asrama,s.kamar,(SELECT k.nama_kelas FROM riwayat_pendidikan rp JOIN kelas k ON k.id=rp.kelas_id JOIN tahun_ajaran ta ON ta.id=k.tahun_ajaran_id AND ta.is_active=1 WHERE rp.santri_id=s.id AND lower(trim(COALESCE(rp.status_riwayat,'aktif'))) IN ('aktif','active','') LIMIT 1) nama_kelas,COUNT(*) count,COUNT(DISTINCT v.type_id) type_count,MAX(v.occurred_at) last"
+export async function getRecap(f: Filters={},page=1,pageSize?: number): Promise<Result<Page<Recap>>> {
  return result(async()=>{
   const {classes}=await access(); const w=whereClause(filters(f),classes,undefined,true); const h=countHaving(f); pageNumber(page)
+  const limit = pageSize ? Math.min(Math.max(pageSize, 5), 100) : PAGE_SIZE
   const grouped=`${BASE_FROM} WHERE ${w.sql} GROUP BY s.id ${h.sql}`
   const [count,rows]=await Promise.all([
    queryOne<{n:number}>(`SELECT COUNT(*) n FROM (SELECT s.id ${grouped})`,[...w.params,...h.params]),
-   query<Recap>(`SELECT ${RECAP_COLUMNS} ${grouped} ORDER BY ${orderBy(f,true)} LIMIT ? OFFSET ?`,[...w.params,...h.params,PAGE_SIZE,(page-1)*PAGE_SIZE]),
+   query<Recap>(`SELECT ${RECAP_COLUMNS} ${grouped} ORDER BY ${orderBy(f,true)} LIMIT ? OFFSET ?`,[...w.params,...h.params,limit,(page-1)*limit]),
   ])
   return {rows,total:count?.n??0,page}
  })
 }
-export async function getStudentDetail(santriId: string,f: Filters={},page=1): Promise<Result<{student:Santri;history:Page<Incident>}>> {
+export async function getStudentDetail(santriId: string,f: Filters={},page=1,pageSize?: number): Promise<Result<{student:Santri;history:Page<Incident>}>> {
  return result(async()=>{
   const {classes}=await access(); const scope=studentScope(classes)
-  const student=await queryOne<Santri>(`SELECT s.id,s.nis,s.nama_lengkap,s.foto_url,s.asrama,s.kamar,s.jenis_kelamin,s.status_global FROM santri s WHERE s.id=? AND ${scope.sql}`,[santriId,...scope.params])
+  const student=await queryOne<Santri>(`SELECT s.id,s.nis,s.nama_lengkap,s.foto_url,s.asrama,s.kamar,s.jenis_kelamin,s.status_global,
+   (SELECT k.nama_kelas FROM riwayat_pendidikan rp JOIN kelas k ON k.id=rp.kelas_id JOIN tahun_ajaran ta ON ta.id=k.tahun_ajaran_id AND ta.is_active=1 WHERE rp.santri_id=s.id AND lower(trim(COALESCE(rp.status_riwayat,'aktif'))) IN ('aktif','active','') LIMIT 1) nama_kelas
+   FROM santri s WHERE s.id=? AND ${scope.sql}`,[santriId,...scope.params])
   if (!student) throw new InputError('Santri tidak ditemukan atau di luar cakupan akses.')
-  return {student,history:await history(f,classes,page,santriId)}
+  return {student,history:await history(f,classes,page,santriId,pageSize)}
  })
 }
 export async function getAnalytics(f: Filters={}): Promise<Result<Analytics>> {

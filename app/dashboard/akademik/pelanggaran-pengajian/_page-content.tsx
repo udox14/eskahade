@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { toWibDateInputValue, formatWibDateTime } from '@/lib/date/wib'
+import { cn } from '@/lib/utils'
 import type {
   Analytics,
   Capabilities,
@@ -88,12 +89,12 @@ function RecapList({
       {/* ─────────────────────────────────────────────────────────────
           MOBILE VIEW (Card List)
          ───────────────────────────────────────────────────────────── */}
-      <div className={`p-3 sm:p-4 space-y-3 ${compact ? '' : 'md:hidden'}`}>
+      <div className={`p-3 sm:p-4 space-y-2.5 ${compact ? '' : 'md:hidden'}`}>
         {data.rows.map((row) => (
           <button
             key={row.santri_id}
             type="button"
-            className="group block w-full rounded-xl border border-slate-200/90 bg-white p-4 text-left shadow-2xs transition-colors hover:border-emerald-300 hover:shadow-xs focus-visible:outline-2 focus-visible:outline-emerald-600 cursor-pointer"
+            className="group block w-full rounded-xl border border-slate-200/90 bg-white p-3.5 text-left shadow-2xs transition-colors hover:border-emerald-300 hover:shadow-xs focus-visible:outline-2 focus-visible:outline-emerald-600 cursor-pointer"
             onClick={() => onSelect(row.santri_id)}
           >
             <div className="flex items-start justify-between gap-3">
@@ -102,16 +103,16 @@ function RecapList({
               </div>
 
               <div className="shrink-0 text-right">
-                <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-slate-900">
-                  <span className="text-base font-bold tabular-nums">{row.count}</span>
-                  <span className="text-[11px] text-slate-500 font-medium">kali</span>
+                <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-slate-900">
+                  <span className="text-sm font-bold tabular-nums">{row.count}</span>
+                  <span className="text-[10px] text-slate-500 font-medium">kali</span>
                 </div>
               </div>
             </div>
 
-            <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs text-slate-500">
+            <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2 text-[11px] text-slate-500">
               <span>
-                {row.type_count} jenis pelanggaran · Terakhir {formatWibDateTime(row.last)}
+                {row.type_count} jenis · Terakhir {formatWibDateTime(row.last)}
               </span>
               <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-transform" />
             </div>
@@ -193,6 +194,7 @@ export default function PageContent() {
   const [tab, setTab] = useState<Tab>('riwayat')
   const [allFilters, setAllFilters] = useState(initialFilters)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10) // Load 10 records by default on initial open
   const [refresh, setRefresh] = useState(0)
 
   const [options, setOptions] = useState<Options>(emptyOptions)
@@ -209,7 +211,7 @@ export default function PageContent() {
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   const [form, setForm] = useState<{ row?: Incident } | null>(null)
-  const [cancel, setCancel] = useState<Incident| null>(null)
+  const [cancel, setCancel] = useState<Incident | null>(null)
   const [student, setStudent] = useState<{ id: string; filters: Filters } | null>(null)
   const [weekly, setWeekly] = useState(false)
 
@@ -237,7 +239,7 @@ export default function PageContent() {
     }
   }, [refresh])
 
-  // Fetch data per tab
+  // Fetch data per tab (bounded by pageSize)
   useEffect(() => {
     let alive = true
     async function load() {
@@ -245,13 +247,13 @@ export default function PageContent() {
       setError('')
       try {
         if (tab === 'riwayat') {
-          const r = await getHistory(filters, page)
+          const r = await getHistory(filters, page, pageSize)
           if (alive) {
             if (r.data) setHistory(r.data)
             else setError(r.error || 'Gagal memuat riwayat.')
           }
         } else if (tab === 'rekap') {
-          const r = await getRecap(filters, page)
+          const r = await getRecap(filters, page, pageSize)
           if (alive) {
             if (r.data) setRecap(r.data)
             else setError(r.error || 'Gagal memuat rekap.')
@@ -273,7 +275,7 @@ export default function PageContent() {
     return () => {
       alive = false
     }
-  }, [tab, filters, page, refresh])
+  }, [tab, filters, page, pageSize, refresh])
 
   function updateFilters(f: Filters) {
     setAllFilters((a) => ({ ...a, [tab]: f }))
@@ -313,35 +315,11 @@ export default function PageContent() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-20">
       {/* ─────────────────────────────────────────────────────────────
-          PAGE HEADER
+          PAGE HEADER (Clean header without duplicate action buttons)
          ───────────────────────────────────────────────────────────── */}
       <DashboardPageHeader
         title="Pelanggaran Pengajian"
         description="Pencatatan kejadian dan evaluasi kedisiplinan pengajian santri."
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            {cap?.manage && (
-              <button
-                type="button"
-                className={button}
-                onClick={() => setSettingsOpen(true)}
-              >
-                <SettingsIcon className="h-4 w-4" />
-                <span>Pengaturan</span>
-              </button>
-            )}
-            {cap?.create && tab === 'riwayat' && (
-              <button
-                type="button"
-                className={primary}
-                onClick={() => setForm({})}
-              >
-                <Plus className="h-4 w-4" />
-                <span>Catat Pelanggaran</span>
-              </button>
-            )}
-          </div>
-        }
       />
 
       {initError && <ErrorMessage message={initError} />}
@@ -394,10 +372,13 @@ export default function PageContent() {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          FILTER TOOLBAR STRIP
+          FILTER & ACTIONS TOOLBAR STRIP
+          - Desktop: Search bar | Catat Pelanggaran | Filter | Pengaturan (gear)
+          - Mobile: Search bar (full) -> Below: Catat | Filter | Pengaturan (gear)
          ───────────────────────────────────────────────────────────── */}
-      <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-        <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          {/* Search Bar */}
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
@@ -410,7 +391,7 @@ export default function PageContent() {
             {filters.search && (
               <button
                 type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 onClick={() => updateFilters({ ...filters, search: '' })}
                 aria-label="Hapus pencarian"
               >
@@ -419,19 +400,45 @@ export default function PageContent() {
             )}
           </div>
 
-          <button
-            type="button"
-            className={button}
-            onClick={() => setFilterOpen(true)}
-          >
-            <Filter className="h-4 w-4 text-slate-500" />
-            <span>Filter & Urutkan</span>
-            {filterCount > 0 && (
-              <span className="rounded-full bg-emerald-100 px-2 py-0.2 text-[11px] font-bold text-emerald-800">
-                {filterCount}
-              </span>
+          {/* Action buttons beside search on desktop, below search on mobile */}
+          <div className="flex items-center gap-2">
+            {cap?.create && tab === 'riwayat' && (
+              <button
+                type="button"
+                className={cn(primary, 'flex-1 sm:flex-none justify-center whitespace-nowrap')}
+                onClick={() => setForm({})}
+              >
+                <Plus className="h-4 w-4" />
+                <span>Catat Pelanggaran</span>
+              </button>
             )}
-          </button>
+
+            <button
+              type="button"
+              className={cn(button, 'flex-1 sm:flex-none justify-center whitespace-nowrap')}
+              onClick={() => setFilterOpen(true)}
+            >
+              <Filter className="h-4 w-4 text-slate-500" />
+              <span>Filter & Urutkan</span>
+              {filterCount > 0 && (
+                <span className="rounded-full bg-emerald-100 px-1.5 py-0.2 text-[11px] font-bold text-emerald-800">
+                  {filterCount}
+                </span>
+              )}
+            </button>
+
+            {cap?.manage && (
+              <button
+                type="button"
+                className={cn(button, 'shrink-0 px-2.5 sm:px-3')}
+                onClick={() => setSettingsOpen(true)}
+                title="Pengaturan Jenis Pelanggaran"
+                aria-label="Pengaturan jenis pelanggaran"
+              >
+                <SettingsIcon className="h-4 w-4 text-slate-600" />
+              </button>
+            )}
+          </div>
         </div>
 
         {filterCount > 0 && (
@@ -509,7 +516,16 @@ export default function PageContent() {
               filters={filters}
               onSort={sort}
             />
-            <Pager data={history} onPage={setPage} noun="kejadian" />
+            <Pager
+              data={history}
+              onPage={setPage}
+              noun="kejadian"
+              pageSize={pageSize}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize)
+                setPage(1)
+              }}
+            />
           </>
         ) : tab === 'rekap' && recap ? (
           <>
@@ -519,7 +535,16 @@ export default function PageContent() {
               filters={filters}
               onSort={sort}
             />
-            <Pager data={recap} onPage={setPage} noun="santri" />
+            <Pager
+              data={recap}
+              onPage={setPage}
+              noun="santri"
+              pageSize={pageSize}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize)
+                setPage(1)
+              }}
+            />
           </>
         ) : tab === 'analitik' && analytics ? (
           <div className="space-y-6">
@@ -650,7 +675,7 @@ export default function PageContent() {
         />
       )}
 
-      {/* Side Drawer for Student History (Requirement 2) */}
+      {/* Side Drawer for Student History with Animations & Phone Back Button Handling */}
       {student && (
         <PelanggaranDetailDrawer
           santriId={student.id}

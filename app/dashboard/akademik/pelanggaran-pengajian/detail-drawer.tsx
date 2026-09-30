@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useState, useTransition, useCallback } from 'react'
 import {
   X,
   Filter,
@@ -14,6 +14,7 @@ import {
   ListLoading,
   Pager,
   button,
+  useModalHistory,
 } from './_components'
 import { FilterModal } from './_forms'
 import type {
@@ -54,24 +55,37 @@ export function PelanggaranDetailDrawer({
     direction: 'desc',
   }))
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [filterOpen, setFilterOpen] = useState(false)
   const [data, setData] = useState<{ student: Santri; history: Page<Incident> } | null>(null)
   const [error, setError] = useState('')
   const [isPending, startTransition] = useTransition()
+  const [closing, setClosing] = useState(false)
+
+  const handleClose = useCallback(() => {
+    if (closing) return
+    setClosing(true)
+    setTimeout(() => {
+      onClose()
+    }, 250)
+  }, [closing, onClose])
+
+  // Intercept phone back button / swipe gesture
+  useModalHistory(!!santriId, handleClose)
 
   // Close on Escape key press
   useEffect(() => {
     if (!santriId) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') handleClose()
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [santriId, onClose])
+  }, [santriId, handleClose])
 
-  // Fetch student detail when santriId, filters, page, or refresh changes
+  // Fetch student detail when santriId, filters, page, pageSize, or refresh changes
   useEffect(() => {
     if (!santriId) return
 
@@ -79,7 +93,7 @@ export function PelanggaranDetailDrawer({
     startTransition(async () => {
       setError('')
       try {
-        const res = await getStudentDetail(santriId, filters, page)
+        const res = await getStudentDetail(santriId, filters, page, pageSize)
         if (isMounted) {
           if (res.data) {
             setData(res.data)
@@ -98,7 +112,7 @@ export function PelanggaranDetailDrawer({
     return () => {
       isMounted = false
     }
-  }, [santriId, filters, page, refresh])
+  }, [santriId, filters, page, pageSize, refresh])
 
   if (!santriId) return null
 
@@ -109,16 +123,28 @@ export function PelanggaranDetailDrawer({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 overflow-hidden bg-slate-950/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+        className={`fixed inset-0 z-50 overflow-hidden transition-all duration-250 ${
+          closing ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
         aria-labelledby="drawer-title"
         role="dialog"
         aria-modal="true"
       >
         {/* Backdrop click dismiss */}
-        <div className="absolute inset-0 cursor-pointer" onClick={onClose} aria-hidden="true" />
+        <div
+          className="absolute inset-0 bg-slate-950/40 backdrop-blur-xs cursor-pointer transition-opacity"
+          onClick={handleClose}
+          aria-hidden="true"
+        />
 
         <div className="absolute inset-y-0 right-0 max-w-full flex pl-4 sm:pl-10 pointer-events-none">
-          <div className="w-screen max-w-xl md:max-w-2xl bg-white shadow-2xl border-l border-slate-200 flex flex-col h-full pointer-events-auto animate-in slide-in-from-right duration-300">
+          <div
+            className={`w-screen max-w-xl md:max-w-2xl bg-white shadow-2xl border-l border-slate-200 flex flex-col h-full pointer-events-auto transition-transform duration-250 ease-out ${
+              closing
+                ? 'translate-x-full'
+                : 'translate-x-0 animate-in slide-in-from-right duration-300'
+            }`}
+          >
             {/* ─────────────────────────────────────────────────────────────
                 1. DRAWER HEADER (Matching Status Pembayaran Standard)
                ───────────────────────────────────────────────────────────── */}
@@ -144,6 +170,7 @@ export function PelanggaranDetailDrawer({
                     <p className="text-xs text-slate-500 truncate mt-0.5">
                       NIS: {data.student.nis} · {data.student.asrama || 'Non-Asrama'}
                       {data.student.kamar ? ` / ${data.student.kamar}` : ''}
+                      {data.student.nama_kelas ? ` · ${data.student.nama_kelas}` : ''}
                       {data.student.jenis_kelamin ? ` · ${data.student.jenis_kelamin === 'L' ? 'Putra' : 'Putri'}` : ''}
                     </p>
                   </div>
@@ -160,7 +187,7 @@ export function PelanggaranDetailDrawer({
 
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleClose}
                 className="rounded-lg p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
                 aria-label="Tutup riwayat"
               >
@@ -262,7 +289,16 @@ export function PelanggaranDetailDrawer({
                ───────────────────────────────────────────────────────────── */}
             {data && data.history.total > 0 && (
               <div className="shrink-0">
-                <Pager data={data.history} onPage={setPage} noun="kejadian" />
+                <Pager
+                  data={data.history}
+                  onPage={setPage}
+                  noun="kejadian"
+                  pageSize={pageSize}
+                  onPageSizeChange={(newSize) => {
+                    setPageSize(newSize)
+                    setPage(1)
+                  }}
+                />
               </div>
             )}
           </div>

@@ -3,13 +3,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import {
   AlertCircle,
-  AlertTriangle,
-  BookOpen,
-  Filter,
   Loader2,
   Plus,
   Search,
-  Settings as SettingsIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
@@ -118,8 +114,6 @@ export function FilterModal({
   return (
     <Modal
       title="Filter & Urutkan Data"
-      description="Sesuaikan kriteria filter untuk mempersempit data yang ditampilkan."
-      icon={<Filter className="h-5 w-5" />}
       onClose={onClose}
       footer={
         <div className="flex w-full items-center justify-between gap-3">
@@ -451,12 +445,6 @@ export function IncidentForm({
     <>
       <Modal
         title={row ? 'Koreksi Catatan Pelanggaran' : 'Catat Pelanggaran Pengajian'}
-        description={
-          student
-            ? 'Lengkapi rincian kejadian pelanggaran santri.'
-            : 'Cari dan pilih santri yang akan dicatat kejadiannya.'
-        }
-        icon={<BookOpen className="h-5 w-5" />}
         busy={busy}
         onClose={incidentSaved ? onSaved : onClose}
         footer={
@@ -781,8 +769,6 @@ export function CancelForm({
   return (
     <Modal
       title="Batalkan Catatan Pelanggaran"
-      description="Konfirmasi pembatalan catatan kejadian santri."
-      icon={<AlertTriangle className="h-5 w-5 text-rose-600" />}
       busy={busy}
       onClose={onClose}
       footer={
@@ -904,8 +890,6 @@ export function Settings({
             : 'Tambah Jenis Pelanggaran'
           : 'Pengaturan Jenis Pelanggaran'
       }
-      description="Kelola master data dan urutan tampilan jenis pelanggaran pengajian."
-      icon={<SettingsIcon className="h-5 w-5" />}
       busy={busy}
       onClose={onClose}
       footer={
