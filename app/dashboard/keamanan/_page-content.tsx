@@ -8,6 +8,7 @@ import {
   Edit2,
   Eye,
   FileSpreadsheet,
+  Filter,
   Loader2,
   Plus,
   RotateCcw,
@@ -29,11 +30,13 @@ import {
   editMasterPelanggaran,
   getDaftarPelanggar,
   getDataExportPelanggaran,
+  getFilterOptionsPelanggaran,
   getMasterPelanggaran,
   getOpsiExportPelanggaran,
   hapusMasterPelanggaran,
   importMasterPelanggaranMassal,
   tambahMasterPelanggaran,
+  type DaftarPelanggarFilter,
   type DaftarPelanggarItem,
   type ExportPelanggaranFilter,
   type MasterPelanggaranItem,
@@ -53,7 +56,7 @@ import {
   StudentIdentity,
 } from './_components'
 import { DetailDrawer } from './detail-drawer'
-import { ModalInputPelanggaran } from './_forms'
+import { ModalFilterPelanggaran, ModalInputPelanggaran } from './_forms'
 import { getDaftarPelanggarCacheKey, keamananCache } from './_cache'
 
 function fmtTgl(s?: string | null) {
@@ -421,6 +424,13 @@ export default function KeamananPage() {
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [filters, setFilters] = useState<DaftarPelanggarFilter>({
+    sort: 'jumlah',
+    direction: 'desc',
+    pageSize: 10,
+    page: 1,
+  })
   const [loadingDaftar, setLoadingDaftar] = useState(true)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
@@ -430,11 +440,42 @@ export default function KeamananPage() {
   const [showInputModal, setShowInputModal] = useState(false)
   const [preselectedSantri, setPreselectedSantri] = useState<SantriSearchResult | null>(null)
   const [showExportModal, setShowExportModal] = useState(false)
+  const [showFilterModal, setShowFilterModal] = useState(false)
+  const [filterAsramas, setFilterAsramas] = useState<string[]>([])
+
+  useEffect(() => {
+    let alive = true
+    getFilterOptionsPelanggaran().then((res) => {
+      if (!alive || 'error' in res) return
+      setFilterAsramas(res.asramas)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const activeFilterCount = [
+    filters.asrama,
+    filters.kategori,
+    filters.spLevel,
+    filters.tanggalMulai,
+    filters.tanggalSelesai,
+    filters.minKejadian,
+    filters.maxKejadian,
+    filters.sort && filters.sort !== 'jumlah',
+    filters.direction && filters.direction !== 'desc',
+  ].filter(Boolean).length
 
   // ─── LOAD DAFTAR PELANGGAR DENGAN SWR CACHING ────────────────────────────
   const loadDaftar = useCallback(
-    async (pg = page, s = search) => {
-      const cacheKey = getDaftarPelanggarCacheKey(s, undefined, pg)
+    async (currentFilters: DaftarPelanggarFilter = filters, s = search, pg = page, ps = pageSize) => {
+      const merged: DaftarPelanggarFilter = {
+        ...currentFilters,
+        search: s?.trim() || undefined,
+        page: pg,
+        pageSize: ps,
+      }
+      const cacheKey = getDaftarPelanggarCacheKey(merged)
       const cached = keamananCache.get<{ rows: DaftarPelanggarItem[]; total: number; totalPages: number }>(cacheKey)
 
       if (cached) {
@@ -451,7 +492,7 @@ export default function KeamananPage() {
       }
 
       try {
-        const res = await getDaftarPelanggar({ search: s || undefined, page: pg })
+        const res = await getDaftarPelanggar(merged)
         setRows(res.rows)
         setTotal(res.total)
         setTotalPages(res.totalPages)
@@ -461,12 +502,12 @@ export default function KeamananPage() {
         setLoadingDaftar(false)
       }
     },
-    [page, search]
+    [filters, page, pageSize, search]
   )
 
   useEffect(() => {
-    void loadDaftar(page, search)
-  }, [loadDaftar, page, search, refresh])
+    void loadDaftar(filters, search, page, pageSize)
+  }, [loadDaftar, filters, search, page, pageSize, refresh])
 
   const handleRefreshAll = () => {
     keamananCache.clear()
@@ -723,6 +764,24 @@ export default function KeamananPage() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    className={cn(
+                      button,
+                      'flex-1 sm:flex-none justify-center whitespace-nowrap relative',
+                      activeFilterCount > 0 && 'border-rose-300 bg-rose-50/70 text-rose-700 font-semibold'
+                    )}
+                    onClick={() => setShowFilterModal(true)}
+                  >
+                    <Filter className="h-4 w-4 text-slate-500" />
+                    <span>Filter & Urutkan</span>
+                    {activeFilterCount > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.2 text-[10px] font-bold text-white">
+                        {activeFilterCount}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
                     className={cn(button, 'flex-1 sm:flex-none justify-center whitespace-nowrap')}
                     onClick={() => setShowExportModal(true)}
                   >
@@ -732,6 +791,54 @@ export default function KeamananPage() {
                 </div>
               </div>
             </div>
+
+            {/* Active Filters Tag Strip */}
+            {activeFilterCount > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3 text-xs">
+                <span className="text-slate-500 font-medium">Filter aktif:</span>
+                {filters.asrama && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
+                    Asrama: {filters.asrama === '__unassigned__' ? 'Non-Asrama' : filters.asrama}
+                  </span>
+                )}
+                {filters.kategori && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
+                    Kategori: {filters.kategori}
+                  </span>
+                )}
+                {filters.spLevel && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
+                    SP: {filters.spLevel}
+                  </span>
+                )}
+                {(filters.tanggalMulai || filters.tanggalSelesai) && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
+                    {filters.tanggalMulai || 'Awal'} — {filters.tanggalSelesai || 'Sekarang'}
+                  </span>
+                )}
+                {(filters.minKejadian || filters.maxKejadian) && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
+                    {filters.minKejadian ? `Min ${filters.minKejadian}` : ''}{' '}
+                    {filters.maxKejadian ? `Max ${filters.maxKejadian}` : ''} kejadian
+                  </span>
+                )}
+                {filters.sort && filters.sort !== 'jumlah' && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
+                    Urut: {filters.sort} ({filters.direction || 'desc'})
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilters({ sort: 'jumlah', direction: 'desc', pageSize, page: 1 })
+                    setPage(1)
+                  }}
+                  className="text-xs font-semibold text-rose-700 hover:text-rose-800 ml-auto cursor-pointer"
+                >
+                  Reset Filter
+                </button>
+              </div>
+            )}
 
             {search && (
               <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
@@ -909,9 +1016,15 @@ export default function KeamananPage() {
                   page={page}
                   totalPages={totalPages}
                   total={total}
+                  pageSize={pageSize}
                   onPage={(pg) => {
                     setPage(pg)
-                    loadDaftar(pg, search)
+                    loadDaftar(filters, search, pg, pageSize)
+                  }}
+                  onPageSizeChange={(sz) => {
+                    setPageSize(sz)
+                    setPage(1)
+                    loadDaftar(filters, search, 1, sz)
                   }}
                   disabled={loadingDaftar}
                 />
@@ -1201,7 +1314,7 @@ export default function KeamananPage() {
           onClose={() => setSelectedSantriId(null)}
           onMutated={() => {
             keamananCache.clear()
-            loadDaftar(page, search)
+            loadDaftar(filters, search, page, pageSize)
           }}
         />
       )}
@@ -1217,7 +1330,7 @@ export default function KeamananPage() {
           }}
           onSuccess={() => {
             keamananCache.clear()
-            loadDaftar(1, search)
+            loadDaftar(filters, search, 1, pageSize)
           }}
         />
       )}
@@ -1225,6 +1338,20 @@ export default function KeamananPage() {
       {/* 3. Modal Export Data */}
       {showExportModal && (
         <ModalExportPelanggaran onClose={() => setShowExportModal(false)} />
+      )}
+
+      {/* 4. Modal Filter & Urutkan */}
+      {showFilterModal && (
+        <ModalFilterPelanggaran
+          value={filters}
+          asramas={filterAsramas}
+          onClose={() => setShowFilterModal(false)}
+          onApply={(newFilters) => {
+            setFilters(newFilters)
+            setPage(1)
+            setShowFilterModal(false)
+          }}
+        />
       )}
     </div>
   )

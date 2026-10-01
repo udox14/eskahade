@@ -9,7 +9,6 @@ import { resolveLetterIncidents, saveIncidentLetter } from '@/lib/discipline/dat
 import { revalidateDiscipline } from '@/lib/discipline/revalidate'
 
 
-const PAGE_SIZE = 30
 const VALID_KATEGORI = new Set(['RINGAN', 'SEDANG', 'BERAT'])
 
 type ImportMasterPelanggaranRow = {
@@ -60,6 +59,21 @@ export type DaftarPelanggarItem = {
   perlu_verifikasi: number
   terakhir: string | null
   sp_terakhir: string | null
+}
+
+export type DaftarPelanggarFilter = {
+  search?: string
+  asrama?: string
+  kategori?: string
+  spLevel?: string
+  tanggalMulai?: string
+  tanggalSelesai?: string
+  minKejadian?: number
+  maxKejadian?: number
+  sort?: 'jumlah' | 'terakhir' | 'nama' | 'sp'
+  direction?: 'asc' | 'desc'
+  page?: number
+  pageSize?: number
 }
 
 export type ExportPelanggaranRow = {
@@ -462,48 +476,157 @@ export async function hapusPelanggaran(id: string): Promise<{ success: boolean }
 
 // ─── DAFTAR PELANGGAR (unik per santri) ───────────────────────────────────────
 // 1 query aggregate — tidak loop per santri
-export async function getDaftarPelanggar(params: {
-  search?: string; asrama?: string; page?: number
-}) {
-  const access=await assertFeature('/dashboard/keamanan'); if('error' in access) throw new Error(access.error)
-  const { search, asrama, page = 1 } = params
-  const offset = (page - 1) * PAGE_SIZE
+export async function getDaftarPelanggar(params: DaftarPelanggarFilter = {}) {
+  const access = await assertFeature('/dashboard/keamanan')
+  if ('error' in access) throw new Error(access.error)
+
+  const {
+    search,
+    asrama,
+    kategori,
+    spLevel,
+    tanggalMulai,
+    tanggalSelesai,
+    minKejadian,
+    maxKejadian,
+    sort = 'jumlah',
+    direction = 'desc',
+    page = 1,
+    pageSize = 10,
+  } = params
+
+  const limit = Math.max(1, Math.min(Number(pageSize) || 10, 100))
+  const currentPage = Math.max(1, Number(page) || 1)
+  const offset = (currentPage - 1) * limit
 
   const clauses = ["s.status_global IN ('aktif','keluar')", "p.status='active'"]
-  const baseParams: any[] = []
-  if (search)  { clauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)'); baseParams.push(`%${search}%`, `%${search}%`) }
-  if (asrama)  { clauses.push('s.asrama = ?'); baseParams.push(asrama) }
+  const baseParams: unknown[] = []
 
-  const where = clauses.join(' AND ')
+  if (search?.trim()) {
+    clauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)')
+    baseParams.push(`%${search.trim()}%`, `%${search.trim()}%`)
+  }
+
+  if (asrama?.trim()) {
+    if (asrama === '__unassigned__') {
+      clauses.push("(s.asrama IS NULL OR s.asrama = '')")
+    } else {
+      clauses.push('s.asrama = ?')
+      baseParams.push(asrama)
+    }
+  }
+
+  if (kategori?.trim()) {
+    clauses.push('p.jenis = ?')
+    baseParams.push(kategori)
+  }
+
+  if (tanggalMulai?.trim()) {
+    clauses.push('p.tanggal >= ?')
+    baseParams.push(tanggalMulai)
+  }
+
+  if (tanggalSelesai?.trim()) {
+    clauses.push('p.tanggal <= ?')
+    baseParams.push(tanggalSelesai)
+  }
+
+  if (spLevel?.trim()) {
+    if (spLevel === 'ADA_SP') {
+      clauses.push('EXISTS (SELECT 1 FROM surat_perjanjian sp WHERE sp.santri_id = s.id)')
+    } else if (spLevel === 'TANPA_SP') {
+      clauses.push('NOT EXISTS (SELECT 1 FROM surat_perjanjian sp WHERE sp.santri_id = s.id)')
+    } else {
+      clauses.push(
+        '(SELECT sp.level FROM surat_perjanjian sp WHERE sp.santri_id = s.id ORDER BY sp.created_at DESC LIMIT 1) = ?'
+      )
+      baseParams.push(spLevel)
+    }
+  }
+
+  const havingClauses: string[] = []
+  const havingParams: unknown[] = []
+
+  if (typeof minKejadian === 'number' && minKejadian > 0) {
+    havingClauses.push('SUM(p.jumlah_kejadian) >= ?')
+    havingParams.push(minKejadian)
+  }
+
+  if (typeof maxKejadian === 'number' && maxKejadian > 0) {
+    havingClauses.push('SUM(p.jumlah_kejadian) <= ?')
+    havingParams.push(maxKejadian)
+  }
+
+  const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
+  const havingSql = havingClauses.length ? `HAVING ${havingClauses.join(' AND ')}` : ''
 
   const countRow = await queryOne<{ total: number }>(
-    `SELECT COUNT(DISTINCT p.santri_id) AS total
-     FROM discipline_incidents p JOIN santri s ON s.id = p.santri_id
-     WHERE ${where}`,
-    baseParams
+    `SELECT COUNT(*) AS total FROM (
+       SELECT p.santri_id
+       FROM discipline_incidents p
+       JOIN santri s ON s.id = p.santri_id
+       ${whereSql}
+       GROUP BY p.santri_id
+       ${havingSql}
+     )`,
+    [...baseParams, ...havingParams]
   )
   const total = countRow?.total ?? 0
 
-  const rows = await query<any>(
+  const dir = direction === 'asc' ? 'ASC' : 'DESC'
+  let orderSql = `jumlah_pelanggaran ${dir}, terakhir DESC, s.id`
+  if (sort === 'terakhir') {
+    orderSql = `terakhir ${dir}, jumlah_pelanggaran DESC, s.id`
+  } else if (sort === 'nama') {
+    orderSql = `s.nama_lengkap ${dir}, s.id`
+  } else if (sort === 'sp') {
+    orderSql = `sp_terakhir ${dir}, jumlah_pelanggaran DESC, s.id`
+  }
+
+  const rows = await query<DaftarPelanggarItem>(
     `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
             (SELECT k.nama_kelas FROM riwayat_pendidikan rp JOIN kelas k ON k.id=rp.kelas_id WHERE rp.santri_id=s.id AND lower(trim(COALESCE(rp.status_riwayat,'aktif'))) IN ('aktif','active','') LIMIT 1) AS nama_kelas,
             SUM(p.jumlah_kejadian) AS jumlah_pelanggaran,
-            SUM(p.perlu_verifikasi) AS perlu_verifikasi,
+            0 AS perlu_verifikasi,
             MAX(p.tanggal) AS terakhir,
-            -- Level SP terakhir (ringan: subquery kecil di tabel kecil)
             (SELECT sp.level FROM surat_perjanjian sp
              WHERE sp.santri_id = s.id
              ORDER BY sp.created_at DESC LIMIT 1) AS sp_terakhir
      FROM discipline_incidents p
      JOIN santri s ON s.id = p.santri_id
-     WHERE ${where}
+     ${whereSql}
      GROUP BY p.santri_id
-     ORDER BY jumlah_pelanggaran DESC, terakhir DESC,s.id
+     ${havingSql}
+     ORDER BY ${orderSql}
      LIMIT ? OFFSET ?`,
-    [...baseParams, PAGE_SIZE, offset]
+    [...baseParams, ...havingParams, limit, offset]
   )
 
-  return { rows, total, page, totalPages: Math.ceil(total / PAGE_SIZE) }
+  return {
+    rows,
+    total,
+    page: currentPage,
+    pageSize: limit,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  }
+}
+
+export async function getFilterOptionsPelanggaran(): Promise<
+  { asramas: string[] } | { error: string }
+> {
+  const access = await assertFeature('/dashboard/keamanan')
+  if ('error' in access) return access
+
+  const asramaRows = await query<{ asrama: string }>(
+    `SELECT DISTINCT s.asrama
+     FROM santri s
+     WHERE s.asrama IS NOT NULL AND s.asrama <> ''
+     ORDER BY s.asrama`
+  )
+
+  return {
+    asramas: asramaRows.map((row) => row.asrama),
+  }
 }
 
 // ─── DETAIL SANTRI (lazy, dipanggil saat modal dibuka) ───────────────────────

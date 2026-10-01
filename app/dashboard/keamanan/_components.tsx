@@ -443,22 +443,68 @@ export function Pager({
   page,
   totalPages,
   total,
+  pageSize = 10,
   onPage,
+  onPageSizeChange,
   disabled = false,
 }: {
   page: number
   totalPages: number
   total: number
+  pageSize?: number
   onPage: (pg: number) => void
+  onPageSizeChange?: (sz: number) => void
   disabled?: boolean
 }) {
+  const currentSize = pageSize || 10
+  const start = total ? (page - 1) * currentSize + 1 : 0
+  const end = Math.min(page * currentSize, total)
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 sm:px-6 py-3 text-xs text-slate-600">
-      <div>
-        Total <span className="font-semibold text-slate-900">{total}</span> santri tercatat
+      <div className="flex items-center gap-3">
+        <div>
+          Menampilkan <span className="font-semibold text-slate-900">{start}–{end}</span> dari{' '}
+          <span className="font-semibold text-slate-900">{total}</span> santri
+        </div>
+
+        {onPageSizeChange && (
+          <div className="hidden sm:flex items-center gap-1.5 border-l border-slate-200 pl-3">
+            <span className="text-slate-500">Tampilkan:</span>
+            <select
+              value={currentSize}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              aria-label="Jumlah santri per halaman"
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:border-rose-500 focus:outline-none cursor-pointer"
+            >
+              {[10, 25, 50, 100].map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
+        {onPageSizeChange && (
+          <div className="flex sm:hidden items-center mr-1">
+            <select
+              value={currentSize}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              aria-label="Pilih jumlah baris"
+              className="rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-700 focus:border-rose-500 focus:outline-none"
+            >
+              {[10, 25, 50, 100].map((size) => (
+                <option key={size} value={size}>
+                  {size}/hal
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <span className="text-slate-500">
           Hal. {page} dari {Math.max(totalPages, 1)}
         </span>

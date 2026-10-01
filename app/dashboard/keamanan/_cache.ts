@@ -43,8 +43,15 @@ class ClientCache {
 
 export const keamananCache = new ClientCache()
 
-export function getDaftarPelanggarCacheKey(search?: string, asrama?: string, page = 1): string {
-  return `daftar:${search || ''}:${asrama || ''}:${page}`
+export function getDaftarPelanggarCacheKey(
+  filterOrSearch: unknown = '',
+  asrama = '',
+  page = 1
+): string {
+  if (typeof filterOrSearch === 'object' && filterOrSearch !== null) {
+    return `daftar:${JSON.stringify(filterOrSearch)}`
+  }
+  return `daftar:${String(filterOrSearch || '')}:${asrama}:${page}`
 }
 
 export function getDetailSantriCacheKey(santriId: string): string {

@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils'
 import {
   cariSantri,
   simpanPelanggaran,
+  type DaftarPelanggarFilter,
   type MasterPelanggaranItem,
   type SantriSearchResult,
 } from './actions'
@@ -570,3 +571,232 @@ export function ModalInputPelanggaran({
     </Modal>
   )
 }
+
+export function ModalFilterPelanggaran({
+  value,
+  asramas,
+  onClose,
+  onApply,
+}: {
+  value: DaftarPelanggarFilter
+  asramas: string[]
+  onClose: () => void
+  onApply: (filters: DaftarPelanggarFilter) => void
+}) {
+  const [draft, setDraft] = useState<DaftarPelanggarFilter>({ ...value })
+  const [error, setError] = useState('')
+
+  const set = (key: keyof DaftarPelanggarFilter, val: unknown) => {
+    setDraft((d) => ({
+      ...d,
+      [key]: val === '' || val === undefined ? undefined : val,
+    }))
+  }
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (draft.tanggalMulai && draft.tanggalSelesai && draft.tanggalMulai > draft.tanggalSelesai) {
+      setError('Tanggal mulai harus sebelum tanggal selesai.')
+      return
+    }
+    if (
+      draft.minKejadian != null &&
+      draft.maxKejadian != null &&
+      draft.minKejadian > draft.maxKejadian
+    ) {
+      setError('Jumlah kejadian minimum melebihi maksimum.')
+      return
+    }
+    onApply(draft)
+  }
+
+  return (
+    <Modal
+      title="Filter & Urutkan Pelanggar"
+      onClose={onClose}
+      footer={
+        <div className="flex w-full items-center justify-between gap-3">
+          <button
+            type="button"
+            className={button}
+            onClick={() => {
+              setDraft({
+                search: value.search,
+                page: 1,
+                pageSize: value.pageSize || 10,
+                sort: 'jumlah',
+                direction: 'desc',
+              })
+              setError('')
+            }}
+          >
+            Reset Default
+          </button>
+          <button form="keamanan-filter-form" className={primaryRose} type="submit">
+            Terapkan Filter
+          </button>
+        </div>
+      }
+    >
+      <form id="keamanan-filter-form" className="space-y-4 sm:space-y-5" onSubmit={submit}>
+        {error && <ErrorMessage message={error} />}
+
+        {/* Section 1: Rentang Waktu */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Rentang Waktu Kejadian
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <Field label="Dari Tanggal">
+              <input
+                type="date"
+                className={control}
+                value={draft.tanggalMulai ?? ''}
+                onChange={(e) => set('tanggalMulai', e.target.value)}
+              />
+            </Field>
+            <Field label="Sampai Tanggal">
+              <input
+                type="date"
+                className={control}
+                value={draft.tanggalSelesai ?? ''}
+                onChange={(e) => set('tanggalSelesai', e.target.value)}
+              />
+            </Field>
+          </div>
+        </div>
+
+        {/* Section 2: Lokasi Asrama */}
+        <div className="space-y-3 border-t border-slate-100 pt-4">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Lokasi Asrama
+          </h4>
+          <Field label="Asrama Santri">
+            <select
+              className={control}
+              value={draft.asrama ?? ''}
+              onChange={(e) => set('asrama', e.target.value)}
+            >
+              <option value="">Semua Asrama</option>
+              {asramas.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+              <option value="__unassigned__">Belum ditempatkan / Non-Asrama</option>
+            </select>
+          </Field>
+        </div>
+
+        {/* Section 3: Kategori Pelanggaran & Status SP */}
+        <div className="space-y-3 border-t border-slate-100 pt-4">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Kategori & SP
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <Field label="Kategori Pelanggaran">
+              <select
+                className={control}
+                value={draft.kategori ?? ''}
+                onChange={(e) => set('kategori', e.target.value)}
+              >
+                <option value="">Semua Kategori</option>
+                <option value="RINGAN">Ringan</option>
+                <option value="SEDANG">Sedang</option>
+                <option value="BERAT">Berat</option>
+              </select>
+            </Field>
+
+            <Field label="Status Surat Pembinaan (SP)">
+              <select
+                className={control}
+                value={draft.spLevel ?? ''}
+                onChange={(e) => set('spLevel', e.target.value)}
+              >
+                <option value="">Semua Santri</option>
+                <option value="ADA_SP">Pernah Dapat SP (Aktif)</option>
+                <option value="TANPA_SP">Tanpa SP</option>
+                <option value="SP1">SP1 Saja</option>
+                <option value="SP2">SP2 Saja</option>
+                <option value="SP3">SP3 Saja</option>
+                <option value="SK">SK (Skorsing/Keluaran) Saja</option>
+              </select>
+            </Field>
+          </div>
+        </div>
+
+        {/* Section 4: Batas Jumlah Kejadian */}
+        <div className="space-y-3 border-t border-slate-100 pt-4">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Jumlah Kejadian Pelanggaran
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <Field label="Jumlah Minimum">
+              <input
+                type="number"
+                min={0}
+                placeholder="Misal: 1"
+                className={control}
+                value={draft.minKejadian ?? ''}
+                onChange={(e) =>
+                  set(
+                    'minKejadian',
+                    e.target.value === '' ? undefined : Number(e.target.value)
+                  )
+                }
+              />
+            </Field>
+            <Field label="Jumlah Maksimum">
+              <input
+                type="number"
+                min={0}
+                placeholder="Misal: 10"
+                className={control}
+                value={draft.maxKejadian ?? ''}
+                onChange={(e) =>
+                  set(
+                    'maxKejadian',
+                    e.target.value === '' ? undefined : Number(e.target.value)
+                  )
+                }
+              />
+            </Field>
+          </div>
+        </div>
+
+        {/* Section 5: Pengurutan Data */}
+        <div className="space-y-3 border-t border-slate-100 pt-4">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Pengurutan
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <Field label="Urut Berdasarkan">
+              <select
+                className={control}
+                value={draft.sort ?? 'jumlah'}
+                onChange={(e) => set('sort', e.target.value)}
+              >
+                <option value="jumlah">Jumlah Kejadian</option>
+                <option value="terakhir">Waktu Melanggar Terakhir</option>
+                <option value="nama">Nama Santri</option>
+                <option value="sp">Level SP Terakhir</option>
+              </select>
+            </Field>
+
+            <Field label="Arah Urutan">
+              <select
+                className={control}
+                value={draft.direction ?? 'desc'}
+                onChange={(e) => set('direction', e.target.value)}
+              >
+                <option value="desc">Menurun (Terbanyak / Terbaru / Z–A)</option>
+                <option value="asc">Menaik (Paling Sedikit / Terlama / A–Z)</option>
+              </select>
+            </Field>
+          </div>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
