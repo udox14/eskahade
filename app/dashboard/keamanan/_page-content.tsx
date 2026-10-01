@@ -1,48 +1,79 @@
 'use client'
 
-import { incidentLabel, sessionLabel } from '@/lib/discipline/format'
-
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  getMasterPelanggaran, tambahMasterPelanggaran, editMasterPelanggaran,
-  hapusMasterPelanggaran, cariSantri, simpanPelanggaran, hapusPelanggaran,
-  getDaftarPelanggar, getDetailSantri, importMasterPelanggaranMassal,
-  getOpsiExportPelanggaran, getDataExportPelanggaran,
-} from './actions'
-import type { ExportPelanggaranFilter } from './actions'
-import { HistoryReview } from './history-review'
-import {
-  ShieldAlert, Plus, Search, Loader2, X, Trash2, Edit2,
-  ChevronLeft, ChevronRight, BookOpen, Camera,
-  Image as ImageIcon, Filter, Eye, Users, ChevronDown,
-  CheckSquare, Square, Download, Upload, FileSpreadsheet,
+  BookOpen,
+  CheckSquare,
+  Download,
+  Edit2,
+  Eye,
+  FileCheck,
+  FileSpreadsheet,
+  Loader2,
+  Plus,
+  RotateCcw,
+  Search,
+  ShieldAlert,
+  Square,
+  Trash2,
+  Upload,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
-import { cn } from '@/lib/utils'
-import { useConfirm } from '@/components/ui/confirm-dialog'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
-import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
+import { RowActionMenu, RowActionItem } from '@/components/ui/dropdown-menu'
+import { useConfirm } from '@/components/ui/confirm-dialog'
+import { cn } from '@/lib/utils'
+import {
+  editMasterPelanggaran,
+  getDaftarPelanggar,
+  getDataExportPelanggaran,
+  getMasterPelanggaran,
+  getOpsiExportPelanggaran,
+  hapusMasterPelanggaran,
+  importMasterPelanggaranMassal,
+  tambahMasterPelanggaran,
+  type DaftarPelanggarItem,
+  type ExportPelanggaranFilter,
+  type MasterPelanggaranItem,
+  type SantriSearchResult,
+} from './actions'
+import {
+  button,
+  control,
+  Empty,
+  Field,
+  ListLoading,
+  Modal,
+  Pager,
+  primary,
+  primaryRose,
+  SpBadge,
+  StudentIdentity,
+} from './_components'
+import { DetailDrawer } from './detail-drawer'
+import { ModalInputPelanggaran } from './_forms'
+import { HistoryReview } from './history-review'
+import { getDaftarPelanggarCacheKey, keamananCache } from './_cache'
 
-function fmtTgl(s: string) {
-  try { return format(new Date(s.replace(' ', 'T')), 'dd MMM yyyy', { locale: idLocale }) }
-  catch { return s }
+function fmtTgl(s?: string | null) {
+  if (!s) return '—'
+  try {
+    return format(new Date(s.replace(' ', 'T')), 'dd MMM yyyy', { locale: idLocale })
+  } catch {
+    return s
+  }
 }
-const KATEGORI_COLOR: Record<string, string> = {
-  RINGAN: 'bg-slate-100 text-slate-600 border-slate-200',
-  SEDANG: 'bg-amber-100 text-amber-700 border-amber-200',
-  BERAT:  'bg-rose-100 text-rose-700 border-rose-200',
-}
+
 const KATEGORI_DOT: Record<string, string> = {
-  RINGAN: 'bg-slate-400', SEDANG: 'bg-amber-400', BERAT: 'bg-rose-500',
+  RINGAN: 'bg-slate-400',
+  SEDANG: 'bg-amber-400',
+  BERAT: 'bg-rose-500',
 }
-const SP_COLOR: Record<string, string> = {
-  SP1: 'bg-amber-100 text-amber-700 border-amber-200',
-  SP2: 'bg-orange-100 text-orange-700 border-orange-200',
-  SP3: 'bg-rose-100 text-rose-700 border-rose-200',
-  SK:  'bg-red-900 text-white border-red-900',
-}
+
+type TabType = 'daftar' | 'verifikasi' | 'kamus'
 
 type ImportKamusRow = {
   kategori: string
@@ -51,400 +82,13 @@ type ImportKamusRow = {
   urutan: number
 }
 
-async function kompresGambar(file: File, maxW = 800, quality = 0.7): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = e => {
-      const img = new window.Image()
-      img.onload = () => {
-        const ratio = Math.min(maxW / img.width, maxW / img.height, 1)
-        const canvas = document.createElement('canvas')
-        canvas.width = img.width * ratio; canvas.height = img.height * ratio
-        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', quality))
-      }
-      img.onerror = reject; img.src = e.target?.result as string
-    }
-    reader.onerror = reject; reader.readAsDataURL(file)
-  })
-}
-async function uploadFoto(base64: string): Promise<string> {
-  const res = await fetch('/api/upload-foto', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ base64, folder: 'bukti-pelanggaran' }),
-  })
-  const data = await res.json()
-  if (!data.url) throw new Error('Upload gagal')
-  return data.url
-}
-
-// MODAL INPUT PELANGGARAN
-function ModalInputPelanggaran({ masterList, onClose, onSuccess }: {
-  masterList: any[]; onClose: () => void; onSuccess: () => void
-}) {
-  const [step, setStep] = useState<1 | 2>(1)
-  const [keyword, setKeyword] = useState('')
-  const [hasilCari, setHasilCari] = useState<any[]>([])
-  const [searching, setSearching] = useState(false)
-  const [selectedSantri, setSelectedSantri] = useState<any>(null)
-  const [jenisSearch, setJenisSearch] = useState('')
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [selectedMasterId, setSelectedMasterId] = useState('')
-  const [deskripsi, setDeskripsi] = useState('')
-  const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10))
-  const [fotoBase64, setFotoBase64] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
-
-  const selectedItem = masterList.find(m => String(m.id) === selectedMasterId)
-  const filteredMaster = jenisSearch.trim()
-    ? masterList.filter(m => m.nama_pelanggaran.toLowerCase().includes(jenisSearch.toLowerCase()) || m.kategori.toLowerCase().includes(jenisSearch.toLowerCase()))
-    : masterList
-
-  useEffect(() => {
-    function h(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setShowDropdown(false)
-    }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (keyword.length < 2) return
-    setSearching(true)
-    const res = await cariSantri(keyword)
-    setHasilCari(res); setSearching(false)
-    if (!res.length) toast.info('Santri tidak ditemukan')
-  }
-  const handleFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return
-    setUploading(true)
-    try { setFotoBase64(await kompresGambar(file)) }
-    catch { toast.error('Gagal memproses foto') }
-    finally { setUploading(false) }
-  }
-  const handleSimpan = async () => {
-    if (!selectedSantri) { toast.error('Pilih santri dulu'); return }
-    if (!selectedMasterId) { toast.error('Pilih jenis pelanggaran'); return }
-    setSaving(true)
-    try {
-      let fotoUrl: string | undefined
-      if (fotoBase64) { try { fotoUrl = await uploadFoto(fotoBase64) } catch { toast.error('Foto gagal diupload, data tetap disimpan tanpa foto') } }
-      const res = await simpanPelanggaran({ santriId: selectedSantri.id, masterId: Number(selectedMasterId), deskripsiTambahan: deskripsi || undefined, tanggal, fotoUrl })
-      if ('error' in res) { toast.error(res.error); return }
-      toast.success(`Pelanggaran ${selectedSantri.nama_lengkap} berhasil dicatat`)
-      onSuccess(); onClose()
-    } finally { setSaving(false) }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
-      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center">
-              <ShieldAlert className="w-4 h-4 text-rose-600" />
-            </div>
-            <div>
-              <p className="font-bold text-slate-900 text-sm">Catat Pelanggaran</p>
-              <p className="text-[10px] text-slate-400">{step === 1 ? 'Langkah 1 — Pilih santri' : 'Langkah 2 — Detail pelanggaran'}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="flex px-5 pt-4 pb-0 gap-2 shrink-0">
-          {[1, 2].map(s => <div key={s} className={cn('flex-1 h-1 rounded-full transition-colors', s <= step ? 'bg-rose-500' : 'bg-slate-100')} />)}
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {step === 1 && (
-            <div className="p-5 space-y-4">
-              <form onSubmit={handleSearch} className="flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                  <input type="text" autoFocus placeholder="Cari nama atau NIS santri..." value={keyword} onChange={e => setKeyword(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent bg-slate-50 focus:bg-white transition-all" />
-                </div>
-                <button type="submit" disabled={searching || keyword.length < 2}
-                  className="px-4 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-50 transition-colors flex items-center gap-1.5">
-                  {searching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />} Cari
-                </button>
-              </form>
-              {hasilCari.length > 0 && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hasil Pencarian</p>
-                  {hasilCari.map(s => (
-                    <button key={s.id} onClick={() => { setSelectedSantri(s); setStep(2) }}
-                      className="w-full flex items-center gap-3 px-4 py-3 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-xl text-left transition-all group">
-                      <SantriPhotoAvatar src={s.foto_url} alt={s.nama_lengkap} name={s.nama_lengkap} size="sm" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-800 text-sm truncate">{s.nama_lengkap}</p>
-                        <p className="text-xs text-slate-400">{s.nis} · {s.asrama} / {s.kamar}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {!hasilCari.length && keyword.length < 2 && (
-                <div className="flex flex-col items-center py-8 text-slate-300 gap-2">
-                  <Users className="w-10 h-10" />
-                  <p className="text-xs text-slate-400">Ketik minimal 2 karakter lalu klik Cari</p>
-                </div>
-              )}
-            </div>
-          )}
-          {step === 2 && (
-            <div className="p-5 space-y-4">
-              <div className="flex items-center gap-3 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3">
-                <SantriPhotoAvatar src={selectedSantri?.foto_url} alt={selectedSantri?.nama_lengkap} name={selectedSantri?.nama_lengkap || 'Santri'} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-rose-800 text-sm truncate">{selectedSantri?.nama_lengkap}</p>
-                  <p className="text-xs text-rose-500">{selectedSantri?.nis} · {selectedSantri?.asrama} / {selectedSantri?.kamar}</p>
-                </div>
-                <button onClick={() => { setStep(1); setSelectedSantri(null); setSelectedMasterId(''); setJenisSearch('') }}
-                  className="p-1.5 text-rose-400 hover:bg-rose-100 rounded-lg transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Jenis Pelanggaran <span className="text-rose-500">*</span></label>
-                <div className="relative" ref={dropdownRef}>
-                  <button type="button" onClick={() => { setShowDropdown(v => !v); setTimeout(() => searchRef.current?.focus(), 50) }}
-                    className={cn('w-full flex items-center justify-between px-3 py-2.5 border rounded-xl text-sm transition-all bg-slate-50 text-left', showDropdown ? 'border-rose-400 ring-2 ring-rose-100' : 'border-slate-200 hover:border-slate-300')}>
-                    {selectedItem ? (
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={cn('w-2 h-2 rounded-full shrink-0', KATEGORI_DOT[selectedItem.kategori])} />
-                        <span className="font-semibold text-slate-800 truncate">{selectedItem.nama_pelanggaran}</span>
-                      </div>
-                    ) : <span className="text-slate-400">Ketik untuk mencari pelanggaran...</span>}
-                    <ChevronDown className={cn('w-4 h-4 text-slate-400 transition-transform shrink-0 ml-2', showDropdown && 'rotate-180')} />
-                  </button>
-                  {showDropdown && (
-                    <div className="absolute z-50 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
-                      <div className="p-2 border-b border-slate-100">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                          <input ref={searchRef} type="text" placeholder="Cari jenis pelanggaran..." value={jenisSearch} onChange={e => setJenisSearch(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-400" />
-                          {jenisSearch && <button onClick={() => setJenisSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2"><X className="w-3 h-3 text-slate-400" /></button>}
-                        </div>
-                      </div>
-                      <div className="max-h-52 overflow-y-auto">
-                        {filteredMaster.length === 0 ? <p className="text-xs text-slate-400 text-center py-6 italic">Tidak ada yang cocok</p>
-                          : jenisSearch.trim()
-                            ? filteredMaster.map(m => (
-                              <button key={m.id} onClick={() => { setSelectedMasterId(String(m.id)); setShowDropdown(false); setJenisSearch('') }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-rose-50 transition-colors text-left border-b border-slate-50 last:border-0">
-                                <span className={cn('w-2 h-2 rounded-full shrink-0', KATEGORI_DOT[m.kategori])} />
-                                <span className="flex-1 text-sm font-medium text-slate-800 truncate">{m.nama_pelanggaran}</span>
-                              </button>
-                            ))
-                            : ['RINGAN', 'SEDANG', 'BERAT'].flatMap(kat => {
-                              const items = masterList.filter(m => m.kategori === kat)
-                              if (!items.length) return []
-                              return [
-                                <div key={`hdr-${kat}`} className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border-b border-slate-100">
-                                  <span className={cn('w-2 h-2 rounded-full', KATEGORI_DOT[kat])} />
-                                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{kat}</span>
-                                </div>,
-                                ...items.map(m => (
-                                  <button key={m.id} onClick={() => { setSelectedMasterId(String(m.id)); setShowDropdown(false) }}
-                                    className={cn('w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-rose-50 transition-colors text-left border-b border-slate-50 last:border-0', selectedMasterId === String(m.id) && 'bg-rose-50')}>
-                                    <span className="flex-1 text-sm font-medium text-slate-800 truncate">{m.nama_pelanggaran}</span>
-                                    {selectedMasterId === String(m.id) && <span className="text-rose-500 text-xs shrink-0">✓</span>}
-                                  </button>
-                                ))
-                              ]
-                            })
-                        }
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Tanggal Kejadian</label>
-                <input type="date" value={tanggal} onChange={e => setTanggal(e.target.value)} max={new Date().toISOString().slice(0, 10)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent bg-slate-50 focus:bg-white transition-all" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Keterangan Tambahan <span className="text-slate-400 font-normal normal-case">(opsional)</span></label>
-                <textarea value={deskripsi} onChange={e => setDeskripsi(e.target.value)} placeholder="Detail kejadian, saksi, lokasi, dsb..." rows={2}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent bg-slate-50 focus:bg-white resize-none transition-all" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Foto Bukti <span className="text-slate-400 font-normal normal-case">(opsional · auto kompres)</span></label>
-                {fotoBase64 ? (
-                  <div className="relative rounded-xl overflow-hidden border border-slate-200">
-                    <img src={fotoBase64} className="w-full max-h-36 object-cover" alt="Bukti" />
-                    <button onClick={() => { setFotoBase64(null); if (fileRef.current) fileRef.current.value = '' }}
-                      className="absolute top-2 right-2 p-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-500 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
-                  </div>
-                ) : (
-                  <button onClick={() => fileRef.current?.click()} disabled={uploading}
-                    className="w-full border-2 border-dashed border-slate-200 rounded-xl py-5 flex flex-col items-center gap-1.5 text-slate-400 hover:border-rose-300 hover:bg-rose-50/50 transition-all">
-                    {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
-                    <span className="text-xs font-medium">{uploading ? 'Memproses...' : 'Klik untuk pilih foto'}</span>
-                  </button>
-                )}
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFoto} />
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="px-5 py-4 border-t border-slate-100 shrink-0 bg-slate-50/50">
-          {step === 1
-            ? <p className="text-xs text-slate-400 text-center">Pilih santri dari hasil pencarian di atas</p>
-            : <div className="flex gap-2">
-              <button onClick={() => setStep(1)} className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-100 transition-colors">← Kembali</button>
-              <button onClick={handleSimpan} disabled={saving || !selectedMasterId}
-                className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 shadow-sm">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
-                {saving ? 'Menyimpan...' : 'Catat Pelanggaran'}
-              </button>
-            </div>
-          }
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// MODAL DETAIL SANTRI
-function ModalDetail({ santriId, onClose }: { santriId: string; onClose: () => void }) {
-  const [data, setData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [dtab, setDtab] = useState<'pelanggaran' | 'riwayat'>('pelanggaran')
-  const [deleting, setDeleting] = useState<string | null>(null)
-
-  useEffect(() => { getDetailSantri(santriId).then(d => { setData(d); setLoading(false) }) }, [santriId])
-
-  const handleHapus = async (id: string) => {
-    if (!await confirm('Batalkan catatan pelanggaran ini? Histori dan surat tetap disimpan.')) return
-    setDeleting(id)
-    const res = await hapusPelanggaran(id)
-    setDeleting(null)
-    if ('error' in res) { toast.error(res.error); return }
-    toast.success('Dibatalkan')
-    setData((prev: any) => ({ ...prev, pelanggaran: prev.pelanggaran.filter((p: any) => p.id !== id) }))
-  }
-  const totalKejadian = data?.pelanggaran?.reduce((a: number, p: any) => a + (p.jumlah_kejadian ?? 0), 0) ?? 0
-  const pending = data?.pelanggaran?.reduce((a: number,p:{perlu_verifikasi?:number})=>a+(p.perlu_verifikasi??0),0)??0
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
-      <div className="bg-white w-full sm:max-w-xl sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-3">
-            {loading ? <div className="h-4 w-40 bg-slate-100 rounded-lg animate-pulse" /> : (
-              <>
-                <SantriPhotoAvatar src={data?.profil?.foto_url} alt={data?.profil?.nama_lengkap} name={data?.profil?.nama_lengkap || 'Santri'} size="sm" />
-                <div>
-                  <p className="font-bold text-slate-900 text-sm">{data?.profil?.nama_lengkap}</p>
-                  <p className="text-[11px] text-slate-400">{data?.profil?.nis} · {data?.profil?.asrama}/{data?.profil?.kamar}</p>
-                </div>
-              </>
-            )}
-          </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="flex gap-0.5 bg-slate-100 p-1 mx-4 mt-3 rounded-xl shrink-0">
-          {([
-            { key: 'pelanggaran', label: 'Pelanggaran', count: data?.pelanggaran?.length ?? 0 },
-            { key: 'riwayat', label: 'Riwayat SP', count: (data?.suratPernyataan?.length ?? 0) + (data?.suratPerjanjian?.length ?? 0) },
-          ] as const).map(t => (
-            <button key={t.key} onClick={() => setDtab(t.key)}
-              className={cn('flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5', dtab === t.key ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700')}>
-              {t.label}
-              {t.count > 0 && <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded-full', dtab === t.key ? 'bg-rose-100 text-rose-700' : 'bg-slate-200 text-slate-500')}>{t.count}</span>}
-            </button>
-          ))}
-        </div>
-        <div className="flex-1 overflow-y-auto p-4">
-          {loading ? <div className="flex justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-slate-300" /></div>
-            : dtab === 'pelanggaran' ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-rose-50 rounded-xl p-3 border border-rose-100">
-                    <p className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">Jumlah Kejadian</p>
-                    <p className="text-2xl font-black text-rose-700 mt-0.5">{totalKejadian}</p>
-                  </div>
-                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Perlu Verifikasi</p>
-                    <p className="text-2xl font-black text-slate-700 mt-0.5">{pending}<span className="text-sm font-semibold ml-0.5">catatan</span></p>
-                  </div>
-                </div>
-                {data.pelanggaran.length === 0 ? <p className="text-center py-8 text-slate-400 text-sm">Belum ada catatan pelanggaran</p>
-                  : data.pelanggaran.map((p: any) => (
-                    <div key={p.id} className="bg-white border border-slate-200 rounded-xl p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                            <span className={cn('text-[9px] font-bold px-2 py-0.5 rounded-full border', KATEGORI_COLOR[p.jenis] ?? KATEGORI_COLOR.RINGAN)}>{incidentLabel(p.jenis)}</span>
-                            <span className="text-xs font-black text-rose-600">{p.perlu_verifikasi?'Perlu verifikasi':'1 kejadian'}</span>
-                            <span className="text-[10px] text-slate-400">{p.tanggal?fmtTgl(p.tanggal):'Tanggal belum terverifikasi'} · {p.source==='pengajian'?'Pengajian':'Umum'}{p.sesi&&` · ${sessionLabel(p.sesi,p.jenis,p.source)}`}</span>
-                          </div>
-                          <p className="text-sm font-semibold text-slate-800">{p.deskripsi}</p>
-                          {p.penindak_nama && <p className="text-[10px] text-slate-400 mt-0.5">Dicatat: {p.penindak_nama}</p>}
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {p.foto_url && <a href={p.foto_url} target="_blank" rel="noreferrer" className="p-1.5 text-blue-400 hover:bg-blue-50 rounded-lg transition-colors"><ImageIcon className="w-3.5 h-3.5" /></a>}
-                          {p.source==='pengajian'||p.sesi?<a href={p.source==='pengajian'?'/dashboard/akademik/pelanggaran-pengajian':p.jenis==='ALFA_BERJAMAAH'?'/dashboard/keamanan/verifikasi-berjamaah':'/dashboard/akademik/absensi/vonis-final'} className="text-xs text-blue-700 underline">Modul asal</a>:<button onClick={() => handleHapus(p.id)} disabled={deleting === p.id}
-                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"><Trash2 className="w-3.5 h-3.5" /></button>}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {(data.suratPernyataan.length + data.suratPerjanjian.length) === 0
-                  ? <p className="text-center py-8 text-slate-400 text-sm">Belum ada riwayat SP / Pernyataan</p>
-                  : <>
-                    {data.suratPernyataan.map((sp: any) => (
-                      <div key={sp.id} className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-3">
-                        <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
-                          <CheckSquare className="w-4 h-4 text-slate-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-slate-800 text-sm">Surat Pernyataan</p>
-                          <p className="text-xs text-slate-400">{fmtTgl(sp.tanggal)} · {sp.dibuat_oleh_nama || '—'}</p>
-                        </div>
-                      </div>
-                    ))}
-                    {data.suratPerjanjian.map((sp: any) => (
-                      <div key={sp.id} className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-3">
-                        <span className={cn('text-xs font-black px-2.5 py-2 rounded-xl border shrink-0', SP_COLOR[sp.level] ?? 'bg-slate-100 text-slate-600')}>{sp.level}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-slate-800 text-sm">{sp.level === 'SK' ? 'SK Pengeluaran' : `Surat Perjanjian ${sp.level}`}</p>
-                          <p className="text-xs text-slate-400">{fmtTgl(sp.tanggal)} · {sp.dibuat_oleh_nama || '—'}</p>
-                          {sp.catatan && <p className="text-xs text-slate-500 mt-0.5 italic">\"{sp.catatan}\"</p>}
-                        </div>
-                      </div>
-                    ))}
-                  </>}
-              </div>
-            )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-type ExportSantriOption = {
-  id: string
-  nama_lengkap: string
-  nis: string | null
-  asrama: string | null
-  kamar: string | null
-}
-
 function ModalExportPelanggaran({ onClose }: { onClose: () => void }) {
   const [loadingOpts, setLoadingOpts] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [asramas, setAsramas] = useState<string[]>([])
-  const [santri, setSantri] = useState<ExportSantriOption[]>([])
+  const [santri, setSantri] = useState<
+    Array<{ id: string; nama_lengkap: string; nis: string | null; asrama: string | null; kamar: string | null }>
+  >([])
   const [selectedAsramas, setSelectedAsramas] = useState<string[]>([])
   const [selectedSantriIds, setSelectedSantriIds] = useState<string[]>([])
   const [tanggalMulai, setTanggalMulai] = useState('')
@@ -453,7 +97,7 @@ function ModalExportPelanggaran({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     let alive = true
-    getOpsiExportPelanggaran().then(res => {
+    getOpsiExportPelanggaran().then((res) => {
       if (!alive) return
       if ('error' in res) {
         toast.error(res.error)
@@ -464,30 +108,39 @@ function ModalExportPelanggaran({ onClose }: { onClose: () => void }) {
       setSantri(res.santri)
       setLoadingOpts(false)
     })
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [onClose])
 
   const toggleAsrama = (asrama: string) => {
-    setSelectedAsramas(prev => prev.includes(asrama) ? prev.filter(item => item !== asrama) : [...prev, asrama])
+    setSelectedAsramas((prev) =>
+      prev.includes(asrama) ? prev.filter((item) => item !== asrama) : [...prev, asrama]
+    )
   }
 
   const toggleSantri = (id: string) => {
-    setSelectedSantriIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id])
+    setSelectedSantriIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    )
   }
 
-  const filteredSantri = santri.filter(item => {
+  const filteredSantri = santri.filter((item) => {
     const q = keyword.trim().toLowerCase()
-    const matchKeyword = !q || item.nama_lengkap.toLowerCase().includes(q) || String(item.nis || '').toLowerCase().includes(q)
-    const matchAsrama = selectedAsramas.length === 0 || selectedAsramas.includes(item.asrama || '')
+    const matchKeyword =
+      !q ||
+      item.nama_lengkap.toLowerCase().includes(q) ||
+      String(item.nis || '').toLowerCase().includes(q)
+    const matchAsrama =
+      selectedAsramas.length === 0 || selectedAsramas.includes(item.asrama || '')
     return matchKeyword && matchAsrama
   })
 
-  const selectedSantri = santri.filter(item => selectedSantriIds.includes(item.id))
-  const activeFilters = selectedAsramas.length + selectedSantriIds.length + (tanggalMulai ? 1 : 0) + (tanggalSelesai ? 1 : 0)
+  const selectedSantriList = santri.filter((item) => selectedSantriIds.includes(item.id))
 
   const handleExport = async () => {
     if (tanggalMulai && tanggalSelesai && tanggalMulai > tanggalSelesai) {
-      toast.error('Tanggal mulai tidak boleh lebih besar dari tanggal selesai')
+      toast.error('Tanggal mulai tidak boleh melebihi tanggal selesai.')
       return
     }
 
@@ -500,10 +153,17 @@ function ModalExportPelanggaran({ onClose }: { onClose: () => void }) {
         tanggalSelesai: tanggalSelesai || undefined,
       }
       const res = await getDataExportPelanggaran(filter)
-      if ('error' in res) { toast.error(res.error); return }
-      if (res.rows.length === 0) { toast.info('Tidak ada data sesuai pilihan export'); return }
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
+      if (res.rows.length === 0) {
+        toast.info('Tidak ada data sesuai pilihan export')
+        return
+      }
 
       const XLSX = await import('xlsx')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rows = res.rows.map((row: any, index: number) => ({
         No: index + 1,
         'Tanggal Pelanggaran': row.tanggal || '',
@@ -516,581 +176,1105 @@ function ModalExportPelanggaran({ onClose }: { onClose: () => void }) {
         'Nama Pelanggaran': row.nama_pelanggaran || '',
         Deskripsi: row.deskripsi || '',
         'Jumlah Kejadian': Number(row.jumlah_kejadian || 0),
-        'Perlu Verifikasi': row.perlu_verifikasi?'Ya':'Tidak',
-        Sumber: row.source==='pengajian'?'Pengajian':'Umum',
-        Sesi: row.sesi||'',
+        'Perlu Verifikasi': row.perlu_verifikasi ? 'Ya' : 'Tidak',
+        Sumber: row.source === 'pengajian' ? 'Pengajian' : 'Umum',
+        Sesi: row.sesi || '',
         Penindak: row.penindak_nama || '',
         'Foto Bukti': row.foto_url || '',
       }))
       const ws = XLSX.utils.json_to_sheet(rows)
       ws['!cols'] = [
-        { wch: 6 }, { wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 28 },
-        { wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 26 }, { wch: 42 },
-        { wch: 8 }, { wch: 22 }, { wch: 32 },
+        { wch: 6 },
+        { wch: 18 },
+        { wch: 22 },
+        { wch: 14 },
+        { wch: 28 },
+        { wch: 18 },
+        { wch: 10 },
+        { wch: 12 },
+        { wch: 26 },
+        { wch: 42 },
+        { wch: 8 },
+        { wch: 22 },
+        { wch: 32 },
       ]
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Pelanggaran')
 
-      const suffix = [tanggalMulai, tanggalSelesai].filter(Boolean).join('_sd_') || new Date().toISOString().slice(0, 10)
+      const suffix =
+        [tanggalMulai, tanggalSelesai].filter(Boolean).join('_sd_') ||
+        new Date().toISOString().slice(0, 10)
       XLSX.writeFile(wb, `Export_Pelanggaran_${suffix}.xlsx`)
-      toast.success(`${res.rows.length} baris pelanggaran diexport`)
+      toast.success(`${res.rows.length} catatan pelanggaran berhasil diexport`)
       onClose()
-    } catch (error: any) {
-      toast.error(`Export gagal: ${error?.message || 'kesalahan tidak diketahui'}`)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'kesalahan tidak diketahui'
+      toast.error(`Export gagal: ${msg}`)
     } finally {
       setExporting(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
-      <div className="bg-white w-full sm:max-w-2xl sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center">
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div>
-              <p className="font-bold text-slate-900 text-sm">Export Pelanggaran</p>
-              <p className="text-[10px] text-slate-400">{activeFilters > 0 ? `${activeFilters} pilihan aktif` : 'Kosongkan pilihan untuk export semua data'}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"><X className="w-4 h-4" /></button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {loadingOpts ? (
-            <div className="flex justify-center py-16 gap-2 text-slate-400">
-              <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Memuat opsi export...</span>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Tanggal Mulai</label>
-                  <input type="date" value={tanggalMulai} onChange={e => setTanggalMulai(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-slate-50 focus:bg-white transition-all" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Tanggal Selesai</label>
-                  <input type="date" value={tanggalSelesai} onChange={e => setTanggalSelesai(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-slate-50 focus:bg-white transition-all" />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Asrama</label>
-                  {selectedAsramas.length > 0 && <button onClick={() => setSelectedAsramas([])} className="text-[10px] font-bold text-red-500 hover:underline">hapus pilihan</button>}
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {asramas.map(asrama => (
-                    <button key={asrama} onClick={() => toggleAsrama(asrama)}
-                      className={cn('px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all active:scale-95',
-                        selectedAsramas.includes(asrama) ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400')}>
-                      {asrama}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Santri</label>
-                  {selectedSantriIds.length > 0 && <button onClick={() => setSelectedSantriIds([])} className="text-[10px] font-bold text-red-500 hover:underline">hapus pilihan</button>}
-                </div>
-                <div className="relative mb-2">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                  <input type="text" value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="Cari santri di data pelanggaran..."
-                    className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-slate-50 focus:bg-white transition-all" />
-                </div>
-                {selectedSantri.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-1.5">
-                    {selectedSantri.slice(0, 8).map(item => (
-                      <button key={item.id} onClick={() => toggleSantri(item.id)}
-                        className="rounded-xl bg-emerald-50 border border-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                        {item.nama_lengkap} x
-                      </button>
-                    ))}
-                    {selectedSantri.length > 8 && <span className="px-2 py-1 text-[11px] text-slate-400">+{selectedSantri.length - 8} lagi</span>}
-                  </div>
-                )}
-                <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white divide-y divide-slate-50">
-                  {filteredSantri.length === 0 ? (
-                    <p className="text-center text-sm text-slate-400 py-8">Tidak ada santri yang cocok</p>
-                  ) : filteredSantri.slice(0, 80).map(item => (
-                    <button key={item.id} onClick={() => toggleSantri(item.id)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-emerald-50 transition-colors">
-                      {selectedSantriIds.includes(item.id) ? <CheckSquare className="w-4 h-4 text-emerald-600 shrink-0" /> : <Square className="w-4 h-4 text-slate-300 shrink-0" />}
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-800 truncate">{item.nama_lengkap}</p>
-                        <p className="text-xs text-slate-400">{item.nis || '-'} · {item.asrama || '-'}/{item.kamar || '-'}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                {filteredSantri.length > 80 && <p className="mt-1 text-[10px] text-slate-400">Menampilkan 80 hasil pertama, gunakan pencarian untuk mempersempit.</p>}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="px-5 py-4 border-t border-slate-100 shrink-0 bg-slate-50/50 flex gap-2">
-          <button onClick={onClose}
-            className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-100 transition-colors">
+    <Modal
+      title="Export Data Pelanggaran"
+      busy={exporting}
+      onClose={onClose}
+      wide
+      footer={
+        <div className="flex w-full sm:w-auto items-center justify-end gap-2">
+          <button
+            type="button"
+            className={button}
+            disabled={exporting}
+            onClick={onClose}
+          >
             Batal
           </button>
-          <button onClick={handleExport} disabled={loadingOpts || exporting}
-            className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 shadow-sm">
-            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            {exporting ? 'Menyiapkan XLSX...' : 'Download XLSX'}
+          <button
+            type="button"
+            disabled={loadingOpts || exporting}
+            onClick={handleExport}
+            className={cn(primary, 'bg-emerald-600 hover:bg-emerald-700')}
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            <span>{exporting ? 'Menyiapkan XLSX…' : 'Download XLSX'}</span>
           </button>
         </div>
+      }
+    >
+      <div className="space-y-4">
+        {loadingOpts ? (
+          <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
+            <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            <span className="text-xs">Memuat opsi export…</span>
+          </div>
+        ) : (
+          <>
+            {/* Rentang Tanggal */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Tanggal Mulai">
+                <input
+                  type="date"
+                  value={tanggalMulai}
+                  onChange={(e) => setTanggalMulai(e.target.value)}
+                  className={control}
+                />
+              </Field>
+              <Field label="Tanggal Selesai">
+                <input
+                  type="date"
+                  value={tanggalSelesai}
+                  onChange={(e) => setTanggalSelesai(e.target.value)}
+                  className={control}
+                />
+              </Field>
+            </div>
+
+            {/* Filter Asrama */}
+            <div className="space-y-1.5 border-t border-slate-100 pt-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                  Filter Asrama
+                </label>
+                {selectedAsramas.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAsramas([])}
+                    className="text-xs text-rose-600 hover:underline"
+                  >
+                    Reset pilihan
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {asramas.map((asrama) => (
+                  <button
+                    type="button"
+                    key={asrama}
+                    onClick={() => toggleAsrama(asrama)}
+                    className={cn(
+                      'px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer',
+                      selectedAsramas.includes(asrama)
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                    )}
+                  >
+                    {asrama}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Filter Santri */}
+            <div className="space-y-1.5 border-t border-slate-100 pt-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                  Filter Santri Tertentu <span className="text-slate-400 font-normal lowercase">(opsional)</span>
+                </label>
+                {selectedSantriIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSantriIds([])}
+                    className="text-xs text-rose-600 hover:underline"
+                  >
+                    Reset pilihan ({selectedSantriIds.length})
+                  </button>
+                )}
+              </div>
+
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari santri..."
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  className={control + ' pl-9 text-xs min-h-9'}
+                />
+              </div>
+
+              {selectedSantriList.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {selectedSantriList.slice(0, 6).map((item) => (
+                    <span
+                      key={item.id}
+                      className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 border border-emerald-200/60"
+                    >
+                      <span>{item.nama_lengkap}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleSantri(item.id)}
+                        className="text-emerald-600 hover:text-emerald-900 cursor-pointer"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {selectedSantriList.length > 6 && (
+                    <span className="text-xs text-slate-400 self-center">
+                      +{selectedSantriList.length - 6} lainnya
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="max-h-48 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                {filteredSantri.slice(0, 60).map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onClick={() => toggleSantri(item.id)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-slate-50 transition cursor-pointer"
+                  >
+                    {selectedSantriIds.includes(item.id) ? (
+                      <CheckSquare className="h-4 w-4 text-emerald-600 shrink-0" />
+                    ) : (
+                      <Square className="h-4 w-4 text-slate-300 shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-800 truncate">
+                        {item.nama_lengkap}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        {item.asrama || '-'}{item.kamar ? ` / ${item.kamar}` : ''}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
-    </div>
+    </Modal>
   )
 }
 
-// TAB DAFTAR PELANGGAR
-function TabDaftar({ masterList }: { masterList: any[] }) {
-  const [rows, setRows] = useState<any[]>([])
+export default function KeamananPage() {
+  const confirm = useConfirm()
+  const [tab, setTab] = useState<TabType>('daftar')
+  const [refresh, setRefresh] = useState(0)
+  const [unverifiedTotal, setUnverifiedTotal] = useState<number>(0)
+
+  // ─── MASTER KAMUS STATE ───────────────────────────────────────────────────
+  const [masterList, setMasterList] = useState<MasterPelanggaranItem[]>([])
+  const [loadingMaster, setLoadingMaster] = useState(true)
+
+  const loadMaster = useCallback(async () => {
+    setLoadingMaster(true)
+    try {
+      const res = await getMasterPelanggaran()
+      setMasterList(res)
+    } finally {
+      setLoadingMaster(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadMaster()
+  }, [loadMaster, refresh])
+
+  // ─── DAFTAR PELANGGAR STATE ───────────────────────────────────────────────
+  const [rows, setRows] = useState<DaftarPelanggarItem[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(false)
-  const [hasLoaded, setHasLoaded] = useState(false)
+  const [loadingDaftar, setLoadingDaftar] = useState(true)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
-  const [modalId, setModalId] = useState<string | null>(null)
-  const [showModalInput, setShowModalInput] = useState(false)
-  const [showModalExport, setShowModalExport] = useState(false)
 
-  const load = useCallback(async (pg = 1, s = search) => {
-    setLoading(true)
-    try {
-      const res = await getDaftarPelanggar({ search: s || undefined, page: pg })
-      setRows(res.rows); setTotal(res.total); setTotalPages(res.totalPages); setPage(pg)
-      setHasLoaded(true)
-    } finally { setLoading(false) }
-  }, [search])
+  // Modals & Drawer
+  const [selectedSantriId, setSelectedSantriId] = useState<string | null>(null)
+  const [showInputModal, setShowInputModal] = useState(false)
+  const [preselectedSantri, setPreselectedSantri] = useState<SantriSearchResult | null>(null)
+  const [showExportModal, setShowExportModal] = useState(false)
 
-  const handleTampilkan = () => { setSearch(searchInput); load(1, searchInput) }
+  // ─── LOAD DAFTAR PELANGGAR DENGAN SWR CACHING ────────────────────────────
+  const loadDaftar = useCallback(
+    async (pg = page, s = search) => {
+      const cacheKey = getDaftarPelanggarCacheKey(s, undefined, pg)
+      const cached = keamananCache.get<{ rows: DaftarPelanggarItem[]; total: number; totalPages: number }>(cacheKey)
 
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2 items-center">
-        <form onSubmit={e => { e.preventDefault(); handleTampilkan() }} className="flex gap-2 flex-1">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-            <input type="text" placeholder="Cari nama atau NIS (kosongkan untuk semua)..." value={searchInput} onChange={e => setSearchInput(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent bg-white transition-all" />
-          </div>
-          <button type="submit" disabled={loading}
-            className="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 disabled:opacity-60 flex items-center gap-1.5 transition-colors shadow-sm whitespace-nowrap">
-            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Filter className="w-3.5 h-3.5" />}
-            Tampilkan
-          </button>
-        </form>
-        <button onClick={() => setShowModalInput(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 transition-colors shadow-sm whitespace-nowrap">
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Catat Pelanggaran</span>
-          <span className="sm:hidden">Catat</span>
-        </button>
-        <button onClick={() => setShowModalExport(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors shadow-sm whitespace-nowrap">
-          <Download className="w-4 h-4" />
-          <span className="hidden sm:inline">Export</span>
-        </button>
-      </div>
+      if (cached) {
+        // Fast-path: Instant UI update from cache without loading skeleton!
+        setRows(cached.rows)
+        setTotal(cached.total)
+        setTotalPages(cached.totalPages)
+        setPage(pg)
+        setLoadingDaftar(false)
 
-      {!hasLoaded && !loading ? (
-        <div className="flex flex-col items-center py-16 gap-3 bg-white rounded-2xl border border-slate-200 border-dashed text-center">
-          <ShieldAlert className="w-10 h-10 text-slate-200" />
-          <p className="text-slate-500 text-sm font-medium">Data belum dimuat</p>
-          <p className="text-xs text-slate-400">Klik <strong>Tampilkan</strong> untuk memuat daftar pelanggar</p>
-          <button onClick={handleTampilkan}
-            className="mt-1 px-5 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold hover:bg-rose-700 transition-colors shadow-sm">
-            Tampilkan Semua
-          </button>
-        </div>
-      ) : loading ? (
-        <div className="flex justify-center py-16 gap-2 text-slate-400 bg-white rounded-2xl border border-slate-200">
-          <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Memuat...</span>
-        </div>
-      ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center py-16 gap-3 bg-white rounded-2xl border border-slate-200 text-center">
-          <ShieldAlert className="w-10 h-10 text-slate-200" />
-          <p className="text-slate-500 text-sm font-medium">Tidak ada data pelanggar</p>
-        </div>
-      ) : (
-        <>
-          <p className="text-xs text-slate-500 px-0.5"><strong className="text-slate-700">{total}</strong> santri tercatat pernah melanggar</p>
-          <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  {['No', 'Nama Santri', 'Asrama / Kamar', 'Jumlah Kejadian', 'Perlu Verifikasi', 'SP Terakhir', ''].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {rows.map((r, i) => (
-                  <tr key={r.id} className="hover:bg-slate-50/70 transition-colors cursor-pointer group" onClick={() => setModalId(r.id)}>
-                    <td className="px-4 py-3 text-xs text-slate-300">{(page - 1) * 30 + i + 1}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <SantriPhotoAvatar src={r.foto_url} alt={r.nama_lengkap} name={r.nama_lengkap} size="sm" />
-                        <div>
-                          <p className="font-semibold text-slate-800 group-hover:text-rose-700 transition-colors">{r.nama_lengkap}</p>
-                          <p className="text-xs text-slate-400">{r.nis}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">{r.asrama}/{r.kamar}</td>
-                    <td className="px-4 py-3 text-xs font-bold text-slate-700">{r.jumlah_pelanggaran}x</td>
-                    <td className="px-4 py-3"><span className="text-sm font-black text-rose-600">{r.perlu_verifikasi}</span><span className="text-xs text-slate-400"> catatan</span></td>
-                    <td className="px-4 py-3">
-                      {r.sp_terakhir ? <span className={cn('text-[10px] font-bold px-2 py-1 rounded-lg border', SP_COLOR[r.sp_terakhir])}>{r.sp_terakhir}</span> : <span className="text-xs text-slate-300">—</span>}
-                    </td>
-                    <td className="px-4 py-3"><Eye className="w-4 h-4 text-slate-200 group-hover:text-rose-400 transition-colors" /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="md:hidden space-y-2">
-            {rows.map(r => (
-              <button key={r.id} onClick={() => setModalId(r.id)}
-                className="w-full bg-white border border-slate-200 rounded-2xl p-4 shadow-sm text-left hover:border-rose-200 active:scale-[0.98] transition-all">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <SantriPhotoAvatar src={r.foto_url} alt={r.nama_lengkap} name={r.nama_lengkap} size="md" />
-                    <div className="min-w-0">
-                      <p className="font-bold text-slate-900 truncate">{r.nama_lengkap}</p>
-                      <p className="text-xs text-slate-400">{r.nis} · {r.asrama}/{r.kamar}</p>
-                    </div>
-                  </div>
-                  {r.sp_terakhir && <span className={cn('shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg border', SP_COLOR[r.sp_terakhir])}>{r.sp_terakhir}</span>}
-                </div>
-                <div className="mt-2.5 flex flex-wrap gap-3 text-xs">
-                  <span className="text-slate-500">{r.jumlah_pelanggaran} kejadian</span>
-                  <span className="font-black text-rose-600">{r.perlu_verifikasi} catatan perlu verifikasi</span>
-                  <span className="text-slate-400">· {fmtTgl(r.terakhir)}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <button onClick={() => load(page - 1)} disabled={page <= 1 || loading}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
-                <ChevronLeft className="w-4 h-4" /> Sebelumnya
-              </button>
-              <span className="text-xs text-slate-500">Hal {page}/{totalPages}</span>
-              <button onClick={() => load(page + 1)} disabled={page >= totalPages || loading}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition-colors">
-                Berikutnya <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-        </>
-      )}
-      {modalId && <ModalDetail santriId={modalId} onClose={() => setModalId(null)} />}
-      {showModalInput && <ModalInputPelanggaran masterList={masterList} onClose={() => setShowModalInput(false)} onSuccess={() => load(1, search)} />}
-      {showModalExport && <ModalExportPelanggaran onClose={() => setShowModalExport(false)} />}
-    </div>
+        if (keamananCache.isFresh(cacheKey, 60_000)) return
+      } else {
+        setLoadingDaftar(true)
+      }
+
+      try {
+        const res = await getDaftarPelanggar({ search: s || undefined, page: pg })
+        setRows(res.rows)
+        setTotal(res.total)
+        setTotalPages(res.totalPages)
+        setPage(pg)
+        keamananCache.set(cacheKey, res)
+      } finally {
+        setLoadingDaftar(false)
+      }
+    },
+    [page, search]
   )
-}
 
-// TAB KAMUS PELANGGARAN
-function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () => void }) {
-  const [form, setForm] = useState({ kategori: 'RINGAN', nama: '', deskripsi: '' })
+  useEffect(() => {
+    void loadDaftar(page, search)
+  }, [loadDaftar, page, search, refresh])
+
+  const handleRefreshAll = () => {
+    keamananCache.clear()
+    setRefresh((n) => n + 1)
+  }
+
+  // ─── KAMUS FORM STATE ─────────────────────────────────────────────────────
+  const [kamusForm, setKamusForm] = useState({ kategori: 'RINGAN', nama: '', deskripsi: '' })
   const [editId, setEditId] = useState<number | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState<number | null>(null)
+  const [savingKamus, setSavingKamus] = useState(false)
+  const [deletingKamusId, setDeletingKamusId] = useState<number | null>(null)
+
+  // Import Kamus
   const [importRows, setImportRows] = useState<ImportKamusRow[]>([])
   const [importing, setImporting] = useState(false)
   const importFileRef = useRef<HTMLInputElement>(null)
 
-  const readImportValue = (row: Record<string, any>, keys: string[]) => {
-    const found = Object.keys(row).find(key => keys.includes(key.trim().toLowerCase()))
-    return found ? row[found] : ''
+  const handleSimpanKamus = async () => {
+    if (!kamusForm.nama.trim()) {
+      toast.error('Nama pelanggaran wajib diisi')
+      return
+    }
+    setSavingKamus(true)
+    try {
+      const res = editId
+        ? await editMasterPelanggaran(editId, kamusForm)
+        : await tambahMasterPelanggaran(kamusForm)
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
+      toast.success(editId ? 'Jenis pelanggaran diperbarui' : 'Jenis pelanggaran ditambahkan')
+      setKamusForm({ kategori: 'RINGAN', nama: '', deskripsi: '' })
+      setEditId(null)
+      keamananCache.clear()
+      await loadMaster()
+    } finally {
+      setSavingKamus(false)
+    }
   }
 
-  const downloadTemplate = async () => {
+  const handleHapusKamus = async (id: number) => {
+    const ok = await confirm('Hapus jenis pelanggaran ini?')
+    if (!ok) return
+
+    setDeletingKamusId(id)
+    try {
+      const res = await hapusMasterPelanggaran(id)
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
+      toast.success('Jenis pelanggaran dihapus')
+      keamananCache.clear()
+      await loadMaster()
+    } finally {
+      setDeletingKamusId(null)
+    }
+  }
+
+  const downloadKamusTemplate = async () => {
     const XLSX = await import('xlsx')
-    const rows: ImportKamusRow[] = [
-      { kategori: 'RINGAN', nama_pelanggaran: 'Terlambat mengikuti kegiatan', deskripsi: 'Tidak hadir tepat waktu pada kegiatan wajib', urutan: 10 },
-      { kategori: 'SEDANG', nama_pelanggaran: 'Meninggalkan asrama tanpa izin', deskripsi: 'Keluar area asrama tanpa izin pengurus', urutan: 20 },
-      { kategori: 'BERAT', nama_pelanggaran: 'Berkelahi', deskripsi: 'Terlibat perkelahian atau kekerasan fisik', urutan: 30 },
+    const templateRows: ImportKamusRow[] = [
+      {
+        kategori: 'RINGAN',
+        nama_pelanggaran: 'Terlambat mengikuti kegiatan',
+        deskripsi: 'Tidak hadir tepat waktu pada kegiatan wajib',
+        urutan: 10,
+      },
+      {
+        kategori: 'SEDANG',
+        nama_pelanggaran: 'Meninggalkan asrama tanpa izin',
+        deskripsi: 'Keluar area asrama tanpa izin pengurus',
+        urutan: 20,
+      },
+      {
+        kategori: 'BERAT',
+        nama_pelanggaran: 'Berkelahi',
+        deskripsi: 'Terlibat perkelahian atau kekerasan fisik',
+        urutan: 30,
+      },
     ]
-    const ws = XLSX.utils.json_to_sheet(rows.map(row => ({
-      KATEGORI: row.kategori,
-      'NAMA PELANGGARAN': row.nama_pelanggaran,
-      DESKRIPSI: row.deskripsi,
-      URUTAN: row.urutan,
-    })))
+    const ws = XLSX.utils.json_to_sheet(
+      templateRows.map((row) => ({
+        KATEGORI: row.kategori,
+        'NAMA PELANGGARAN': row.nama_pelanggaran,
+        DESKRIPSI: row.deskripsi,
+        URUTAN: row.urutan,
+      }))
+    )
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Kamus Pelanggaran')
     XLSX.writeFile(wb, 'Template_Kamus_Pelanggaran.xlsx')
   }
 
-  const handleUploadImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+  const handleUploadKamusImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
     if (!file) return
     try {
       const XLSX = await import('xlsx')
       const buffer = await file.arrayBuffer()
       const wb = XLSX.read(buffer, { type: 'array' })
       const ws = wb.Sheets[wb.SheetNames[0]]
-      const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: '' })
-      const rows = rawRows
-        .map(row => ({
-          kategori: String(readImportValue(row, ['kategori']) || '').trim().toUpperCase(),
-          nama_pelanggaran: String(readImportValue(row, ['nama pelanggaran', 'nama_pelanggaran', 'nama']) || '').trim(),
-          deskripsi: String(readImportValue(row, ['deskripsi', 'keterangan']) || '').trim(),
-          urutan: Number(readImportValue(row, ['urutan']) || 0),
-        }))
-        .filter(row => row.kategori || row.nama_pelanggaran || row.deskripsi || row.urutan)
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
 
-      setImportRows(rows)
-      toast.success(`${rows.length} baris terbaca`)
+      const readImportVal = (row: Record<string, unknown>, keys: string[]) => {
+        const found = Object.keys(row).find((k) => keys.includes(k.trim().toLowerCase()))
+        return found ? row[found] : ''
+      }
+
+      const parsed = rawRows
+        .map((row) => ({
+          kategori: String(readImportVal(row, ['kategori']) || '').trim().toUpperCase(),
+          nama_pelanggaran: String(
+            readImportVal(row, ['nama pelanggaran', 'nama_pelanggaran', 'nama']) || ''
+          ).trim(),
+          deskripsi: String(readImportVal(row, ['deskripsi', 'keterangan']) || '').trim(),
+          urutan: Number(readImportVal(row, ['urutan']) || 0),
+        }))
+        .filter((row) => row.kategori || row.nama_pelanggaran || row.deskripsi || row.urutan)
+
+      setImportRows(parsed)
+      toast.success(`${parsed.length} baris template terbaca`)
     } catch {
-      toast.error('Gagal membaca file Excel')
+      toast.error('Gagal membaca file Excel template')
     } finally {
       if (importFileRef.current) importFileRef.current.value = ''
     }
   }
 
-  const handleSimpanImport = async () => {
-    if (importRows.length === 0) { toast.error('Upload file template dulu'); return }
+  const handleSimpanKamusImport = async () => {
+    if (!importRows.length) return
     setImporting(true)
     try {
-      toast.info('Kolom poin pada template lama diabaikan. Setiap catatan dihitung sebagai kejadian.')
       const res = await importMasterPelanggaranMassal(importRows)
-      if ('error' in res) { toast.error(res.error); return }
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
       const parts = [`${res.inserted} baru`, `${res.updated} diperbarui`]
       if (res.skipped > 0) parts.push(`${res.skipped} duplikat dilewati`)
       toast.success(`Import selesai: ${parts.join(', ')}`)
       setImportRows([])
-      onRefresh()
-    } catch (error: any) {
-      toast.error(`Import gagal: ${error?.message || 'kesalahan tidak diketahui'}`)
+      keamananCache.clear()
+      await loadMaster()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'kesalahan tidak diketahui'
+      toast.error(`Import gagal: ${msg}`)
     } finally {
       setImporting(false)
     }
   }
 
-  const handleSimpan = async () => {
-    if (!form.nama.trim()) { toast.error('Nama pelanggaran wajib diisi'); return }
-    setSaving(true)
-    const res = editId ? await editMasterPelanggaran(editId, form) : await tambahMasterPelanggaran(form)
-    setSaving(false)
-    if ('error' in res) { toast.error(res.error); return }
-    toast.success(editId ? 'Diperbarui' : 'Ditambahkan')
-    setForm({ kategori: 'RINGAN', nama: '', deskripsi: '' }); setEditId(null)
-    onRefresh()
-  }
-  const handleHapus = async (id: number) => {
-    if (!await confirm('Hapus jenis pelanggaran ini?')) return
-    setDeleting(id)
-    const res = await hapusMasterPelanggaran(id)
-    setDeleting(null)
-    if ('error' in res) { toast.error(res.error); return }
-    toast.success('Dihapus'); onRefresh()
-  }
-  const grouped = ['RINGAN', 'SEDANG', 'BERAT'].reduce((acc, k) => {
-    acc[k] = masterList.filter((m: any) => m.kategori === k); return acc
-  }, {} as Record<string, any[]>)
+  const groupedKamus = ['RINGAN', 'SEDANG', 'BERAT'].reduce<Record<string, MasterPelanggaranItem[]>>((acc, k) => {
+    acc[k] = masterList.filter((m) => m.kategori === k)
+    return acc
+  }, {})
+
+  const TABS = [
+    { key: 'daftar' as const, label: 'Daftar Pelanggar', shortLabel: 'Daftar', icon: ShieldAlert },
+    {
+      key: 'verifikasi' as const,
+      label: 'Verifikasi Histori',
+      shortLabel: 'Verifikasi',
+      icon: FileCheck,
+      badge: unverifiedTotal > 0 ? unverifiedTotal : undefined,
+    },
+    { key: 'kamus' as const, label: 'Kamus Pelanggaran', shortLabel: 'Kamus', icon: BookOpen },
+  ]
 
   return (
-    <div className="space-y-5">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">{editId ? '✎ Edit Jenis Pelanggaran' : '+ Tambah Jenis Pelanggaran'}</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Kategori</label>
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
-              {(['RINGAN', 'SEDANG', 'BERAT'] as const).map(k => (
-                <button key={k} onClick={() => setForm(f => ({ ...f, kategori: k }))}
-                  className={cn('flex-1 py-1.5 rounded-lg text-xs font-bold transition-all', form.kategori === k ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700')}>{k}</button>
-              ))}
-            </div>
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Nama Pelanggaran</label>
-            <input type="text" value={form.nama} onChange={e => setForm(f => ({ ...f, nama: e.target.value }))} placeholder="Contoh: Merokok, Berkelahi, Pencurian..."
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 bg-slate-50" />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Deskripsi <span className="font-normal normal-case text-slate-400">(opsional)</span></label>
-            <input type="text" value={form.deskripsi} onChange={e => setForm(f => ({ ...f, deskripsi: e.target.value }))} placeholder="Keterangan singkat..."
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 bg-slate-50" />
-          </div>
-        </div>
-        <div className="flex gap-2 mt-4">
-          <button onClick={handleSimpan} disabled={saving}
-            className="flex-1 py-2.5 bg-slate-800 text-white rounded-xl text-sm font-bold hover:bg-slate-900 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            {saving ? 'Menyimpan...' : editId ? 'Simpan Perubahan' : 'Tambah'}
-          </button>
-          {editId && (
-            <button onClick={() => { setEditId(null); setForm({ kategori: 'RINGAN', nama: '', deskripsi: '' }) }}
-              className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors">Batal</button>
-          )}
-        </div>
-      </div>
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Import Kamus Pelanggaran</p>
-            <p className="mt-1 text-xs text-slate-500">Gunakan template Excel agar kolom kategori, nama pelanggaran, deskripsi, dan urutan terbaca.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={downloadTemplate}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Template
-            </button>
-            <button
-              type="button"
-              onClick={() => importFileRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
-            >
-              <Upload className="h-3.5 w-3.5" />
-              Upload Excel
-            </button>
-            <input ref={importFileRef} type="file" accept=".xlsx,.xls" onChange={handleUploadImport} className="hidden" />
-          </div>
-        </div>
+    <div className="space-y-4 sm:space-y-5 pb-16">
+      <DashboardPageHeader
+        title="Pelanggaran Santri"
+        description="Pencatatan disiplin, pembinaan, dan histori sanksi santri."
+      />
 
-        {importRows.length > 0 && (
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
-            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2 text-sm font-bold text-emerald-800">
-                <FileSpreadsheet className="h-4 w-4" />
-                Preview Import ({importRows.length} baris)
+      {/* ─────────────────────────────────────────────────────────────
+          1. NAVIGATION TABS (Daftar, Verifikasi, Kamus)
+         ───────────────────────────────────────────────────────────── */}
+      <nav
+        className="flex gap-1 rounded-2xl bg-slate-100 p-1"
+        role="tablist"
+        aria-label="Menu Pelanggaran"
+      >
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
+            onClick={() => setTab(t.key)}
+            className={cn(
+              'flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold transition cursor-pointer',
+              tab === t.key
+                ? 'bg-white text-slate-900 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            )}
+          >
+            <t.icon className="h-4 w-4" />
+            <span className="hidden sm:inline">{t.label}</span>
+            <span className="sm:hidden">{t.shortLabel}</span>
+            {t.badge && (
+              <span
+                className={cn(
+                  'rounded-full px-1.5 py-0.2 text-[10px] font-bold',
+                  tab === t.key ? 'bg-rose-100 text-rose-800' : 'bg-slate-200 text-slate-700'
+                )}
+              >
+                {t.badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </nav>
+
+      {/* ─────────────────────────────────────────────────────────────
+          TAB 1: DAFTAR PELANGGAR
+         ───────────────────────────────────────────────────────────── */}
+      {tab === 'daftar' && (
+        <div className="space-y-3 sm:space-y-4">
+          {/* TOOLBAR STRIP */}
+          <div className="space-y-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              {/* Search Bar */}
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  className={control + ' pl-10 pr-9'}
+                  aria-label="Cari nama atau NIS"
+                  placeholder="Cari nama santri atau NIS…"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      setSearch(searchInput)
+                      setPage(1)
+                    }
+                  }}
+                />
+                {searchInput && (
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    onClick={() => {
+                      setSearchInput('')
+                      setSearch('')
+                      setPage(1)
+                    }}
+                    aria-label="Hapus pencarian"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
-              <div className="flex gap-2">
+
+              {/* Action buttons beside search on desktop, stacked on mobile */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setImportRows([])}
-                  className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50"
+                  className={cn(primaryRose, 'w-full sm:w-auto justify-center whitespace-nowrap')}
+                  onClick={() => {
+                    setPreselectedSantri(null)
+                    setShowInputModal(true)
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Catat Pelanggaran</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className={cn(button, 'flex-1 sm:flex-none justify-center whitespace-nowrap')}
+                    onClick={() => setShowExportModal(true)}
+                  >
+                    <Download className="h-4 w-4 text-slate-500" />
+                    <span>Export XLSX</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {search && (
+              <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                <p>
+                  Menampilkan hasil pencarian: <span className="font-bold text-slate-800">&ldquo;{search}&rdquo;</span>
+                </p>
+                <button
+                  type="button"
+                  className="font-semibold text-rose-700 hover:text-rose-800 transition cursor-pointer"
+                  onClick={() => {
+                    setSearchInput('')
+                    setSearch('')
+                    setPage(1)
+                  }}
+                >
+                  Reset Pencarian
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Subheader info & refresh */}
+          <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+            <p>
+              Total <span className="font-bold text-slate-800">{total}</span> santri pernah tercatat
+            </p>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-rose-700 transition cursor-pointer"
+              onClick={handleRefreshAll}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Segarkan data</span>
+            </button>
+          </div>
+
+          {/* ─────────────────────────────────────────────────────────────
+              PANEL DATA SANTRI PELANGGAR
+             ───────────────────────────────────────────────────────────── */}
+          <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xs">
+            {loadingDaftar ? (
+              <ListLoading />
+            ) : rows.length === 0 ? (
+              <Empty>
+                Tidak ada data santri yang cocok dengan pencarian.
+                <br />
+                Ketik nama atau NIS santri lain untuk melihat data.
+              </Empty>
+            ) : (
+              <>
+                {/* ── MOBILE VIEW: Clean Cards with 3-dots Menu ── */}
+                <div className="p-3 sm:p-4 space-y-2.5 md:hidden">
+                  {rows.map((row) => (
+                    <article
+                      key={row.id}
+                      onClick={() => setSelectedSantriId(row.id)}
+                      className="rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-2.5 transition-colors hover:border-slate-300 cursor-pointer"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <StudentIdentity student={row} />
+                        </div>
+
+                        {/* Top-Right Dropdown Menu */}
+                        <div
+                          className="shrink-0 flex items-center"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <RowActionMenu label={`Aksi untuk ${row.nama_lengkap}`}>
+                            <RowActionItem
+                              icon={<Eye className="h-3.5 w-3.5" />}
+                              onSelect={() => setSelectedSantriId(row.id)}
+                            >
+                              Lihat Rincian & Riwayat
+                            </RowActionItem>
+                            <RowActionItem
+                              icon={<Plus className="h-3.5 w-3.5" />}
+                              onSelect={() => {
+                                setPreselectedSantri(row)
+                                setShowInputModal(true)
+                              }}
+                            >
+                              Catat Pelanggaran Santri Ini
+                            </RowActionItem>
+                          </RowActionMenu>
+                        </div>
+                      </div>
+
+                      {/* Bottom Info Strip */}
+                      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900">
+                            {row.jumlah_pelanggaran} kejadian
+                          </span>
+                          {row.perlu_verifikasi > 0 && (
+                            <span className="inline-flex rounded-md bg-rose-50 px-1.5 py-0.2 text-[10px] font-bold text-rose-700 ring-1 ring-inset ring-rose-600/20">
+                              {row.perlu_verifikasi} perlu verifikasi
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
+                          <SpBadge level={row.sp_terakhir} />
+                          <span>·</span>
+                          <span>{fmtTgl(row.terakhir)}</span>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                {/* ── DESKTOP VIEW: Clean Table ── */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-600">
+                    <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      <tr>
+                        <th scope="col" className="py-3 pl-6 pr-2 w-12 text-slate-400">
+                          No
+                        </th>
+                        <th scope="col" className="py-3 px-4">
+                          Santri
+                        </th>
+                        <th scope="col" className="py-3 px-4">
+                          Jumlah Kejadian
+                        </th>
+                        <th scope="col" className="py-3 px-4">
+                          Perlu Verifikasi
+                        </th>
+                        <th scope="col" className="py-3 px-4">
+                          SP Terakhir
+                        </th>
+                        <th scope="col" className="py-3 px-4">
+                          Terakhir Melanggar
+                        </th>
+                        <th scope="col" className="py-3 pl-3 pr-6 text-right w-16">
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {rows.map((row, i) => (
+                        <tr
+                          key={row.id}
+                          onClick={() => setSelectedSantriId(row.id)}
+                          className="transition-colors hover:bg-slate-50/80 cursor-pointer group"
+                        >
+                          <td className="py-3.5 pl-6 pr-2 text-slate-400 font-mono">
+                            {(page - 1) * 30 + i + 1}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <StudentIdentity student={row} />
+                          </td>
+                          <td className="py-3.5 px-4 font-bold text-slate-900 text-sm">
+                            {row.jumlah_pelanggaran}
+                            <span className="text-xs font-normal text-slate-400 ml-1">kejadian</span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {row.perlu_verifikasi > 0 ? (
+                              <span className="inline-flex items-center rounded-md bg-rose-50 px-2 py-0.5 text-xs font-bold text-rose-700 ring-1 ring-inset ring-rose-600/20">
+                                {row.perlu_verifikasi} catatan
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-400">0</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <SpBadge level={row.sp_terakhir} />
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                            {fmtTgl(row.terakhir)}
+                          </td>
+                          <td className="py-3.5 pl-3 pr-6 text-right">
+                            <button
+                              type="button"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-rose-700 transition cursor-pointer"
+                              aria-label={`Lihat rincian ${row.nama_lengkap}`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedSantriId(row.id)
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <Pager
+                  page={page}
+                  totalPages={totalPages}
+                  total={total}
+                  onPage={(pg) => {
+                    setPage(pg)
+                    loadDaftar(pg, search)
+                  }}
+                  disabled={loadingDaftar}
+                />
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          TAB 2: VERIFIKASI HISTORI
+         ───────────────────────────────────────────────────────────── */}
+      {tab === 'verifikasi' && (
+        <HistoryReview
+          onTotalChange={setUnverifiedTotal}
+          onVerified={() => {
+            keamananCache.clear()
+            loadDaftar(1, search)
+          }}
+        />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          TAB 3: KAMUS PELANGGARAN
+         ───────────────────────────────────────────────────────────── */}
+      {tab === 'kamus' && (
+        <div className="space-y-4 sm:space-y-5">
+          {/* Form Tambah / Edit */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-2xs space-y-4">
+            <h3 className="text-sm font-bold text-slate-900">
+              {editId ? 'Edit Jenis Pelanggaran' : 'Tambah Jenis Pelanggaran Baru'}
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                  Kategori Pelanggaran
+                </label>
+                <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl max-w-sm">
+                  {(['RINGAN', 'SEDANG', 'BERAT'] as const).map((k) => (
+                    <button
+                      type="button"
+                      key={k}
+                      onClick={() => setKamusForm((f) => ({ ...f, kategori: k }))}
+                      className={cn(
+                        'flex-1 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer',
+                        kamusForm.kategori === k
+                          ? 'bg-white shadow-2xs text-slate-900'
+                          : 'text-slate-600 hover:text-slate-900'
+                      )}
+                    >
+                      {k}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Nama Pelanggaran <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={kamusForm.nama}
+                  onChange={(e) => setKamusForm((f) => ({ ...f, nama: e.target.value }))}
+                  placeholder="Contoh: Merokok, Meninggalkan Asrama Tanpa Izin..."
+                  className={control}
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+                  Deskripsi / Keterangan <span className="text-slate-400 font-normal lowercase">(opsional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={kamusForm.deskripsi}
+                  onChange={(e) => setKamusForm((f) => ({ ...f, deskripsi: e.target.value }))}
+                  placeholder="Keterangan singkat cakupan jenis pelanggaran..."
+                  className={control}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                disabled={savingKamus}
+                onClick={handleSimpanKamus}
+                className={primary}
+              >
+                {savingKamus ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                <span>{savingKamus ? 'Menyimpan…' : editId ? 'Simpan Perubahan' : 'Tambah Jenis'}</span>
+              </button>
+
+              {editId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditId(null)
+                    setKamusForm({ kategori: 'RINGAN', nama: '', deskripsi: '' })
+                  }}
+                  className={button}
                 >
                   Batal
                 </button>
+              )}
+            </div>
+          </div>
+
+          {/* Import Kamus Excel Section */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-2xs space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">Import Master Pelanggaran (Excel)</h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Unduh template standar, isi kolom kategori, nama pelanggaran, dan deskripsi, lalu unggah kembali.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleSimpanImport}
-                  disabled={importing}
-                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-1.5 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
+                  onClick={downloadKamusTemplate}
+                  className={cn(button, 'text-xs')}
                 >
-                  {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                  {importing ? 'Menyimpan...' : 'Simpan Import'}
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Template</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => importFileRef.current?.click()}
+                  className={cn(primary, 'bg-emerald-600 hover:bg-emerald-700 text-xs')}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  <span>Upload File Excel</span>
+                </button>
+                <input
+                  ref={importFileRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleUploadKamusImport}
+                  className="hidden"
+                />
               </div>
             </div>
-            <div className="max-h-64 overflow-auto rounded-lg border border-emerald-100 bg-white">
-              <table className="w-full min-w-[640px] text-left text-xs">
-                <thead className="sticky top-0 bg-slate-50 text-slate-500">
-                  <tr>
-                    <th className="px-3 py-2">Kategori</th>
-                    <th className="px-3 py-2">Nama Pelanggaran</th>
-                    <th className="px-3 py-2">Deskripsi</th>
-                    <th className="px-3 py-2 text-right">Urutan</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {importRows.slice(0, 50).map((row, index) => (
-                    <tr key={`${row.kategori}-${row.nama_pelanggaran}-${index}`}>
-                      <td className="px-3 py-2 font-bold text-slate-700">{row.kategori || '-'}</td>
-                      <td className="px-3 py-2 text-slate-800">{row.nama_pelanggaran || '-'}</td>
-                      <td className="px-3 py-2 text-slate-500">{row.deskripsi || '-'}</td>
-                      <td className="px-3 py-2 text-right text-slate-500">{row.urutan}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {importRows.length > 50 && <p className="mt-2 text-xs text-emerald-700">Preview hanya menampilkan 50 baris pertama.</p>}
-          </div>
-        )}
-      </div>
-      {['RINGAN', 'SEDANG', 'BERAT'].map(kat => (
-        <div key={kat}>
-          <div className="flex items-center gap-2 mb-2.5">
-            <span className={cn('w-2 h-2 rounded-full shrink-0', KATEGORI_DOT[kat])} />
-            <span className={cn('text-[10px] font-bold uppercase tracking-[0.14em]', { RINGAN: 'text-slate-500', SEDANG: 'text-amber-600', BERAT: 'text-rose-600' }[kat])}>{kat}</span>
-            <div className="flex-1 h-px bg-slate-100" />
-            <span className="text-[10px] text-slate-400 font-medium">{grouped[kat]?.length ?? 0}</span>
-          </div>
-          {!grouped[kat]?.length ? <p className="text-xs text-slate-400 italic pl-3">Belum ada</p>
-            : <div className="space-y-1.5">
-              {grouped[kat].map((m: any) => (
-                <div key={m.id} className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3 hover:border-slate-300 transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-slate-800 text-sm">{m.nama_pelanggaran}</p>
-                    {m.deskripsi && <p className="text-xs text-slate-400 truncate">{m.deskripsi}</p>}
+
+            {importRows.length > 0 && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-900">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    <span>Preview Import ({importRows.length} baris)</span>
                   </div>
-                  <button onClick={() => { setEditId(m.id); setForm({ kategori: m.kategori, nama: m.nama_pelanggaran, deskripsi: m.deskripsi || '' }) }}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => handleHapus(m.id)} disabled={deleting === m.id}
-                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"><Trash2 className="w-3.5 h-3.5" /></button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setImportRows([])}
+                      className={cn(button, 'text-xs')}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      disabled={importing}
+                      onClick={handleSimpanKamusImport}
+                      className={cn(primary, 'bg-emerald-700 hover:bg-emerald-800 text-xs')}
+                    >
+                      {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                      <span>{importing ? 'Menyimpan…' : 'Simpan ke Master'}</span>
+                    </button>
+                  </div>
                 </div>
-              ))}
-            </div>}
+
+                <div className="max-h-56 overflow-auto rounded-lg border border-emerald-200 bg-white">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                      <tr>
+                        <th className="px-3 py-2">Kategori</th>
+                        <th className="px-3 py-2">Nama Pelanggaran</th>
+                        <th className="px-3 py-2">Deskripsi</th>
+                        <th className="px-3 py-2 text-right">Urutan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {importRows.slice(0, 50).map((row, index) => (
+                        <tr key={index}>
+                          <td className="px-3 py-2 font-bold text-slate-800">{row.kategori}</td>
+                          <td className="px-3 py-2 text-slate-800">{row.nama_pelanggaran}</td>
+                          <td className="px-3 py-2 text-slate-500">{row.deskripsi || '-'}</td>
+                          <td className="px-3 py-2 text-right text-slate-500">{row.urutan}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Grouped Master Pelanggaran Cards */}
+          <div className="space-y-4">
+            {loadingMaster ? (
+              <ListLoading />
+            ) : (
+              ['RINGAN', 'SEDANG', 'BERAT'].map((kat) => {
+                const list = groupedKamus[kat] || []
+
+                return (
+                  <div
+                    key={kat}
+                    className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-100 px-4 sm:px-5 py-3 bg-slate-50/60">
+                      <div className="flex items-center gap-2">
+                        <span className={cn('h-2.5 w-2.5 rounded-full', KATEGORI_DOT[kat])} />
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                          Kategori {kat}
+                        </h4>
+                      </div>
+                      <span className="text-xs font-semibold text-slate-500">
+                        {list.length} jenis
+                      </span>
+                    </div>
+
+                    {!list.length ? (
+                      <p className="p-6 text-center text-xs text-slate-400 italic">
+                        Belum ada jenis pelanggaran kategori {kat}.
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-slate-100">
+                        {list.map((m) => (
+                          <div
+                            key={m.id}
+                            className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 hover:bg-slate-50/60 transition"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-slate-900">{m.nama_pelanggaran}</p>
+                              {m.deskripsi && (
+                                <p className="text-xs text-slate-500 mt-0.5 truncate">{m.deskripsi}</p>
+                              )}
+                            </div>
+
+                            <div className="shrink-0 flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditId(m.id)
+                                  setKamusForm({
+                                    kategori: m.kategori,
+                                    nama: m.nama_pelanggaran,
+                                    deskripsi: m.deskripsi || '',
+                                  })
+                                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                                title="Edit jenis pelanggaran"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={deletingKamusId === m.id}
+                                onClick={() => handleHapusKamus(m.id)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                                title="Hapus jenis pelanggaran"
+                              >
+                                {deletingKamusId === m.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin text-rose-600" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
         </div>
-      ))}
-    </div>
-  )
-}
+      )}
 
-// MAIN PAGE
-export default function KeamananPage() {
-  const confirm = useConfirm()
-  const [tab, setTab] = useState<'daftar' | 'kamus'>('daftar')
-  const [masterList, setMasterList] = useState<any[]>([])
-  const [loadingMaster, setLoadingMaster] = useState(true)
+      {/* ─────────────────────────────────────────────────────────────
+          MODALS & DRAWERS
+         ───────────────────────────────────────────────────────────── */}
+      {/* 1. Side Drawer Detail Santri */}
+      {selectedSantriId && (
+        <DetailDrawer
+          santriId={selectedSantriId}
+          onClose={() => setSelectedSantriId(null)}
+          onMutated={() => {
+            keamananCache.clear()
+            loadDaftar(page, search)
+          }}
+        />
+      )}
 
-  const loadMaster = useCallback(async () => {
-    setLoadingMaster(true)
-    setMasterList(await getMasterPelanggaran())
-    setLoadingMaster(false)
-  }, [])
+      {/* 2. Modal Catat Pelanggaran */}
+      {showInputModal && (
+        <ModalInputPelanggaran
+          masterList={masterList}
+          preselectedSantri={preselectedSantri}
+          onClose={() => {
+            setShowInputModal(false)
+            setPreselectedSantri(null)
+          }}
+          onSuccess={() => {
+            keamananCache.clear()
+            loadDaftar(1, search)
+          }}
+        />
+      )}
 
-  useEffect(() => { loadMaster() }, [loadMaster])
-
-  const TABS = [
-    { key: 'daftar', label: 'Daftar Pelanggar', shortLabel: 'Daftar', icon: ShieldAlert },
-    { key: 'kamus',  label: 'Kamus Pelanggaran', shortLabel: 'Kamus', icon: BookOpen },
-  ] as const
-
-  return (
-    <div className="space-y-5 pb-16">
-      <DashboardPageHeader
-        title="Pelanggaran"
-        description="Catatan disiplin santri."
-      />
-      <div className="flex gap-0.5 bg-slate-100 p-1 rounded-2xl">
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex-1 justify-center', tab === t.key ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700')}>
-            <t.icon className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{t.label}</span>
-            <span className="sm:hidden">{t.shortLabel}</span>
-          </button>
-        ))}
-      </div>
-      {tab === 'daftar' && <><HistoryReview /><TabDaftar masterList={masterList} /></>}
-      {tab === 'kamus' && (
-        loadingMaster
-          ? <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-slate-300" /></div>
-          : <TabKamus masterList={masterList} onRefresh={loadMaster} />
+      {/* 3. Modal Export Data */}
+      {showExportModal && (
+        <ModalExportPelanggaran onClose={() => setShowExportModal(false)} />
       )}
     </div>
   )

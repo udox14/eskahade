@@ -28,6 +28,104 @@ export type ExportPelanggaranFilter = {
   tanggalSelesai?: string
 }
 
+export type MasterPelanggaranItem = {
+  id: number
+  kategori: string
+  nama_pelanggaran: string
+  deskripsi: string | null
+  urutan?: number | null
+}
+
+export type SantriSearchResult = {
+  id: string
+  nama_lengkap: string
+  nis: string | null
+  asrama: string | null
+  kamar: string | null
+  nama_ayah?: string | null
+  alamat?: string | null
+  foto_url?: string | null
+  nama_kelas?: string | null
+}
+
+export type DaftarPelanggarItem = {
+  id: string
+  nama_lengkap: string
+  nis: string | null
+  asrama: string | null
+  kamar: string | null
+  foto_url: string | null
+  nama_kelas: string | null
+  jumlah_pelanggaran: number
+  perlu_verifikasi: number
+  terakhir: string | null
+  sp_terakhir: string | null
+}
+
+export type ExportPelanggaranRow = {
+  id: string
+  tanggal: string | null
+  created_at: string | null
+  nis: string | null
+  nama_lengkap: string | null
+  asrama: string | null
+  kamar: string | null
+  jenis: string | null
+  nama_pelanggaran: string | null
+  deskripsi: string | null
+  jumlah_kejadian: number | string | null
+  perlu_verifikasi: boolean | number | null
+  source: string | null
+  source_id?: string | null
+  sesi: string | null
+  penindak_nama: string | null
+  foto_url: string | null
+}
+
+export type DetailSantriResponse = {
+  profil: {
+    id: string
+    nama_lengkap: string
+    nis: string | null
+    asrama: string | null
+    kamar: string | null
+    foto_url: string | null
+    nama_ayah: string | null
+    alamat: string | null
+    nama_kelas: string | null
+    status_global?: string | null
+  } | null
+  pelanggaran: Array<{
+    id: string
+    tanggal: string | null
+    jenis: string | null
+    deskripsi: string | null
+    jumlah_kejadian: number | null
+    perlu_verifikasi: number | boolean | null
+    source: string | null
+    source_id: string | null
+    sesi: string | null
+    foto_url: string | null
+    penindak_nama: string | null
+    nama_pelanggaran: string | null
+  }>
+  suratPernyataan: Array<{
+    id: string
+    tanggal: string | null
+    pelanggaran_ids: string | null
+    created_at: string | null
+    dibuat_oleh_nama: string | null
+  }>
+  suratPerjanjian: Array<{
+    id: string
+    level: string
+    tanggal: string | null
+    catatan: string | null
+    created_at: string | null
+    dibuat_oleh_nama: string | null
+  }>
+}
+
 function cleanText(value: unknown) {
   return String(value ?? '').trim()
 }
@@ -251,10 +349,11 @@ export async function importMasterPelanggaranMassal(
 export async function cariSantri(keyword: string) {
   const access=await assertFeature('/dashboard/keamanan'); if('error' in access) throw new Error(access.error)
   return query<any>(
-    `SELECT id, nama_lengkap, nis, asrama, kamar, nama_ayah, alamat, foto_url
-     FROM santri
-     WHERE status_global = 'aktif'
-       AND (nama_lengkap LIKE ? OR nis = ?)
+    `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.nama_ayah, s.alamat, s.foto_url,
+            (SELECT k.nama_kelas FROM riwayat_pendidikan rp JOIN kelas k ON k.id=rp.kelas_id WHERE rp.santri_id=s.id AND lower(trim(COALESCE(rp.status_riwayat,'aktif'))) IN ('aktif','active','') LIMIT 1) AS nama_kelas
+     FROM santri s
+     WHERE s.status_global = 'aktif'
+       AND (s.nama_lengkap LIKE ? OR s.nis = ?)
      LIMIT 8`,
     [`%${keyword}%`, keyword]
   )
@@ -387,6 +486,7 @@ export async function getDaftarPelanggar(params: {
 
   const rows = await query<any>(
     `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
+            (SELECT k.nama_kelas FROM riwayat_pendidikan rp JOIN kelas k ON k.id=rp.kelas_id WHERE rp.santri_id=s.id AND lower(trim(COALESCE(rp.status_riwayat,'aktif'))) IN ('aktif','active','') LIMIT 1) AS nama_kelas,
             SUM(p.jumlah_kejadian) AS jumlah_pelanggaran,
             SUM(p.perlu_verifikasi) AS perlu_verifikasi,
             MAX(p.tanggal) AS terakhir,
@@ -488,7 +588,7 @@ export async function getDetailSantri(santriId: string) {
   const [profil, pelanggaran, suratPernyataan, suratPerjanjian] = await Promise.all([
     queryOne<any>(
       `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
-              s.nama_ayah, s.alamat,
+              s.nama_ayah, s.alamat, s.status_global,
               k.nama_kelas
        FROM santri s
        LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
