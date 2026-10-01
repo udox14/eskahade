@@ -146,11 +146,6 @@ export function DetailDrawer({ santriId, onClose, onMutated }: DetailDrawerProps
 
   const totalKejadian =
     data?.pelanggaran?.reduce((a, p) => a + (p.jumlah_kejadian ?? 0), 0) ?? 0
-  const pending =
-    data?.pelanggaran?.reduce(
-      (a, p) => a + (p.perlu_verifikasi ? 1 : 0),
-      0
-    ) ?? 0
 
   const spTerakhir =
     data?.suratPerjanjian?.[0]?.level ?? null
@@ -253,11 +248,11 @@ export function DetailDrawer({ santriId, onClose, onMutated }: DetailDrawerProps
                 </span>
               </div>
               <div className="p-3.5 sm:p-4 text-center">
-                <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-rose-500 block">
-                  Perlu Verifikasi
+                <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400 block">
+                  Surat & SP
                 </span>
-                <span className="text-lg sm:text-2xl font-bold text-rose-600 mt-0.5 block">
-                  {loading ? '…' : pending}
+                <span className="text-lg sm:text-2xl font-bold text-slate-900 mt-0.5 block">
+                  {loading ? '…' : totalSurat}
                 </span>
               </div>
               <div className="p-3.5 sm:p-4 text-center">
@@ -348,8 +343,10 @@ export function DetailDrawer({ santriId, onClose, onMutated }: DetailDrawerProps
                     </div>
                   ) : (
                     data.pelanggaran.map((p) => {
-                      const isUnverified = Boolean(p.perlu_verifikasi)
                       const isOriginFromOther = p.source === 'pengajian' || Boolean(p.sesi)
+                      const title =
+                        p.nama_pelanggaran ||
+                        (p.deskripsi?.startsWith('Akumulasi Alfa') ? 'Alfa Pengajian' : p.deskripsi)
 
                       return (
                         <div
@@ -360,15 +357,8 @@ export function DetailDrawer({ santriId, onClose, onMutated }: DetailDrawerProps
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <KategoriBadge kategori={p.jenis} />
-                                <span
-                                  className={cn(
-                                    'text-[10px] font-bold px-2 py-0.5 rounded-md border',
-                                    isUnverified
-                                      ? 'bg-rose-50 border-rose-200 text-rose-700'
-                                      : 'bg-slate-100 border-slate-200 text-slate-700'
-                                  )}
-                                >
-                                  {isUnverified ? 'Perlu verifikasi' : `${p.jumlah_kejadian ?? 1} kejadian`}
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md border bg-slate-100 border-slate-200 text-slate-700">
+                                  {`${p.jumlah_kejadian ?? 1} kejadian`}
                                 </span>
                                 <span className="text-[11px] text-slate-500">
                                   {p.tanggal ? fmtTgl(p.tanggal) : 'Tanggal belum terverifikasi'}
@@ -381,14 +371,17 @@ export function DetailDrawer({ santriId, onClose, onMutated }: DetailDrawerProps
                               </div>
 
                               <p className="text-sm font-semibold text-slate-900 mt-1.5">
-                                {p.nama_pelanggaran || p.deskripsi}
+                                {title}
                               </p>
 
-                              {p.deskripsi && p.nama_pelanggaran && p.deskripsi !== p.nama_pelanggaran && (
-                                <p className="text-xs text-slate-600 mt-1 whitespace-pre-wrap leading-relaxed">
-                                  {p.deskripsi}
-                                </p>
-                              )}
+                              {p.deskripsi &&
+                                p.nama_pelanggaran &&
+                                p.deskripsi !== p.nama_pelanggaran &&
+                                !p.deskripsi.startsWith('Akumulasi Alfa') && (
+                                  <p className="text-xs text-slate-600 mt-1 whitespace-pre-wrap leading-relaxed">
+                                    {p.deskripsi}
+                                  </p>
+                                )}
 
                               {p.penindak_nama && (
                                 <p className="text-[11px] text-slate-400 mt-1">

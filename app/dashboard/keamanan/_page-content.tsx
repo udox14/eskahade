@@ -7,7 +7,6 @@ import {
   Download,
   Edit2,
   Eye,
-  FileCheck,
   FileSpreadsheet,
   Loader2,
   Plus,
@@ -55,7 +54,6 @@ import {
 } from './_components'
 import { DetailDrawer } from './detail-drawer'
 import { ModalInputPelanggaran } from './_forms'
-import { HistoryReview } from './history-review'
 import { getDaftarPelanggarCacheKey, keamananCache } from './_cache'
 
 function fmtTgl(s?: string | null) {
@@ -73,7 +71,7 @@ const KATEGORI_DOT: Record<string, string> = {
   BERAT: 'bg-rose-500',
 }
 
-type TabType = 'daftar' | 'verifikasi' | 'kamus'
+type TabType = 'daftar' | 'kamus'
 
 type ImportKamusRow = {
   kategori: string
@@ -399,7 +397,6 @@ export default function KeamananPage() {
   const confirm = useConfirm()
   const [tab, setTab] = useState<TabType>('daftar')
   const [refresh, setRefresh] = useState(0)
-  const [unverifiedTotal, setUnverifiedTotal] = useState<number>(0)
 
   // ─── MASTER KAMUS STATE ───────────────────────────────────────────────────
   const [masterList, setMasterList] = useState<MasterPelanggaranItem[]>([])
@@ -630,13 +627,6 @@ export default function KeamananPage() {
 
   const TABS = [
     { key: 'daftar' as const, label: 'Daftar Pelanggar', shortLabel: 'Daftar', icon: ShieldAlert },
-    {
-      key: 'verifikasi' as const,
-      label: 'Verifikasi Histori',
-      shortLabel: 'Verifikasi',
-      icon: FileCheck,
-      badge: unverifiedTotal > 0 ? unverifiedTotal : undefined,
-    },
     { key: 'kamus' as const, label: 'Kamus Pelanggaran', shortLabel: 'Kamus', icon: BookOpen },
   ]
 
@@ -671,16 +661,6 @@ export default function KeamananPage() {
             <t.icon className="h-4 w-4" />
             <span className="hidden sm:inline">{t.label}</span>
             <span className="sm:hidden">{t.shortLabel}</span>
-            {t.badge && (
-              <span
-                className={cn(
-                  'rounded-full px-1.5 py-0.2 text-[10px] font-bold',
-                  tab === t.key ? 'bg-rose-100 text-rose-800' : 'bg-slate-200 text-slate-700'
-                )}
-              >
-                {t.badge}
-              </span>
-            )}
           </button>
         ))}
       </nav>
@@ -846,11 +826,6 @@ export default function KeamananPage() {
                           <span className="font-bold text-slate-900">
                             {row.jumlah_pelanggaran} kejadian
                           </span>
-                          {row.perlu_verifikasi > 0 && (
-                            <span className="inline-flex rounded-md bg-rose-50 px-1.5 py-0.2 text-[10px] font-bold text-rose-700 ring-1 ring-inset ring-rose-600/20">
-                              {row.perlu_verifikasi} perlu verifikasi
-                            </span>
-                          )}
                         </div>
 
                         <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
@@ -876,9 +851,6 @@ export default function KeamananPage() {
                         </th>
                         <th scope="col" className="py-3 px-4">
                           Jumlah Kejadian
-                        </th>
-                        <th scope="col" className="py-3 px-4">
-                          Perlu Verifikasi
                         </th>
                         <th scope="col" className="py-3 px-4">
                           SP Terakhir
@@ -907,15 +879,6 @@ export default function KeamananPage() {
                           <td className="py-3.5 px-4 font-bold text-slate-900 text-sm">
                             {row.jumlah_pelanggaran}
                             <span className="text-xs font-normal text-slate-400 ml-1">kejadian</span>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            {row.perlu_verifikasi > 0 ? (
-                              <span className="inline-flex items-center rounded-md bg-rose-50 px-2 py-0.5 text-xs font-bold text-rose-700 ring-1 ring-inset ring-rose-600/20">
-                                {row.perlu_verifikasi} catatan
-                              </span>
-                            ) : (
-                              <span className="text-xs text-slate-400">0</span>
-                            )}
                           </td>
                           <td className="py-3.5 px-4">
                             <SpBadge level={row.sp_terakhir} />
@@ -959,20 +922,7 @@ export default function KeamananPage() {
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          TAB 2: VERIFIKASI HISTORI
-         ───────────────────────────────────────────────────────────── */}
-      {tab === 'verifikasi' && (
-        <HistoryReview
-          onTotalChange={setUnverifiedTotal}
-          onVerified={() => {
-            keamananCache.clear()
-            loadDaftar(1, search)
-          }}
-        />
-      )}
-
-      {/* ─────────────────────────────────────────────────────────────
-          TAB 3: KAMUS PELANGGARAN
+          TAB 2: KAMUS PELANGGARAN
          ───────────────────────────────────────────────────────────── */}
       {tab === 'kamus' && (
         <div className="space-y-4 sm:space-y-5">

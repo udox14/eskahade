@@ -192,14 +192,7 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[], tanggalRe
     const { santriId, items, vonis } = data
 
     if (vonis === 'ALFA_MURNI') {
-      const totalSesi  = items.length
-      const detailString = items
-        .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime())
-        .map(i => {
-          const tgl = new Date(i.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
-          return `${tgl} (${i.sesi})`
-        })
-        .join(', ')
+      const totalSesi = items.length
 
       const violationId = `absensi-verifikasi:${santriId}:${items
         .map(item => `${item.absen_id}:${item.sesi}`)
@@ -210,7 +203,7 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[], tanggalRe
         santri_id:  santriId,
         tanggal:    now(),
         jenis:      'ALFA_PENGAJIAN',
-        deskripsi:  `Akumulasi Alfa Pengajian (${totalSesi} Sesi).\nDetail: ${detailString}`,
+        deskripsi:  totalSesi === 1 ? 'Alfa Pengajian' : `Alfa Pengajian (${totalSesi} Sesi)`,
         poin:       0,
         penindak_id: session?.id ?? null,
       })
