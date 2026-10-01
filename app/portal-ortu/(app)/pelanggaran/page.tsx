@@ -1,7 +1,9 @@
+
+import { incidentLabel, sessionLabel } from '@/lib/discipline/format'
 import Link from 'next/link'
 import { ShieldCheck } from '@phosphor-icons/react/dist/ssr'
 import { requirePortalSessionStrict } from '@/lib/portal/session'
-import { getPelanggaranAnak } from '@/lib/portal/data'
+import { getPelanggaranAnak, getTotalPelanggaranAnak } from '@/lib/portal/data'
 import { formatTanggalId } from '@/lib/portal/format'
 
 export const dynamic = 'force-dynamic'
@@ -12,10 +14,11 @@ const JENIS_STYLE: Record<string, string> = {
   BERAT: 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300',
 }
 
-export default async function PelanggaranPage() {
+export default async function PelanggaranPage({searchParams}:{searchParams:Promise<{page?:string}>}) {
+  const params=await searchParams
+  const page=Math.min(100000,Math.max(1,Number(params.page)||1))
   const session = await requirePortalSessionStrict()
-  const daftar = await getPelanggaranAnak(session.santri_id)
-  const totalPoin = daftar.reduce((sum, p) => sum + p.poin, 0)
+  const [daftar,disiplin]=await Promise.all([getPelanggaranAnak(session.santri_id,page),getTotalPelanggaranAnak(session.santri_id)])
 
   return (
     <div className="px-5 pt-5 pb-32 space-y-5">
@@ -28,22 +31,24 @@ export default async function PelanggaranPage() {
         </Link>
         <h1 className="text-4xl font-bold tracking-tight text-slate-950 dark:text-slate-100">Catatan Kedisiplinan</h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-          Catatan kedisiplinan dan pelanggaran dari bagian keamanan pesantren.
+          Catatan kedisiplinan dan pelanggaran dari keamanan dan pengajian pesantren.
         </p>
       </div>
 
       {/* Summary surface */}
       <div className="rounded-[22px] bg-[#064e3b] p-5 text-white shadow-[0_8px_24px_rgba(6,78,59,0.16)] flex items-center justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-[#bef264]">Total Poin</p>
-          <p className="mt-0.5 text-3xl font-black font-mono leading-none text-white">{totalPoin} Poin</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-[#bef264]">Jumlah Kejadian</p>
+          <p className="mt-0.5 text-3xl font-black font-mono leading-none text-white">{disiplin.jumlah}</p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-emerald-200">Jumlah Catatan</p>
-          <p className="text-lg font-bold font-mono text-white mt-0.5">{daftar.length} Catatan</p>
+          <p className="text-xs text-emerald-200">Perlu Verifikasi</p>
+          <p className="text-lg font-bold font-mono text-white mt-0.5">{disiplin.pending} catatan</p>
         </div>
       </div>
 
+      {disiplin.pending>0&&<p className="text-xs text-amber-700">Jumlah di atas adalah kejadian terkonfirmasi. {disiplin.pending} catatan masih perlu verifikasi.</p>}
+      <nav className="flex justify-between text-sm">{page>1&&<Link href={`?page=${page-1}`}>Sebelumnya</Link>}<span>Halaman {page}</span>{page*200<disiplin.catatan&&<Link href={`?page=${page+1}`}>Berikutnya</Link>}</nav>
       {/* Flat List */}
       <div className="space-y-2 pt-1">
         <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
@@ -68,7 +73,7 @@ export default async function PelanggaranPage() {
                       JENIS_STYLE[String(item.jenis).toUpperCase()] || 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                     }`}
                   >
-                    {item.jenis}
+                    {incidentLabel(item.jenis)}
                   </span>
                   <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                     {formatTanggalId(item.tanggal)}
@@ -77,7 +82,7 @@ export default async function PelanggaranPage() {
                 {item.deskripsi && (
                   <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed pt-0.5">{item.deskripsi}</p>
                 )}
-                <p className="text-xs font-bold text-rose-600 dark:text-rose-400 font-mono">+{item.poin} poin</p>
+                <p className="text-xs font-bold text-rose-600 dark:text-rose-400 font-mono">{item.source==='pengajian'?'Pengajian':'Umum'}{item.sesi&&` · ${sessionLabel(item.sesi,item.jenis,item.source)}`} · {item.perlu_verifikasi?'Perlu verifikasi':'1 kejadian'}</p>
               </div>
             ))}
           </div>

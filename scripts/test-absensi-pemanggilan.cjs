@@ -18,6 +18,8 @@ db.exec(`
  INSERT INTO santri VALUES('s1','001','Ahmad','A','1','aktif','REGULER'),('s2','001','Budi','B','2','aktif','SADESA');
  INSERT INTO riwayat_pendidikan VALUES('r1','s1','k','aktif'),('r2','s2','k','aktif');
 `)
+require('./discipline-fixture.cjs').prepare(db)
+require('./discipline-fixture.cjs').migrate(db)
 let session = { id: 'admin', roles: ['admin'] }
 let race = null
 const logs = []
@@ -26,7 +28,7 @@ const stubs = {
  '@/lib/auth/session': { async getSession() { return session }, hasRole(s, role) { return s.roles.includes(role) } },
  '@/lib/cache/master': { async getCachedMarhalahList() { return [] } },
  '@/lib/activity-log': { actorFromSession(s) { return s }, async logActivity(entry) { logs.push(entry) } },
- 'next/cache': { revalidatePath() {} },
+ 'next/cache': { revalidatePath() {}, revalidateTag() {} },
  '@/lib/db': {
   async query(sql, params = []) { return db.prepare(sql).all(...params) },
   async queryOne(sql, params = []) { return db.prepare(sql).get(...params) },
@@ -106,7 +108,8 @@ async function run() {
  assert.equal((await verif.simpanVerifikasiMassal([payload('current','2026-09-30','ALFA_MURNI')], '2026-09-30')).success, true)
  assert.equal((await verif.simpanVerifikasiMassal([payload('current','2026-09-30','ALFA_MURNI')], '2026-09-30')).code, 'STALE')
  assert.equal(db.prepare('SELECT count(*) n FROM pelanggaran').get().n, 1)
- assert.equal(db.prepare('SELECT poin FROM pelanggaran').get().poin, 10)
+ assert.equal(db.prepare('SELECT poin FROM pelanggaran').get().poin, 0)
+ assert.equal(db.prepare('SELECT count(*) n FROM pelanggaran_sessions').get().n,1)
  assert.equal((await verif.simpanVerifikasiMassal([payload('current2','2026-10-01')], '2026-09-30')).success, true)
  assert.equal(db.prepare("SELECT shubuh FROM absensi_harian WHERE id='current2'").get().shubuh, 'H')
  for (const [id, verdict, expected] of [['sakit','SAKIT','S'],['izin','IZIN','I'],['mangkir','BELUM','A']]) {

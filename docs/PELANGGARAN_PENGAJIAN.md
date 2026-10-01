@@ -1,6 +1,6 @@
 # Pelanggaran Pengajian
 
-Modul manual berada di `/dashboard/akademik/pelanggaran-pengajian`, dalam kelompok Akademik. Tidak mengubah tabel `pelanggaran` atau alur otomatis `ALFA_PENGAJIAN` dari verifikasi absensi.
+Modul manual berada di `/dashboard/akademik/pelanggaran-pengajian`, dalam kelompok Akademik. Tabel sumber, revisi, dan izin perubahan tetap terpisah. Catatan aktif ikut dihitung sebagai satu kejadian dalam rekap umum, profil, pimpinan, portal orang tua, ekspor, dan surat melalui pembacaan gabungan. Foto bukti tidak diberikan kepada orang tua. Rekap khusus modul ini tetap hanya menghitung pengajian manual. Lihat [model jumlah kejadian](PELANGGARAN_JUMLAH_KEJADIAN.md).
 
 ## Operasional
 

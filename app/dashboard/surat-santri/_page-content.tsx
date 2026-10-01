@@ -1,5 +1,7 @@
 'use client'
 
+import { incidentLabel, sessionLabel } from '@/lib/discipline/format'
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useReactToPrint } from '@/lib/pdf/client'
 import {
@@ -79,7 +81,7 @@ const SuratPernyataanDoc = ({ data }: { data: any }) => {
       </p>
       <div style={{ marginBottom: '14px' }}>
         {pelanggaran.map((p: any) => (
-          <p key={p.id} style={{ borderBottom: '1px solid black', marginBottom: '4px', minHeight: '24px', paddingBottom: '2px' }}>{p.deskripsi}</p>
+          <p key={p.id} style={{ borderBottom: '1px solid black', marginBottom: '4px', minHeight: '24px', paddingBottom: '2px' }}>{p.deskripsi}{p.sesi&&` · ${fmtTgl(p.tanggal)} (${sessionLabel(p.sesi,p.jenis,p.source)})`}</p>
         ))}
         {Array.from({ length: Math.max(0, 4 - pelanggaran.length) }).map((_, i) => (
           <p key={i} style={{ borderBottom: '1px solid black', marginBottom: '4px', minHeight: '24px' }}>&nbsp;</p>
@@ -434,7 +436,7 @@ function FormSuratPernyataan({ onBack, onSuccess }: { onBack: () => void; onSucc
                       {checked.has(p.id) ? <CheckSquare className="w-4 h-4 text-slate-700 shrink-0" /> : <Square className="w-4 h-4 text-slate-300 shrink-0" />}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-800 truncate">{p.deskripsi}</p>
-                        <p className="text-xs text-slate-400">{fmtTgl(p.tanggal)} · {p.jenis} · +{p.poin}p</p>
+                        <p className="text-xs text-slate-400">{fmtTgl(p.tanggal)} · {incidentLabel(p.jenis)} · {p.source==='pengajian'?'Pengajian':'Umum'}{p.sesi&&` · ${sessionLabel(p.sesi,p.jenis,p.source)}`} · {p.jumlah_kejadian} kejadian</p>
                       </div>
                     </button>
                   ))}

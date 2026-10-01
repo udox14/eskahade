@@ -46,4 +46,4 @@ INSERT INTO spp_log (id, santri_id, bulan, tahun, nominal_bayar, keterangan) VAL
   ('demo-spp-2', 'demo-s-2', 1, 2025, 70000, 'Demo');
 
 INSERT INTO pelanggaran (id, santri_id, jenis, deskripsi, poin) VALUES
-  ('demo-plg-1', 'demo-s-3', 'RINGAN', 'Terlambat (data demo)', 5);
+  ('demo-plg-1', 'demo-s-3', 'RINGAN', 'Terlambat (data demo)', 0);

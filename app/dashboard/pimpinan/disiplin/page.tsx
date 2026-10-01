@@ -27,27 +27,26 @@ export default async function PimpinanDisiplinPage({
     <div className="space-y-5">
       <PageHeader
         title="Monitoring Disiplin Santri"
-        description={`Rekap pelanggaran dan poin ${labelBulan(data.period.month)}. Data bersifat baca saja.`}
+        description={`Rekap jumlah kejadian ${labelBulan(data.period.month)}. Data bersifat baca saja.`}
       />
 
       <MonthPeriodFilter month={data.period.month} />
 
       <div className="print-area space-y-5">
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <KpiCard label="Total Pelanggaran" value={data.total.total} sub={labelBulan(data.period.month)} />
+          <KpiCard label="Jumlah Kejadian" value={data.total.total} sub={labelBulan(data.period.month)} />
           <KpiCard label="Santri Terlibat" value={data.total.santri} />
-          <KpiCard label="Total Poin" value={data.total.poin} tone={data.total.poin > 0 ? 'warn' : 'good'} />
+          <KpiCard label="Perlu Verifikasi" value={data.total.pending} sub="histori belum pasti periodenya" tone={data.total.pending > 0 ? 'warn' : 'good'} />
           <KpiCard label="Jenis Surat Perjanjian" value={data.suratPerjanjian.reduce((sum, row) => sum + row.total, 0)} sub="surat terbit" />
         </div>
 
         <div className="grid gap-5 lg:grid-cols-2">
-          <SectionCard title="Pelanggaran per Asrama" subtitle="Jumlah pelanggaran, santri, dan poin.">
+          <SectionCard title="Pelanggaran per Asrama" subtitle="Jumlah kejadian terkonfirmasi dan santri.">
             <DataTable
               columns={[
                 { label: 'Asrama' },
                 { label: 'Pelanggaran', align: 'right' },
                 { label: 'Santri', align: 'right' },
-                { label: 'Poin', align: 'right' },
               ]}
               empty={data.perAsrama.length === 0}
             >
@@ -56,7 +55,6 @@ export default async function PimpinanDisiplinPage({
                   <td className="px-4 py-3 font-bold text-slate-700">{row.asrama}</td>
                   <td className="px-4 py-3 text-right font-black text-red-700">{row.total}</td>
                   <td className="px-4 py-3 text-right font-bold text-slate-700">{row.santri}</td>
-                  <td className="px-4 py-3 text-right font-bold text-amber-700">{row.poin}</td>
                 </tr>
               ))}
             </DataTable>
@@ -67,7 +65,6 @@ export default async function PimpinanDisiplinPage({
               columns={[
                 { label: 'Jenis' },
                 { label: 'Jumlah', align: 'right' },
-                { label: 'Poin', align: 'right' },
               ]}
               empty={data.perJenis.length === 0}
             >
@@ -75,7 +72,6 @@ export default async function PimpinanDisiplinPage({
                 <tr key={row.jenis} className="hover:bg-slate-50">
                   <td className="px-4 py-3 font-bold text-slate-700">{row.jenis}</td>
                   <td className="px-4 py-3 text-right font-black text-slate-800">{row.total}</td>
-                  <td className="px-4 py-3 text-right font-bold text-amber-700">{row.poin}</td>
                 </tr>
               ))}
             </DataTable>

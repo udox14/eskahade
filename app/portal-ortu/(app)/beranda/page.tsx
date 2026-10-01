@@ -11,7 +11,7 @@ import { requirePortalSessionStrict } from '@/lib/portal/session'
 import {
   getRekapAbsensiAnak,
   getPelanggaranAnak,
-  type PelanggaranAnak,
+  getTotalPelanggaranAnak,
 } from '@/lib/portal/data'
 import { getPortalStudentBilling } from '@/lib/portal/finance'
 import { formatRupiah } from '@/lib/portal/format'
@@ -40,13 +40,14 @@ export default async function PortalBerandaPage() {
   const lastDay = new Date(Date.UTC(currentYear, currentMonth, 0)).getUTCDate()
   const end = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
 
-  const [billing, absen, pelanggaran] = await Promise.all([
+  const [billing, absen, pelanggaran, disiplin] = await Promise.all([
     getPortalStudentBilling(session.santri_id).catch(() => null),
     getRekapAbsensiAnak(session.santri_id, start, end),
     getPelanggaranAnak(session.santri_id),
+    getTotalPelanggaranAnak(session.santri_id),
   ])
 
-  const totalPoin = (pelanggaran ?? []).reduce((sum: number, p: PelanggaranAnak) => sum + (p.poin || 0), 0)
+
 
   const pendingOrders = billing?.pendingOrders ?? []
   const hasPendingOrder = pendingOrders.length > 0
@@ -128,7 +129,7 @@ export default async function PortalBerandaPage() {
             </span>
           </Link>
 
-          {/* Shortcut 2: Kedisiplinan / Poin Pelanggaran */}
+          {/* Shortcut 2: Kedisiplinan / Jumlah Kejadian */}
           <Link
             href="/portal-ortu/pelanggaran"
             className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-blue-50/90 dark:bg-blue-950/40 border border-slate-200/60 dark:border-white/5 p-2.5 text-center active:scale-95 transition hover:bg-blue-100/70 dark:hover:bg-blue-900/50"
@@ -354,7 +355,7 @@ export default async function PortalBerandaPage() {
             <div className="flex items-center gap-3 min-w-0 pr-2">
               <div
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                  totalPoin > 0
+                  disiplin.jumlah > 0
                     ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                 }`}
@@ -368,19 +369,19 @@ export default async function PortalBerandaPage() {
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
                   {pelanggaran.length === 0
                     ? 'Tertib · Tidak ada catatan pelanggaran'
-                    : `${pelanggaran.length} catatan kedisiplinan tercatat`}
+                    : `${disiplin.jumlah} kejadian${disiplin.pending?` · ${disiplin.pending} catatan perlu verifikasi`:''}`}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span
                 className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                  totalPoin > 0
+                  disiplin.jumlah > 0
                     ? 'text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 font-mono'
                     : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 font-mono'
                 }`}
               >
-                {totalPoin} Poin
+                {disiplin.jumlah} kejadian
               </span>
               <CaretRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition" />
             </div>

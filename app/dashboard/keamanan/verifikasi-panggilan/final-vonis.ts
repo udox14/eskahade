@@ -4,6 +4,9 @@ import { batch, execute, generateId, now, query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
+import { assertFeature } from '@/lib/auth/feature'
+import { sessionKey, sessionStatement, sessionLinkStatement } from '@/lib/discipline/data'
+import { revalidateDiscipline } from '@/lib/discipline/revalidate'
 
 type SourceType = 'pengajian' | 'berjamaah'
 export type FinalStatus = 'ALFA' | 'IZIN' | 'SAKIT' | 'HADIR' | 'MANGKIR'
@@ -148,67 +151,12 @@ function berjamaahColumn(sesi: string) {
   return sesi
 }
 
-async function applyPengajianStatus(payload: SaveFinalPayload) {
-  const absenId = await getPengajianAbsensiId(payload.santriId, payload.tanggal)
-  if (!absenId) return
-
-  const { statusColumn, verifColumn } = pengajianColumns(payload.sesi)
-  if (payload.status === 'MANGKIR') return
-  if (payload.status === 'ALFA') {
-    await execute(`UPDATE absensi_harian SET ${verifColumn} = 'OK' WHERE id = ?`, [absenId])
-    return
-  }
-
-  const nextStatus = payload.status === 'IZIN' ? 'I' : payload.status === 'SAKIT' ? 'S' : 'H'
-  await execute(`UPDATE absensi_harian SET ${statusColumn} = ?, ${verifColumn} = NULL WHERE id = ?`, [nextStatus, absenId])
-}
-
-async function applyBerjamaahStatus(payload: SaveFinalPayload) {
-  if (payload.status === 'MANGKIR' || payload.status === 'ALFA') return
-  const column = berjamaahColumn(payload.sesi)
-
-  if (payload.status === 'HADIR') {
-    await execute(`UPDATE absen_berjamaah SET ${column} = NULL WHERE santri_id = ? AND tanggal = ?`, [payload.santriId, payload.tanggal])
-    await execute(`
-      DELETE FROM absen_berjamaah
-      WHERE santri_id = ? AND tanggal = ?
-        AND shubuh IS NULL AND dzuhur IS NULL AND ashar IS NULL AND maghrib IS NULL AND isya IS NULL
-    `, [payload.santriId, payload.tanggal])
-    return
-  }
-
-  const nextStatus = payload.status === 'IZIN' ? 'P' : 'S'
-  const session = await getSession()
-  await execute(`
-    INSERT INTO absen_berjamaah (santri_id, tanggal, ${column}, created_by)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(santri_id, tanggal) DO UPDATE SET ${column} = excluded.${column}
-  `, [payload.santriId, payload.tanggal, nextStatus, session?.id ?? null])
-}
-
-async function createPelanggaranIfNeeded(payload: SaveFinalPayload, existingPelanggaranId: string | null) {
-  if (payload.status !== 'ALFA') return existingPelanggaranId
-  if (existingPelanggaranId) return existingPelanggaranId
-
-  const session = await getSession()
-  const id = generateId()
-  const jenis = payload.source === 'pengajian' ? 'ALFA_PENGAJIAN' : 'ALFA_BERJAMAAH'
-  const label = payload.source === 'pengajian' ? 'Alfa Pengajian' : 'Alfa Berjamaah'
-  const detail = `${payload.tanggal} (${payload.sesi})`
-
-  await execute(`
-    INSERT INTO pelanggaran (id, santri_id, tanggal, jenis, deskripsi, poin, penindak_id)
-    VALUES (?, ?, ?, ?, ?, 10, ?)
-  `, [id, payload.santriId, now(), jenis, `${label}.\nDetail: ${detail}`, session?.id ?? null])
-
-  return id
-}
-
 export async function getFinalVonisQueue(
   source: SourceType,
   tanggalRef: string,
   filters: { status?: FinalFilterStatus; search?: string; asrama?: string } = {}
 ) {
+  const access=await assertFeature(SOURCE_PATH[source]);if('error' in access) throw new Error(access.error)
   await ensureFinalVonisTable()
   const { start, end } = getWeekRangeFromRef(tanggalRef)
   const rows = await query<any>(`
@@ -274,61 +222,52 @@ export async function getFinalVonisQueue(
 }
 
 export async function simpanFinalVonis(daftar: SaveFinalPayload[]) {
-  await ensureFinalVonisTable()
-  const session = await getSession()
-  if (!session) return { error: 'Unauthorized' }
-  if (!daftar.length) return { error: 'Tidak ada vonis untuk disimpan.' }
-
-  const savedAt = now()
-  const statements: { sql: string; params: unknown[] }[] = []
-
-  for (const item of daftar) {
-    const existing = await queryOne<{ id: string; pelanggaran_id: string | null }>(`
-      SELECT id, pelanggaran_id
-      FROM verifikasi_panggilan_vonis
-      WHERE panggilan_id = ? AND source = ? AND tanggal = ? AND sesi = ?
-    `, [item.panggilanId, item.source, item.tanggal, item.sesi])
-
-    if (item.source === 'pengajian') await applyPengajianStatus(item)
-    else await applyBerjamaahStatus(item)
-
-    const pelanggaranId = await createPelanggaranIfNeeded(item, existing?.pelanggaran_id ?? null)
-
-    statements.push({
-      sql: `
-        INSERT INTO verifikasi_panggilan_vonis
-          (id, panggilan_id, periode_awal, periode_akhir, santri_id, source, tanggal, sesi,
-           status_final, catatan, pelanggaran_id, verified_by, verified_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(panggilan_id, source, tanggal, sesi) DO UPDATE SET
-          status_final = excluded.status_final,
-          catatan = excluded.catatan,
-          pelanggaran_id = excluded.pelanggaran_id,
-          verified_by = excluded.verified_by,
-          verified_at = excluded.verified_at,
-          updated_at = excluded.updated_at
-      `,
-      params: [
-        generateId(),
-        item.panggilanId,
-        item.periodeAwal,
-        item.periodeAkhir,
-        item.santriId,
-        item.source,
-        item.tanggal,
-        item.sesi,
-        item.status,
-        item.catatan?.trim() || null,
-        pelanggaranId,
-        session.id,
-        savedAt,
-        savedAt,
-      ],
-    })
+  if(!Array.isArray(daftar)||!daftar.length||daftar.length>500) return {error:'Data vonis tidak valid.'}
+  const seen=new Set<string>()
+  for(const item of daftar) {
+    if(!['pengajian','berjamaah'].includes(item.source)||!['ALFA','IZIN','SAKIT','HADIR','MANGKIR'].includes(item.status)||!/^\d{4}-\d{2}-\d{2}$/.test(item.tanggal)||!Number.isFinite(Date.parse(item.tanggal))||new Date(item.tanggal+'T00:00:00Z').toISOString().slice(0,10)!==item.tanggal||item.tanggal<item.periodeAwal||item.tanggal>item.periodeAkhir) return {error:'Data vonis tidak valid.'}
+    const sessions=item.source==='pengajian'?PENGAJIAN_SESI:BERJAMAAH_SESI
+    if(!(sessions as readonly string[]).includes(item.sesi)) return {error:'Sesi tidak valid.'}
+    const key=sessionKey(item.source,item.santriId,item.tanggal,item.sesi)
+    if(seen.has(key)) return {error:'Sesi duplikat.'};seen.add(key)
+    const access=await assertFeature(SOURCE_PATH[item.source],'update');if('error' in access)return access
   }
-
-  for (let i = 0; i < statements.length; i += 50) {
-    await batch(statements.slice(i, i + 50))
+  const session=await getSession();if(!session)return {error:'Unauthorized'}
+  await ensureFinalVonisTable()
+  const savedAt=now(),statements:{sql:string;params:unknown[]}[]=[]
+  for(const item of daftar) {
+    const call=await queryOne<{snapshot_json:string}>("SELECT snapshot_json FROM verifikasi_panggilan WHERE id=? AND santri_id=? AND periode_awal=? AND periode_akhir=? AND keputusan='DIPANGGIL'",[item.panggilanId,item.santriId,item.periodeAwal,item.periodeAkhir])
+    if(!call||!(parseSnapshot(call.snapshot_json).events??[]).some(e=>e.source===item.source&&e.tanggal===item.tanggal&&e.sesi===item.sesi&&e.counted!==false)) return {error:'Sesi bukan bagian pemanggilan santri ini.'}
+    const old=await queryOne<{id:string;status_final:string;updated_at:string;pelanggaran_id:string|null}>('SELECT id,status_final,updated_at,pelanggaran_id FROM verifikasi_panggilan_vonis WHERE panggilan_id=? AND source=? AND tanggal=? AND sesi=?',[item.panggilanId,item.source,item.tanggal,item.sesi])
+    const canonical=await queryOne<{pelanggaran_id:string}>('SELECT pelanggaran_id FROM pelanggaran_sessions WHERE santri_id=? AND source=? AND tanggal=? AND sesi=?',[item.santriId,item.source,item.tanggal,item.sesi])
+    const parent=canonical?.pelanggaran_id??old?.pelanggaran_id??sessionKey(item.source,item.santriId,item.tanggal,item.sesi)
+    statements.push({sql:"SELECT json(CASE WHEN EXISTS(SELECT 1 FROM verifikasi_panggilan WHERE id=? AND santri_id=? AND snapshot_json=? AND keputusan='DIPANGGIL') THEN 'true' ELSE 'stale_call' END)",params:[item.panggilanId,item.santriId,call.snapshot_json]})
+    if(old)statements.push({sql:"SELECT json(CASE WHEN EXISTS(SELECT 1 FROM verifikasi_panggilan_vonis WHERE id=? AND updated_at=? AND status_final=?) THEN 'true' ELSE 'stale_verdict' END)",params:[old.id,old.updated_at,old.status_final]})
+    else statements.push({sql:"SELECT json(CASE WHEN NOT EXISTS(SELECT 1 FROM verifikasi_panggilan_vonis WHERE panggilan_id=? AND source=? AND tanggal=? AND sesi=?) THEN 'true' ELSE 'stale_verdict' END)",params:[item.panggilanId,item.source,item.tanggal,item.sesi]})
+    if(item.status!=='MANGKIR') {
+      if(item.source==='pengajian') {
+        const absenId=await getPengajianAbsensiId(item.santriId,item.tanggal)
+        if(!absenId) return {error:'Data absensi sesi tidak ditemukan.'}
+        const {statusColumn,verifColumn}=pengajianColumns(item.sesi)
+        statements.push(item.status==='ALFA'?{sql:`UPDATE absensi_harian SET ${statusColumn}='A',${verifColumn}='OK' WHERE id=?`,params:[absenId]}:{sql:`UPDATE absensi_harian SET ${statusColumn}=?,${verifColumn}=NULL WHERE id=?`,params:[item.status==='IZIN'?'I':item.status==='SAKIT'?'S':'H',absenId]})
+      } else {
+        const column=berjamaahColumn(item.sesi)
+        statements.push({sql:`INSERT INTO absen_berjamaah(santri_id,tanggal,${column},created_by) VALUES(?,?,?,?) ON CONFLICT(santri_id,tanggal) DO UPDATE SET ${column}=excluded.${column}`,params:[item.santriId,item.tanggal,item.status==='ALFA'?'A':item.status==='IZIN'?'P':item.status==='SAKIT'?'S':'H',session.id]})
+      }
+    }
+    if(item.status==='ALFA') {
+      const jenis=item.source==='pengajian'?'ALFA_PENGAJIAN':'ALFA_BERJAMAAH'
+      statements.push({sql:'INSERT OR IGNORE INTO pelanggaran(id,santri_id,tanggal,jenis,deskripsi,poin,penindak_id) VALUES(?,?,?,?,?,0,?)',params:[parent,item.santriId,item.tanggal,jenis,`Alfa ${item.source}. Detail: ${item.tanggal} (${item.sesi})`,session.id]})
+      statements.push(sessionStatement({parentId:parent,santriId:item.santriId,source:item.source,tanggal:item.tanggal,sesi:item.sesi,ref:item.panggilanId,actor:session.id,reason:item.catatan?.trim()||'Vonis final alfa'}))
+      statements.push(sessionLinkStatement(parent,item.source,item.santriId,item.tanggal,item.sesi))
+    } else if(item.status!=='MANGKIR'&&canonical) {
+      statements.push({sql:"UPDATE pelanggaran_sessions SET status='cancelled',updated_by=?,updated_at=?,reason=?,version=version+1 WHERE santri_id=? AND source=? AND tanggal=? AND sesi=? AND status='active'",params:[session.id,savedAt,item.catatan?.trim()||'Koreksi vonis menjadi '+item.status,item.santriId,item.source,item.tanggal,item.sesi]})
+    }
+    statements.push({sql:`INSERT INTO verifikasi_panggilan_vonis(id,panggilan_id,periode_awal,periode_akhir,santri_id,source,tanggal,sesi,status_final,catatan,pelanggaran_id,verified_by,verified_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(panggilan_id,source,tanggal,sesi) DO UPDATE SET status_final=excluded.status_final,catatan=excluded.catatan,pelanggaran_id=excluded.pelanggaran_id,verified_by=excluded.verified_by,verified_at=excluded.verified_at,updated_at=excluded.updated_at`,params:[old?.id??generateId(),item.panggilanId,item.periodeAwal,item.periodeAkhir,item.santriId,item.source,item.tanggal,item.sesi,item.status,item.catatan?.trim()||null,item.status==='ALFA'||canonical||old?.pelanggaran_id?parent:null,session.id,savedAt,savedAt]})
+  }
+  try {await batch(statements)} catch(error) {
+    if(error instanceof Error&&/malformed JSON|stale_|UNIQUE constraint/.test(error.message))return {error:'Data berubah. Muat ulang antrean sebelum menyimpan.'}
+    throw error
   }
 
   const source = daftar[0]?.source || 'pengajian'
@@ -354,6 +293,6 @@ export async function simpanFinalVonis(daftar: SaveFinalPayload[]) {
 
   revalidatePath(SOURCE_PATH[source])
   revalidatePath('/dashboard/keamanan/verifikasi-panggilan')
-  revalidatePath('/dashboard/keamanan')
+  revalidateDiscipline()
   return { success: true, count: daftar.length }
 }

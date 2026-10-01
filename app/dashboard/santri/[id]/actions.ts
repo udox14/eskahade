@@ -1,4 +1,5 @@
 'use server'
+import { getStudentIncidents } from '@/lib/discipline/data'
 
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { batch, query, queryOne } from '@/lib/db'
@@ -302,10 +303,7 @@ export async function getRiwayatAkademik(santriId: string) {
 export async function getRiwayatPelanggaran(santriId: string) {
   const session = await getSession()
   if (!(await canViewSantriDetail(session, santriId))) return []
-  return await query(
-    'SELECT id, tanggal, jenis, deskripsi, poin FROM pelanggaran WHERE santri_id = ? ORDER BY tanggal DESC',
-    [santriId]
-  )
+  return getStudentIncidents(santriId)
 }
 
 export async function getRiwayatPerizinan(santriId: string) {
@@ -378,6 +376,8 @@ export async function deleteSantri(santriId: string) {
   )
 
   if (!santri) return { error: 'Data santri tidak ditemukan atau sudah dihapus.' }
+  const discipline=await queryOne<{n:number}>("SELECT (SELECT COUNT(*) FROM pelanggaran WHERE santri_id=?)+(SELECT COUNT(*) FROM pengajian_violations WHERE santri_id=?) n",[santriId,santriId])
+  if(discipline?.n)return {error:'Santri mempunyai histori pelanggaran. Gunakan arsip agar histori dan surat tetap tersimpan.'}
 
   try {
     const statements = await buildRelatedDeleteStatements(santriId)

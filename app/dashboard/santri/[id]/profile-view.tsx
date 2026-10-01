@@ -1,5 +1,7 @@
 'use client'
 
+import { incidentLabel, sessionLabel } from '@/lib/discipline/format'
+
 import { useState } from 'react'
 import { User, MapPin, Calendar, School, Home, BookOpen, AlertTriangle, Clock, CreditCard, Wallet, Trophy, CheckCircle, XCircle, AlertCircle, Users, Utensils, Shirt } from 'lucide-react'
 import { format, isValid } from 'date-fns'
@@ -324,16 +326,16 @@ export function SantriProfileView({
            
            {/* PELANGGARAN */}
            <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-              <div className="bg-red-50 p-4 border-b border-red-100"><h3 className="font-bold text-red-900 flex items-center gap-2"><AlertTriangle className="w-5 h-5"/> Riwayat Pelanggaran</h3></div>
+              <div className="bg-red-50 p-4 border-b border-red-100"><h3 className="font-bold text-red-900 flex items-center gap-2"><AlertTriangle className="w-5 h-5"/> Riwayat Pelanggaran · {pelanggaran.reduce((sum:number,p:any)=>sum+(p.jumlah_kejadian??0),0)} kejadian{pelanggaran.some((p:{perlu_verifikasi:number})=>p.perlu_verifikasi>0)&&' · histori perlu verifikasi'}</h3></div>
               <div className="divide-y max-h-80 overflow-y-auto">
                  {pelanggaran.length===0?<EmptyState text="Alhamdulillah, nihil pelanggaran."/>:pelanggaran.map((p:any)=>(
                     <div key={p.id} className="p-4 hover:bg-gray-50 transition-colors">
                        <div className="flex justify-between mb-2">
-                          <span className="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100 text-xs">+{p.poin} Poin</span>
+                          <span className="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100 text-xs">{p.perlu_verifikasi?'Perlu verifikasi':'1 kejadian'}</span>
                           <span className="text-xs text-gray-500">{safeFormat(p.tanggal, 'dd MMM yyyy')}</span>
                        </div>
                        <p className="font-medium text-gray-800 text-sm mb-1">{p.deskripsi}</p>
-                       <p className="text-xs text-gray-500 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> {p.jenis}</p>
+                       <p className="text-xs text-gray-500 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> {incidentLabel(p.jenis)} · {p.source==='pengajian'?'Pengajian':'Umum'}{p.sesi&&` · ${sessionLabel(p.sesi,p.jenis,p.source)}`}</p>
                     </div>
                  ))}
               </div>

@@ -228,6 +228,8 @@ async function restoreHardDeletedArchive(arsip: Row, snap: Row) {
   await restoreSnapshotRows('santri_nonaktif_log', asrama.santri_nonaktif_log ?? [], { santri_id: idAsli })
 
   await restoreSnapshotRows('pelanggaran', disiplin.pelanggaran ?? snap.pelanggaran ?? [], { santri_id: idAsli })
+  // Old hard-delete snapshots have no session evidence. Never infer from points.
+  await execute("UPDATE pelanggaran SET review_state='pending',reason='Pemulihan arsip: bukti sesi perlu diverifikasi',version=version+1 WHERE santri_id=? AND jenis IN ('ALFA_PENGAJIAN','ALFA_BERJAMAAH') AND NOT EXISTS(SELECT 1 FROM pelanggaran_session_links l WHERE l.pelanggaran_id=pelanggaran.id)", [idAsli])
   await restoreSnapshotRows('surat_pernyataan', disiplin.surat_pernyataan ?? [], { santri_id: idAsli })
   await restoreSnapshotRows('surat_perjanjian', disiplin.surat_perjanjian ?? [], { santri_id: idAsli })
   await restoreSnapshotRows('perizinan', disiplin.perizinan ?? [], { santri_id: idAsli })

@@ -1,5 +1,7 @@
 'use client'
 
+import { incidentLabel, sessionLabel } from '@/lib/discipline/format'
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getMasterPelanggaran, tambahMasterPelanggaran, editMasterPelanggaran,
@@ -8,6 +10,7 @@ import {
   getOpsiExportPelanggaran, getDataExportPelanggaran,
 } from './actions'
 import type { ExportPelanggaranFilter } from './actions'
+import { HistoryReview } from './history-review'
 import {
   ShieldAlert, Plus, Search, Loader2, X, Trash2, Edit2,
   ChevronLeft, ChevronRight, BookOpen, Camera,
@@ -44,7 +47,6 @@ const SP_COLOR: Record<string, string> = {
 type ImportKamusRow = {
   kategori: string
   nama_pelanggaran: string
-  poin: number
   deskripsi: string
   urutan: number
 }
@@ -214,7 +216,6 @@ function ModalInputPelanggaran({ masterList, onClose, onSuccess }: {
                       <div className="flex items-center gap-2 min-w-0">
                         <span className={cn('w-2 h-2 rounded-full shrink-0', KATEGORI_DOT[selectedItem.kategori])} />
                         <span className="font-semibold text-slate-800 truncate">{selectedItem.nama_pelanggaran}</span>
-                        <span className="text-xs font-bold text-rose-600 shrink-0">+{selectedItem.poin}p</span>
                       </div>
                     ) : <span className="text-slate-400">Ketik untuk mencari pelanggaran...</span>}
                     <ChevronDown className={cn('w-4 h-4 text-slate-400 transition-transform shrink-0 ml-2', showDropdown && 'rotate-180')} />
@@ -237,7 +238,6 @@ function ModalInputPelanggaran({ masterList, onClose, onSuccess }: {
                                 className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-rose-50 transition-colors text-left border-b border-slate-50 last:border-0">
                                 <span className={cn('w-2 h-2 rounded-full shrink-0', KATEGORI_DOT[m.kategori])} />
                                 <span className="flex-1 text-sm font-medium text-slate-800 truncate">{m.nama_pelanggaran}</span>
-                                <span className="text-xs font-bold text-rose-600 shrink-0">+{m.poin}p</span>
                               </button>
                             ))
                             : ['RINGAN', 'SEDANG', 'BERAT'].flatMap(kat => {
@@ -252,7 +252,6 @@ function ModalInputPelanggaran({ masterList, onClose, onSuccess }: {
                                   <button key={m.id} onClick={() => { setSelectedMasterId(String(m.id)); setShowDropdown(false) }}
                                     className={cn('w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-rose-50 transition-colors text-left border-b border-slate-50 last:border-0', selectedMasterId === String(m.id) && 'bg-rose-50')}>
                                     <span className="flex-1 text-sm font-medium text-slate-800 truncate">{m.nama_pelanggaran}</span>
-                                    <span className="text-xs font-bold text-rose-600 shrink-0">+{m.poin}p</span>
                                     {selectedMasterId === String(m.id) && <span className="text-rose-500 text-xs shrink-0">✓</span>}
                                   </button>
                                 ))
@@ -322,15 +321,16 @@ function ModalDetail({ santriId, onClose }: { santriId: string; onClose: () => v
   useEffect(() => { getDetailSantri(santriId).then(d => { setData(d); setLoading(false) }) }, [santriId])
 
   const handleHapus = async (id: string) => {
-    if (!await confirm('Hapus data pelanggaran ini?')) return
+    if (!await confirm('Batalkan catatan pelanggaran ini? Histori dan surat tetap disimpan.')) return
     setDeleting(id)
     const res = await hapusPelanggaran(id)
     setDeleting(null)
     if ('error' in res) { toast.error(res.error); return }
-    toast.success('Dihapus')
+    toast.success('Dibatalkan')
     setData((prev: any) => ({ ...prev, pelanggaran: prev.pelanggaran.filter((p: any) => p.id !== id) }))
   }
-  const totalPoin = data?.pelanggaran?.reduce((a: number, p: any) => a + (p.poin ?? 0), 0) ?? 0
+  const totalKejadian = data?.pelanggaran?.reduce((a: number, p: any) => a + (p.jumlah_kejadian ?? 0), 0) ?? 0
+  const pending = data?.pelanggaran?.reduce((a: number,p:{perlu_verifikasi?:number})=>a+(p.perlu_verifikasi??0),0)??0
 
   return (
     <div className="fixed inset-0 bg-slate-900/70 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm">
@@ -367,12 +367,12 @@ function ModalDetail({ santriId, onClose }: { santriId: string; onClose: () => v
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-rose-50 rounded-xl p-3 border border-rose-100">
-                    <p className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">Total Poin</p>
-                    <p className="text-2xl font-black text-rose-700 mt-0.5">{totalPoin}</p>
+                    <p className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">Jumlah Kejadian</p>
+                    <p className="text-2xl font-black text-rose-700 mt-0.5">{totalKejadian}</p>
                   </div>
                   <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Jumlah Kasus</p>
-                    <p className="text-2xl font-black text-slate-700 mt-0.5">{data.pelanggaran.length}<span className="text-sm font-semibold ml-0.5">x</span></p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Perlu Verifikasi</p>
+                    <p className="text-2xl font-black text-slate-700 mt-0.5">{pending}<span className="text-sm font-semibold ml-0.5">catatan</span></p>
                   </div>
                 </div>
                 {data.pelanggaran.length === 0 ? <p className="text-center py-8 text-slate-400 text-sm">Belum ada catatan pelanggaran</p>
@@ -381,17 +381,17 @@ function ModalDetail({ santriId, onClose }: { santriId: string; onClose: () => v
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                            <span className={cn('text-[9px] font-bold px-2 py-0.5 rounded-full border', KATEGORI_COLOR[p.jenis] ?? KATEGORI_COLOR.RINGAN)}>{p.jenis}</span>
-                            <span className="text-xs font-black text-rose-600">+{p.poin}p</span>
-                            <span className="text-[10px] text-slate-400">{fmtTgl(p.tanggal)}</span>
+                            <span className={cn('text-[9px] font-bold px-2 py-0.5 rounded-full border', KATEGORI_COLOR[p.jenis] ?? KATEGORI_COLOR.RINGAN)}>{incidentLabel(p.jenis)}</span>
+                            <span className="text-xs font-black text-rose-600">{p.perlu_verifikasi?'Perlu verifikasi':'1 kejadian'}</span>
+                            <span className="text-[10px] text-slate-400">{p.tanggal?fmtTgl(p.tanggal):'Tanggal belum terverifikasi'} · {p.source==='pengajian'?'Pengajian':'Umum'}{p.sesi&&` · ${sessionLabel(p.sesi,p.jenis,p.source)}`}</span>
                           </div>
                           <p className="text-sm font-semibold text-slate-800">{p.deskripsi}</p>
                           {p.penindak_nama && <p className="text-[10px] text-slate-400 mt-0.5">Dicatat: {p.penindak_nama}</p>}
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           {p.foto_url && <a href={p.foto_url} target="_blank" rel="noreferrer" className="p-1.5 text-blue-400 hover:bg-blue-50 rounded-lg transition-colors"><ImageIcon className="w-3.5 h-3.5" /></a>}
-                          <button onClick={() => handleHapus(p.id)} disabled={deleting === p.id}
-                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"><Trash2 className="w-3.5 h-3.5" /></button>
+                          {p.source==='pengajian'||p.sesi?<a href={p.source==='pengajian'?'/dashboard/akademik/pelanggaran-pengajian':p.jenis==='ALFA_BERJAMAAH'?'/dashboard/keamanan/verifikasi-berjamaah':'/dashboard/akademik/absensi/vonis-final'} className="text-xs text-blue-700 underline">Modul asal</a>:<button onClick={() => handleHapus(p.id)} disabled={deleting === p.id}
+                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"><Trash2 className="w-3.5 h-3.5" /></button>}
                         </div>
                       </div>
                     </div>
@@ -515,7 +515,10 @@ function ModalExportPelanggaran({ onClose }: { onClose: () => void }) {
         Kategori: row.jenis || '',
         'Nama Pelanggaran': row.nama_pelanggaran || '',
         Deskripsi: row.deskripsi || '',
-        Poin: Number(row.poin || 0),
+        'Jumlah Kejadian': Number(row.jumlah_kejadian || 0),
+        'Perlu Verifikasi': row.perlu_verifikasi?'Ya':'Tidak',
+        Sumber: row.source==='pengajian'?'Pengajian':'Umum',
+        Sesi: row.sesi||'',
         Penindak: row.penindak_nama || '',
         'Foto Bukti': row.foto_url || '',
       }))
@@ -727,7 +730,7 @@ function TabDaftar({ masterList }: { masterList: any[] }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  {['No', 'Nama Santri', 'Asrama / Kamar', 'Kasus', 'Total Poin', 'SP Terakhir', ''].map(h => (
+                  {['No', 'Nama Santri', 'Asrama / Kamar', 'Jumlah Kejadian', 'Perlu Verifikasi', 'SP Terakhir', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
@@ -747,7 +750,7 @@ function TabDaftar({ masterList }: { masterList: any[] }) {
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500">{r.asrama}/{r.kamar}</td>
                     <td className="px-4 py-3 text-xs font-bold text-slate-700">{r.jumlah_pelanggaran}x</td>
-                    <td className="px-4 py-3"><span className="text-sm font-black text-rose-600">{r.total_poin}</span><span className="text-xs text-slate-400"> poin</span></td>
+                    <td className="px-4 py-3"><span className="text-sm font-black text-rose-600">{r.perlu_verifikasi}</span><span className="text-xs text-slate-400"> catatan</span></td>
                     <td className="px-4 py-3">
                       {r.sp_terakhir ? <span className={cn('text-[10px] font-bold px-2 py-1 rounded-lg border', SP_COLOR[r.sp_terakhir])}>{r.sp_terakhir}</span> : <span className="text-xs text-slate-300">—</span>}
                     </td>
@@ -771,9 +774,9 @@ function TabDaftar({ masterList }: { masterList: any[] }) {
                   </div>
                   {r.sp_terakhir && <span className={cn('shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg border', SP_COLOR[r.sp_terakhir])}>{r.sp_terakhir}</span>}
                 </div>
-                <div className="mt-2.5 flex gap-3 text-xs">
-                  <span className="text-slate-500">{r.jumlah_pelanggaran}x kasus</span>
-                  <span className="font-black text-rose-600">{r.total_poin} poin</span>
+                <div className="mt-2.5 flex flex-wrap gap-3 text-xs">
+                  <span className="text-slate-500">{r.jumlah_pelanggaran} kejadian</span>
+                  <span className="font-black text-rose-600">{r.perlu_verifikasi} catatan perlu verifikasi</span>
                   <span className="text-slate-400">· {fmtTgl(r.terakhir)}</span>
                 </div>
               </button>
@@ -803,7 +806,7 @@ function TabDaftar({ masterList }: { masterList: any[] }) {
 
 // TAB KAMUS PELANGGARAN
 function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () => void }) {
-  const [form, setForm] = useState({ kategori: 'RINGAN', nama: '', poin: 10, deskripsi: '' })
+  const [form, setForm] = useState({ kategori: 'RINGAN', nama: '', deskripsi: '' })
   const [editId, setEditId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
@@ -819,14 +822,13 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
   const downloadTemplate = async () => {
     const XLSX = await import('xlsx')
     const rows: ImportKamusRow[] = [
-      { kategori: 'RINGAN', nama_pelanggaran: 'Terlambat mengikuti kegiatan', poin: 5, deskripsi: 'Tidak hadir tepat waktu pada kegiatan wajib', urutan: 10 },
-      { kategori: 'SEDANG', nama_pelanggaran: 'Meninggalkan asrama tanpa izin', poin: 25, deskripsi: 'Keluar area asrama tanpa izin pengurus', urutan: 20 },
-      { kategori: 'BERAT', nama_pelanggaran: 'Berkelahi', poin: 50, deskripsi: 'Terlibat perkelahian atau kekerasan fisik', urutan: 30 },
+      { kategori: 'RINGAN', nama_pelanggaran: 'Terlambat mengikuti kegiatan', deskripsi: 'Tidak hadir tepat waktu pada kegiatan wajib', urutan: 10 },
+      { kategori: 'SEDANG', nama_pelanggaran: 'Meninggalkan asrama tanpa izin', deskripsi: 'Keluar area asrama tanpa izin pengurus', urutan: 20 },
+      { kategori: 'BERAT', nama_pelanggaran: 'Berkelahi', deskripsi: 'Terlibat perkelahian atau kekerasan fisik', urutan: 30 },
     ]
     const ws = XLSX.utils.json_to_sheet(rows.map(row => ({
       KATEGORI: row.kategori,
       'NAMA PELANGGARAN': row.nama_pelanggaran,
-      POIN: row.poin,
       DESKRIPSI: row.deskripsi,
       URUTAN: row.urutan,
     })))
@@ -848,11 +850,10 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
         .map(row => ({
           kategori: String(readImportValue(row, ['kategori']) || '').trim().toUpperCase(),
           nama_pelanggaran: String(readImportValue(row, ['nama pelanggaran', 'nama_pelanggaran', 'nama']) || '').trim(),
-          poin: Number(readImportValue(row, ['poin']) || 0),
           deskripsi: String(readImportValue(row, ['deskripsi', 'keterangan']) || '').trim(),
           urutan: Number(readImportValue(row, ['urutan']) || 0),
         }))
-        .filter(row => row.kategori || row.nama_pelanggaran || row.poin || row.deskripsi || row.urutan)
+        .filter(row => row.kategori || row.nama_pelanggaran || row.deskripsi || row.urutan)
 
       setImportRows(rows)
       toast.success(`${rows.length} baris terbaca`)
@@ -867,6 +868,7 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
     if (importRows.length === 0) { toast.error('Upload file template dulu'); return }
     setImporting(true)
     try {
+      toast.info('Kolom poin pada template lama diabaikan. Setiap catatan dihitung sebagai kejadian.')
       const res = await importMasterPelanggaranMassal(importRows)
       if ('error' in res) { toast.error(res.error); return }
       const parts = [`${res.inserted} baru`, `${res.updated} diperbarui`]
@@ -888,7 +890,7 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
     setSaving(false)
     if ('error' in res) { toast.error(res.error); return }
     toast.success(editId ? 'Diperbarui' : 'Ditambahkan')
-    setForm({ kategori: 'RINGAN', nama: '', poin: 10, deskripsi: '' }); setEditId(null)
+    setForm({ kategori: 'RINGAN', nama: '', deskripsi: '' }); setEditId(null)
     onRefresh()
   }
   const handleHapus = async (id: number) => {
@@ -917,11 +919,6 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
               ))}
             </div>
           </div>
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Poin</label>
-            <input type="number" value={form.poin} onChange={e => setForm(f => ({ ...f, poin: Number(e.target.value) }))} min={1} max={100}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 bg-slate-50" />
-          </div>
           <div className="sm:col-span-2">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Nama Pelanggaran</label>
             <input type="text" value={form.nama} onChange={e => setForm(f => ({ ...f, nama: e.target.value }))} placeholder="Contoh: Merokok, Berkelahi, Pencurian..."
@@ -940,7 +937,7 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
             {saving ? 'Menyimpan...' : editId ? 'Simpan Perubahan' : 'Tambah'}
           </button>
           {editId && (
-            <button onClick={() => { setEditId(null); setForm({ kategori: 'RINGAN', nama: '', poin: 10, deskripsi: '' }) }}
+            <button onClick={() => { setEditId(null); setForm({ kategori: 'RINGAN', nama: '', deskripsi: '' }) }}
               className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors">Batal</button>
           )}
         </div>
@@ -949,7 +946,7 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Import Kamus Pelanggaran</p>
-            <p className="mt-1 text-xs text-slate-500">Gunakan template Excel agar kolom kategori, nama pelanggaran, poin, deskripsi, dan urutan terbaca.</p>
+            <p className="mt-1 text-xs text-slate-500">Gunakan template Excel agar kolom kategori, nama pelanggaran, deskripsi, dan urutan terbaca.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -1004,7 +1001,6 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
                   <tr>
                     <th className="px-3 py-2">Kategori</th>
                     <th className="px-3 py-2">Nama Pelanggaran</th>
-                    <th className="px-3 py-2 text-right">Poin</th>
                     <th className="px-3 py-2">Deskripsi</th>
                     <th className="px-3 py-2 text-right">Urutan</th>
                   </tr>
@@ -1014,7 +1010,6 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
                     <tr key={`${row.kategori}-${row.nama_pelanggaran}-${index}`}>
                       <td className="px-3 py-2 font-bold text-slate-700">{row.kategori || '-'}</td>
                       <td className="px-3 py-2 text-slate-800">{row.nama_pelanggaran || '-'}</td>
-                      <td className="px-3 py-2 text-right font-bold text-rose-600">{row.poin}</td>
                       <td className="px-3 py-2 text-slate-500">{row.deskripsi || '-'}</td>
                       <td className="px-3 py-2 text-right text-slate-500">{row.urutan}</td>
                     </tr>
@@ -1042,8 +1037,7 @@ function TabKamus({ masterList, onRefresh }: { masterList: any[]; onRefresh: () 
                     <p className="font-semibold text-slate-800 text-sm">{m.nama_pelanggaran}</p>
                     {m.deskripsi && <p className="text-xs text-slate-400 truncate">{m.deskripsi}</p>}
                   </div>
-                  <span className="shrink-0 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-lg">+{m.poin}p</span>
-                  <button onClick={() => { setEditId(m.id); setForm({ kategori: m.kategori, nama: m.nama_pelanggaran, poin: m.poin, deskripsi: m.deskripsi || '' }) }}
+                  <button onClick={() => { setEditId(m.id); setForm({ kategori: m.kategori, nama: m.nama_pelanggaran, deskripsi: m.deskripsi || '' }) }}
                     className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
                   <button onClick={() => handleHapus(m.id)} disabled={deleting === m.id}
                     className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-40"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -1092,7 +1086,7 @@ export default function KeamananPage() {
           </button>
         ))}
       </div>
-      {tab === 'daftar' && <TabDaftar masterList={masterList} />}
+      {tab === 'daftar' && <><HistoryReview /><TabDaftar masterList={masterList} /></>}
       {tab === 'kamus' && (
         loadingMaster
           ? <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-slate-300" /></div>

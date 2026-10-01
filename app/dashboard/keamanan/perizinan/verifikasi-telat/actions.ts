@@ -4,6 +4,9 @@ import { query, execute, generateId, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
+import { assertFeature } from '@/lib/auth/feature'
+import { saveLateVerdict } from '@/lib/discipline/late'
+import { revalidateDiscipline } from '@/lib/discipline/revalidate'
 import { formatDistance } from 'date-fns'
 import { id } from 'date-fns/locale'
 
@@ -102,40 +105,11 @@ export async function simpanVonisTelat(
   vonis: 'TELAT_MURNI' | 'SAKIT' | 'IZIN_UZUR' | 'MANGKIR',
   sumber: 'perizinan' | 'perpulangan' = 'perizinan'
 ): Promise<{ success: boolean; message?: string } | { error: string }> {
-  const session = await getSession()
-
-  if (vonis === 'MANGKIR') {
-    return { success: true, message: 'Ditandai Mangkir. Akan muncul lagi nanti.' }
-  }
-
-  if (vonis === 'TELAT_MURNI') {
-    const deskripsi = sumber === 'perpulangan'
-      ? 'Terlambat kembali ke pondok setelah perpulangan libur semester.'
-      : 'Terlambat kembali ke pondok (Melebihi batas izin).'
-
-    await execute(`
-      INSERT INTO pelanggaran (id, santri_id, tanggal, jenis, deskripsi, poin, penindak_id)
-      VALUES (?, ?, ?, 'SEDANG', ?, 25, ?)
-    `, [generateId(), santriId, now(), deskripsi, session?.id ?? null])
-  }
-
-  if (sumber === 'perpulangan') {
-    // TELAT_MURNI → VONIS (sudah diproses, tetap kelihatan bedanya dari SUDAH tepat waktu)
-    // SAKIT / IZIN_UZUR → SUDAH (dianggap kembali dengan keterangan)
-    const newStatus = vonis === 'TELAT_MURNI' ? 'VONIS' : 'SUDAH'
-    await execute(
-      `UPDATE perpulangan_log SET status_datang = ?, tgl_datang = ?, updated_by = ? WHERE id = ?`,
-      [newStatus, now(), session?.id ?? null, izinId]
-    )
-    revalidatePath('/dashboard/asrama/perpulangan/monitoring')
-  } else {
-    // Existing: update perizinan
-    await execute(
-      `UPDATE perizinan SET status = 'KEMBALI' WHERE id = ?`,
-      [izinId]
-    )
-  }
-
+  const access=await assertFeature('/dashboard/keamanan/perizinan/verifikasi-telat','update');if('error' in access)return access
+  const session=access
+  try { await saveLateVerdict({source:sumber,id:izinId,santriId,vonis,actor:session.id}) }
+  catch { return {error:'Data sudah diproses, tidak sesuai santri, atau gagal disimpan. Muat ulang antrean.'} }
+  if(vonis==='MANGKIR')return {success:true,message:'Ditandai mangkir. Data tetap muncul di antrean.'}
   await logActivity({
     actor: actorFromSession(session),
     module: 'keamanan_verifikasi_telat',
@@ -150,6 +124,6 @@ export async function simpanVonisTelat(
   })
 
   revalidatePath('/dashboard/keamanan/perizinan/verifikasi-telat')
-  revalidatePath('/dashboard/keamanan')
+  revalidateDiscipline(santriId)
   return { success: true }
 }

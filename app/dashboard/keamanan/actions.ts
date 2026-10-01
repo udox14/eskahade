@@ -5,6 +5,8 @@ import { getSession } from '@/lib/auth/session'
 import { assertFeature } from '@/lib/auth/feature'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
+import { resolveLetterIncidents, saveIncidentLetter } from '@/lib/discipline/data'
+import { revalidateDiscipline } from '@/lib/discipline/revalidate'
 
 
 const PAGE_SIZE = 30
@@ -36,8 +38,9 @@ function cleanImportKey(kategori: string, nama: string) {
 
 // ─── KAMUS PELANGGARAN ────────────────────────────────────────────────────────
 export async function getMasterPelanggaran() {
+  const access=await assertFeature('/dashboard/keamanan'); if('error' in access) throw new Error(access.error)
   return query<any>(
-    `SELECT id, kategori, nama_pelanggaran, poin, deskripsi, urutan
+    `SELECT id, kategori, nama_pelanggaran, deskripsi, urutan
      FROM master_pelanggaran
      ORDER BY CASE kategori WHEN 'RINGAN' THEN 1 WHEN 'SEDANG' THEN 2 WHEN 'BERAT' THEN 3 ELSE 4 END,
               urutan, nama_pelanggaran`
@@ -45,14 +48,15 @@ export async function getMasterPelanggaran() {
 }
 
 export async function tambahMasterPelanggaran(data: {
-  kategori: string; nama: string; poin: number; deskripsi?: string
+  kategori: string; nama: string; deskripsi?: string
 }): Promise<{ success: boolean } | { error: string }> {
   const access = await assertFeature('/dashboard/keamanan', 'create')
   if ('error' in access) return access
-  const session = await getSession()
+  const session = access
+  if(!VALID_KATEGORI.has(data.kategori)||!cleanText(data.nama)||cleanText(data.nama).length>120)return {error:'Kategori atau nama pelanggaran tidak valid.'}
   await execute(
-    'INSERT INTO master_pelanggaran (kategori, nama_pelanggaran, poin, deskripsi) VALUES (?, ?, ?, ?)',
-    [data.kategori, data.nama, data.poin, data.deskripsi || null]
+    'INSERT INTO master_pelanggaran (kategori, nama_pelanggaran, poin, deskripsi) VALUES (?, ?, 0, ?)',
+    [data.kategori, data.nama, data.deskripsi || null]
   )
   await logActivity({
     actor: actorFromSession(session),
@@ -65,29 +69,30 @@ export async function tambahMasterPelanggaran(data: {
     summary: `Menambahkan master pelanggaran ${data.nama}`,
     details: {
       kategori: data.kategori,
-      poin: data.poin,
+
       deskripsi: data.deskripsi || null,
     },
   })
   
-  revalidatePath('/dashboard/keamanan')
+  revalidateDiscipline()
   return { success: true }
 }
 
 export async function editMasterPelanggaran(id: number, data: {
-  kategori: string; nama: string; poin: number; deskripsi?: string
+  kategori: string; nama: string; deskripsi?: string
 }): Promise<{ success: boolean } | { error: string }> {
   const access = await assertFeature('/dashboard/keamanan', 'update')
   if ('error' in access) return access
-  const session = await getSession()
+  const session = access
+  if(!VALID_KATEGORI.has(data.kategori)||!cleanText(data.nama)||cleanText(data.nama).length>120)return {error:'Kategori atau nama pelanggaran tidak valid.'}
   const beforeMaster = await queryOne<Record<string, unknown>>(
     'SELECT id, kategori, nama_pelanggaran, poin, deskripsi FROM master_pelanggaran WHERE id = ?',
     [id]
   )
   if (!beforeMaster) return { error: 'Master pelanggaran tidak ditemukan.' }
   await execute(
-    'UPDATE master_pelanggaran SET kategori=?, nama_pelanggaran=?, poin=?, deskripsi=? WHERE id=?',
-    [data.kategori, data.nama, data.poin, data.deskripsi || null, id]
+    'UPDATE master_pelanggaran SET kategori=?, nama_pelanggaran=?, deskripsi=? WHERE id=?',
+    [data.kategori, data.nama, data.deskripsi || null, id]
   )
   await logActivity({
     actor: actorFromSession(session),
@@ -105,15 +110,15 @@ export async function editMasterPelanggaran(id: number, data: {
         {
           kategori: data.kategori,
           nama_pelanggaran: data.nama,
-          poin: data.poin,
+
           deskripsi: data.deskripsi || null,
         },
-        ['kategori', 'nama_pelanggaran', 'poin', 'deskripsi']
+        ['kategori', 'nama_pelanggaran', 'deskripsi']
       ),
     },
   })
   
-  revalidatePath('/dashboard/keamanan')
+  revalidateDiscipline()
   return { success: true }
 }
 
@@ -165,20 +170,17 @@ export async function importMasterPelanggaranMassal(
   const cleanRows = rows.map((row, index) => {
     const kategori = cleanText(row.kategori).toUpperCase()
     const nama = cleanText(row.nama_pelanggaran || row.nama)
-    const poin = Number(row.poin)
     const deskripsi = cleanText(row.deskripsi)
     const urutanRaw = cleanText(row.urutan)
     const urutan = urutanRaw ? Number(urutanRaw) : 0
 
     if (!VALID_KATEGORI.has(kategori)) return { error: `Baris ${index + 2}: kategori harus RINGAN, SEDANG, atau BERAT.` }
     if (!nama) return { error: `Baris ${index + 2}: nama pelanggaran wajib diisi.` }
-    if (!Number.isFinite(poin) || poin < 0) return { error: `Baris ${index + 2}: poin harus berupa angka minimal 0.` }
     if (!Number.isFinite(urutan)) return { error: `Baris ${index + 2}: urutan harus berupa angka.` }
 
     return {
       kategori,
       nama,
-      poin: Math.round(poin),
       deskripsi: deskripsi || null,
       urutan: Math.round(urutan),
       key: cleanImportKey(kategori, nama),
@@ -207,14 +209,14 @@ export async function importMasterPelanggaranMassal(
       if (existingId) {
         return {
           mode: 'update' as const,
-          sql: 'UPDATE master_pelanggaran SET kategori=?, nama_pelanggaran=?, poin=?, deskripsi=?, urutan=? WHERE id=?',
-          params: [row.kategori, row.nama, row.poin, row.deskripsi, row.urutan, existingId],
+          sql: 'UPDATE master_pelanggaran SET kategori=?, nama_pelanggaran=?, deskripsi=?, urutan=? WHERE id=?',
+          params: [row.kategori, row.nama, row.deskripsi, row.urutan, existingId],
         }
       }
       return {
         mode: 'insert' as const,
-        sql: 'INSERT INTO master_pelanggaran (kategori, nama_pelanggaran, poin, deskripsi, urutan) VALUES (?, ?, ?, ?, ?)',
-        params: [row.kategori, row.nama, row.poin, row.deskripsi, row.urutan],
+        sql: 'INSERT INTO master_pelanggaran (kategori, nama_pelanggaran, poin, deskripsi, urutan) VALUES (?, ?, 0, ?, ?)',
+        params: [row.kategori, row.nama, row.deskripsi, row.urutan],
       }
     })
 
@@ -238,7 +240,7 @@ export async function importMasterPelanggaranMassal(
     })
 
     
-    revalidatePath('/dashboard/keamanan')
+    revalidateDiscipline()
     return { success: true, inserted, updated, skipped }
   } catch (error: any) {
     return { error: `Import gagal: ${error?.message || 'kesalahan tidak diketahui'}` }
@@ -247,6 +249,7 @@ export async function importMasterPelanggaranMassal(
 
 // ─── CARI SANTRI ──────────────────────────────────────────────────────────────
 export async function cariSantri(keyword: string) {
+  const access=await assertFeature('/dashboard/keamanan'); if('error' in access) throw new Error(access.error)
   return query<any>(
     `SELECT id, nama_lengkap, nis, asrama, kamar, nama_ayah, alamat, foto_url
      FROM santri
@@ -269,8 +272,10 @@ export async function simpanPelanggaran(data: {
   if ('error' in access) return access
   const session = access
 
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(data.tanggal)||!Number.isFinite(Date.parse(data.tanggal))||new Date(data.tanggal+'T00:00:00Z').toISOString().slice(0,10)!==data.tanggal)return {error:'Tanggal kejadian tidak valid.'}
+  const student=await queryOne<{id:string}>("SELECT id FROM santri WHERE id=? AND status_global='aktif'",[data.santriId]);if(!student)return {error:'Santri aktif tidak ditemukan.'}
   const master = await queryOne<any>(
-    'SELECT id, nama_pelanggaran, kategori, poin FROM master_pelanggaran WHERE id=?',
+    'SELECT id, nama_pelanggaran, kategori FROM master_pelanggaran WHERE id=?',
     [data.masterId]
   )
   if (!master) return { error: 'Jenis pelanggaran tidak ditemukan' }
@@ -283,7 +288,7 @@ export async function simpanPelanggaran(data: {
     `INSERT INTO pelanggaran (id, santri_id, master_id, jenis, deskripsi, tanggal, poin, foto_url, penindak_id)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [generateId(), data.santriId, data.masterId, master.kategori,
-     deskripsi, data.tanggal, master.poin, data.fotoUrl || null, session.id]
+     deskripsi, data.tanggal, 0, data.fotoUrl || null, session.id]
   )
 
   const actorSession = await getSession()
@@ -303,19 +308,21 @@ export async function simpanPelanggaran(data: {
     details: {
       jenis: master.kategori,
       nama_pelanggaran: master.nama_pelanggaran,
-      poin: master.poin,
+      jumlah_kejadian: 1,
       tanggal: data.tanggal,
     },
   })
 
-  revalidatePath('/dashboard/keamanan')
+  revalidateDiscipline()
   return { success: true }
 }
 
 export async function hapusPelanggaran(id: string): Promise<{ success: boolean } | { error: string }> {
   const access = await assertFeature('/dashboard/keamanan', 'delete')
   if ('error' in access) return access
-  const session = await getSession()
+  const session = access
+  if(id.startsWith('pengajian:')||id.startsWith('sesi:'))return {error:'Koreksi catatan ini melalui modul asalnya.'}
+  if(id.startsWith('umum:'))id=id.slice(5)
   const target = await queryOne<{
     id: string
     deskripsi: string | null
@@ -331,27 +338,8 @@ export async function hapusPelanggaran(id: string): Promise<{ success: boolean }
   )
   if (!target) return { error: 'Data pelanggaran tidak ditemukan.' }
 
-  // Cascade: hapus surat_pernyataan yang mencantumkan pelanggaran ini
-  // pelanggaran_ids disimpan sebagai JSON array — cari yang mengandung ID ini
-  const suratTerdampak = await query<{ id: string; pelanggaran_ids: string }>(
-    `SELECT id, pelanggaran_ids FROM surat_pernyataan
-     WHERE pelanggaran_ids LIKE ?`,
-    [`%"${id}"%`]
-  )
-  for (const surat of suratTerdampak) {
-    const ids: string[] = JSON.parse(surat.pelanggaran_ids || '[]')
-    const idsBarу = ids.filter(i => i !== id)
-    if (idsBarу.length === 0) {
-      // Tidak ada pelanggaran tersisa — hapus suratnya
-      await execute('DELETE FROM surat_pernyataan WHERE id=?', [surat.id])
-    } else {
-      // Masih ada pelanggaran lain — update array
-      await execute('UPDATE surat_pernyataan SET pelanggaran_ids=? WHERE id=?',
-        [JSON.stringify(idsBarу), surat.id])
-    }
-  }
-
-  await execute('DELETE FROM pelanggaran WHERE id=?', [id])
+  if (id.startsWith('pengajian:') || id.startsWith('sesi:')) return { error: 'Koreksi catatan ini melalui modul asalnya.' }
+  await execute("UPDATE pelanggaran SET status='cancelled',version=version+1,updated_by=?,updated_at=?,reason='Pembatalan oleh petugas keamanan' WHERE id=? AND status='active'",[session?.id??null,now(),id])
   await logActivity({
     actor: actorFromSession(session),
     module: 'keamanan',
@@ -361,14 +349,14 @@ export async function hapusPelanggaran(id: string): Promise<{ success: boolean }
     entityType: 'pelanggaran',
     entityId: id,
     entityLabel: target.nama_lengkap || id,
-    summary: `Menghapus pelanggaran milik ${target.nama_lengkap || id}`,
+    summary: `Membatalkan pelanggaran milik ${target.nama_lengkap || id}`,
     details: {
       deskripsi: target.deskripsi,
       jenis: target.jenis,
       poin: target.poin,
     },
   })
-  revalidatePath('/dashboard/keamanan')
+  revalidateDiscipline()
   revalidatePath('/dashboard/surat-santri')
   return { success: true }
 }
@@ -378,10 +366,11 @@ export async function hapusPelanggaran(id: string): Promise<{ success: boolean }
 export async function getDaftarPelanggar(params: {
   search?: string; asrama?: string; page?: number
 }) {
+  const access=await assertFeature('/dashboard/keamanan'); if('error' in access) throw new Error(access.error)
   const { search, asrama, page = 1 } = params
   const offset = (page - 1) * PAGE_SIZE
 
-  const clauses = ["s.status_global IN ('aktif','keluar')"]
+  const clauses = ["s.status_global IN ('aktif','keluar')", "p.status='active'"]
   const baseParams: any[] = []
   if (search)  { clauses.push('(s.nama_lengkap LIKE ? OR s.nis LIKE ?)'); baseParams.push(`%${search}%`, `%${search}%`) }
   if (asrama)  { clauses.push('s.asrama = ?'); baseParams.push(asrama) }
@@ -390,7 +379,7 @@ export async function getDaftarPelanggar(params: {
 
   const countRow = await queryOne<{ total: number }>(
     `SELECT COUNT(DISTINCT p.santri_id) AS total
-     FROM pelanggaran p JOIN santri s ON s.id = p.santri_id
+     FROM discipline_incidents p JOIN santri s ON s.id = p.santri_id
      WHERE ${where}`,
     baseParams
   )
@@ -398,18 +387,18 @@ export async function getDaftarPelanggar(params: {
 
   const rows = await query<any>(
     `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
-            COUNT(p.id)    AS jumlah_pelanggaran,
-            SUM(p.poin)    AS total_poin,
+            SUM(p.jumlah_kejadian) AS jumlah_pelanggaran,
+            SUM(p.perlu_verifikasi) AS perlu_verifikasi,
             MAX(p.tanggal) AS terakhir,
             -- Level SP terakhir (ringan: subquery kecil di tabel kecil)
             (SELECT sp.level FROM surat_perjanjian sp
              WHERE sp.santri_id = s.id
              ORDER BY sp.created_at DESC LIMIT 1) AS sp_terakhir
-     FROM pelanggaran p
+     FROM discipline_incidents p
      JOIN santri s ON s.id = p.santri_id
      WHERE ${where}
      GROUP BY p.santri_id
-     ORDER BY total_poin DESC, terakhir DESC
+     ORDER BY jumlah_pelanggaran DESC, terakhir DESC,s.id
      LIMIT ? OFFSET ?`,
     [...baseParams, PAGE_SIZE, offset]
   )
@@ -426,16 +415,16 @@ export async function getOpsiExportPelanggaran() {
   const [asramaRows, santriRows] = await Promise.all([
     query<{ asrama: string }>(
       `SELECT DISTINCT s.asrama
-       FROM pelanggaran p
+       FROM discipline_incidents p
        JOIN santri s ON s.id = p.santri_id
-       WHERE s.asrama IS NOT NULL AND s.asrama <> ''
+       WHERE p.status='active' AND s.asrama IS NOT NULL AND s.asrama <> ''
        ORDER BY s.asrama`
     ),
     query<{ id: string; nama_lengkap: string; nis: string | null; asrama: string | null; kamar: string | null }>(
       `SELECT DISTINCT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar
-       FROM pelanggaran p
+       FROM discipline_incidents p
        JOIN santri s ON s.id = p.santri_id
-       WHERE s.status_global IN ('aktif','keluar')
+       WHERE p.status='active' AND s.status_global IN ('aktif','keluar')
        ORDER BY s.nama_lengkap`
     ),
   ])
@@ -450,7 +439,7 @@ export async function getDataExportPelanggaran(filter: ExportPelanggaranFilter =
   const access = await assertFeature('/dashboard/keamanan')
   if ('error' in access) return access
 
-  const clauses = ["s.status_global IN ('aktif','keluar')"]
+  const clauses = ["s.status_global IN ('aktif','keluar')", "p.status='active'"]
   const params: any[] = []
 
   const santriIds = Array.isArray(filter.santriIds)
@@ -461,28 +450,28 @@ export async function getDataExportPelanggaran(filter: ExportPelanggaranFilter =
     : []
 
   if (santriIds.length > 0) {
-    clauses.push(`s.id IN (${santriIds.map(() => '?').join(',')})`)
-    params.push(...santriIds)
+    clauses.push('s.id IN (SELECT value FROM json_each(?))')
+    params.push(JSON.stringify(santriIds))
   }
   if (asramas.length > 0) {
-    clauses.push(`s.asrama IN (${asramas.map(() => '?').join(',')})`)
-    params.push(...asramas)
+    clauses.push('s.asrama IN (SELECT value FROM json_each(?))')
+    params.push(JSON.stringify(asramas))
   }
   if (filter.tanggalMulai) {
-    clauses.push('p.tanggal >= ?')
+    clauses.push('substr(p.tanggal,1,10) >= ?')
     params.push(filter.tanggalMulai)
   }
   if (filter.tanggalSelesai) {
-    clauses.push('p.tanggal <= ?')
+    clauses.push('substr(p.tanggal,1,10) <= ?')
     params.push(filter.tanggalSelesai)
   }
 
   const rows = await query<any>(
-    `SELECT p.id, p.tanggal, p.created_at, p.jenis, p.deskripsi, p.poin, p.foto_url,
+    `SELECT p.id, p.tanggal, p.created_at, p.jenis, p.deskripsi, p.jumlah_kejadian,p.perlu_verifikasi,p.source,p.source_id,p.sesi, p.foto_url,
             s.nama_lengkap, s.nis, s.asrama, s.kamar,
             mp.nama_pelanggaran,
             u.full_name AS penindak_nama
-     FROM pelanggaran p
+     FROM discipline_incidents p
      JOIN santri s ON s.id = p.santri_id
      LEFT JOIN master_pelanggaran mp ON mp.id = p.master_id
      LEFT JOIN users u ON u.id = p.penindak_id
@@ -495,6 +484,7 @@ export async function getDataExportPelanggaran(filter: ExportPelanggaranFilter =
 }
 
 export async function getDetailSantri(santriId: string) {
+  const access=await assertFeature('/dashboard/keamanan'); if('error' in access) throw new Error(access.error)
   const [profil, pelanggaran, suratPernyataan, suratPerjanjian] = await Promise.all([
     queryOne<any>(
       `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
@@ -507,13 +497,13 @@ export async function getDetailSantri(santriId: string) {
       [santriId]
     ),
     query<any>(
-      `SELECT p.id, p.tanggal, p.jenis, p.deskripsi, p.poin, p.foto_url,
+      `SELECT p.id, p.tanggal, p.jenis, p.deskripsi, p.jumlah_kejadian,p.perlu_verifikasi,p.source,p.source_id,p.sesi, p.foto_url,
               u.full_name AS penindak_nama,
               mp.nama_pelanggaran
-       FROM pelanggaran p
+       FROM discipline_incidents p
        LEFT JOIN users u ON u.id = p.penindak_id
        LEFT JOIN master_pelanggaran mp ON mp.id = p.master_id
-       WHERE p.santri_id = ?
+       WHERE p.santri_id = ? AND p.status='active'
        ORDER BY p.tanggal DESC, p.created_at DESC`,
       [santriId]
     ),
@@ -549,12 +539,9 @@ export async function simpanSuratPernyataan(
   const access = await assertFeature('/dashboard/keamanan', 'create')
   if ('error' in access) return access
   const session = access
-  const id = generateId()
-  await execute(
-    `INSERT INTO surat_pernyataan (id, santri_id, pelanggaran_ids, tanggal, dibuat_oleh, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, santriId, JSON.stringify(pelanggaranIds), tanggal, session.id, now()]
-  )
+  let id: string
+  try { id=await saveIncidentLetter(santriId,pelanggaranIds,tanggal,session.id) }
+  catch { return { error: 'Pilihan pelanggaran tidak valid atau sudah berubah. Muat ulang sebelum menyimpan.' } }
   const actorSession = await getSession()
   const santri = await queryOne<{ nama_lengkap: string | null }>(
     'SELECT nama_lengkap FROM santri WHERE id = ?',
@@ -575,7 +562,7 @@ export async function simpanSuratPernyataan(
       jumlah_pelanggaran: pelanggaranIds.length,
     },
   })
-  revalidatePath('/dashboard/keamanan')
+  revalidateDiscipline()
   return { success: true, id }
 }
 
@@ -616,7 +603,7 @@ export async function simpanSuratPerjanjian(
       catatan: catatan || null,
     },
   })
-  revalidatePath('/dashboard/keamanan')
+  revalidateDiscipline()
   return { success: true, id }
 }
 
@@ -632,16 +619,7 @@ export async function getDataSuratPernyataan(santriId: string, pelanggaranIds: s
        WHERE s.id = ?`,
       [santriId]
     ),
-    // IN query — max ids terbatas, aman
-    pelanggaranIds.length > 0
-      ? query<any>(
-          `SELECT id, tanggal, deskripsi, jenis, poin
-           FROM pelanggaran
-           WHERE id IN (${pelanggaranIds.map(() => '?').join(',')})
-           ORDER BY tanggal ASC`,
-          pelanggaranIds
-        )
-      : Promise.resolve([]),
+    pelanggaranIds.length ? resolveLetterIncidents(santriId,pelanggaranIds) : Promise.resolve([]),
   ])
   return { profil, pelanggaran }
 }

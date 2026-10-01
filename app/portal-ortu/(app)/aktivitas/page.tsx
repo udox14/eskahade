@@ -1,5 +1,5 @@
 import { requirePortalSessionStrict } from '@/lib/portal/session'
-import { getPelanggaranAnak, getRekapAbsensiAnak } from '@/lib/portal/data'
+import { getPelanggaranAnak, getTotalPelanggaranAnak, getRekapAbsensiAnak } from '@/lib/portal/data'
 import { toWibDateInputValue } from '@/lib/date/wib'
 import { AktivitasClient } from './_aktivitas-client'
 
@@ -31,10 +31,11 @@ export default async function AktivitasPage({
   d.setUTCDate(d.getUTCDate() - 6)
   const weekStart = d.toISOString().slice(0, 10)
 
-  const [rekapBulan, rekap7Hari, pelanggaran] = await Promise.all([
+  const [rekapBulan, rekap7Hari, pelanggaran, disiplin] = await Promise.all([
     getRekapAbsensiAnak(session.santri_id, start, end),
     getRekapAbsensiAnak(session.santri_id, weekStart, todayStr),
     getPelanggaranAnak(session.santri_id),
+    getTotalPelanggaranAnak(session.santri_id),
   ])
 
   return (
@@ -47,6 +48,7 @@ export default async function AktivitasPage({
         rekapBulan={rekapBulan}
         rekap7Hari={rekap7Hari}
         pelanggaran={pelanggaran}
+        disiplin={disiplin}
         currentYear={tahun}
         currentMonth={bulan}
         todayStr={todayStr}

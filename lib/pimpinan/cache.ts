@@ -61,8 +61,8 @@ export const getCachedAsramaMonitoring = unstable_cache(
 
 export const getCachedDisiplinMonitoring = unstable_cache(
   async (scope: string, month?: string) => getDisiplinMonitoring({ month }),
-  ['pimpinan-disiplin'],
-  { revalidate: MONITORING_CACHE_TTL }
+  ['pimpinan-disiplin-kejadian'],
+  { revalidate: MONITORING_CACHE_TTL, tags:['discipline'] }
 )
 
 export const getCachedAkademikMonitoring = unstable_cache(

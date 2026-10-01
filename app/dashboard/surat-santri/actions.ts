@@ -4,20 +4,22 @@ import { query, queryOne, execute, generateId, now } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { assertFeature } from '@/lib/auth/feature'
 import { revalidatePath } from 'next/cache'
+import { getStudentIncidents, resolveLetterIncidents, saveIncidentLetter } from '@/lib/discipline/data'
+import { revalidateDiscipline } from '@/lib/discipline/revalidate'
 
 const PAGE_SIZE = 30
 
 // ─── CARI SANTRI ─────────────────────────────────────────────────────────────
 export async function cariSantriSurat(keyword: string) {
+  const access=await assertFeature('/dashboard/surat-santri');if('error' in access) throw new Error(access.error)
   return query<any>(
     `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.foto_url,
             s.nama_ayah, s.alamat,
             k.nama_kelas,
-            COUNT(p.id) AS jumlah_pelanggaran
+            (SELECT COALESCE(SUM(d.jumlah_kejadian),0) FROM discipline_incidents d WHERE d.santri_id=s.id AND d.status='active') AS jumlah_pelanggaran
      FROM santri s
      LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
      LEFT JOIN kelas k ON k.id = rp.kelas_id
-     LEFT JOIN pelanggaran p ON p.santri_id = s.id
      WHERE s.status_global = 'aktif'
        AND (s.nama_lengkap LIKE ? OR s.nis = ?)
      GROUP BY s.id
@@ -28,13 +30,8 @@ export async function cariSantriSurat(keyword: string) {
 
 // ─── AMBIL PELANGGARAN SANTRI (untuk pilih di form pernyataan) ───────────────
 export async function getPelanggaranSantri(santriId: string) {
-  return query<any>(
-    `SELECT p.id, p.tanggal, p.deskripsi, p.jenis, p.poin
-     FROM pelanggaran p
-     WHERE p.santri_id = ?
-     ORDER BY p.tanggal DESC`,
-    [santriId]
-  )
+  const access=await assertFeature('/dashboard/surat-santri');if('error' in access) throw new Error(access.error)
+  return (await getStudentIncidents(santriId)).filter(r=>!r.perlu_verifikasi)
 }
 
 // ─── SUGGEST LEVEL SP ────────────────────────────────────────────────────────
@@ -59,12 +56,10 @@ export async function simpanSuratPernyataan(
   if ('error' in access) return access
   const session = access
   if (pelanggaranIds.length === 0) return { error: 'Pilih minimal 1 pelanggaran' }
-  const id = generateId()
-  await execute(
-    `INSERT INTO surat_pernyataan (id, santri_id, pelanggaran_ids, tanggal, dibuat_oleh, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, santriId, JSON.stringify(pelanggaranIds), tanggal, session.id, now()]
-  )
+  let id: string
+  try { id=await saveIncidentLetter(santriId,pelanggaranIds,tanggal,session.id) }
+  catch { return { error: 'Pilihan pelanggaran tidak valid atau sudah berubah. Muat ulang sebelum menyimpan.' } }
+  revalidateDiscipline(santriId)
   revalidatePath('/dashboard/surat-santri')
   return { success: true, id }
 }
@@ -162,9 +157,10 @@ export async function getDaftarSurat(params: {
 // ─── DATA DETAIL UNTUK PREVIEW SURAT ─────────────────────────────────────────
 // Satu fungsi untuk kedua jenis surat — hemat duplikasi
 export async function getDataPreviewSurat(suratId: string, tipe: 'pernyataan' | 'perjanjian') {
+  const access=await assertFeature('/dashboard/surat-santri');if('error' in access) throw new Error(access.error)
   if (tipe === 'pernyataan') {
     const surat = await queryOne<any>(
-      `SELECT sp.id, sp.tanggal, sp.pelanggaran_ids,
+      `SELECT sp.id, sp.santri_id, sp.tanggal, sp.pelanggaran_ids, sp.incident_snapshot,
               s.nama_lengkap, s.asrama, s.kamar, s.nama_ayah, s.alamat,
               k.nama_kelas
        FROM surat_pernyataan sp
@@ -176,13 +172,7 @@ export async function getDataPreviewSurat(suratId: string, tipe: 'pernyataan' | 
     )
     if (!surat) return null
     const ids: string[] = JSON.parse(surat.pelanggaran_ids || '[]')
-    const pelanggaran = ids.length
-      ? await query<any>(
-          `SELECT id, tanggal, deskripsi, jenis, poin FROM pelanggaran
-           WHERE id IN (${ids.map(() => '?').join(',')}) ORDER BY tanggal ASC`,
-          ids
-        )
-      : []
+    const pelanggaran = surat.incident_snapshot ? JSON.parse(surat.incident_snapshot) : ids.length ? await resolveLetterIncidents(surat.santri_id,ids,false) : []
     return { tipe: 'pernyataan' as const, surat, pelanggaran }
   } else {
     const surat = await queryOne<any>(

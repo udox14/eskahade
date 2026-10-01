@@ -21,7 +21,7 @@ type Stmt = { sql: string; params?: unknown[] }
 const DATA_TABLES = [
   // Photo retention metadata survives reset (FK becomes NULL), so R2 cleanup
   // still tracks every object, including interrupted uploads.
-  'pengajian_violation_revisions', 'pengajian_violations',
+  'pelanggaran_revisions', 'pelanggaran_session_links', 'pelanggaran_sessions', 'pengajian_violation_revisions', 'pengajian_violations',
   'absensi_harian', 'absensi_guru', 'absen_asrama', 'absen_sakit',
   'nilai_akademik', 'nilai_akhlak', 'ranking',
   'pelanggaran', 'perizinan', 'hasil_tes_klasifikasi',
@@ -74,7 +74,7 @@ function seedStatements(): Stmt[] {
     VALUES ('demo-spp-1', 'demo-s-1', 1, 2025, 70000, 'Demo'),
            ('demo-spp-2', 'demo-s-2', 1, 2025, 70000, 'Demo')` })
   s.push({ sql: `INSERT INTO pelanggaran (id, santri_id, jenis, deskripsi, poin)
-    VALUES ('demo-plg-1', 'demo-s-3', 'RINGAN', 'Terlambat (data demo)', 5)` })
+    VALUES ('demo-plg-1', 'demo-s-3', 'RINGAN', 'Terlambat (data demo)', 0)` })
 
   return s
 }

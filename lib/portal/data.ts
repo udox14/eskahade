@@ -225,21 +225,16 @@ export async function getRekapAbsensiAnak(
 // ── Pelanggaran ──────────────────────────────────────────────
 
 export type PelanggaranAnak = {
-  id: string
-  tanggal: string
-  jenis: string
-  deskripsi: string | null
-  poin: number
+  id:string; tanggal:string|null; jenis:string; deskripsi:string|null
+  source:'umum'|'pengajian'; sesi:string|null; jumlah_kejadian:number; perlu_verifikasi:number
 }
-
-export async function getPelanggaranAnak(santriId: string): Promise<PelanggaranAnak[]> {
-  return query<PelanggaranAnak>(`
-    SELECT id, tanggal, jenis, deskripsi, COALESCE(poin, 0) AS poin
-    FROM pelanggaran
-    WHERE santri_id = ?
-    ORDER BY tanggal DESC, created_at DESC
-    LIMIT 200
-  `, [santriId])
+export async function getPelanggaranAnak(santriId:string,page=1):Promise<PelanggaranAnak[]> {
+  if(!Number.isSafeInteger(page)||page<1||page>100000)throw new Error('Halaman tidak valid.')
+  return query<PelanggaranAnak>(`SELECT id,tanggal,jenis,deskripsi,source,sesi,jumlah_kejadian,perlu_verifikasi FROM discipline_incidents
+    WHERE santri_id=? AND status='active' ORDER BY COALESCE(tanggal,created_at) DESC,id LIMIT 200 OFFSET ?`,[santriId,(page-1)*200])
+}
+export async function getTotalPelanggaranAnak(santriId:string) {
+  return (await queryOne<{jumlah:number;pending:number;catatan:number}>(`SELECT COALESCE(SUM(jumlah_kejadian),0) jumlah,COALESCE(SUM(perlu_verifikasi),0) pending,COUNT(*) catatan FROM discipline_incidents WHERE santri_id=? AND status='active'`,[santriId]))??{jumlah:0,pending:0,catatan:0}
 }
 
 // ── Pengajuan pembayaran portal ──────────────────────────────

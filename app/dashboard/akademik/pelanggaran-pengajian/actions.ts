@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { revalidateDiscipline } from '@/lib/discipline/revalidate'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { isDemoRequest } from '@/lib/auth/demo-context'
 import { batch, getDB, query, queryOne, now } from '@/lib/db'
@@ -41,6 +42,7 @@ function pageNumber(page: number) { if (!Number.isSafeInteger(page) || page < 1 
 async function activity(session: SessionUser, action: string, id: string) {
  await logActivity({ actor:actorFromSession(session),module:'pelanggaran_pengajian',action,fiturHref:HREF,logKind:action==='create'?'create':'update',entityType:'pengajian_violation',entityId:id,summary:`${action==='create'?'Mencatat':action==='cancel'?'Membatalkan':'Memperbarui'} pelanggaran pengajian`,details:{id} })
  revalidatePath(HREF)
+ revalidateDiscipline()
 }
 export async function getCapabilities(): Promise<Result<Capabilities>> {
  return result(async()=>{

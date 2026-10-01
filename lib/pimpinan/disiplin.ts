@@ -7,23 +7,23 @@ export type DisiplinMonitoring = {
     asrama: string
     total: number
     santri: number
-    poin: number
+    pending: number
   }>
-  perJenis: Array<{ jenis: string; total: number; poin: number }>
+  perJenis: Array<{ jenis: string; total: number; pending: number }>
   suratPerjanjian: Array<{ level: string; total: number }>
-  total: { total: number; santri: number; poin: number }
+  total: { total: number; santri: number; pending: number }
 }
 
 async function getPerAsrama(period: MonthPeriod): Promise<DisiplinMonitoring['perAsrama']> {
   try {
-    const rows = await query<{ asrama: string; total: number; santri: number; poin: number }>(
+    const rows = await query<{ asrama: string; total: number; santri: number; pending: number }>(
       `SELECT COALESCE(s.asrama, 'Tanpa Asrama') AS asrama,
-              COUNT(p.id) AS total,
+              SUM(p.jumlah_kejadian) AS total,
               COUNT(DISTINCT p.santri_id) AS santri,
-              COALESCE(SUM(p.poin), 0) AS poin
-       FROM pelanggaran p
+              0 AS pending
+       FROM discipline_incidents p
        JOIN santri s ON s.id = p.santri_id
-       WHERE p.tanggal BETWEEN ? AND ?
+       WHERE p.status='active' AND substr(p.tanggal,1,10) BETWEEN substr(?,1,10) AND substr(?,1,10)
        GROUP BY COALESCE(s.asrama, 'Tanpa Asrama')
        ORDER BY total DESC`,
       [period.from, period.to]
@@ -32,22 +32,22 @@ async function getPerAsrama(period: MonthPeriod): Promise<DisiplinMonitoring['pe
       asrama: row.asrama,
       total: safeNumber(row.total),
       santri: safeNumber(row.santri),
-      poin: safeNumber(row.poin),
+      pending: safeNumber(row.pending),
     }))
-  } catch {
-    return []
+  } catch (error) {
+    throw error
   }
 }
 
 async function getPerJenis(period: MonthPeriod): Promise<DisiplinMonitoring['perJenis']> {
   try {
-    const rows = await query<{ jenis: string; total: number; poin: number }>(
+    const rows = await query<{ jenis: string; total: number; pending: number }>(
       `SELECT COALESCE(NULLIF(TRIM(mp.nama_pelanggaran), ''), p.jenis) AS jenis,
-              COUNT(*) AS total,
-              COALESCE(SUM(p.poin), 0) AS poin
-       FROM pelanggaran p
+              SUM(p.jumlah_kejadian) AS total,
+              0 AS pending
+       FROM discipline_incidents p
        LEFT JOIN master_pelanggaran mp ON mp.id = p.master_id
-       WHERE p.tanggal BETWEEN ? AND ?
+       WHERE p.status='active' AND substr(p.tanggal,1,10) BETWEEN substr(?,1,10) AND substr(?,1,10)
        GROUP BY COALESCE(NULLIF(TRIM(mp.nama_pelanggaran), ''), p.jenis)
        ORDER BY total DESC
        LIMIT 15`,
@@ -56,10 +56,10 @@ async function getPerJenis(period: MonthPeriod): Promise<DisiplinMonitoring['per
     return rows.map(row => ({
       jenis: row.jenis || 'Lainnya',
       total: safeNumber(row.total),
-      poin: safeNumber(row.poin),
+      pending: safeNumber(row.pending),
     }))
-  } catch {
-    return []
+  } catch (error) {
+    throw error
   }
 }
 
@@ -72,8 +72,8 @@ async function getSuratPerjanjian(): Promise<Array<{ level: string; total: numbe
        ORDER BY level`
     )
     return rows.map(row => ({ level: row.level, total: safeNumber(row.total) }))
-  } catch {
-    return []
+  } catch (error) {
+    throw error
   }
 }
 
@@ -95,7 +95,12 @@ export async function getDisiplinMonitoring(
     total: {
       total: perAsrama.reduce((sum, row) => sum + row.total, 0),
       santri: perAsrama.reduce((sum, row) => sum + row.santri, 0),
-      poin: perAsrama.reduce((sum, row) => sum + row.poin, 0),
+      pending: await getPending(),
     },
   }
+}
+
+async function getPending() {
+  const row=await query<{n:number}>("SELECT COALESCE(SUM(perlu_verifikasi),0) n FROM discipline_incidents WHERE status='active'")
+  return row[0]?.n??0
 }

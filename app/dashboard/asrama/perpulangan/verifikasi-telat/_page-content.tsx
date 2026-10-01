@@ -33,7 +33,7 @@ function BarisTelat({
   const [busy, setBusy] = useState(false)
 
   const handle = async (v: VonisType) => {
-    if (v === 'TELAT_MURNI' && !await confirm(`Vonis TELAT kepada ${item.nama}? (+25 poin)`)) return
+    if (v === 'TELAT_MURNI' && !await confirm(`Vonis TELAT kepada ${item.nama}? (1 kejadian pelanggaran)`)) return
     setBusy(true)
     await onVonis(item.log_id, item.santri_id, v)
     setBusy(false)

@@ -4,6 +4,9 @@ import { execute, generateId, now, query } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
+import { assertFeature } from '@/lib/auth/feature'
+import { saveLateVerdict } from '@/lib/discipline/late'
+import { revalidateDiscipline } from '@/lib/discipline/revalidate'
 import { formatDistance } from 'date-fns'
 import { id } from 'date-fns/locale'
 
@@ -54,26 +57,11 @@ export async function simpanVonisTelatPerpulangan(
   santriId: string,
   vonis: 'TELAT_MURNI' | 'SAKIT' | 'IZIN_UZUR' | 'MANGKIR'
 ): Promise<{ success: boolean; message?: string } | { error: string }> {
-  const session = await getSession()
-  if (!session) return { error: 'Unauthorized' }
-
-  if (vonis === 'MANGKIR') {
-    return { success: true, message: 'Ditandai mangkir. Data tetap muncul di antrian.' }
-  }
-
-  if (vonis === 'TELAT_MURNI') {
-    await execute(`
-      INSERT INTO pelanggaran (id, santri_id, tanggal, jenis, deskripsi, poin, penindak_id)
-      VALUES (?, ?, ?, 'SEDANG', 'Terlambat kembali ke pondok setelah perpulangan libur panjang.', 25, ?)
-    `, [generateId(), santriId, now(), session.id])
-  }
-
-  const newStatus = vonis === 'TELAT_MURNI' ? 'VONIS' : 'SUDAH'
-  await execute(
-    `UPDATE perpulangan_log SET status_datang = ?, tgl_datang = ?, updated_by = ? WHERE id = ?`,
-    [newStatus, now(), session.id, logId]
-  )
-
+  const access=await assertFeature('/dashboard/asrama/perpulangan/verifikasi-telat','update');if('error' in access)return access
+  const session=access
+  try { await saveLateVerdict({source:'perpulangan',id:logId,santriId,vonis,actor:session.id}) }
+  catch { return {error:'Data sudah diproses, tidak sesuai santri, atau gagal disimpan. Muat ulang antrean.'} }
+  if(vonis==='MANGKIR')return {success:true,message:'Ditandai mangkir. Data tetap muncul di antrean.'}
   await logActivity({
     actor: actorFromSession(session),
     module: 'asrama_perpulangan_verifikasi_telat',
@@ -90,6 +78,6 @@ export async function simpanVonisTelatPerpulangan(
   revalidatePath('/dashboard/asrama/perpulangan')
   revalidatePath('/dashboard/asrama/perpulangan/monitoring')
   revalidatePath('/dashboard/asrama/perpulangan/verifikasi-telat')
-  revalidatePath('/dashboard/keamanan')
+  revalidateDiscipline(santriId)
   return { success: true }
 }

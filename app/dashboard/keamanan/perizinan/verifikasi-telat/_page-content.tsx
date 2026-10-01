@@ -35,7 +35,7 @@ function BarisTelat({ item, no, onVonis }: {
   const isPerpulangan   = item.sumber === 'perpulangan'
 
   const handle = async (v: VonisType) => {
-    if (v === 'TELAT_MURNI' && !await confirm(`Vonis TELAT kepada ${item.nama}? (+25 poin)`)) return
+    if (v === 'TELAT_MURNI' && !await confirm(`Vonis TELAT kepada ${item.nama}? (1 kejadian pelanggaran)`)) return
     setBusy(true)
     await onVonis(item.izin_id, item.santri_id, v, item.sumber)
     setBusy(false)

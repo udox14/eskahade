@@ -1,5 +1,7 @@
 'use client'
 
+import { incidentLabel, sessionLabel } from '@/lib/discipline/format'
+
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import {
@@ -18,6 +20,7 @@ interface AktivitasClientProps {
   rekapBulan: RekapAbsensiAnak
   rekap7Hari: RekapAbsensiAnak
   pelanggaran: PelanggaranAnak[]
+  disiplin: {jumlah:number;pending:number;catatan:number}
   currentYear: number
   currentMonth: number
   todayStr: string
@@ -105,6 +108,7 @@ export function AktivitasClient({
   rekapBulan,
   rekap7Hari,
   pelanggaran,
+  disiplin,
   currentYear,
   currentMonth,
   todayStr,
@@ -209,7 +213,7 @@ export function AktivitasClient({
   })
 
   // Agregasi Pelanggaran & Poin
-  const totalPoin = pelanggaran.reduce((sum, p) => sum + p.poin, 0)
+  const totalKejadian = disiplin.jumlah
   const persen7Hari =
     rekap7Hari.totalSesi > 0 ? Math.round((rekap7Hari.hadir / rekap7Hari.totalSesi) * 100) : null
   const persenBulan =
@@ -260,9 +264,9 @@ export function AktivitasClient({
         >
           <ShieldCheck className="w-4 h-4 text-slate-500 dark:text-slate-400" />
           <span>Pelanggaran</span>
-          {totalPoin > 0 && (
+          {disiplin.jumlah > 0 && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300 whitespace-nowrap shrink-0">
-              {totalPoin}
+              {disiplin.jumlah}
             </span>
           )}
         </button>
@@ -609,7 +613,7 @@ export function AktivitasClient({
       {activeTab === 'PELANGGARAN' && (
         <section className="space-y-4">
           {/* KARTU STATUS KEDISIPLINAN (HERO BANNER) */}
-          {totalPoin === 0 ? (
+          {disiplin.catatan === 0 ? (
             <div className="rounded-[22px] bg-[#064e3b] p-5 text-white shadow-[0_8px_24px_rgba(6,78,59,0.16)] flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-[#bef264] shrink-0 border border-white/10">
                 <ShieldCheck className="w-6 h-6 text-[#bef264]" />
@@ -622,19 +626,19 @@ export function AktivitasClient({
             <div className="rounded-[22px] bg-red-950 p-5 text-white shadow-xs space-y-2 border border-red-900/60">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-red-300">
-                  Total Poin Pelanggaran
+                  Jumlah Kejadian
                 </span>
                 <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300">
                   <AlertTriangle className="w-3 h-3 text-red-300" />
                   <span>Perlu Perhatian</span>
                 </span>
               </div>
-              <div className="flex items-baseline justify-between pt-1">
+              <div className="flex flex-wrap items-baseline gap-2 justify-between pt-1">
                 <p className="text-3xl font-black font-mono text-white">
-                  {totalPoin} Poin
+                  {totalKejadian} kejadian
                 </p>
                 <span className="text-xs text-red-200/80">
-                  {pelanggaran.length} catatan kedisiplinan
+                  {disiplin.pending>0?`${disiplin.pending} catatan perlu verifikasi`:`${disiplin.catatan} catatan kedisiplinan`}
                 </span>
               </div>
             </div>
@@ -644,9 +648,9 @@ export function AktivitasClient({
           {pelanggaran.length > 0 && (
             <div className="space-y-2 pt-1">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Riwayat Catatan Kedisiplinan
+                Riwayat Catatan Kedisiplinan (200 terbaru)
               </h3>
-
+              <a href="/portal-ortu/pelanggaran" className="text-xs underline">Lihat seluruh riwayat</a>
               <div className="space-y-2">
                 {pelanggaran.map(item => {
                   const jenisKey = String(item.jenis).toUpperCase()
@@ -664,7 +668,7 @@ export function AktivitasClient({
                     >
                       <div className="flex items-center justify-between">
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap shrink-0 ${jenisBadgeCls}`}>
-                          {item.jenis}
+                          {incidentLabel(item.jenis)}
                         </span>
                         <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                           {formatTanggalId(item.tanggal)}
@@ -676,9 +680,9 @@ export function AktivitasClient({
                         </p>
                       )}
                       <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-xs">
-                        <span className="text-[11px] text-slate-400 dark:text-slate-500">Bagian Keamanan</span>
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500">{item.source==='pengajian'?'Pengajian':'Umum'}{item.sesi&&` · ${sessionLabel(item.sesi,item.jenis,item.source)}`}</span>
                         <span className="font-mono font-bold text-red-600 dark:text-red-400">
-                          +{item.poin} Poin
+                          {item.perlu_verifikasi?'Perlu verifikasi':'1 kejadian'}
                         </span>
                       </div>
                     </div>

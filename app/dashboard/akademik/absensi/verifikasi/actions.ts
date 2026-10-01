@@ -4,6 +4,8 @@ import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
 import { getSession, hasRole } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
+import { sessionStatement, sessionLinkStatement } from '@/lib/discipline/data'
+import { revalidateDiscipline } from '@/lib/discipline/revalidate'
 import { getCachedMarhalahList } from '@/lib/cache/master'
 import { assertFeature } from '@/lib/auth/feature'
 import { getAbsensiWeek } from '@/lib/absensi/pemanggilan'
@@ -191,7 +193,6 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[], tanggalRe
 
     if (vonis === 'ALFA_MURNI') {
       const totalSesi  = items.length
-      const totalPoin  = totalSesi * 10
       const detailString = items
         .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime())
         .map(i => {
@@ -210,10 +211,12 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[], tanggalRe
         tanggal:    now(),
         jenis:      'ALFA_PENGAJIAN',
         deskripsi:  `Akumulasi Alfa Pengajian (${totalSesi} Sesi).\nDetail: ${detailString}`,
-        poin:       totalPoin,
+        poin:       0,
         penindak_id: session?.id ?? null,
       })
 
+      for (const item of items) statements.push(sessionStatement({parentId:violationId,santriId,source:'pengajian',tanggal:item.tanggal,sesi:item.sesi,ref:item.absen_id,actor:session.id,reason:'Vonis alfa murni'}))
+      for (const item of items) statements.push(sessionLinkStatement(violationId,'pengajian',santriId,item.tanggal,item.sesi))
       for (const item of items) statements.push({
         sql: `UPDATE absensi_harian SET ${getVerifColumn(item.sesi)} = 'OK' WHERE id = ?`,
         params: [item.absen_id],
@@ -240,7 +243,7 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[], tanggalRe
     })
   }
   try {
-    await batch([...checks, ...statements])
+    await batch([...checks,...statements.filter(s=>s.sql.includes('INSERT OR IGNORE INTO pelanggaran (')),...statements.filter(s=>!s.sql.includes('INSERT OR IGNORE INTO pelanggaran ('))])
   } catch (error) {
     if (error instanceof Error && /malformed JSON|absensi_stale/i.test(error.message)) {
       return { error: 'Data absensi sudah berubah, tidak sesuai santri, atau periode sudah final. Muat ulang antrean.', code: 'STALE' }
@@ -277,7 +280,7 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[], tanggalRe
   })
 
   revalidatePath('/dashboard/akademik/absensi/verifikasi')
-  revalidatePath('/dashboard/keamanan')
+  revalidateDiscipline()
   revalidatePath('/dashboard/akademik/absensi/cetak')
   return { success: true, count: daftarVonis.length }
 }
