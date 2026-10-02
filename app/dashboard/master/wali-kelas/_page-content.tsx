@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { getJadwalFilterOptions, getKelasJadwalByMarhalah, importGuruMassal, tambahGuruManual, hapusGuru, hapusGuruMassal, simpanJadwalBatch, getTahunAjaranList, copyGuruJadwalFromTahunAjaran, editGuruManual, getGuruSyncStatus, linkGuruToUser, autoSyncGuruAccounts } from './actions'
 import { UserCheck, Save, Loader2, School, Search, Upload, Download, List, Plus, Trash2, CheckSquare, Square, Printer, Filter, CalendarDays, UsersRound, Settings2, X, Copy, Link2, Unlink, RefreshCw, Check, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
@@ -78,6 +78,20 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Terjadi kesalahan saat menghubungi server.'
 }
 
+async function withLoadTimeout<T>(request: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      request,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Waktu pemuatan data habis.')), 30000)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export default function ManajemenGuruPage() {
   const confirm = useConfirm()
   const [tab, setTab] = useState<'JADWAL' | 'MASTER'>('JADWAL')
@@ -86,7 +100,7 @@ export default function ManajemenGuruPage() {
   const [localKelasList, setLocalKelasList] = useState<any[]>([])
   const [marhalahList, setMarhalahList] = useState<any[]>([])
   const [waliUserList, setWaliUserList] = useState<any[]>([])
-  const [selectedMarhalah, setSelectedMarhalah] = useState('')
+  const [selectedMarhalah, setSelectedMarhalah] = useState('SEMUA')
   const [jadwalLoaded, setJadwalLoaded] = useState(false)
   const [scheduleModal, setScheduleModal] = useState<{ kelasId: string; tab: ScheduleModalTab } | null>(null)
 
@@ -96,7 +110,12 @@ export default function ManajemenGuruPage() {
   const [selectedGuruIds, setSelectedGuruIds] = useState<number[]>([])
   const [guruSearch, setGuruSearch] = useState('')
 
-  const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [jadwalLoading, setJadwalLoading] = useState(true)
+  const [initialError, setInitialError] = useState('')
+  const [jadwalError, setJadwalError] = useState('')
+  const jadwalRequest = useRef(0)
+  const loading = initialLoading || jadwalLoading
   const [isSavingBatch, setIsSavingBatch] = useState(false)
   const [isDeletingBatch, setIsDeletingBatch] = useState(false)
 
@@ -117,17 +136,33 @@ export default function ManajemenGuruPage() {
   const [copySourceId, setCopySourceId] = useState<number | ''>('')
   const [isCopying, setIsCopying] = useState(false)
 
-  useEffect(() => { loadInitialData() }, [])
+  useEffect(() => {
+    void loadInitialData()
+    void loadKelasByFilter('SEMUA')
+  }, [])
 
   const loadInitialData = async () => {
-    setLoading(true)
-    const [res, tal] = await Promise.all([getJadwalFilterOptions(), getTahunAjaranList()])
-    setGuruList(res.guruList)
-    setMarhalahList(res.marhalahList)
-    setWaliUserList(res.waliUserList || [])
-    setSelectedGuruIds([])
-    setTahunAjaranList(tal)
-    setLoading(false)
+    setInitialLoading(true)
+    setInitialError('')
+    try {
+      const [options, years] = await Promise.allSettled([
+        withLoadTimeout(getJadwalFilterOptions()),
+        withLoadTimeout(getTahunAjaranList()),
+      ])
+      if (years.status === 'fulfilled') setTahunAjaranList(years.value)
+      else toast.error('Daftar tahun ajaran gagal dimuat. Muat ulang sebelum menyalin jadwal.')
+      if (options.status === 'rejected') throw options.reason
+      const res = options.value
+      setGuruList(res.guruList)
+      setMarhalahList(res.marhalahList)
+      setWaliUserList(res.waliUserList || [])
+      setSelectedGuruIds([])
+    } catch (error) {
+      console.error('Gagal memuat data master guru:', error)
+      setInitialError('Data guru dan pilihan jadwal gagal dimuat. Silakan coba lagi.')
+    } finally {
+      setInitialLoading(false)
+    }
   }
 
   const handleCopyGuruJadwal = async () => {
@@ -146,42 +181,53 @@ export default function ManajemenGuruPage() {
   }
 
   const loadKelasByFilter = async (marhalahId: string) => {
-    setLoading(true)
-    const kelas = await getKelasJadwalByMarhalah(marhalahId)
-    setKelasList(kelas)
-    const mappedLocal = kelas.map((k: any) => {
-      const weekly = makeEmptyWeeklyMap()
-      const gabungan = makeEmptyGabunganMap()
-      ;(k.weekly_rules || []).forEach((rule: any) => {
-        if (weekly[rule.sesi as WeeklySessionKey]) {
-          weekly[rule.sesi as WeeklySessionKey][Number(rule.hari_index)] = String(rule.guru_id)
-        }
-      })
-      SESSION_META.forEach(session => {
-        const item = k.gabungan?.[session.serverKey]
-        if (item) {
-          gabungan[session.serverKey] = {
-            groupKey: item.group_key || '',
-            tempat: item.tempat || '',
+    const requestId = ++jadwalRequest.current
+    setJadwalLoading(true)
+    setJadwalError('')
+    try {
+      const kelas = await withLoadTimeout(getKelasJadwalByMarhalah(marhalahId))
+      if (requestId !== jadwalRequest.current) return
+      setKelasList(kelas)
+      const mappedLocal = kelas.map((k: any) => {
+        const weekly = makeEmptyWeeklyMap()
+        const gabungan = makeEmptyGabunganMap()
+        ;(k.weekly_rules || []).forEach((rule: any) => {
+          if (weekly[rule.sesi as WeeklySessionKey]) {
+            weekly[rule.sesi as WeeklySessionKey][Number(rule.hari_index)] = String(rule.guru_id)
           }
+        })
+        SESSION_META.forEach(session => {
+          const item = k.gabungan?.[session.serverKey]
+          if (item) {
+            gabungan[session.serverKey] = {
+              groupKey: item.group_key || '',
+              tempat: item.tempat || '',
+            }
+          }
+        })
+
+        return {
+          id: k.id,
+          nama_kelas: k.nama_kelas,
+          marhalah_nama: k.marhalah_nama,
+          wali_kelas_id: k.wali_kelas_id || '',
+          s: k.guru_shubuh_id?.toString() || '',
+          a: k.guru_ashar_id?.toString() || '',
+          m: k.guru_maghrib_id?.toString() || '',
+          weekly,
+          gabungan,
         }
       })
-
-      return {
-        id: k.id,
-        nama_kelas: k.nama_kelas,
-        marhalah_nama: k.marhalah_nama,
-        wali_kelas_id: k.wali_kelas_id || '',
-        s: k.guru_shubuh_id?.toString() || '',
-        a: k.guru_ashar_id?.toString() || '',
-        m: k.guru_maghrib_id?.toString() || '',
-        weekly,
-        gabungan,
-      }
-    })
-    setLocalKelasList(mappedLocal)
-    setJadwalLoaded(true)
-    setLoading(false)
+      setLocalKelasList(mappedLocal)
+      setJadwalLoaded(true)
+    } catch (error) {
+      if (requestId !== jadwalRequest.current) return
+      console.error('Gagal memuat jadwal kelas:', error)
+      setJadwalLoaded(false)
+      setJadwalError('Jadwal kelas gagal dimuat. Silakan coba lagi.')
+    } finally {
+      if (requestId === jadwalRequest.current) setJadwalLoading(false)
+    }
   }
 
   const handleChangeLocal = (kelasId: string, field: SessionKey | 'wali_kelas_id', value: string) => {
@@ -484,6 +530,13 @@ export default function ManajemenGuruPage() {
         </div>
       </div>
 
+      {initialError && (
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <p>{initialError}</p>
+          <button type="button" disabled={initialLoading} onClick={() => void loadInitialData()} className="shrink-0 font-semibold disabled:opacity-50">Coba lagi</button>
+        </div>
+      )}
+
       {tab === 'JADWAL' && (
         <div className="space-y-4 animate-in fade-in slide-in-from-left-2">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
@@ -499,7 +552,12 @@ export default function ManajemenGuruPage() {
                     setJadwalLoaded(false)
                     setKelasList([])
                     setLocalKelasList([])
-                    if (!value) return
+                    if (!value) {
+                      jadwalRequest.current += 1
+                      setJadwalLoading(false)
+                      setJadwalError('')
+                      return
+                    }
                     await loadKelasByFilter(value)
                   }}
                   className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
@@ -518,7 +576,7 @@ export default function ManajemenGuruPage() {
                 <input disabled={!jadwalLoaded} className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm disabled:bg-slate-50 disabled:text-slate-400" placeholder="Cari guru di dropdown..." value={guruSearch} onChange={e => setGuruSearch(e.target.value)} />
               </div>
             </div>
-            <button onClick={handleSimpanSemua} disabled={isSavingBatch || loading || !jadwalLoaded} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 transition-colors">
+            <button onClick={handleSimpanSemua} disabled={isSavingBatch || loading || !!initialError || !jadwalLoaded} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 transition-colors">
               {isSavingBatch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               SIMPAN JADWAL
             </button>
@@ -535,6 +593,11 @@ export default function ManajemenGuruPage() {
           <div className="space-y-4">
             {loading ? (
               <div className="bg-white border rounded-xl shadow-sm py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400" /></div>
+            ) : jadwalError ? (
+              <div role="alert" className="bg-white border rounded-xl py-12 text-center text-red-700">
+                <p>{jadwalError}</p>
+                <button type="button" onClick={() => void loadKelasByFilter(selectedMarhalah)} className="mt-3 text-sm font-semibold">Coba lagi</button>
+              </div>
             ) : !jadwalLoaded ? (
               <div className="bg-white border rounded-xl shadow-sm py-20 text-center text-slate-400">
                 <div className="space-y-2">
@@ -795,6 +858,12 @@ export default function ManajemenGuruPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+                  {initialLoading && (
+                    <tr><td colSpan={5} className="p-8 text-center text-slate-500"><Loader2 className="mx-auto h-6 w-6 animate-spin" /><span className="sr-only">Memuat data guru</span></td></tr>
+                  )}
+                  {!initialLoading && !initialError && guruList.length === 0 && (
+                    <tr><td colSpan={5} className="p-8 text-center text-slate-500">Belum ada data guru.</td></tr>
+                  )}
                   {pagedGuruList.map(g => (
                     <tr key={g.id} className={`hover:bg-slate-50 transition-colors ${selectedGuruIds.includes(g.id) ? 'bg-red-50' : ''}`}>
                       <td className="p-3 text-center">

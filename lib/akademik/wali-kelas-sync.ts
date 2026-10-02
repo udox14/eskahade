@@ -39,7 +39,7 @@ async function getOrCreateWaliUserForGuru(guruId: number) {
          role IN ('wali_kelas', 'sekpen')
          OR EXISTS (
            SELECT 1
-           FROM json_each(COALESCE(users.roles, '[]'))
+           FROM json_each(CASE WHEN json_valid(users.roles) THEN users.roles ELSE '[]' END)
            WHERE value IN ('wali_kelas', 'sekpen')
          )
        )

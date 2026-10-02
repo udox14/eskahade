@@ -390,7 +390,7 @@ export async function getDataMaster() {
 }
 
 export async function getJadwalFilterOptions() {
-  await ensureKelasCetakColumns()
+  await ensureGuruJadwalSchema()
   
   const guruQuery = `
     WITH KelasTerhubung AS (
@@ -421,7 +421,7 @@ export async function getJadwalFilterOptions() {
 }
 
 export async function getKelasJadwalByMarhalah(marhalahId: string) {
-  await ensureKelasCetakColumns()
+  await ensureGuruJadwalSchema()
 
   const params: unknown[] = []
   const marhalahClause =
@@ -920,7 +920,7 @@ export async function getUsersForWaliKelas() {
     WHERE role IN ('wali_kelas', 'sekpen')
        OR EXISTS (
          SELECT 1
-         FROM json_each(COALESCE(users.roles, '[]'))
+         FROM json_each(CASE WHEN json_valid(users.roles) THEN users.roles ELSE '[]' END)
          WHERE value IN ('wali_kelas', 'sekpen')
        )
     ORDER BY full_name
