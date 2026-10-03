@@ -56,3 +56,85 @@ export const getCachedBiayaSettings = unstable_cache(
 export async function getCachedDataGuru() {
   return query<any>('SELECT id, nama_lengkap, gelar, kode_guru FROM data_guru ORDER BY nama_lengkap')
 }
+
+// ─── FILTER SANTRI (GLOBAL) ───────────────────────────────────────────────
+// Dropdown filter santri (sekolah, kecamatan, kab_kota, tahun_masuk, dll).
+// Sangat masif (>300M row reads) jika di-query ulang di setiap page load.
+export type SantriFilterOptions = {
+  asramaKamarRows: { asrama: string | null; kamar: string | null }[]
+  sekolahRows: { v: string }[]
+  kelasSekolahRows: { v: string }[]
+  statusRows: { v: string }[]
+  golDarahRows: { v: string }[]
+  tahunRows: { v: number }[]
+  provinsiRows: { v: string }[]
+  kabKotaRows: { v: string }[]
+  kecamatanRows: { v: string }[]
+  jemaahRows: { v: string }[]
+}
+
+export const getCachedSantriFilterOptions = unstable_cache(
+  async (): Promise<SantriFilterOptions> => {
+    const [
+      asramaKamarRows,
+      sekolahRows,
+      kelasSekolahRows,
+      statusRows,
+      golDarahRows,
+      tahunRows,
+      provinsiRows,
+      kabKotaRows,
+      kecamatanRows,
+      jemaahRows,
+    ] = await Promise.all([
+      query<{ asrama: string | null; kamar: string | null }>(
+        'SELECT DISTINCT asrama, kamar FROM santri ORDER BY asrama, CAST(kamar AS INTEGER), kamar'
+      ),
+      query<{ v: string }>(
+        "SELECT DISTINCT sekolah AS v FROM santri WHERE sekolah IS NOT NULL AND sekolah <> '' ORDER BY sekolah"
+      ),
+      query<{ v: string }>(
+        "SELECT DISTINCT kelas_sekolah AS v FROM santri WHERE kelas_sekolah IS NOT NULL AND kelas_sekolah <> '' ORDER BY CAST(kelas_sekolah AS INTEGER), kelas_sekolah"
+      ),
+      query<{ v: string }>(
+        "SELECT DISTINCT status_global AS v FROM santri WHERE status_global IS NOT NULL AND status_global <> '' ORDER BY status_global"
+      ),
+      query<{ v: string }>(
+        "SELECT DISTINCT gol_darah AS v FROM santri WHERE gol_darah IS NOT NULL AND gol_darah <> '' ORDER BY gol_darah"
+      ),
+      query<{ v: number }>(
+        `SELECT DISTINCT COALESCE(tahun_masuk, CAST(SUBSTR(NULLIF(tanggal_masuk, ''), 1, 4) AS INTEGER)) AS v
+         FROM santri
+         WHERE COALESCE(tahun_masuk, CAST(SUBSTR(NULLIF(tanggal_masuk, ''), 1, 4) AS INTEGER)) IS NOT NULL
+         ORDER BY v DESC`
+      ),
+      query<{ v: string }>(
+        "SELECT DISTINCT provinsi AS v FROM santri WHERE provinsi IS NOT NULL AND provinsi <> '' ORDER BY provinsi"
+      ),
+      query<{ v: string }>(
+        "SELECT DISTINCT kab_kota AS v FROM santri WHERE kab_kota IS NOT NULL AND kab_kota <> '' ORDER BY kab_kota"
+      ),
+      query<{ v: string }>(
+        "SELECT DISTINCT kecamatan AS v FROM santri WHERE kecamatan IS NOT NULL AND kecamatan <> '' ORDER BY kecamatan"
+      ),
+      query<{ v: string }>(
+        "SELECT DISTINCT jemaah AS v FROM santri WHERE jemaah IS NOT NULL AND jemaah <> '' ORDER BY jemaah"
+      ),
+    ])
+    return {
+      asramaKamarRows,
+      sekolahRows,
+      kelasSekolahRows,
+      statusRows,
+      golDarahRows,
+      tahunRows,
+      provinsiRows,
+      kabKotaRows,
+      kecamatanRows,
+      jemaahRows,
+    }
+  },
+  ['santri-filter-options-global'],
+  { tags: ['santri-filters'], revalidate: 3600 }
+)
+

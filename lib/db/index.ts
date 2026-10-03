@@ -1,5 +1,6 @@
 // lib/db/index.ts
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 
 const SESSION_COOKIE = 'eskahade_session'
@@ -27,28 +28,45 @@ function parseRoles(rolesJson: string | null | undefined, fallbackRole: string |
   return fallbackRole ? [fallbackRole] : []
 }
 
-async function getRequestUserId(): Promise<string | null> {
+interface SessionPayload {
+  id?: unknown
+  role?: unknown
+  roles?: unknown
+}
+
+function getSessionPayload(token: string | undefined): SessionPayload | null {
+  if (!token) return null
+  const body = token.split('.')[1]
+  if (!body) return null
+  return decodeBase64UrlJson<SessionPayload>(body)
+}
+
+const isTesterRequest = cache(async (db: any): Promise<boolean> => {
   try {
     const cookieStore = await cookies()
     const token = cookieStore.get(SESSION_COOKIE)?.value
-    const payload = token ? decodeBase64UrlJson<{ id?: unknown }>(token.split('.')[1] || '') : null
-    return typeof payload?.id === 'string' ? payload.id : null
-  } catch {
-    return null
-  }
-}
+    if (!token) return false
+    const payload = getSessionPayload(token)
+    if (!payload || typeof payload.id !== 'string') return false
 
-async function isTesterRequest(db: any): Promise<boolean> {
-  const userId = await getRequestUserId()
-  if (!userId) return false
-  try {
-    const user = await db.prepare('SELECT role, roles FROM users WHERE id = ?').bind(userId).first() as { role: string | null; roles: string | null } | null
+    // Fast-path: jika session token tidak mengandung role 'tester', dipastikan bukan tester.
+    // Menghilangkan 100% query SELECT users di setiap getDB() untuk pengguna biasa/admin/staf.
+    const tokenRoles = parseRoles(
+      typeof payload.roles === 'string' ? payload.roles : Array.isArray(payload.roles) ? JSON.stringify(payload.roles) : null,
+      typeof payload.role === 'string' ? payload.role : null
+    )
+    if (!tokenRoles.includes('tester')) {
+      return false
+    }
+
+    // Hanya jika role tester terdeteksi di token, verifikasi ke DB (di-cache per-request via React.cache)
+    const user = await db.prepare('SELECT role, roles FROM users WHERE id = ?').bind(payload.id).first() as { role: string | null; roles: string | null } | null
     const roles = parseRoles(user?.roles, user?.role)
     return roles.includes('tester') && !roles.includes('admin') && !roles.includes('demo')
   } catch {
     return false
   }
-}
+})
 
 function isWriteSql(sql: unknown): boolean {
   return typeof sql === 'string' && WRITE_SQL_RE.test(sql) && !SCHEMA_MAINTENANCE_SQL_RE.test(sql)

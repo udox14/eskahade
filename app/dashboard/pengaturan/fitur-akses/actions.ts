@@ -5,6 +5,7 @@ import { getSession, isAdmin } from '@/lib/auth/session'
 import { getCrudPermissionsForAdmin, type CrudAction } from '@/lib/auth/crud'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
 import { ensureSidebarGroupsReady } from '@/lib/menu/groups'
+import { invalidateFiturAksesCache } from '@/lib/cache/fitur-akses'
 
 
 const ALL_ROLES = [
@@ -103,6 +104,7 @@ export async function toggleFiturActive(id: number, currentActive: boolean) {
     },
   })
   
+  invalidateFiturAksesCache()
   return { success: true }
 }
 
@@ -140,6 +142,7 @@ export async function addRoleToFitur(id: number, role: string) {
       },
     })
     
+    invalidateFiturAksesCache()
   }
   return { success: true }
 }
@@ -176,6 +179,7 @@ export async function removeRoleFromFitur(id: number, role: string) {
     },
   })
   
+  invalidateFiturAksesCache()
   return { success: true }
 }
 
@@ -316,6 +320,7 @@ export async function toggleFiturBottomNav(id: number, currentVal: boolean) {
     },
   })
   
+  invalidateFiturAksesCache()
   return { success: true }
 }
 
@@ -349,6 +354,7 @@ export async function setBottomNavUrutan(id: number, urutan: number) {
     },
   })
   
+  invalidateFiturAksesCache()
   return { success: true }
 }
 
@@ -604,6 +610,7 @@ export async function updateFiturTitle(id: number, title: string) {
     },
   })
 
+  invalidateFiturAksesCache()
   return { success: true }
 }
 
@@ -637,6 +644,7 @@ export async function moveFiturToGroup(id: number, groupName: string) {
     details: { href: fitur.href, from_group: fromGroup, to_group: groupName },
   })
 
+  invalidateFiturAksesCache()
   return { success: true }
 }
 
@@ -666,5 +674,6 @@ export async function reorderFiturItems(groupName: string, orderedIds: number[])
     details: { group_name: groupName, ordered_ids: ids },
   })
 
+  invalidateFiturAksesCache()
   return { success: true }
 }

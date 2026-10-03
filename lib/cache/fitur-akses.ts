@@ -33,7 +33,14 @@ interface FiturAksesRow {
   bottomnav_urutan: number
 }
 
-let fiturSchemaReady = false
+let fiturSchemaReady = true
+
+let memoryCache: { data: FiturAkses[]; timestamp: number } | null = null
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 menit
+
+export function invalidateFiturAksesCache(): void {
+  memoryCache = null
+}
 
 function isReadOnlyTesterError(error: unknown): boolean {
   return error instanceof Error && error.message === 'Akun tester hanya boleh membaca data.'
@@ -111,22 +118,17 @@ async function ensureFiturAksesReady() {
       ('UPK', 'Cetak', '/dashboard/akademik/upk/cetak', 'Printer', '["admin","sekpen","panitia_upk"]', 1, 8)
   `)
 
-  // Catatan: Seed awal diisi lewat migrasi database. Reorganisasi/renumbering
-  // urutan sidebar yang dulu berupa UPDATE di sini sudah dipindahkan ke
-  // migrations/0135_legacy_sidebar_fixes.sql agar tidak menimpa kustomisasi
-  // admin (urutan, nama, grup, status aktif) setiap kali modul dimuat ulang.
-
   fiturSchemaReady = true
 }
 
-// Ambil SEMUA fitur — query langsung ke D1, dengan fallback aman kalau DB error
+// Ambil SEMUA fitur — di-cache in-memory (TTL 5 menit) untuk menghemat jutaan row reads D1
 export async function getCachedFiturAkses(): Promise<FiturAkses[]> {
+  const now = Date.now()
+  if (memoryCache && (now - memoryCache.timestamp < CACHE_TTL_MS)) {
+    return memoryCache.data
+  }
+
   try {
-    try {
-      await ensureFiturAksesReady()
-    } catch (err) {
-      if (!isReadOnlyTesterError(err)) throw err
-    }
     // Coba query dengan kolom bottomnav dulu (setelah migration 0016)
     // Kalau kolom belum ada, fallback ke query tanpa kolom bottomnav
     let rows: FiturAksesRow[] = []
@@ -143,7 +145,7 @@ export async function getCachedFiturAkses(): Promise<FiturAkses[]> {
       )
       rows = fallbackRows.map(r => ({ ...r, is_bottomnav: 0, bottomnav_urutan: 0 }))
     }
-    return rows.map(r => ({
+    const result = rows.map(r => ({
       ...r,
       roles: (() => {
         try { return JSON.parse(r.roles) as string[] } catch { return [] }
@@ -151,8 +153,11 @@ export async function getCachedFiturAkses(): Promise<FiturAkses[]> {
       is_active: r.is_active === 1,
       is_bottomnav: r.is_bottomnav === 1,
     }))
+    memoryCache = { data: result, timestamp: now }
+    return result
   } catch (err: unknown) {
     console.error('[fitur-akses] getCachedFiturAkses ERROR:', err instanceof Error ? err.message : err)
+    if (memoryCache?.data) return memoryCache.data
     return []
   }
 }

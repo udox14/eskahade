@@ -275,64 +275,64 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
   const billingStart = await getSppBillingStart()
   const isBeforeBillingStart = (tahun * 100 + currentMonth) < (billingStart.tahun * 100 + billingStart.bulan)
 
-  const baseRows = await query<any>(`
-    WITH
-      base_santri AS (
+  const [santriRows, uangMasukRows, uangHistorisRows] = await Promise.all([
+    query<any>(`
+      WITH base_santri AS (
         SELECT id, nama_lengkap, tanggal_masuk, created_at, COALESCE(bebas_spp, 0) AS bebas_spp
         FROM santri
         WHERE status_global = 'aktif'
           ${sadesaMode ? 'AND kategori_santri = ?' : 'AND (kategori_santri IS NULL OR kategori_santri != ?) AND asrama = ?'}
-      ),
-      bayar_ini AS (
-        SELECT DISTINCT santri_id
-        FROM spp_log
-        WHERE tahun = ? AND bulan = ?
-          AND tujuan_setoran = 'DEWAN_SANTRI'
-      ),
-      ditiadakan_ini AS (
-        SELECT DISTINCT santri_id
-        FROM spp_tagihan_ditiadakan
-        WHERE tahun = ? AND bulan = ? AND is_active = 1
-        UNION
-        -- Santri baru PSB angkatan ini: SPP Juli ke Bendahara Pusat, bukan asrama.
-        -- FIX: ganti dari cek spp_log (hanya yang sudah bayar) ke cek kriteria santri
-        -- langsung agar santri PSB yang belum bayar Juli juga masuk tidak_ada_tagihan.
-        SELECT DISTINCT bs.id AS santri_id
-        FROM base_santri bs
-        JOIN santri s ON s.id = bs.id
-        WHERE ${tujuanSetoranSql('s', String(tahun), String(currentMonth))} = 'BENDAHARA_PUSAT'
-      ),
-      uang_masuk_bulan_ini AS (
-        SELECT sl.santri_id, sl.nominal_bayar, sl.bulan, sl.tahun
-        FROM spp_log sl
-        WHERE sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
-          AND sl.tujuan_setoran = 'DEWAN_SANTRI'
-      ),
-      uang_historis_masuk_bulan_ini AS (
-        SELECT th.santri_id, th.nominal_tagihan
-        FROM spp_tunggakan_historis th
-        WHERE th.status = 'LUNAS'
-          AND th.tanggal_lunas >= ? AND th.tanggal_lunas < ?
       )
-    SELECT
-      bs.id,
-      bs.nama_lengkap,
-      bs.tanggal_masuk,
-      bs.created_at,
-      bs.bebas_spp,
-      CASE WHEN di.santri_id IS NOT NULL THEN 1 ELSE 0 END AS ditiadakan_ini,
-      CASE WHEN bi.santri_id IS NOT NULL THEN 1 ELSE 0 END AS bayar_ini,
-      COALESCE(um.nominal_bayar, 0) AS nominal_bayar_masuk,
-      COALESCE(um.bulan, 0) AS bulan_tagihan_dibayar,
-      COALESCE(um.tahun, 0) AS tahun_tagihan_dibayar,
-      COALESCE(uh.nominal_tagihan, 0) AS nominal_historis_masuk
-    FROM base_santri bs
-    LEFT JOIN ditiadakan_ini di ON di.santri_id = bs.id
-    LEFT JOIN bayar_ini bi ON bi.santri_id = bs.id
-    LEFT JOIN uang_masuk_bulan_ini um ON um.santri_id = bs.id
-    LEFT JOIN uang_historis_masuk_bulan_ini uh ON uh.santri_id = bs.id
-  `, sadesaMode ? [SADESA_CATEGORY, tahun, currentMonth, tahun, currentMonth, currentMonthStart, currentMonthEnd, currentMonthStart, currentMonthEnd]
-                : [SADESA_CATEGORY, unit, tahun, currentMonth, tahun, currentMonth, currentMonthStart, currentMonthEnd, currentMonthStart, currentMonthEnd])
+      SELECT
+        bs.id,
+        bs.nama_lengkap,
+        bs.tanggal_masuk,
+        bs.created_at,
+        bs.bebas_spp,
+        EXISTS (
+          SELECT 1 FROM spp_log sl
+          WHERE sl.santri_id = bs.id AND sl.tahun = ? AND sl.bulan = ? AND sl.tujuan_setoran = 'DEWAN_SANTRI'
+        ) AS bayar_ini,
+        (
+          EXISTS (
+            SELECT 1 FROM spp_tagihan_ditiadakan td
+            WHERE td.santri_id = bs.id AND td.tahun = ? AND td.bulan = ? AND td.is_active = 1
+          )
+          OR (
+            ${tujuanSetoranSql('s', String(tahun), String(currentMonth))} = 'BENDAHARA_PUSAT'
+          )
+        ) AS ditiadakan_ini
+      FROM base_santri bs
+      JOIN santri s ON s.id = bs.id
+    `, sadesaMode ? [SADESA_CATEGORY, tahun, currentMonth, tahun, currentMonth]
+                  : [SADESA_CATEGORY, unit, tahun, currentMonth, tahun, currentMonth]),
+
+    query<any>(`
+      SELECT sl.santri_id, sl.nominal_bayar, sl.bulan, sl.tahun
+      FROM spp_log sl
+      WHERE sl.tanggal_bayar >= ? AND sl.tanggal_bayar < ?
+        AND sl.tujuan_setoran = 'DEWAN_SANTRI'
+        AND sl.santri_id IN (
+          SELECT id FROM santri
+          WHERE status_global = 'aktif'
+            ${sadesaMode ? 'AND kategori_santri = ?' : 'AND (kategori_santri IS NULL OR kategori_santri != ?) AND asrama = ?'}
+        )
+    `, sadesaMode ? [currentMonthStart, currentMonthEnd, SADESA_CATEGORY]
+                  : [currentMonthStart, currentMonthEnd, SADESA_CATEGORY, unit]),
+
+    query<any>(`
+      SELECT th.santri_id, th.nominal_tagihan
+      FROM spp_tunggakan_historis th
+      WHERE th.status = 'LUNAS'
+        AND th.tanggal_lunas >= ? AND th.tanggal_lunas < ?
+        AND th.santri_id IN (
+          SELECT id FROM santri
+          WHERE status_global = 'aktif'
+            ${sadesaMode ? 'AND kategori_santri = ?' : 'AND (kategori_santri IS NULL OR kategori_santri != ?) AND asrama = ?'}
+        )
+    `, sadesaMode ? [currentMonthStart, currentMonthEnd, SADESA_CATEGORY]
+                  : [currentMonthStart, currentMonthEnd, SADESA_CATEGORY, unit]),
+  ])
 
   let totalSantri = 0
   let bebasSppCount = 0
@@ -340,45 +340,36 @@ export async function getRekapStatistikSPP(tahun: number, unitSetor: string) {
   let tidakAdaTagihanIni = 0
   let bayarIni = 0
   let wajibBulanIni = 0
+
+  for (const row of santriRows) {
+    totalSantri++
+    if (row.bebas_spp === 1) {
+      bebasSppCount++
+      bebasSppList.push(row.nama_lengkap)
+    } else if (isSppBillablePeriod(tahun, currentMonth, getSppStudentBillingStart(row, billingStart))) {
+      wajibBulanIni++
+      if (row.ditiadakan_ini === 1) tidakAdaTagihanIni++
+      if (row.bayar_ini === 1) bayarIni++
+    }
+  }
+
   let uangDiterimaTotal = 0
   let uangTunggakanLama = 0
   let uangHarusSetor = 0
 
-  const processedPaymentIds = new Set<string>()
-
-  for (const row of baseRows) {
-    if (!processedPaymentIds.has(row.id)) {
-      totalSantri++
-      if (row.bebas_spp === 1) {
-        bebasSppCount++
-        bebasSppList.push(row.nama_lengkap)
-      } else if (isSppBillablePeriod(tahun, currentMonth, getSppStudentBillingStart(row, billingStart))) {
-        wajibBulanIni++
-        if (row.ditiadakan_ini === 1) tidakAdaTagihanIni++
-        if (row.bayar_ini === 1) bayarIni++
-      }
-      processedPaymentIds.add(row.id)
+  for (const row of uangMasukRows) {
+    uangDiterimaTotal += row.nominal_bayar
+    const isTunggakan = (row.tahun * 100 + row.bulan) < (tahun * 100 + currentMonth)
+    if (isTunggakan) {
+      uangTunggakanLama += row.nominal_bayar
+    } else {
+      uangHarusSetor += row.nominal_bayar
     }
+  }
 
-    const uangMasuk = row.nominal_bayar_masuk + row.nominal_historis_masuk
-    uangDiterimaTotal += uangMasuk
-    
-    if (uangMasuk > 0) {
-      if (row.nominal_historis_masuk > 0) {
-        uangTunggakanLama += row.nominal_historis_masuk
-      }
-      if (row.nominal_bayar_masuk > 0) {
-        // Fix #10: pakai parameter `tahun` (bukan new Date().getFullYear()) sebagai referensi.
-        // Sebelumnya pakai waktu real-time sehingga rekap tahun lalu selalu menganggap
-        // semua pembayaran sebagai tunggakan (karena tahun_tagihan_dibayar < tahun sekarang).
-        const isTunggakan = (row.tahun_tagihan_dibayar * 100 + row.bulan_tagihan_dibayar) < (tahun * 100 + currentMonth)
-        if (isTunggakan) {
-          uangTunggakanLama += row.nominal_bayar_masuk
-        } else {
-          uangHarusSetor += row.nominal_bayar_masuk
-        }
-      }
-    }
+  for (const row of uangHistorisRows) {
+    uangDiterimaTotal += row.nominal_tagihan
+    uangTunggakanLama += row.nominal_tagihan
   }
 
   const wajibSpp = totalSantri - bebasSppCount

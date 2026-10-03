@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { guardPage } from '@/lib/auth/guard'
 import { canCrud } from '@/lib/auth/crud'
 import { query } from '@/lib/db'
-import { getCachedMarhalahList } from '@/lib/cache/master'
+import { getCachedMarhalahList, getCachedSantriFilterOptions } from '@/lib/cache/master'
 import { getSession, hasRole, isAdmin } from '@/lib/auth/session'
 import { getSantriKelasScopeForSession } from '@/lib/akademik/guru-access'
 import Link from 'next/link'
@@ -42,6 +42,89 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
   const [
     marhalahList,
     kelasRaw,
+    filterOptionsRaw,
+  ] = await Promise.all([
+    getCachedMarhalahList(),
+    query<any>(`
+      SELECT k.id, k.nama_kelas, k.marhalah_id
+      FROM kelas k
+      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
+    `, []),
+    isScopedGuru
+      ? (async () => {
+          const [
+            asramaKamarRows,
+            sekolahRows,
+            kelasSekolahRows,
+            statusRows,
+            golDarahRows,
+            tahunRows,
+            provinsiRows,
+            kabKotaRows,
+            kecamatanRows,
+            jemaahRows,
+          ] = await Promise.all([
+            query<{ asrama: string | null; kamar: string | null }>(
+              `SELECT DISTINCT asrama, kamar FROM santri ${scopedWhere} ORDER BY asrama, CAST(kamar AS INTEGER), kamar`,
+              scopedParams
+            ),
+            query<{ v: string }>(
+              `SELECT DISTINCT sekolah AS v FROM santri ${appendScopedWhere("sekolah IS NOT NULL AND sekolah <> ''")} ORDER BY sekolah`,
+              scopedParams
+            ),
+            query<{ v: string }>(
+              `SELECT DISTINCT kelas_sekolah AS v FROM santri ${appendScopedWhere("kelas_sekolah IS NOT NULL AND kelas_sekolah <> ''")} ORDER BY CAST(kelas_sekolah AS INTEGER), kelas_sekolah`,
+              scopedParams
+            ),
+            query<{ v: string }>(
+              `SELECT DISTINCT status_global AS v FROM santri ${appendScopedWhere("status_global IS NOT NULL AND status_global <> ''")} ORDER BY status_global`,
+              scopedParams
+            ),
+            query<{ v: string }>(
+              `SELECT DISTINCT gol_darah AS v FROM santri ${appendScopedWhere("gol_darah IS NOT NULL AND gol_darah <> ''")} ORDER BY gol_darah`,
+              scopedParams
+            ),
+            query<{ v: number }>(
+              `SELECT DISTINCT COALESCE(tahun_masuk, CAST(SUBSTR(NULLIF(tanggal_masuk, ''), 1, 4) AS INTEGER)) AS v
+               FROM santri
+               ${appendScopedWhere("COALESCE(tahun_masuk, CAST(SUBSTR(NULLIF(tanggal_masuk, ''), 1, 4) AS INTEGER)) IS NOT NULL")}
+               ORDER BY v DESC`,
+              scopedParams
+            ),
+            query<{ v: string }>(
+              `SELECT DISTINCT provinsi AS v FROM santri ${appendScopedWhere("provinsi IS NOT NULL AND provinsi <> ''")} ORDER BY provinsi`,
+              scopedParams
+            ),
+            query<{ v: string }>(
+              `SELECT DISTINCT kab_kota AS v FROM santri ${appendScopedWhere("kab_kota IS NOT NULL AND kab_kota <> ''")} ORDER BY kab_kota`,
+              scopedParams
+            ),
+            query<{ v: string }>(
+              `SELECT DISTINCT kecamatan AS v FROM santri ${appendScopedWhere("kecamatan IS NOT NULL AND kecamatan <> ''")} ORDER BY kecamatan`,
+              scopedParams
+            ),
+            query<{ v: string }>(
+              `SELECT DISTINCT jemaah AS v FROM santri ${appendScopedWhere("jemaah IS NOT NULL AND jemaah <> ''")} ORDER BY jemaah`,
+              scopedParams
+            ),
+          ])
+          return {
+            asramaKamarRows,
+            sekolahRows,
+            kelasSekolahRows,
+            statusRows,
+            golDarahRows,
+            tahunRows,
+            provinsiRows,
+            kabKotaRows,
+            kecamatanRows,
+            jemaahRows,
+          }
+        })()
+      : getCachedSantriFilterOptions(),
+  ])
+
+  const {
     asramaKamarRows,
     sekolahRows,
     kelasSekolahRows,
@@ -52,57 +135,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
     kabKotaRows,
     kecamatanRows,
     jemaahRows,
-  ] = await Promise.all([
-    getCachedMarhalahList(),
-    query<any>(`
-      SELECT k.id, k.nama_kelas, k.marhalah_id
-      FROM kelas k
-      JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
-    `, []),
-    query<{ asrama: string | null; kamar: string | null }>(
-      `SELECT DISTINCT asrama, kamar FROM santri ${scopedWhere} ORDER BY asrama, CAST(kamar AS INTEGER), kamar`,
-      scopedParams
-    ),
-    query<{ v: string }>(
-      `SELECT DISTINCT sekolah AS v FROM santri ${appendScopedWhere("sekolah IS NOT NULL AND sekolah <> ''")} ORDER BY sekolah`,
-      scopedParams
-    ),
-    query<{ v: string }>(
-      `SELECT DISTINCT kelas_sekolah AS v FROM santri ${appendScopedWhere("kelas_sekolah IS NOT NULL AND kelas_sekolah <> ''")} ORDER BY CAST(kelas_sekolah AS INTEGER), kelas_sekolah`,
-      scopedParams
-    ),
-    query<{ v: string }>(
-      `SELECT DISTINCT status_global AS v FROM santri ${appendScopedWhere("status_global IS NOT NULL AND status_global <> ''")} ORDER BY status_global`,
-      scopedParams
-    ),
-    query<{ v: string }>(
-      `SELECT DISTINCT gol_darah AS v FROM santri ${appendScopedWhere("gol_darah IS NOT NULL AND gol_darah <> ''")} ORDER BY gol_darah`,
-      scopedParams
-    ),
-    query<{ v: number }>(
-      `SELECT DISTINCT COALESCE(tahun_masuk, CAST(SUBSTR(NULLIF(tanggal_masuk, ''), 1, 4) AS INTEGER)) AS v
-       FROM santri
-       ${appendScopedWhere("COALESCE(tahun_masuk, CAST(SUBSTR(NULLIF(tanggal_masuk, ''), 1, 4) AS INTEGER)) IS NOT NULL")}
-       ORDER BY v DESC`,
-      scopedParams
-    ),
-    query<{ v: string }>(
-      `SELECT DISTINCT provinsi AS v FROM santri ${appendScopedWhere("provinsi IS NOT NULL AND provinsi <> ''")} ORDER BY provinsi`,
-      scopedParams
-    ),
-    query<{ v: string }>(
-      `SELECT DISTINCT kab_kota AS v FROM santri ${appendScopedWhere("kab_kota IS NOT NULL AND kab_kota <> ''")} ORDER BY kab_kota`,
-      scopedParams
-    ),
-    query<{ v: string }>(
-      `SELECT DISTINCT kecamatan AS v FROM santri ${appendScopedWhere("kecamatan IS NOT NULL AND kecamatan <> ''")} ORDER BY kecamatan`,
-      scopedParams
-    ),
-    query<{ v: string }>(
-      `SELECT DISTINCT jemaah AS v FROM santri ${appendScopedWhere("jemaah IS NOT NULL AND jemaah <> ''")} ORDER BY jemaah`,
-      scopedParams
-    ),
-  ])
+  } = filterOptionsRaw
   const kelasListRaw = kelasRaw.sort((a: any, b: any) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )
