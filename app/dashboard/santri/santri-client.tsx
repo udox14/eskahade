@@ -3,15 +3,15 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
+  MagnifyingGlass,
+  CaretLeft,
+  CaretRight,
+  CaretDown,
   X,
-  SlidersHorizontal,
-  Pencil,
+  Faders,
+  PencilSimple,
   Eye,
-} from 'lucide-react'
+} from '@phosphor-icons/react'
 import { RowActionMenu, RowActionItem } from '@/components/ui/dropdown-menu'
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -90,7 +90,7 @@ export function SearchInput() {
 
   return (
     <div className="relative flex-1">
-      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+      <MagnifyingGlass className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" weight="bold" />
       <input
         type="text"
         placeholder="Cari nama atau NIS santri..."
@@ -138,7 +138,7 @@ export function LimitSelector() {
         <option value="100">100 / hal</option>
         <option value="9999">Semua</option>
       </select>
-      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+      <CaretDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" weight="bold" />
     </div>
   )
 }
@@ -175,7 +175,7 @@ export function PaginationControls({ total, limit, page }: { total: number; limi
             className="p-1.5 sm:p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-700"
             aria-label="Halaman sebelumnya"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <CaretLeft className="w-4 h-4" weight="bold" />
           </button>
           <button
             onClick={() => go(Math.min(totalPages, page + 1))}
@@ -183,7 +183,7 @@ export function PaginationControls({ total, limit, page }: { total: number; limi
             className="p-1.5 sm:p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-700"
             aria-label="Halaman berikutnya"
           >
-            <ChevronRight className="w-4 h-4" />
+            <CaretRight className="w-4 h-4" weight="bold" />
           </button>
         </div>
       </div>
@@ -227,7 +227,7 @@ export function SantriActionMenu({
         )}
         {canUpdate && (
           <RowActionItem
-            icon={<Pencil />}
+            icon={<PencilSimple className="w-3.5 h-3.5" weight="bold" />}
             tone="default"
             onSelect={() => router.push(`/dashboard/santri/${santriId}/edit`)}
           >
@@ -292,7 +292,7 @@ function SelectField({ label, value, onChange, options, allLabel, disabled = fal
             </option>
           ))}
         </select>
-        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        <CaretDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" weight="bold" />
       </div>
     </label>
   )
@@ -739,7 +739,7 @@ export function SantriFilter({
         }`}
         aria-label="Filter santri"
       >
-        <SlidersHorizontal className="w-4 h-4 text-current shrink-0" />
+        <Faders className="w-4 h-4 text-current shrink-0" weight="bold" />
         <span>Filter</span>
         {activeCount > 0 && (
           <span className="bg-emerald-700 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">

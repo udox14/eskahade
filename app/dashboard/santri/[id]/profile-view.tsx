@@ -6,27 +6,39 @@ import { incidentLabel, sessionLabel } from '@/lib/discipline/format'
 import {
   User,
   MapPin,
-  School,
-  Home,
+  GraduationCap,
+  House,
   BookOpen,
-  AlertTriangle,
+  Warning,
   Clock,
   CreditCard,
   Wallet,
   Trophy,
   CheckCircle,
   XCircle,
-  AlertCircle,
+  WarningCircle,
   Users,
-  Utensils,
-  Shirt,
+  ForkKnife,
+  TShirt,
   ArrowLeft,
-  Pencil,
-} from 'lucide-react'
+  PencilSimple,
+  CalendarBlank,
+  Drop,
+  IdentificationBadge,
+  Buildings,
+} from '@phosphor-icons/react'
 import { format, isValid } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { DeleteSantriButton } from './delete-santri-button'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
+import type {
+  SantriDetail,
+  RiwayatAkademikWithNilai,
+  RiwayatPerizinanRow,
+  RiwayatSPPRow,
+  RiwayatTabunganRow,
+} from './actions'
+import type { DisciplineIncident } from '@/lib/discipline/data'
 
 // ── Helper: format tanggal aman, tidak crash jika null/invalid ────────────────
 function safeFormat(value: string | null | undefined, fmt: string): string {
@@ -72,15 +84,6 @@ function getStatusBadge(status: string | null | undefined) {
   }
 }
 
-import type {
-  SantriDetail,
-  RiwayatAkademikWithNilai,
-  RiwayatPerizinanRow,
-  RiwayatSPPRow,
-  RiwayatTabunganRow,
-} from './actions'
-import type { DisciplineIncident } from '@/lib/discipline/data'
-
 interface Props {
   santri: SantriDetail
   akademik: RiwayatAkademikWithNilai[]
@@ -114,7 +117,7 @@ export function SantriProfileView({
           href="/dashboard/santri"
           className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
         >
-          <ArrowLeft className="w-4 h-4 text-slate-400" />
+          <ArrowLeft className="w-4 h-4 text-slate-500" weight="bold" />
           <span>Data Santri</span>
         </Link>
 
@@ -124,7 +127,7 @@ export function SantriProfileView({
               href={`/dashboard/santri/${santri.id}/edit`}
               className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 transition-colors"
             >
-              <Pencil className="w-3.5 h-3.5 text-slate-500" />
+              <PencilSimple className="w-3.5 h-3.5 text-slate-500" weight="bold" />
               <span>Edit Data</span>
             </Link>
           )}
@@ -186,13 +189,13 @@ export function SantriProfileView({
               {/* Baris 3: Kamar & Kelas (Ringkas 1 baris) */}
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
                 <span className="flex items-center gap-1.5">
-                  <Home className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <House className="w-3.5 h-3.5 text-slate-400 shrink-0" weight="duotone" />
                   <span className="truncate">
                     {santri.asrama ? `${santri.asrama} · Kmr ${santri.kamar || '-'}` : 'Non-Asrama'}
                   </span>
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" weight="duotone" />
                   <span className="truncate">
                     {santri.info_kelas || '-'}
                     {santri.sekolah ? ` · ${santri.sekolah}` : ''}
@@ -229,7 +232,7 @@ export function SantriProfileView({
           <TabButton
             active={activeTab === 'DISIPLIN'}
             onClick={() => setActiveTab('DISIPLIN')}
-            icon={AlertTriangle}
+            icon={Warning}
             label="Kedisiplinan"
             count={perizinan.length + pelanggaran.length}
           />
@@ -238,117 +241,319 @@ export function SantriProfileView({
 
       {/* 3. KONTEN TABS */}
 
-      {/* ── TAB PROFIL (BIODATA HIGH-DENSITY) ── */}
+      {/* ── TAB PROFIL (SCANNABLE HIGH-HIERARCHY BIODATA) ── */}
       {activeTab === 'PROFIL' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-150">
-          {/* SEKSI 1: IDENTITAS PRIBADI */}
-          <SectionCard title="Identitas Pribadi" icon={User}>
-            <FieldItem label="NIS (Nomor Induk)" value={santri.nis as string} isMono />
-            <FieldItem label="NIK" value={santri.nik as string} isMono />
-            <FieldItem
-              label="Jenis Kelamin"
-              value={santri.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}
-            />
-            <FieldItem
-              label="Tempat, Tanggal Lahir"
-              value={`${(santri.tempat_lahir as string) || '-'}, ${safeFormat(santri.tanggal_lahir as string, 'dd MMMM yyyy')}`}
-            />
-            <FieldItem label="Golongan Darah" value={(santri.gol_darah as string) || '-'} />
-            <FieldItem
-              label="Status Santri"
-              badge={
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusBadge.className}`}
-                >
-                  {statusBadge.label}
-                </span>
-              }
-            />
-            <FieldItem
-              label="Kategori Santri"
-              value={(santri.kategori_efektif as string) || (santri.kategori_santri as string) || 'REGULER'}
-            />
-            {santri.kategori_efektif === 'BARU' && (
-              <FieldItem
-                label="Kategori Pasca Masa Baru"
-                value={(santri.kategori_santri as string) || 'REGULER'}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-150">
+          {/* KARTU 1: IDENTITAS SANTRI */}
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                <IdentificationBadge className="w-4 h-4 text-emerald-600" weight="duotone" />
+                <span>Identitas & Berkas Pribadi</span>
+              </h3>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusBadge.className}`}>
+                {statusBadge.label}
+              </span>
+            </div>
+            <div className="p-4 divide-y divide-slate-100/90 text-xs sm:text-sm">
+              <InfoRow
+                icon={<IdentificationBadge className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                label="NIS (Nomor Induk)"
+                value={
+                  <span className="font-mono bg-slate-100 text-slate-800 px-2 py-0.5 rounded text-xs font-semibold">
+                    {santri.nis || '-'}
+                  </span>
+                }
               />
-            )}
-            <FieldItem
-              label="Tanggal Masuk"
-              value={safeFormat(santri.tanggal_masuk as string, 'dd MMMM yyyy')}
-            />
-            {santri.tanggal_keluar ? (
-              <FieldItem
-                label="Tanggal Keluar"
-                value={safeFormat(santri.tanggal_keluar as string, 'dd MMMM yyyy')}
+              <InfoRow
+                icon={<IdentificationBadge className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                label="NIK"
+                value={
+                  santri.nik ? (
+                    <span className="font-mono text-slate-700 text-xs font-medium">
+                      {String(santri.nik)}
+                    </span>
+                  ) : (
+                    '-'
+                  )
+                }
               />
-            ) : null}
-          </SectionCard>
-
-          {/* SEKSI 2: TEMPAT TINGGAL & FASILITAS PONDOK */}
-          <SectionCard title="Tempat Tinggal & Fasilitas Pondok" icon={Home}>
-            <FieldItem label="Asrama" value={(santri.asrama as string) || '-'} />
-            <FieldItem label="Kamar" value={(santri.kamar as string) || '-'} />
-            <FieldItem label="Kelas Diniyah" value={santri.info_kelas || '-'} />
-            <FieldItem
-              label="Tempat Makan (Katering)"
-              value={(santri.nama_tempat_makan as string) || 'Belum diatur'}
-              icon={<Utensils className="w-3.5 h-3.5 text-slate-400 inline mr-1" />}
-            />
-            <FieldItem
-              label="Tempat Cuci (Laundry)"
-              value={(santri.nama_tempat_mencuci as string) || 'Belum diatur'}
-              icon={<Shirt className="w-3.5 h-3.5 text-slate-400 inline mr-1" />}
-            />
-          </SectionCard>
-
-          {/* SEKSI 3: PENDIDIKAN FORMAL & KELUARGA */}
-          <SectionCard title="Pendidikan Formal & Orang Tua" icon={School}>
-            {santri.kategori_santri === 'SADESA' ? (
-              <div className="col-span-full py-2">
-                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-0.5">
-                  Sekolah Formal
-                </span>
-                <span className="text-xs sm:text-sm font-medium text-slate-600 italic">
-                  Santri program SADESA (Tanpa sekolah formal)
-                </span>
-              </div>
-            ) : (
-              <>
-                <FieldItem label="Sekolah Formal" value={(santri.sekolah as string) || '-'} />
-                <FieldItem
-                  label="Kelas Formal"
-                  value={santri.kelas_sekolah ? `Kelas ${santri.kelas_sekolah}` : '-'}
+              <InfoRow
+                icon={<User className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                label="Jenis Kelamin"
+                value={
+                  santri.jenis_kelamin === 'L' ? (
+                    <span className="text-slate-800 font-semibold">Laki-laki (Ikhwan)</span>
+                  ) : santri.jenis_kelamin === 'P' ? (
+                    <span className="text-slate-800 font-semibold">Perempuan (Akhwat)</span>
+                  ) : (
+                    '-'
+                  )
+                }
+              />
+              <InfoRow
+                icon={<CalendarBlank className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                label="Tempat, Tgl Lahir"
+                value={
+                  <span className="font-semibold text-slate-800">
+                    {(santri.tempat_lahir as string) || '-'},{' '}
+                    {safeFormat(santri.tanggal_lahir as string, 'dd MMMM yyyy')}
+                  </span>
+                }
+              />
+              <InfoRow
+                icon={<Drop className="w-3.5 h-3.5 text-rose-400" weight="duotone" />}
+                label="Golongan Darah"
+                value={
+                  santri.gol_darah ? (
+                    <span className="bg-rose-50 text-rose-700 border border-rose-200/60 font-bold px-2 py-0.5 rounded text-xs">
+                      Gol. {santri.gol_darah as string}
+                    </span>
+                  ) : (
+                    '-'
+                  )
+                }
+              />
+              <InfoRow
+                icon={<CheckCircle className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                label="Kategori Santri"
+                value={
+                  <span
+                    className={`px-2 py-0.5 rounded text-xs font-bold ${
+                      santri.kategori_efektif === 'BARU'
+                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200/60'
+                        : santri.kategori_santri === 'SADESA'
+                          ? 'bg-purple-50 text-purple-700 border border-purple-200/60'
+                          : 'bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    {(santri.kategori_efektif as string) || (santri.kategori_santri as string) || 'REGULER'}
+                  </span>
+                }
+              />
+              <InfoRow
+                icon={<CalendarBlank className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                label="Tanggal Masuk"
+                value={
+                  <span className="font-medium text-slate-800">
+                    {safeFormat(santri.tanggal_masuk as string, 'dd MMMM yyyy')}
+                  </span>
+                }
+              />
+              {santri.tanggal_keluar ? (
+                <InfoRow
+                  icon={<CalendarBlank className="w-3.5 h-3.5 text-rose-400" weight="duotone" />}
+                  label="Tanggal Keluar"
+                  value={
+                    <span className="font-medium text-rose-700">
+                      {safeFormat(santri.tanggal_keluar as string, 'dd MMMM yyyy')}
+                    </span>
+                  }
                 />
-              </>
-            )}
-            <div className="col-span-full border-t border-slate-100 my-1 pt-2">
-              <span className="text-xs font-bold text-slate-500 flex items-center gap-1.5 mb-2">
-                <Users className="w-3.5 h-3.5 text-slate-400" /> Data Orang Tua
-              </span>
-              <div className="grid grid-cols-2 gap-x-4">
-                <FieldItem label="Nama Ayah" value={(santri.nama_ayah as string) || '-'} />
-                <FieldItem label="Nama Ibu" value={(santri.nama_ibu as string) || '-'} />
+              ) : null}
+            </div>
+          </div>
+
+          {/* KARTU 2: PONDOK & FASILITAS */}
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                <House className="w-4 h-4 text-indigo-600" weight="duotone" />
+                <span>Kehidupan Asrama & Fasilitas</span>
+              </h3>
+            </div>
+            <div className="p-4 space-y-3 text-xs sm:text-sm">
+              {/* Highlight Box Asrama & Kamar */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Kamar & Asrama
+                  </span>
+                  <p className="text-sm sm:text-base font-bold text-slate-900 mt-0.5">
+                    {santri.asrama ? (
+                      <>
+                        {santri.asrama} <span className="text-slate-400 font-normal">·</span> Kamar{' '}
+                        {santri.kamar || '-'}
+                      </>
+                    ) : (
+                      'Non-Asrama'
+                    )}
+                  </p>
+                </div>
+                <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                  <House className="w-5 h-5" weight="duotone" />
+                </div>
+              </div>
+
+              {/* Rincian Pondok */}
+              <div className="divide-y divide-slate-100/90 pt-1">
+                <InfoRow
+                  icon={<BookOpen className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                  label="Kelas Diniyah"
+                  value={
+                    <span className="font-semibold text-slate-900">
+                      {santri.info_kelas || 'Belum Masuk Kelas'}
+                    </span>
+                  }
+                />
+                <InfoRow
+                  icon={<ForkKnife className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                  label="Layanan Katering"
+                  value={
+                    santri.nama_tempat_makan ? (
+                      <span className="bg-emerald-50 text-emerald-800 font-semibold px-2 py-0.5 rounded text-xs border border-emerald-200/60">
+                        {santri.nama_tempat_makan as string}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic text-xs">Belum diatur</span>
+                    )
+                  }
+                />
+                <InfoRow
+                  icon={<TShirt className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                  label="Layanan Laundry"
+                  value={
+                    santri.nama_tempat_mencuci ? (
+                      <span className="bg-sky-50 text-sky-800 font-semibold px-2 py-0.5 rounded text-xs border border-sky-200/60">
+                        {santri.nama_tempat_mencuci as string}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic text-xs">Belum diatur</span>
+                    )
+                  }
+                />
               </div>
             </div>
-          </SectionCard>
+          </div>
 
-          {/* SEKSI 4: DOMISILI & ALAMAT */}
-          <SectionCard title="Domisili Asal & Alamat" icon={MapPin}>
-            <div className="col-span-full py-1">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                Alamat Lengkap
-              </span>
-              <p className="text-xs sm:text-sm text-slate-800 bg-slate-50/70 p-2.5 rounded-xl border border-slate-100 leading-relaxed">
-                {(santri.alamat_lengkap as string) || (santri.alamat as string) || 'Alamat belum diisi.'}
-              </p>
+          {/* KARTU 3: PENDIDIKAN FORMAL & KELUARGA */}
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                <GraduationCap className="w-4 h-4 text-blue-600" weight="duotone" />
+                <span>Pendidikan Formal & Orang Tua</span>
+              </h3>
             </div>
-            <FieldItem label="Kecamatan" value={(santri.kecamatan as string) || '-'} />
-            <FieldItem label="Kab/Kota" value={(santri.kab_kota as string) || '-'} />
-            <FieldItem label="Provinsi" value={(santri.provinsi as string) || '-'} />
-            {santri.jemaah ? <FieldItem label="Jemaah" value={santri.jemaah as string} /> : null}
-          </SectionCard>
+            <div className="p-4 divide-y divide-slate-100/90 text-xs sm:text-sm">
+              {santri.kategori_santri === 'SADESA' ? (
+                <div className="py-2.5">
+                  <div className="p-2.5 rounded-lg bg-purple-50/60 border border-purple-100 flex items-center gap-2 text-purple-800 text-xs">
+                    <BookOpen className="w-4 h-4 text-purple-600 shrink-0" weight="duotone" />
+                    <span>Santri Program SADESA (Fokus Pesantren, Tanpa Sekolah Formal)</span>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <InfoRow
+                    icon={<Buildings className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                    label="Sekolah Formal"
+                    value={
+                      <span className="font-semibold text-slate-900">
+                        {(santri.sekolah as string) || '-'}
+                      </span>
+                    }
+                  />
+                  <InfoRow
+                    icon={<GraduationCap className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                    label="Tingkat Kelas"
+                    value={
+                      <span className="font-semibold text-slate-900">
+                        {santri.kelas_sekolah ? `Kelas ${santri.kelas_sekolah}` : '-'}
+                      </span>
+                    }
+                  />
+                </>
+              )}
+
+              {/* Data Orang Tua */}
+              <div className="pt-2">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-slate-400" weight="duotone" /> Data Orang Tua
+                </span>
+                <InfoRow
+                  icon={<User className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                  label="Nama Ayah"
+                  value={
+                    <span className="font-semibold text-slate-900">
+                      {(santri.nama_ayah as string) || '-'}
+                    </span>
+                  }
+                />
+                <InfoRow
+                  icon={<User className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                  label="Nama Ibu"
+                  value={
+                    <span className="font-semibold text-slate-900">
+                      {(santri.nama_ibu as string) || '-'}
+                    </span>
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* KARTU 4: DOMISILI & ASAL DAERAH */}
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-rose-600" weight="duotone" />
+                <span>Domisili Asal & Alamat</span>
+              </h3>
+            </div>
+            <div className="p-4 space-y-3 text-xs sm:text-sm">
+              {/* Box Alamat Lengkap */}
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  Alamat Lengkap
+                </span>
+                <p className="text-xs sm:text-sm text-slate-800 bg-slate-50 p-2.5 rounded-xl border border-slate-100 leading-relaxed font-medium">
+                  {(santri.alamat_lengkap as string) ||
+                    (santri.alamat as string) ||
+                    'Alamat belum diisi.'}
+                </p>
+              </div>
+
+              {/* Rantai Wilayah */}
+              <div className="divide-y divide-slate-100/90 pt-1">
+                <InfoRow
+                  icon={<MapPin className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                  label="Kecamatan"
+                  value={
+                    <span className="font-semibold text-slate-800">
+                      {(santri.kecamatan as string) || '-'}
+                    </span>
+                  }
+                />
+                <InfoRow
+                  icon={<MapPin className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                  label="Kabupaten / Kota"
+                  value={
+                    <span className="font-semibold text-slate-800">
+                      {(santri.kab_kota as string) || '-'}
+                    </span>
+                  }
+                />
+                <InfoRow
+                  icon={<MapPin className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                  label="Provinsi"
+                  value={
+                    <span className="font-semibold text-slate-800">
+                      {(santri.provinsi as string) || '-'}
+                    </span>
+                  }
+                />
+                {santri.jemaah ? (
+                  <InfoRow
+                    icon={<Users className="w-3.5 h-3.5 text-slate-400" weight="duotone" />}
+                    label="Jemaah"
+                    value={
+                      <span className="font-semibold text-slate-900">{santri.jemaah as string}</span>
+                    }
+                  />
+                ) : null}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -387,7 +592,7 @@ export function SantriProfileView({
                     {rank != null && (
                       <div className="flex items-center gap-2 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-xs">
                         <span className="text-xs font-bold text-amber-600 flex items-center gap-1">
-                          <Trophy className="w-3.5 h-3.5" /> Rank {rank}
+                          <Trophy className="w-3.5 h-3.5" weight="fill" /> Rank {rank}
                         </span>
                         {rataRata != null && (
                           <span className="text-xs text-slate-500 font-mono">
@@ -451,7 +656,7 @@ export function SantriProfileView({
           <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col">
             <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
               <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-emerald-600" /> Riwayat SPP
+                <CreditCard className="w-4 h-4 text-emerald-600" weight="duotone" /> Riwayat SPP
               </h3>
               <span className="text-[11px] bg-white text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-200">
                 {spp.length} Transaksi
@@ -493,7 +698,7 @@ export function SantriProfileView({
           <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col">
             <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
               <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
-                <Wallet className="w-4 h-4 text-amber-600" /> Mutasi Tabungan
+                <Wallet className="w-4 h-4 text-amber-600" weight="duotone" /> Mutasi Tabungan
               </h3>
               <span className="text-[11px] bg-white text-amber-700 px-2 py-0.5 rounded-full font-bold border border-amber-200">
                 {tabungan.length} Mutasi
@@ -516,9 +721,9 @@ export function SantriProfileView({
                       <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="py-2 px-3 flex items-center gap-1.5">
                           {t.jenis === 'MASUK' ? (
-                            <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" weight="fill" />
                           ) : (
-                            <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                            <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" weight="fill" />
                           )}
                           <span className="truncate max-w-[130px] font-medium text-slate-800">
                             {t.keterangan}
@@ -552,7 +757,7 @@ export function SantriProfileView({
           <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col">
             <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
               <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
-                <Clock className="w-4 h-4 text-slate-600" /> Riwayat Izin
+                <Clock className="w-4 h-4 text-slate-600" weight="duotone" /> Riwayat Izin
               </h3>
               <span className="text-[11px] bg-white text-slate-700 px-2 py-0.5 rounded-full font-bold border border-slate-200">
                 {perizinan.length} Izin
@@ -580,7 +785,7 @@ export function SantriProfileView({
                     </div>
                     <p className="font-medium text-slate-800 text-xs sm:text-sm mb-1">{p.alasan}</p>
                     <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                      <Home className="w-3 h-3 text-slate-400" />{' '}
+                      <House className="w-3 h-3 text-slate-400" weight="duotone" />{' '}
                       {p.jenis === 'PULANG' ? 'Izin Pulang' : 'Izin Keluar'}
                     </p>
                   </div>
@@ -593,7 +798,7 @@ export function SantriProfileView({
           <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col">
             <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
               <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-600" /> Riwayat Pelanggaran
+                <Warning className="w-4 h-4 text-rose-600" weight="duotone" /> Riwayat Pelanggaran
               </h3>
               <span className="text-[11px] bg-white text-rose-700 px-2 py-0.5 rounded-full font-bold border border-rose-200">
                 {pelanggaran.reduce((sum, p) => sum + (p.jumlah_kejadian ?? 0), 0)} Kejadian
@@ -615,7 +820,7 @@ export function SantriProfileView({
                     </div>
                     <p className="font-medium text-slate-800 text-xs sm:text-sm mb-1">{p.deskripsi}</p>
                     <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 text-slate-400" />
+                      <WarningCircle className="w-3 h-3 text-slate-400" weight="duotone" />
                       <span>{incidentLabel(p.jenis)}</span>
                       <span>· {p.source === 'pengajian' ? 'Pengajian' : 'Umum'}</span>
                       {p.sesi && <span>· {sessionLabel(p.sesi, p.jenis, p.source || '')}</span>}
@@ -640,7 +845,7 @@ function TabButton({
 }: {
   active: boolean
   onClick: () => void
-  icon: React.ComponentType<{ className?: string }>
+  icon: React.ComponentType<{ className?: string; weight?: 'regular' | 'bold' | 'duotone' | 'fill' }>
   label: string
   count?: number
 }) {
@@ -654,7 +859,10 @@ function TabButton({
           : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
       }`}
     >
-      <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${active ? 'text-emerald-600' : 'text-slate-400'}`} />
+      <Icon
+        className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${active ? 'text-emerald-600' : 'text-slate-400'}`}
+        weight={active ? 'bold' : 'regular'}
+      />
       <span>{label}</span>
       {typeof count === 'number' && count > 0 && (
         <span
@@ -669,58 +877,22 @@ function TabButton({
   )
 }
 
-function SectionCard({
-  title,
-  icon: Icon,
-  children,
-}: {
-  title: string
-  icon: React.ComponentType<{ className?: string }>
-  children: React.ReactNode
-}) {
-  return (
-    <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 sm:p-4 shadow-sm">
-      <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100 mb-2">
-        <Icon className="w-4 h-4 text-slate-500" />
-        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-wide">
-          {title}
-        </h3>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 sm:gap-x-4 gap-y-1">{children}</div>
-    </div>
-  )
-}
-
-function FieldItem({
+function InfoRow({
+  icon,
   label,
   value,
-  isMono = false,
-  badge = null,
-  icon = null,
 }: {
-  label: string
-  value?: string | number | null
-  isMono?: boolean
-  badge?: React.ReactNode
   icon?: React.ReactNode
+  label: string
+  value: React.ReactNode
 }) {
   return (
-    <div className="py-1">
-      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
-        {label}
-      </span>
-      {badge ? (
-        <div className="mt-0.5">{badge}</div>
-      ) : (
-        <span
-          className={`text-xs sm:text-sm text-slate-800 break-words flex items-center ${
-            isMono ? 'font-mono' : 'font-medium'
-          }`}
-        >
-          {icon}
-          {value || '-'}
-        </span>
-      )}
+    <div className="flex items-center justify-between py-2 gap-3">
+      <div className="flex items-center gap-2 min-w-0 text-slate-500">
+        {icon}
+        <span className="text-xs font-medium truncate">{label}</span>
+      </div>
+      <div className="text-right shrink-0">{value}</div>
     </div>
   )
 }

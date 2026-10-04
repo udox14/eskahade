@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Trash2 } from 'lucide-react'
+import { Trash, CircleNotch } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -70,7 +70,11 @@ export function DeleteSantriButton({ santriId, nama, nis, compact = false }: Pro
           : 'inline-flex items-center gap-2 rounded-lg bg-rose-100 px-4 py-2 text-sm font-bold text-rose-700 shadow-sm transition-colors hover:bg-rose-200 disabled:cursor-not-allowed disabled:opacity-70'
       }
     >
-      {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+      {isDeleting ? (
+        <CircleNotch className="h-3.5 w-3.5 animate-spin" weight="bold" />
+      ) : (
+        <Trash className="h-3.5 w-3.5" weight="bold" />
+      )}
       <span>Hapus Data</span>
     </button>
   )

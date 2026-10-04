@@ -6,7 +6,7 @@ import { getCachedMarhalahList, getCachedSantriFilterOptions } from '@/lib/cache
 import { getSession, hasRole, isAdmin } from '@/lib/auth/session'
 import { getSantriKelasScopeForSession } from '@/lib/akademik/guru-access'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Plus } from '@phosphor-icons/react/dist/ssr'
 import { SearchInput, LimitSelector, SantriFilter, ActiveFilterChips } from './santri-client'
 import { TableSkeleton, CardListSkeleton } from '@/components/ui/skeletons'
 import { SantriTable } from './santri-table'

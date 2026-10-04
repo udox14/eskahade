@@ -1,6 +1,6 @@
 import { query, queryOne } from '@/lib/db'
 import Link from 'next/link'
-import { Pencil, ChevronRight, Users, Home, BookOpen } from 'lucide-react'
+import { PencilSimple, CaretRight, Users, House, BookOpen } from '@phosphor-icons/react/dist/ssr'
 import { PaginationControls, SantriActionMenu } from './santri-client'
 import { getKategoriSantriEfektifSql } from '@/lib/santri/kategori'
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
@@ -220,7 +220,7 @@ export async function SantriTable({
   if (santriList.length === 0) {
     return (
       <div className="bg-white border border-slate-200 rounded-xl py-14 px-4 text-center shadow-sm">
-        <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+        <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" weight="duotone" />
         <p className="text-slate-700 font-semibold text-sm">Santri tidak ditemukan</p>
         <p className="text-slate-400 text-xs mt-1">Coba sesuaikan kata kunci pencarian atau reset filter</p>
       </div>
@@ -302,7 +302,7 @@ export async function SantriTable({
 
                     {/* Baris 2: Asrama & Kamar */}
                     <div className="flex items-center gap-1.5 text-xs text-slate-600 mt-1 truncate">
-                      <Home className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <House className="w-3.5 h-3.5 text-slate-400 shrink-0" weight="duotone" />
                       <span className="truncate">
                         {santri.asrama ? `${santri.asrama} · Kmr ${santri.kamar || '-'}` : 'Non-Asrama'}
                       </span>
@@ -310,7 +310,7 @@ export async function SantriTable({
 
                     {/* Baris 3: Pendidikan & Kelas */}
                     <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5 truncate">
-                      <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" weight="duotone" />
                       <span className="truncate">{pendidikanStr}</span>
                     </div>
                   </div>
@@ -437,7 +437,7 @@ export async function SantriTable({
                             className="inline-flex items-center gap-1 text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2.5 py-1.5 rounded-lg font-medium text-xs transition-colors"
                             title="Edit Data Santri"
                           >
-                            <Pencil className="w-3.5 h-3.5 text-slate-500" /> Edit
+                            <PencilSimple className="w-3.5 h-3.5 text-slate-500" weight="bold" /> Edit
                           </Link>
                         )}
                         {isViewable ? (
@@ -446,7 +446,7 @@ export async function SantriTable({
                             className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1.5 rounded-lg font-medium text-xs transition-colors"
                             title="Lihat Detail Santri"
                           >
-                            Detail <ChevronRight className="w-3.5 h-3.5" />
+                            Detail <CaretRight className="w-3.5 h-3.5" weight="bold" />
                           </Link>
                         ) : (
                           <span
