@@ -7,7 +7,7 @@ import { getSession, hasRole, isAdmin } from '@/lib/auth/session'
 import { getSantriKelasScopeForSession } from '@/lib/akademik/guru-access'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
-import { SearchInput, LimitSelector, SantriFilter } from './santri-client'
+import { SearchInput, LimitSelector, SantriFilter, ActiveFilterChips } from './santri-client'
 import { TableSkeleton, CardListSkeleton } from '@/components/ui/skeletons'
 import { SantriTable } from './santri-table'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
@@ -16,6 +16,12 @@ import { KATEGORI_SANTRI_EFEKTIF } from '@/lib/santri/kategori'
 export const dynamic = 'force-dynamic'
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
+
+interface KelasRow {
+  id: number
+  nama_kelas: string
+  marhalah_id: number
+}
 
 export default async function SantriPage(props: { searchParams: SearchParams }) {
   await guardPage('/dashboard/santri')
@@ -45,7 +51,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
     filterOptionsRaw,
   ] = await Promise.all([
     getCachedMarhalahList(),
-    query<any>(`
+    query<KelasRow>(`
       SELECT k.id, k.nama_kelas, k.marhalah_id
       FROM kelas k
       JOIN tahun_ajaran ta ON ta.id = k.tahun_ajaran_id AND ta.is_active = 1
@@ -136,7 +142,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
     kecamatanRows,
     jemaahRows,
   } = filterOptionsRaw
-  const kelasListRaw = kelasRaw.sort((a: any, b: any) =>
+  const kelasListRaw = kelasRaw.sort((a, b) =>
     a.nama_kelas.localeCompare(b.nama_kelas, undefined, { numeric: true, sensitivity: 'base' })
   )
   const kelasList = ownKelasSet
@@ -202,7 +208,7 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
           !isPengurusAsrama && canCreateSantri ? (
             <Link
               href="/dashboard/santri/input"
-              className="bg-green-700 hover:bg-green-800 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 transition-colors shadow-sm text-sm font-semibold w-full sm:w-auto justify-center"
+              className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2.5 rounded-xl flex items-center gap-2 transition-colors shadow-sm text-sm font-semibold w-full sm:w-auto justify-center"
             >
               <Plus className="w-4 h-4" /> Tambah Santri
             </Link>
@@ -210,18 +216,25 @@ export default async function SantriPage(props: { searchParams: SearchParams }) 
         }
       />
 
-      {/* Filter bar — tampil langsung, tidak perlu data */}
-      <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
-        <div className="flex gap-2 items-center">
-          <div className="flex-1"><SearchInput /></div>
-          <SantriFilter
-            marhalahList={marhalahScoped}
-            kelasList={kelasList}
-            filterOptions={filterOptions}
-            userAsrama={null}
-          />
-          <LimitSelector />
+      {/* Toolbar Pencarian & Filter */}
+      <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-2">
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <SearchInput />
+          <div className="flex items-center gap-2">
+            <div className="flex-1 sm:flex-initial">
+              <SantriFilter
+                marhalahList={marhalahScoped}
+                kelasList={kelasList}
+                filterOptions={filterOptions}
+                userAsrama={userAsrama}
+              />
+            </div>
+            <LimitSelector />
+          </div>
         </div>
+
+        {/* Chip ringkasan filter aktif */}
+        <ActiveFilterChips userAsrama={userAsrama} />
       </div>
 
       {/* List — di-suspend, tampilkan skeleton sambil fetch */}
