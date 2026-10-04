@@ -38,7 +38,7 @@ export default async function SantriDetailPage({ params }: Props) {
   const isAdmin = hasRole(session, 'admin')
 
   return (
-    <div className="max-w-5xl mx-auto pb-16">
+    <div className="space-y-4 pb-16">
       {/* Detail content — di-suspend */}
       <Suspense fallback={<DetailSkeleton />}>
         <SantriDetailContent

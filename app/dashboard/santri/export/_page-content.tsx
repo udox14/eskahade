@@ -1,495 +1,785 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { getFilterOptions, getDataExport, getKamarList } from './actions'
 import {
-  KOLOM_TERSEDIA, SORT_OPTIONS, KOLOM_DEFAULT, HEADER_MAP,
-  type ExportFilter, type SortBy, type KolomExport
+  KOLOM_TERSEDIA,
+  SORT_OPTIONS,
+  KOLOM_DEFAULT,
+  HEADER_MAP,
+  PRESET_KOLOM,
+  type ExportFilter,
+  type SortBy,
+  type KolomExport,
 } from './constants'
 import {
-  Filter, Download, RefreshCw,
-  ChevronDown, ChevronUp, Check, Loader2, Users, Settings2
-} from 'lucide-react'
+  Funnel,
+  ArrowsDownUp,
+  Users,
+  Eye,
+  CircleNotch,
+  Sparkle,
+  ArrowCounterClockwise,
+  IdentificationBadge,
+  House,
+  GraduationCap,
+  UsersThree,
+  MagnifyingGlass,
+  FileXls,
+} from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const KOLOM_GROUPS = [...new Set(KOLOM_TERSEDIA.map(k => k.group))]
+// ── Kelompok Kolom ─────────────────────────────────────────────────────────────
+const GRUP_CONFIG: {
+  nama: string
+  icon: React.ElementType
+}[] = [
+  { nama: 'Identitas Santri', icon: IdentificationBadge },
+  { nama: 'Pesantren & Asrama', icon: House },
+  { nama: 'Sekolah & Layanan', icon: GraduationCap },
+  { nama: 'Keluarga & Wilayah', icon: UsersThree },
+]
 
-// ── Komponen: Toggle pilih kolom ──────────────────────────────────────────────
-function KolomPicker({ selected, onChange }: {
-  selected: KolomExport[]
-  onChange: (k: KolomExport[]) => void
-}) {
-  const toggle = (k: KolomExport) =>
-    onChange(selected.includes(k) ? selected.filter(x => x !== k) : [...selected, k])
-
-  const pilihSemua  = () => onChange(KOLOM_TERSEDIA.map(k => k.key))
-  const hapusSemua  = () => onChange([])
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-slate-500">{selected.length} kolom dipilih</span>
-        <div className="flex gap-1.5">
-          <button onClick={pilihSemua} className="text-[10px] font-bold text-emerald-600 hover:underline">Pilih semua</button>
-          <span className="text-slate-300">·</span>
-          <button onClick={hapusSemua} className="text-[10px] font-bold text-red-500 hover:underline">Hapus semua</button>
-        </div>
-      </div>
-      {KOLOM_GROUPS.map(grp => (
-        <div key={grp}>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">{grp}</p>
-          <div className="flex flex-wrap gap-1.5">
-            {KOLOM_TERSEDIA.filter(k => k.group === grp).map(k => (
-              <button key={k.key} onClick={() => toggle(k.key)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all active:scale-95 ${
-                  selected.includes(k.key)
-                    ? 'bg-emerald-600 text-white border-emerald-600'
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                }`}>
-                {selected.includes(k.key) && <Check className="w-3 h-3" />}
-                {k.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
+interface FilterOptionsState {
+  asramaList: string[]
+  sekolahList: string[]
+  kelasSekolahList: string[]
+  tahunList: number[]
+  marhalahUnik: string[]
+  kelasList: string[]
+  jasaMakanList: { id: string; nama_jasa: string }[]
+  jasaCuciList: { id: string; nama_jasa: string }[]
+  kabKotaList: string[]
+  provinsiList: string[]
+  golDarahList: string[]
+  jemaahList: string[]
+  asramaBinaan: string | null
 }
 
-// ── Komponen: Section collapsible ────────────────────────────────────────────
-function Section({ title, icon: Icon, badge, children, defaultOpen = false }: {
-  title: string; icon: React.ElementType; badge?: string
-  children: React.ReactNode; defaultOpen?: boolean
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <button onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
-        <div className="flex items-center gap-2.5">
-          <Icon className="w-4 h-4 text-slate-500" />
-          <span className="font-bold text-slate-800 text-sm">{title}</span>
-          {badge && <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">{badge}</span>}
-        </div>
-        {open ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-      </button>
-      {open && <div className="px-4 pb-4 border-t border-slate-100 pt-4">{children}</div>}
-    </div>
-  )
-}
-
-// ── Komponen: Multi-select chip ──────────────────────────────────────────────
-function MultiChip({ label, selected, onChange, options, disabled = false }: {
-  label: string
-  selected: string[]
-  onChange: (v: string[]) => void
-  options: string[]
-  disabled?: boolean
-}) {
-  if (options.length === 0) return (
-    <div>
-      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{label}</label>
-      <p className="text-xs text-slate-300 italic py-1">{disabled ? '← Pilih asrama dulu' : 'Tidak ada opsi'}</p>
-    </div>
-  )
-
-  const toggle = (v: string) =>
-    onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</label>
-        {selected.length > 0 && (
-          <button onClick={() => onChange([])} className="text-[9px] text-red-400 hover:underline">× hapus</button>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map(o => (
-          <button key={o} onClick={() => toggle(o)}
-            className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all active:scale-95 ${
-              selected.includes(o)
-                ? 'bg-emerald-600 text-white border-emerald-600'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400'
-            }`}>
-            {o}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-type ChipOption = { value: string; label: string }
-
-function MultiOptionChip({ label, selected, onChange, options }: {
-  label: string
-  selected: string[]
-  onChange: (v: string[]) => void
-  options: ChipOption[]
-}) {
-  if (options.length === 0) return (
-    <div>
-      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">{label}</label>
-      <p className="text-xs text-slate-300 italic py-1">Tidak ada opsi</p>
-    </div>
-  )
-
-  const toggle = (v: string) =>
-    onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</label>
-        {selected.length > 0 && (
-          <button onClick={() => onChange([])} className="text-[9px] text-red-400 hover:underline">hapus</button>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map(o => (
-          <button key={o.value} onClick={() => toggle(o.value)}
-            className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all active:scale-95 ${
-              selected.includes(o.value)
-                ? 'bg-emerald-600 text-white border-emerald-600'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400'
-            }`}>
-            {o.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ── Main ──────────────────────────────────────────────────────────────────────
 export default function ExportSantriPage() {
-  const [opts, setOpts]         = useState<any>(null)
+  const [opts, setOpts] = useState<FilterOptionsState | null>(null)
   const [loadingOpts, setLoadingOpts] = useState(true)
-  const [kamarList, setKamarList]     = useState<string[]>([])
+  const [kamarList, setKamarList] = useState<string[]>([])
 
-  // Filter
-  const [filter, setFilter]     = useState<ExportFilter>({})
-  const [sortBy, setSortBy]     = useState<SortBy>('nama_lengkap')
-  const [kolom, setKolom]       = useState<KolomExport[]>(KOLOM_DEFAULT)
+  // Filter State
+  const [filter, setFilter] = useState<ExportFilter>({
+    status: 'aktif',
+  })
+  const [sortBy, setSortBy] = useState<SortBy>('nama_lengkap')
+  const [kolom, setKolom] = useState<KolomExport[]>(KOLOM_DEFAULT)
 
-  // Preview
-  const [preview, setPreview]   = useState<any[]>([])
-  const [total, setTotal]       = useState(0)
+  // Preview & Export State
+  const [preview, setPreview] = useState<Record<string, unknown>[]>([])
+  const [total, setTotal] = useState(0)
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [hasPreview, setHasPreview] = useState(false)
-
   const [exporting, setExporting] = useState(false)
 
   // Load opsi filter saat mount
   useEffect(() => {
-    getFilterOptions().then(o => { setOpts(o); setLoadingOpts(false) })
+    let alive = true
+    getFilterOptions().then((o) => {
+      if (alive) {
+        setOpts(o)
+        setLoadingOpts(false)
+      }
+    })
+    return () => {
+      alive = false
+    }
   }, [])
 
-  // Load kamar list saat asrama dipilih (single asrama) atau clear saat multi/kosong
+  // Lazy load daftar kamar jika asrama dipilih tunggal
   useEffect(() => {
+    let alive = true
     if (filter.asrama && filter.asrama.length === 1) {
-      getKamarList(filter.asrama[0]).then(setKamarList)
+      getKamarList(filter.asrama[0]).then((k) => {
+        if (alive) setKamarList(k)
+      })
     } else {
       setKamarList([])
     }
+    return () => {
+      alive = false
+    }
   }, [filter.asrama])
 
+  // Helper pengubah filter
+  const updateFilter = useCallback((key: keyof ExportFilter, val: unknown) => {
+    setFilter((prev) => {
+      if (val === undefined || val === '' || (Array.isArray(val) && val.length === 0)) {
+        const next = { ...prev }
+        delete next[key]
+        return next
+      }
+      return { ...prev, [key]: val }
+    })
+  }, [])
 
+  const resetFilter = useCallback(() => {
+    setFilter({ status: 'aktif' })
+    setHasPreview(false)
+  }, [])
 
-  const setF = (key: keyof ExportFilter, val: any) =>
-    setFilter(prev => ({ ...prev, [key]: val }))
+  // Hitung jumlah filter aktif (di luar status default aktif)
+  const activeFiltersCount = useMemo(() => {
+    let count = 0
+    if (filter.status && filter.status !== 'aktif') count++
+    if (filter.jenis_kelamin) count++
+    if (filter.asrama && filter.asrama.length > 0) count++
+    if (filter.kamar && filter.kamar.length > 0) count++
+    if (filter.tempat_makan_id && filter.tempat_makan_id.length > 0) count++
+    if (filter.tempat_mencuci_id && filter.tempat_mencuci_id.length > 0) count++
+    if (filter.sekolah && filter.sekolah.length > 0) count++
+    if (filter.kelas_sekolah && filter.kelas_sekolah.length > 0) count++
+    if (filter.nama_kelas && filter.nama_kelas.length > 0) count++
+    if (filter.marhalah && filter.marhalah.length > 0) count++
+    if (filter.tahun_masuk && filter.tahun_masuk.length > 0) count++
+    if (filter.kategori_santri && filter.kategori_santri.length > 0) count++
+    if (filter.gol_darah && filter.gol_darah.length > 0) count++
+    if (filter.kab_kota && filter.kab_kota.length > 0) count++
+    if (filter.jemaah && filter.jemaah.length > 0) count++
+    if (filter.q) count++
+    return count
+  }, [filter])
 
-  const setArr = (key: keyof ExportFilter) => (vals: string[]) =>
-    setFilter(prev => ({ ...prev, [key]: vals.length > 0 ? vals : undefined }))
+  // Toggle satu kolom
+  const toggleKolom = useCallback((key: KolomExport) => {
+    setKolom((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))
+  }, [])
 
-  // Hitung jumlah filter aktif
-  const activeFilters = Object.values(filter).filter(v =>
-    v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0)
-  ).length
-  const jasaMakanOptions: ChipOption[] = [
-    { value: '__NULL__', label: 'Belum diatur' },
-    ...((opts?.jasaMakanList ?? []) as Array<{ id: string; nama_jasa: string }>).map(j => ({
-      value: j.id,
-      label: j.nama_jasa,
-    })),
-  ]
-  const jasaCuciOptions: ChipOption[] = [
-    { value: '__NULL__', label: 'Belum diatur' },
-    ...((opts?.jasaCuciList ?? []) as Array<{ id: string; nama_jasa: string }>).map(j => ({
-      value: j.id,
-      label: j.nama_jasa,
-    })),
-  ]
+  // Toggle semua kolom dalam grup
+  const toggleGrupKolom = useCallback(
+    (grupNama: string) => {
+      const kolomInGrup = KOLOM_TERSEDIA.filter((k) => k.group === grupNama).map((k) => k.key)
+      const allSelected = kolomInGrup.every((k) => kolom.includes(k))
 
-  // Preview — ambil 10 baris pertama untuk konfirmasi
+      if (allSelected) {
+        setKolom((prev) => prev.filter((k) => !kolomInGrup.includes(k)))
+      } else {
+        setKolom((prev) => Array.from(new Set([...prev, ...kolomInGrup])))
+      }
+    },
+    [kolom]
+  )
+
+  // Terapkan Preset
+  const applyPreset = useCallback((presetKolom: KolomExport[]) => {
+    setKolom(presetKolom)
+  }, [])
+
+  // Preview Data
   const handlePreview = useCallback(async () => {
-    if (kolom.length === 0) { toast.error('Pilih minimal 1 kolom'); return }
+    if (kolom.length === 0) {
+      toast.error('Pilih minimal 1 kolom untuk pratinjau')
+      return
+    }
     setLoadingPreview(true)
     try {
       const res = await getDataExport(filter, kolom, sortBy)
-      if ('error' in res) { toast.error(res.error); return }
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
       setPreview(res.rows.slice(0, 10))
       setTotal(res.total)
       setHasPreview(true)
-    } finally { setLoadingPreview(false) }
+      if (res.total === 0) {
+        toast.info('Tidak ada data santri yang cocok dengan kriteria filter.')
+      }
+    } catch {
+      toast.error('Gagal mengambil pratinjau data')
+    } finally {
+      setLoadingPreview(false)
+    }
   }, [filter, kolom, sortBy])
 
   // Export ke Excel
   const handleExport = async () => {
-    if (kolom.length === 0) { toast.error('Pilih minimal 1 kolom'); return }
+    if (kolom.length === 0) {
+      toast.error('Pilih minimal 1 kolom yang ingin diexport')
+      return
+    }
     setExporting(true)
-    const toastId = toast.loading('Mengambil data...')
+    const toastId = toast.loading('Mengambil seluruh data santri...')
     try {
       const res = await getDataExport(filter, kolom, sortBy)
-      if ('error' in res) { toast.error(res.error); return }
+      if ('error' in res) {
+        toast.error(res.error)
+        return
+      }
 
+      if (res.rows.length === 0) {
+        toast.error('Data kosong, tidak ada baris yang bisa diexport')
+        return
+      }
+
+      toast.loading('Menyusun file Excel (.xlsx)...', { id: toastId })
       const XLSX = await import('xlsx')
 
-      // Header row
-      const headers = ['No', ...kolom.map(k => HEADER_MAP[k])]
-      const rows = res.rows.map((r: any, i: number) => [
+      const headers = ['No', ...kolom.map((k) => HEADER_MAP[k] || k)]
+      const rows = res.rows.map((r, i) => [
         i + 1,
-        ...kolom.map(k => {
-          const v = r[k] ?? r['nama'] ?? ''
-          if (k === 'jenis_kelamin') return v === 'L' ? 'Laki-laki' : v === 'P' ? 'Perempuan' : v
-          return v ?? ''
-        })
+        ...kolom.map((k) => {
+          const val = r[k]
+          if (k === 'jenis_kelamin') {
+            return val === 'L' ? 'Laki-laki' : val === 'P' ? 'Perempuan' : val || ''
+          }
+          if (k === 'status_global') {
+            const s = String(val || '').toLowerCase()
+            if (s === 'aktif') return 'Aktif'
+            if (s === 'lulus') return 'Lulus'
+            if (s === 'keluar') return 'Keluar'
+            if (s === 'nonaktif_sementara') return 'Nonaktif Sementara'
+            return val || ''
+          }
+          return val ?? ''
+        }),
       ])
 
       const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-      // Auto column width
-      const colWidths = headers.map((h, i) => ({
-        wch: Math.max(h.length, ...rows.map(r => String(r[i] ?? '').length), 8)
-      }))
+
+      // Lebar kolom otomatis
+      const colWidths = headers.map((h, colIdx) => {
+        let maxLen = h.length
+        for (let rowIdx = 0; rowIdx < Math.min(rows.length, 100); rowIdx++) {
+          const cellStr = String(rows[rowIdx][colIdx] ?? '')
+          if (cellStr.length > maxLen) maxLen = cellStr.length
+        }
+        return { wch: Math.min(Math.max(maxLen + 3, 10), 45) }
+      })
       ws['!cols'] = colWidths
 
       const wb = XLSX.utils.book_new()
-      const filterDesc = [
-        filter.asrama?.join('-'),
-        filter.jenis_kelamin === 'L' ? 'Laki' : filter.jenis_kelamin === 'P' ? 'Perempuan' : '',
-        filter.nama_kelas?.join('-'),
-      ].filter(Boolean).join('_') || 'Semua'
-
       XLSX.utils.book_append_sheet(wb, ws, 'Data Santri')
-      XLSX.writeFile(wb, `Data_Santri_${filterDesc}_${new Date().toLocaleDateString('id-ID').replace(/\//g, '-')}.xlsx`)
 
-      toast.success(`Berhasil export ${res.total} data santri`)
-    } catch (e) {
-      toast.error('Gagal export')
+      const statusTag = filter.status ? `_${filter.status}` : ''
+      const asramaTag = filter.asrama && filter.asrama.length === 1 ? `_${filter.asrama[0]}` : ''
+      const dateTag = new Date().toISOString().slice(0, 10)
+      const fileName = `Data_Santri${statusTag}${asramaTag}_${dateTag}.xlsx`
+
+      XLSX.writeFile(wb, fileName)
+      toast.success(`Berhasil mengunduh ${res.total} data santri!`, { id: toastId })
+    } catch {
+      toast.error('Gagal mengekspor file Excel', { id: toastId })
     } finally {
       setExporting(false)
       toast.dismiss(toastId)
     }
   }
 
-  const kolomBadge = `${kolom.length}/${KOLOM_TERSEDIA.length} kolom`
-  const filterBadge = activeFilters > 0 ? `${activeFilters} filter aktif` : undefined
-
   if (loadingOpts) {
     return (
-      <div className="flex justify-center py-20 gap-2 text-slate-400">
-        <Loader2 className="w-5 h-5 animate-spin" /><span className="text-sm">Memuat opsi...</span>
+      <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-400">
+        <CircleNotch className="w-6 h-6 animate-spin text-emerald-600" />
+        <span className="text-sm font-medium">Memuat konfigurasi export...</span>
       </div>
     )
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-16 space-y-4">
-
+    <div className="space-y-6 pb-16">
+      {/* ── HEADER ── */}
       <DashboardPageHeader
         title="Export Data Santri"
-        description="Pilih filter, kolom, dan urutan lalu export ke Excel."
+        description="Filter data santri secara spesifik, tentukan susunan kolom, lalu unduh dalam format spreadsheet Excel."
       />
 
-      {/* 1. Filter kriteria */}
-      <Section title="Filter Kriteria" icon={Filter} badge={filterBadge} defaultOpen={true}>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-
-          {/* Jenis kelamin */}
-          <div className="col-span-2 sm:col-span-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Jenis Kelamin</label>
-            <div className="flex gap-1.5">
-              {(['', 'L', 'P'] as const).map(v => (
-                <button key={v} onClick={() => setF('jenis_kelamin', v || undefined)}
-                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all active:scale-95 ${
-                    (filter.jenis_kelamin ?? '') === v
-                      ? 'bg-emerald-600 text-white border-emerald-600'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400'
-                  }`}>
-                  {v === '' ? 'Semua' : v === 'L' ? 'Laki-laki' : 'Perempuan'}
-                </button>
-              ))}
+      {/* ── 1. KARTU FILTER SANTRI (CLEAN FORM GRID) ── */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+        {/* Header Seksi */}
+        <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+              <Funnel className="w-4 h-4" weight="duotone" />
+            </div>
+            <div>
+              <h2 className="font-bold text-slate-800 text-sm sm:text-base">1. Kriteria & Filter Santri</h2>
+              <p className="text-xs text-slate-500">Tentukan data santri yang ingin diambil.</p>
             </div>
           </div>
 
-          <div className="col-span-2 sm:col-span-3">
-            <MultiChip label="Asrama" selected={filter.asrama ?? []}
-              onChange={vals => { setArr('asrama')(vals); setF('kamar', undefined) }}
-              options={opts?.asramaList ?? []} />
+          <div className="flex items-center gap-2">
+            {activeFiltersCount > 0 && (
+              <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-2.5 py-1 rounded-full">
+                {activeFiltersCount} filter diterapkan
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={resetFilter}
+              className="text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              <ArrowCounterClockwise className="w-3.5 h-3.5" />
+              <span>Reset</span>
+            </button>
           </div>
-
-          <div className="col-span-2 sm:col-span-3">
-            <MultiChip label="Kamar" selected={filter.kamar ?? []}
-              onChange={setArr('kamar')}
-              options={filter.asrama?.length === 1 ? kamarList : []}
-              disabled={!filter.asrama?.length} />
-          </div>
-
-          <div className="col-span-2 sm:col-span-3">
-            <MultiOptionChip label="Katering / Tempat Makan" selected={filter.tempat_makan_id ?? []}
-              onChange={vals => setF('tempat_makan_id', vals.length ? vals : undefined)}
-              options={jasaMakanOptions} />
-          </div>
-
-          <div className="col-span-2 sm:col-span-3">
-            <MultiOptionChip label="Laundry / Tempat Cuci" selected={filter.tempat_mencuci_id ?? []}
-              onChange={vals => setF('tempat_mencuci_id', vals.length ? vals : undefined)}
-              options={jasaCuciOptions} />
-          </div>
-
-          <div className="col-span-2 sm:col-span-3">
-            <MultiChip label="Kelas Pesantren" selected={filter.nama_kelas ?? []}
-              onChange={setArr('nama_kelas')}
-              options={opts?.kelasList ?? []} />
-          </div>
-
-          <div className="col-span-2 sm:col-span-3">
-            <MultiChip label="Marhalah" selected={filter.marhalah ?? []}
-              onChange={setArr('marhalah')}
-              options={opts?.marhalahUnik ?? []} />
-          </div>
-
-          <div className="col-span-2 sm:col-span-3">
-            <MultiChip label="Sekolah" selected={filter.sekolah ?? []}
-              onChange={setArr('sekolah')}
-              options={opts?.sekolahList ?? []} />
-          </div>
-
-          <div className="col-span-2 sm:col-span-1">
-            <MultiChip label="Kelas Sekolah" selected={filter.kelas_sekolah ?? []}
-              onChange={setArr('kelas_sekolah')}
-              options={opts?.kelasSekolahList ?? []} />
-          </div>
-
-          <div className="col-span-2 sm:col-span-1">
-            <MultiChip label="Tahun Masuk"
-              selected={filter.tahun_masuk?.map(String) ?? []}
-              onChange={vals => setF('tahun_masuk', vals.length ? vals.map(Number) : undefined)}
-              options={opts?.tahunList?.map(String) ?? []} />
-          </div>
-
-          <div className="col-span-2 sm:col-span-1">
-            <MultiChip label="Kategori Santri"
-              selected={filter.kategori_santri ?? []}
-              onChange={setArr('kategori_santri')}
-              options={['BARU', 'REGULER', 'SADESA']} />
-          </div>
-
-          <div className="col-span-2 sm:col-span-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Kata dalam Alamat</label>
-            <input type="text" placeholder="Cth: Tasikmalaya"
-              value={filter.alamat_kata ?? ''}
-              onChange={e => setF('alamat_kata', e.target.value || undefined)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
-
         </div>
 
-        {activeFilters > 0 && (
-          <button onClick={() => setFilter({})}
-            className="mt-3 text-xs text-red-500 hover:underline font-medium">
-            × Hapus semua filter
-          </button>
-        )}
-      </Section>
+        {/* Isi Form Filter */}
+        <div className="p-5 sm:p-6 space-y-5">
+          {/* Baris 1: Status, JK, Kategori, Pencarian Cepat */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Status Santri */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">Status Santri</label>
+              <select
+                value={filter.status ?? 'aktif'}
+                onChange={(e) => updateFilter('status', e.target.value)}
+                className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+              >
+                <option value="aktif">Santri Aktif (Default)</option>
+                <option value="lulus">Alumni / Lulus</option>
+                <option value="nonaktif_sementara">Nonaktif Sementara</option>
+                <option value="keluar">Santri Keluar</option>
+                <option value="all">Semua Status (Aktif & Nonaktif)</option>
+              </select>
+            </div>
 
-      {/* 2. Pilih kolom */}
-      <Section title="Kolom yang Diexport" icon={Settings2} badge={kolomBadge} defaultOpen={true}>
-        <KolomPicker selected={kolom} onChange={setKolom} />
-      </Section>
+            {/* Jenis Kelamin */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">Jenis Kelamin</label>
+              <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
+                {(['', 'L', 'P'] as const).map((jk) => (
+                  <button
+                    key={jk}
+                    type="button"
+                    onClick={() => updateFilter('jenis_kelamin', jk || undefined)}
+                    className={`py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                      (filter.jenis_kelamin ?? '') === jk
+                        ? 'bg-white text-emerald-700 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {jk === '' ? 'Semua' : jk === 'L' ? 'Laki-laki' : 'Perempuan'}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-      {/* 3. Urutan */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="text-sm font-bold text-slate-700 shrink-0">Urutkan berdasarkan:</label>
-          <div className="flex flex-wrap gap-1.5">
-            {SORT_OPTIONS.map(s => (
-              <button key={s.value} onClick={() => setSortBy(s.value)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all active:scale-95 ${
-                  sortBy === s.value
-                    ? 'bg-slate-800 text-white border-slate-800'
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                }`}>
-                {s.label}
-              </button>
+            {/* Kategori Santri */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">Kategori Santri</label>
+              <select
+                value={filter.kategori_santri?.[0] ?? ''}
+                onChange={(e) =>
+                  updateFilter('kategori_santri', e.target.value ? [e.target.value] : undefined)
+                }
+                className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+              >
+                <option value="">Semua Kategori</option>
+                <option value="REGULER">REGULER</option>
+                <option value="BARU">BARU</option>
+                <option value="SADESA">SADESA</option>
+              </select>
+            </div>
+
+            {/* Pencarian Nama / NIS */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">Pencarian Nama / NIS</label>
+              <div className="relative">
+                <MagnifyingGlass className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Ketik nama atau NIS..."
+                  value={filter.q ?? ''}
+                  onChange={(e) => updateFilter('q', e.target.value || undefined)}
+                  className="w-full bg-slate-50/80 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Baris 2: Asrama, Kamar, Marhalah, Kelas Pesantren */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-slate-100">
+            {/* Asrama */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">Asrama</label>
+              <select
+                value={filter.asrama?.[0] ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value
+                  updateFilter('asrama', val ? [val] : undefined)
+                  updateFilter('kamar', undefined)
+                }}
+                disabled={Boolean(opts?.asramaBinaan)}
+                className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition disabled:bg-slate-100 disabled:text-slate-500"
+              >
+                <option value="">Semua Asrama</option>
+                {opts?.asramaList.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Kamar */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">Kamar</label>
+              <select
+                value={filter.kamar?.[0] ?? ''}
+                onChange={(e) => updateFilter('kamar', e.target.value ? [e.target.value] : undefined)}
+                disabled={!filter.asrama || filter.asrama.length !== 1}
+                className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                <option value="">
+                  {!filter.asrama?.length
+                    ? 'Pilih asrama dahulu'
+                    : kamarList.length === 0
+                      ? 'Tidak ada data kamar'
+                      : 'Semua Kamar'}
+                </option>
+                {kamarList.map((kmr) => (
+                  <option key={kmr} value={kmr}>
+                    Kamar {kmr}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Marhalah */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">Marhalah</label>
+              <select
+                value={filter.marhalah?.[0] ?? ''}
+                onChange={(e) => updateFilter('marhalah', e.target.value ? [e.target.value] : undefined)}
+                className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+              >
+                <option value="">Semua Marhalah</option>
+                {opts?.marhalahUnik.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Kelas Pesantren */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">Kelas Pesantren</label>
+              <select
+                value={filter.nama_kelas?.[0] ?? ''}
+                onChange={(e) => updateFilter('nama_kelas', e.target.value ? [e.target.value] : undefined)}
+                className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+              >
+                <option value="">Semua Kelas Pesantren</option>
+                {opts?.kelasList.map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Baris 3: Sekolah Formal, Kelas Sekolah, Tahun Masuk, Domisili/Fasilitas */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-slate-100">
+            {/* Sekolah Formal */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">Sekolah Formal</label>
+              <select
+                value={filter.sekolah?.[0] ?? ''}
+                onChange={(e) => updateFilter('sekolah', e.target.value ? [e.target.value] : undefined)}
+                className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+              >
+                <option value="">Semua Sekolah</option>
+                {opts?.sekolahList.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Kelas Sekolah */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">Tingkat Kelas Sekolah</label>
+              <select
+                value={filter.kelas_sekolah?.[0] ?? ''}
+                onChange={(e) =>
+                  updateFilter('kelas_sekolah', e.target.value ? [e.target.value] : undefined)
+                }
+                className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+              >
+                <option value="">Semua Tingkat</option>
+                {opts?.kelasSekolahList.map((ks) => (
+                  <option key={ks} value={ks}>
+                    Kelas {ks}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Tahun Masuk */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">Tahun Masuk</label>
+              <select
+                value={filter.tahun_masuk?.[0] ?? ''}
+                onChange={(e) =>
+                  updateFilter('tahun_masuk', e.target.value ? [Number(e.target.value)] : undefined)
+                }
+                className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+              >
+                <option value="">Semua Tahun</option>
+                {opts?.tahunList.map((th) => (
+                  <option key={th} value={th}>
+                    Tahun {th}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Kab/Kota Domisili */}
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1.5">Kab/Kota Asal</label>
+              <select
+                value={filter.kab_kota?.[0] ?? ''}
+                onChange={(e) => updateFilter('kab_kota', e.target.value ? [e.target.value] : undefined)}
+                className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+              >
+                <option value="">Semua Kab/Kota</option>
+                {opts?.kabKotaList.map((kota) => (
+                  <option key={kota} value={kota}>
+                    {kota}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 2. KARTU PILIHAN KOLOM (PRESETS + STRUCTURED CHECKBOXES) ── */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+        {/* Header Seksi */}
+        <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+              <Sparkle className="w-4 h-4" weight="duotone" />
+            </div>
+            <div>
+              <h2 className="font-bold text-slate-800 text-sm sm:text-base">2. Pilihan Kolom Data</h2>
+              <p className="text-xs text-slate-500">Pilih preset praktis atau centang kolom yang dibutuhkan.</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2.5 py-1 rounded-full">
+              {kolom.length} dari {KOLOM_TERSEDIA.length} kolom dipilih
+            </span>
+          </div>
+        </div>
+
+        {/* Toolbar Preset Cepat */}
+        <div className="px-5 py-3.5 bg-slate-50/40 border-b border-slate-100">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2">
+            <span>⚡ Preset Ekspor Cepat:</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {PRESET_KOLOM.map((preset) => {
+              const isMatch =
+                preset.kolom.length === kolom.length &&
+                preset.kolom.every((k) => kolom.includes(k))
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => applyPreset(preset.kolom)}
+                  title={preset.description}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all active:scale-95 ${
+                    isMatch
+                      ? 'bg-slate-800 text-white border-slate-800 shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => setKolom([])}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-all ml-auto"
+            >
+              Hapus Semua
+            </button>
+          </div>
+        </div>
+
+        {/* Kluster Kolom Berdasarkan Grup */}
+        <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+          {GRUP_CONFIG.map(({ nama, icon: IconComponent }) => {
+            const listKolomGrup = KOLOM_TERSEDIA.filter((k) => k.group === nama)
+            const allChecked = listKolomGrup.every((k) => kolom.includes(k.key))
+            const someChecked =
+              !allChecked && listKolomGrup.some((k) => kolom.includes(k.key))
+
+            return (
+              <div
+                key={nama}
+                className="rounded-xl border border-slate-200/80 bg-slate-50/30 overflow-hidden flex flex-col"
+              >
+                {/* Header Grup */}
+                <div className="px-4 py-2.5 bg-slate-100/70 border-b border-slate-200/70 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <IconComponent className="w-4 h-4 text-slate-500" weight="duotone" />
+                    <span className="text-xs font-bold text-slate-700">{nama}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleGrupKolom(nama)}
+                    className="text-[11px] font-semibold text-emerald-700 hover:underline"
+                  >
+                    {allChecked ? 'Batal Semua' : someChecked ? 'Pilih Semua' : 'Pilih Semua'}
+                  </button>
+                </div>
+
+                {/* Daftar Checkbox Kolom */}
+                <div className="p-3.5 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white flex-1">
+                  {listKolomGrup.map((item) => {
+                    const isChecked = kolom.includes(item.key)
+                    return (
+                      <label
+                        key={item.key}
+                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs cursor-pointer select-none transition-colors ${
+                          isChecked
+                            ? 'bg-emerald-50/60 text-slate-900 font-semibold'
+                            : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleKolom(item.key)}
+                          className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 transition"
+                        />
+                        <span className="truncate">{item.label}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── 3. PENGURUTAN & TOMBOL AKSI (ACTION BAR) ── */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 sm:p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {/* Dropdown Pengurutan */}
+        <div className="flex items-center gap-2.5">
+          <ArrowsDownUp className="w-4 h-4 text-slate-500 shrink-0" weight="duotone" />
+          <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Urutan:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+            className="bg-slate-50/80 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
             ))}
-          </div>
+          </select>
+        </div>
+
+        {/* Tombol Preview & Download */}
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={handlePreview}
+            disabled={loadingPreview || kolom.length === 0}
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold transition-colors disabled:opacity-50"
+          >
+            {loadingPreview ? (
+              <CircleNotch className="w-4 h-4 animate-spin text-slate-500" />
+            ) : (
+              <Eye className="w-4 h-4 text-slate-500" weight="bold" />
+            )}
+            <span>Pratinjau Data</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={exporting || kolom.length === 0}
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs hover:shadow-sm transition-all disabled:opacity-50"
+          >
+            {exporting ? (
+              <CircleNotch className="w-4 h-4 animate-spin text-white" />
+            ) : (
+              <FileXls className="w-4 h-4 text-white" weight="bold" />
+            )}
+            <span>Download Excel</span>
+          </button>
         </div>
       </div>
 
-      {/* Tombol aksi */}
-      <div className="flex flex-wrap gap-3">
-        <button onClick={handlePreview} disabled={loadingPreview || kolom.length === 0}
-          className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 disabled:opacity-50 transition-colors">
-          {loadingPreview ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
-          Pratinjau Data
-        </button>
-        <button onClick={handleExport} disabled={exporting || kolom.length === 0}
-          className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 disabled:opacity-50 shadow-sm transition-colors">
-          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {exporting ? 'Mengexport...' : 'Export Excel'}
-        </button>
-      </div>
-
-      {/* Preview tabel */}
+      {/* ── 4. TABEL PRATINJAU DATA ── */}
       {hasPreview && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden animate-in fade-in duration-200">
+          <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-emerald-600" />
-              <span className="font-bold text-slate-800 text-sm">
-                Pratinjau — {total} data ditemukan
+              <Users className="w-4 h-4 text-emerald-600" weight="duotone" />
+              <span className="font-bold text-slate-800 text-xs sm:text-sm">
+                Hasil Pratinjau ({total.toLocaleString('id-ID')} Santri Ditemukan)
               </span>
               {total > 10 && (
-                <span className="text-xs text-slate-400">(menampilkan 10 pertama)</span>
+                <span className="text-xs text-slate-400 font-normal hidden sm:inline">
+                  — menampilkan 10 baris pertama
+                </span>
               )}
             </div>
+            <span className="text-xs text-slate-500 font-medium">
+              {kolom.length} Kolom
+            </span>
           </div>
+
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-left text-xs">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-3 py-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">No</th>
-                  {kolom.map(k => (
-                    <th key={k} className="px-3 py-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                      {KOLOM_TERSEDIA.find(x => x.key === k)?.label ?? k}
+                <tr className="bg-slate-50/80 border-b border-slate-200/80">
+                  <th className="px-3 py-2.5 font-bold text-slate-600 w-12 text-center">No</th>
+                  {kolom.map((k) => (
+                    <th key={k} className="px-3 py-2.5 font-bold text-slate-600 whitespace-nowrap">
+                      {HEADER_MAP[k] || k}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
-                {preview.map((row, i) => (
-                  <tr key={i} className="hover:bg-slate-50/50">
-                    <td className="px-3 py-2 text-slate-400">{i + 1}</td>
-                    {kolom.map(k => (
-                      <td key={k} className="px-3 py-2 text-slate-700 max-w-[180px] truncate">
-                        {k === 'jenis_kelamin'
-                          ? (row[k] === 'L' ? 'Laki-laki' : row[k] === 'P' ? 'Perempuan' : row[k])
-                          : (row[k] ?? '—')}
-                      </td>
-                    ))}
+              <tbody className="divide-y divide-slate-100">
+                {preview.map((row, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="px-3 py-2 text-center text-slate-400 font-mono text-[11px]">
+                      {idx + 1}
+                    </td>
+                    {kolom.map((k) => {
+                      const val = row[k]
+                      let displayVal = String(val ?? '-')
+                      if (k === 'jenis_kelamin') {
+                        displayVal = val === 'L' ? 'Laki-laki' : val === 'P' ? 'Perempuan' : '-'
+                      }
+                      return (
+                        <td
+                          key={k}
+                          className="px-3 py-2 text-slate-800 max-w-[200px] truncate font-medium"
+                          title={String(val ?? '')}
+                        >
+                          {displayVal === '' ? '-' : displayVal}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+
           {total === 0 && (
-            <div className="text-center py-10 text-slate-400 text-sm">
-              Tidak ada data yang cocok dengan filter ini.
+            <div className="py-12 text-center text-slate-400 text-xs">
+              Tidak ada data yang sesuai dengan kombinasi filter yang dipilih.
             </div>
           )}
         </div>

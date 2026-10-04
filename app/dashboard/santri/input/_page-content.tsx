@@ -206,7 +206,7 @@ export default function InputSantriPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-20">
+    <div className="space-y-6 pb-20">
 
       {/* HEADER */}
       <DashboardPageHeader

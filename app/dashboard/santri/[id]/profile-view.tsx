@@ -112,7 +112,7 @@ export function SantriProfileView({
   return (
     <div className="space-y-4">
       {/* 1. TOP BAR: NAVIGASI BACK & TOMBOL AKSI */}
-      <div className="flex items-center justify-between gap-3 px-1">
+      <div className="flex items-center justify-between gap-3">
         <Link
           href="/dashboard/santri"
           className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
@@ -283,9 +283,9 @@ export function SantriProfileView({
                 label="Jenis Kelamin"
                 value={
                   santri.jenis_kelamin === 'L' ? (
-                    <span className="text-slate-800 font-semibold">Laki-laki (Ikhwan)</span>
+                    <span className="text-slate-800 font-semibold">Laki-laki</span>
                   ) : santri.jenis_kelamin === 'P' ? (
-                    <span className="text-slate-800 font-semibold">Perempuan (Akhwat)</span>
+                    <span className="text-slate-800 font-semibold">Perempuan</span>
                   ) : (
                     '-'
                   )
