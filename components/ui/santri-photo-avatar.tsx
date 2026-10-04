@@ -8,7 +8,7 @@ type SantriPhotoAvatarProps = {
   src?: string | null
   alt?: string
   name: string
-  size?: 'sm' | 'md'
+  size?: 'sm' | 'md' | 'lg'
   clickable?: boolean
   className?: string
 }
@@ -16,6 +16,13 @@ type SantriPhotoAvatarProps = {
 const sizeClassMap = {
   sm: 'w-10 min-w-[2.5rem] max-w-[2.5rem] aspect-[3/4] shrink-0',
   md: 'w-12 min-w-[3rem] max-w-[3rem] aspect-[3/4] shrink-0',
+  lg: 'w-20 sm:w-24 min-w-[5rem] sm:min-w-[6rem] max-w-[5rem] sm:max-w-[6rem] aspect-[3/4] shrink-0',
+} as const
+
+const initialsSizeMap = {
+  sm: 'text-[11px]',
+  md: 'text-xs',
+  lg: 'text-sm sm:text-base',
 } as const
 
 function getInitials(name: string) {
@@ -95,7 +102,12 @@ export function SantriPhotoAvatar({
       {hasPhoto ? (
         <img src={src!} alt={alt || name} className="h-full w-full object-cover" />
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-200 to-slate-100 text-[11px] font-black uppercase tracking-wide text-slate-500">
+        <div
+          className={cn(
+            'flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-200 to-slate-100 font-black uppercase tracking-wide text-slate-500',
+            initialsSizeMap[size]
+          )}
+        >
           {getInitials(name)}
         </div>
       )}

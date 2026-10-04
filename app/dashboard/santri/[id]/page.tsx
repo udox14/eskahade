@@ -5,8 +5,6 @@ import { hasRole, isAdmin as isSessionAdmin } from '@/lib/auth/session'
 import { getSantriDetail } from './actions'
 import { SantriDetailContent } from './detail-content'
 import { notFound, redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
 import { DetailSkeleton } from '@/components/ui/skeletons'
 import { Metadata } from 'next'
 
@@ -40,23 +38,7 @@ export default async function SantriDetailPage({ params }: Props) {
   const isAdmin = hasRole(session, 'admin')
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-20">
-      {/* Header — langsung tampil */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/dashboard/santri"
-            className="p-2 bg-white border hover:bg-gray-50 rounded-full transition-colors shadow-sm text-gray-600"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">{santri.nama_lengkap}</h1>
-            <p className="text-slate-500 text-xs mt-0.5 font-mono">{santri.nis}</p>
-          </div>
-        </div>
-      </div>
-
+    <div className="max-w-5xl mx-auto pb-16">
       {/* Detail content — di-suspend */}
       <Suspense fallback={<DetailSkeleton />}>
         <SantriDetailContent

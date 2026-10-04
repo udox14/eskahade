@@ -300,32 +300,58 @@ export async function getRiwayatAkademik(santriId: string) {
   }))
 }
 
+export type RiwayatAkademikWithNilai = RiwayatAkademikRow & {
+  nilai_detail: NilaiAkademikRow[]
+}
+
+export type RiwayatPerizinanRow = {
+  id: string
+  created_at: string
+  status: string
+  jenis: string
+  alasan: string
+  tgl_mulai?: string | null
+  tgl_selesai_rencana?: string | null
+  tgl_kembali_aktual?: string | null
+}
+
+export type RiwayatSPPRow = {
+  id: string
+  bulan: number
+  tahun: number
+  nominal_bayar: number
+  tanggal_bayar: string
+  penerima_nama: string | null
+}
+
+export type RiwayatTabunganRow = {
+  id: string
+  santri_id: string
+  jenis: 'MASUK' | 'KELUAR' | string
+  nominal: number
+  keterangan: string
+  created_at: string
+}
+
 export async function getRiwayatPelanggaran(santriId: string) {
   const session = await getSession()
   if (!(await canViewSantriDetail(session, santriId))) return []
   return getStudentIncidents(santriId)
 }
 
-export async function getRiwayatPerizinan(santriId: string) {
+export async function getRiwayatPerizinan(santriId: string): Promise<RiwayatPerizinanRow[]> {
   const session = await getSession()
   if (!(await canViewSantriDetail(session, santriId))) return []
-  return await query(
+  return await query<RiwayatPerizinanRow>(
     'SELECT id, created_at, status, jenis, alasan, tgl_mulai, tgl_selesai_rencana, tgl_kembali_aktual FROM perizinan WHERE santri_id = ? ORDER BY created_at DESC',
     [santriId]
   )
 }
 
-export async function getRiwayatSPP(santriId: string) {
+export async function getRiwayatSPP(santriId: string): Promise<RiwayatSPPRow[]> {
   const session = await getSession()
   if (!(await canViewSantriDetail(session, santriId))) return []
-  return await query<{
-    id: string
-    bulan: number
-    tahun: number
-    nominal_bayar: number
-    tanggal_bayar: string
-    penerima_nama: string | null
-  }>(`
+  return await query<RiwayatSPPRow>(`
     SELECT id, bulan, tahun, nominal_bayar, tanggal_bayar, penerima_nama
     FROM (
       SELECT sl.id, sl.bulan, sl.tahun, sl.nominal_bayar, sl.tanggal_bayar, u.full_name as penerima_nama
@@ -346,10 +372,10 @@ export async function getRiwayatSPP(santriId: string) {
   `, [santriId, santriId])
 }
 
-export async function getRiwayatTabungan(santriId: string) {
+export async function getRiwayatTabungan(santriId: string): Promise<RiwayatTabunganRow[]> {
   const session = await getSession()
   if (!(await canViewSantriDetail(session, santriId))) return []
-  return await query(
+  return await query<RiwayatTabunganRow>(
     'SELECT * FROM tabungan_log WHERE santri_id = ? ORDER BY created_at DESC',
     [santriId]
   )

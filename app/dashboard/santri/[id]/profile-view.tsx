@@ -1,11 +1,32 @@
 'use client'
 
+import React, { useState } from 'react'
+import Link from 'next/link'
 import { incidentLabel, sessionLabel } from '@/lib/discipline/format'
-
-import { useState } from 'react'
-import { User, MapPin, Calendar, School, Home, BookOpen, AlertTriangle, Clock, CreditCard, Wallet, Trophy, CheckCircle, XCircle, AlertCircle, Users, Utensils, Shirt } from 'lucide-react'
+import {
+  User,
+  MapPin,
+  School,
+  Home,
+  BookOpen,
+  AlertTriangle,
+  Clock,
+  CreditCard,
+  Wallet,
+  Trophy,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Users,
+  Utensils,
+  Shirt,
+  ArrowLeft,
+  Pencil,
+} from 'lucide-react'
 import { format, isValid } from 'date-fns'
 import { id } from 'date-fns/locale'
+import { DeleteSantriButton } from './delete-santri-button'
+import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 
 // ── Helper: format tanggal aman, tidak crash jika null/invalid ────────────────
 function safeFormat(value: string | null | undefined, fmt: string): string {
@@ -19,349 +40,695 @@ function safeFormat(value: string | null | undefined, fmt: string): string {
   }
 }
 
-// Pastikan export function (Named Export)
-export function SantriProfileView({ 
-  santri, 
-  akademik, 
-  pelanggaran, 
-  perizinan, 
-  spp, 
-  tabungan 
-}: any) {
+function getStatusBadge(status: string | null | undefined) {
+  const s = status || 'aktif'
+  if (s === 'aktif') {
+    return {
+      label: 'Aktif',
+      className: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20',
+    }
+  }
+  if (s === 'nonaktif_sementara') {
+    return {
+      label: 'Nonaktif',
+      className: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20',
+    }
+  }
+  if (s === 'lulus') {
+    return {
+      label: 'Lulus',
+      className: 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20',
+    }
+  }
+  if (s === 'keluar') {
+    return {
+      label: 'Keluar',
+      className: 'bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-600/20',
+    }
+  }
+  return {
+    label: s.toUpperCase(),
+    className: 'bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-600/20',
+  }
+}
+
+import type {
+  SantriDetail,
+  RiwayatAkademikWithNilai,
+  RiwayatPerizinanRow,
+  RiwayatSPPRow,
+  RiwayatTabunganRow,
+} from './actions'
+import type { DisciplineIncident } from '@/lib/discipline/data'
+
+interface Props {
+  santri: SantriDetail
+  akademik: RiwayatAkademikWithNilai[]
+  pelanggaran: DisciplineIncident[]
+  perizinan: RiwayatPerizinanRow[]
+  spp: RiwayatSPPRow[]
+  tabungan: RiwayatTabunganRow[]
+  isReadOnly?: boolean
+  isAdmin?: boolean
+}
+
+export function SantriProfileView({
+  santri,
+  akademik,
+  pelanggaran,
+  perizinan,
+  spp,
+  tabungan,
+  isReadOnly = false,
+  isAdmin = false,
+}: Props) {
   const [activeTab, setActiveTab] = useState<'PROFIL' | 'AKADEMIK' | 'KEUANGAN' | 'DISIPLIN'>('PROFIL')
 
+  const statusBadge = getStatusBadge(santri.status_global as string | undefined)
+
   return (
-    <div className="space-y-6">
-      
-      {/* 1. KARTU IDENTITAS UTAMA */}
-      <div className="bg-white rounded-2xl shadow-sm border overflow-hidden relative">
-         <div className="h-32 bg-gradient-to-r from-green-600 to-emerald-800"></div>
-         <div className="px-8 pb-8">
-            <div className="flex flex-col md:flex-row gap-6 items-start -mt-12">
-               
-               {/* FOTO PROFIL */}
-               <div className="w-32 h-40 md:w-40 md:h-52 rounded-xl border-4 border-white shadow-lg bg-gray-200 overflow-hidden flex-shrink-0 relative">
-                  {santri.foto_url ? (
-                    <img src={santri.foto_url} alt={santri.nama_lengkap} className="w-full h-full object-cover"/>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100"><User className="w-16 h-16 opacity-50"/></div>
-                  )}
-               </div>
+    <div className="space-y-4">
+      {/* 1. TOP BAR: NAVIGASI BACK & TOMBOL AKSI */}
+      <div className="flex items-center justify-between gap-3 px-1">
+        <Link
+          href="/dashboard/santri"
+          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4 text-slate-400" />
+          <span>Data Santri</span>
+        </Link>
 
-               {/* INFO NAMA */}
-               <div className="flex-1 pt-2 md:pt-14">
-                  <h2 className="text-3xl font-bold text-gray-900">{santri.nama_lengkap}</h2>
-                  <div className="flex flex-wrap gap-3 mt-2 text-sm">
-                      <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium border border-blue-100 font-mono">NIS: {santri.nis}</span>
-                      <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full font-medium border border-green-100">{santri.info_kelas}</span>
-                      <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-medium border border-gray-200">{santri.asrama} - {santri.kamar}</span>
-                  </div>
-               </div>
-            </div>
-         </div>
-
-         {/* TAB NAVIGATION */}
-         <div className="flex border-t px-8 overflow-x-auto scrollbar-hide">
-            <TabButton active={activeTab==='PROFIL'} onClick={()=>setActiveTab('PROFIL')} icon={User} label="Biodata Lengkap" />
-            <TabButton active={activeTab==='AKADEMIK'} onClick={()=>setActiveTab('AKADEMIK')} icon={BookOpen} label="Akademik" />
-            <TabButton active={activeTab==='KEUANGAN'} onClick={()=>setActiveTab('KEUANGAN')} icon={CreditCard} label="Keuangan" />
-            <TabButton active={activeTab==='DISIPLIN'} onClick={()=>setActiveTab('DISIPLIN')} icon={AlertTriangle} label="Kedisiplinan" />
-         </div>
+        <div className="flex items-center gap-2">
+          {!isReadOnly && (
+            <Link
+              href={`/dashboard/santri/${santri.id}/edit`}
+              className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5 text-slate-500" />
+              <span>Edit Data</span>
+            </Link>
+          )}
+          {isAdmin && (
+            <DeleteSantriButton
+              santriId={santri.id}
+              nama={santri.nama_lengkap}
+              nis={santri.nis}
+              compact
+            />
+          )}
+        </div>
       </div>
 
-      {/* 2. KONTEN TABS */}
-      
-      {/* --- TAB PROFIL (LENGKAP) --- */}
-      {activeTab === 'PROFIL' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2">
-           
-           {/* KOLOM 1: DATA PRIBADI */}
-           <div className="bg-white p-6 rounded-xl border shadow-sm space-y-5">
-              <h3 className="font-bold text-gray-800 border-b pb-3 flex items-center gap-2 text-lg">
-                <User className="w-5 h-5 text-blue-600"/> Informasi Pribadi
-              </h3>
-              
-              <div className="space-y-4">
-                <InfoRow label="NIS (Nomor Induk Santri)" value={santri.nis} isMono />
-                <InfoRow label="NIK" value={santri.nik} isMono />
-                <InfoRow label="Nama Lengkap" value={santri.nama_lengkap} isBold />
-                <InfoRow label="Jenis Kelamin" value={santri.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} />
-                <InfoRow 
-                    label="Tempat, Tanggal Lahir" 
-                    value={`${santri.tempat_lahir || '-'}, ${safeFormat(santri.tanggal_lahir, 'dd MMMM yyyy')}`} 
-                />
-                <InfoRow label="Golongan Darah" value={santri.gol_darah} />
-                <InfoRow 
-                    label="Status Santri" 
-                    value={
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${santri.status_global === 'aktif' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                            {santri.status_global?.toUpperCase()}
-                        </span>
-                    } 
-                    isCustom 
-                />
-                <InfoRow
-                  label="Kategori Santri"
-                  value={
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                      santri.kategori_efektif === 'BARU'
-                        ? 'bg-indigo-100 text-indigo-700'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {santri.kategori_efektif || santri.kategori_santri || 'REGULER'}
-                    </span>
-                  }
-                  isCustom
-                />
+      {/* 2. UNIFIED COMPACT PROFILE HEADER */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+        <div className="p-3.5 sm:p-5">
+          <div className="flex items-start gap-3.5 sm:gap-5">
+            {/* FOTO PROFIL (3:4 Formal Aspect Ratio Frame) */}
+            <SantriPhotoAvatar
+              src={santri.foto_url as string | null | undefined}
+              alt={santri.nama_lengkap}
+              name={santri.nama_lengkap}
+              size="lg"
+            />
+
+            {/* IDENTITAS UTAMA SANTRI */}
+            <div className="flex-1 min-w-0">
+              {/* Baris 1: Nama Santri + Badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-base sm:text-xl font-bold text-slate-900 truncate">
+                  {santri.nama_lengkap}
+                </h1>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusBadge.className}`}
+                >
+                  {statusBadge.label}
+                </span>
                 {santri.kategori_efektif === 'BARU' && (
-                  <InfoRow label="Kategori Setelah Masa Baru" value={santri.kategori_santri || 'REGULER'} />
+                  <span className="shrink-0 rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-indigo-700 ring-1 ring-inset ring-indigo-500/20">
+                    BARU
+                  </span>
                 )}
-                <InfoRow label="Tanggal Masuk" value={safeFormat(santri.tanggal_masuk, 'dd MMMM yyyy')} />
-                {santri.tanggal_keluar && (
-                  <InfoRow label="Tanggal Keluar" value={safeFormat(santri.tanggal_keluar, 'dd MMMM yyyy')} />
+                {santri.kategori_santri === 'SADESA' && (
+                  <span className="shrink-0 rounded bg-purple-50 px-1.5 py-0.5 text-[9px] font-bold text-purple-700 ring-1 ring-inset ring-purple-500/20">
+                    SADESA
+                  </span>
                 )}
               </div>
 
-              {/* ALAMAT */}
-              <div className="pt-2 border-t space-y-3">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><MapPin className="w-3.5 h-3.5"/> Alamat</p>
-                {santri.alamat_lengkap ? (
-                  <div>
-                    <p className="text-xs text-gray-400 mb-1">Alamat Lengkap</p>
-                    <p className="text-sm text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 leading-relaxed">{santri.alamat_lengkap}</p>
-                  </div>
-                ) : santri.alamat ? (
-                  <p className="text-sm text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 leading-relaxed">{santri.alamat}</p>
-                ) : (
-                  <p className="text-sm text-gray-400 italic">Alamat belum diisi.</p>
+              {/* Baris 2: NIS & NIK */}
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1 text-xs text-slate-500 font-mono">
+                <span>NIS: {santri.nis || '-'}</span>
+                {Boolean(santri.nik) && (
+                  <span className="hidden sm:inline text-slate-400">· NIK: {String(santri.nik)}</span>
                 )}
-                {(santri.kecamatan || santri.kab_kota || santri.provinsi) && (
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div className="bg-gray-50 p-2 rounded border text-center">
-                      <p className="text-gray-400 uppercase font-bold mb-0.5">Kecamatan</p>
-                      <p className="text-gray-700 font-medium">{santri.kecamatan || '-'}</p>
-                    </div>
-                    <div className="bg-gray-50 p-2 rounded border text-center">
-                      <p className="text-gray-400 uppercase font-bold mb-0.5">Kab/Kota</p>
-                      <p className="text-gray-700 font-medium">{santri.kab_kota || '-'}</p>
-                    </div>
-                    <div className="bg-gray-50 p-2 rounded border text-center">
-                      <p className="text-gray-400 uppercase font-bold mb-0.5">Provinsi</p>
-                      <p className="text-gray-700 font-medium">{santri.provinsi || '-'}</p>
-                    </div>
-                  </div>
-                )}
-                {santri.jemaah && <InfoRow label="Jemaah" value={santri.jemaah} />}
               </div>
-           </div>
 
-           {/* KOLOM 2: KELUARGA & PONDOK */}
-           <div className="bg-white p-6 rounded-xl border shadow-sm space-y-5">
-              <h3 className="font-bold text-gray-800 border-b pb-3 flex items-center gap-2 text-lg">
-                <School className="w-5 h-5 text-green-600"/> Keluarga & Institusi
-              </h3>
-              
-              <div className="space-y-4">
-                 <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 space-y-3">
-                    <p className="text-xs font-bold text-orange-800 uppercase flex items-center gap-2"><Users className="w-4 h-4"/> Data Orang Tua</p>
-                    <InfoRow label="Nama Ayah" value={santri.nama_ayah} />
-                    <InfoRow label="Nama Ibu" value={santri.nama_ibu} />
-                 </div>
-
-                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 space-y-3">
-                    <p className="text-xs font-bold text-blue-800 uppercase flex items-center gap-2"><School className="w-4 h-4"/> Pendidikan Formal</p>
-                    {santri.kategori_santri === 'SADESA' ? (
-                      <p className="text-sm text-blue-800 font-medium">Santri kategori SADESA tidak memiliki status sekolah formal.</p>
-                    ) : (
-                      <>
-                        <InfoRow label="Sekolah" value={santri.sekolah} />
-                        <InfoRow label="Kelas Sekolah" value={santri.kelas_sekolah} />
-                      </>
-                    )}
-                 </div>
-
-                 <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100 space-y-3">
-                    <p className="text-xs font-bold text-emerald-800 uppercase flex items-center gap-2"><Home className="w-4 h-4"/> Data Pondok</p>
-                    <InfoRow label="Asrama" value={santri.asrama} />
-                    <InfoRow label="Kamar" value={santri.kamar} />
-                    <InfoRow label="Kelas Diniyah" value={santri.info_kelas} isBold />
-                    
-                    <div className="pt-2 mt-2 border-t border-emerald-100 space-y-3">
-                        <InfoRow 
-                            label={<span className="flex items-center gap-1.5"><Utensils className="w-3.5 h-3.5"/> Tempat Makan</span>} 
-                            value={santri.nama_tempat_makan || 'Belum diatur'} 
-                        />
-                        <InfoRow 
-                            label={<span className="flex items-center gap-1.5"><Shirt className="w-3.5 h-3.5"/> Tempat Cuci</span>} 
-                            value={santri.nama_tempat_mencuci || 'Belum diatur'} 
-                        />
-                    </div>
-                 </div>
+              {/* Baris 3: Kamar & Kelas (Ringkas 1 baris) */}
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+                <span className="flex items-center gap-1.5">
+                  <Home className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate">
+                    {santri.asrama ? `${santri.asrama} · Kmr ${santri.kamar || '-'}` : 'Non-Asrama'}
+                  </span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate">
+                    {santri.info_kelas || '-'}
+                    {santri.sekolah ? ` · ${santri.sekolah}` : ''}
+                    {santri.kelas_sekolah ? ` (Kls ${santri.kelas_sekolah})` : ''}
+                  </span>
+                </span>
               </div>
-           </div>
+            </div>
+          </div>
+        </div>
+
+        {/* TAB NAVIGATION TERPADU */}
+        <div className="flex border-t border-slate-100 bg-slate-50/60 px-2 sm:px-4 overflow-x-auto scrollbar-hide">
+          <TabButton
+            active={activeTab === 'PROFIL'}
+            onClick={() => setActiveTab('PROFIL')}
+            icon={User}
+            label="Biodata"
+          />
+          <TabButton
+            active={activeTab === 'AKADEMIK'}
+            onClick={() => setActiveTab('AKADEMIK')}
+            icon={BookOpen}
+            label="Akademik"
+            count={akademik.length}
+          />
+          <TabButton
+            active={activeTab === 'KEUANGAN'}
+            onClick={() => setActiveTab('KEUANGAN')}
+            icon={CreditCard}
+            label="Keuangan"
+            count={spp.length + tabungan.length}
+          />
+          <TabButton
+            active={activeTab === 'DISIPLIN'}
+            onClick={() => setActiveTab('DISIPLIN')}
+            icon={AlertTriangle}
+            label="Kedisiplinan"
+            count={perizinan.length + pelanggaran.length}
+          />
+        </div>
+      </div>
+
+      {/* 3. KONTEN TABS */}
+
+      {/* ── TAB PROFIL (BIODATA HIGH-DENSITY) ── */}
+      {activeTab === 'PROFIL' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in duration-150">
+          {/* SEKSI 1: IDENTITAS PRIBADI */}
+          <SectionCard title="Identitas Pribadi" icon={User}>
+            <FieldItem label="NIS (Nomor Induk)" value={santri.nis as string} isMono />
+            <FieldItem label="NIK" value={santri.nik as string} isMono />
+            <FieldItem
+              label="Jenis Kelamin"
+              value={santri.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}
+            />
+            <FieldItem
+              label="Tempat, Tanggal Lahir"
+              value={`${(santri.tempat_lahir as string) || '-'}, ${safeFormat(santri.tanggal_lahir as string, 'dd MMMM yyyy')}`}
+            />
+            <FieldItem label="Golongan Darah" value={(santri.gol_darah as string) || '-'} />
+            <FieldItem
+              label="Status Santri"
+              badge={
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusBadge.className}`}
+                >
+                  {statusBadge.label}
+                </span>
+              }
+            />
+            <FieldItem
+              label="Kategori Santri"
+              value={(santri.kategori_efektif as string) || (santri.kategori_santri as string) || 'REGULER'}
+            />
+            {santri.kategori_efektif === 'BARU' && (
+              <FieldItem
+                label="Kategori Pasca Masa Baru"
+                value={(santri.kategori_santri as string) || 'REGULER'}
+              />
+            )}
+            <FieldItem
+              label="Tanggal Masuk"
+              value={safeFormat(santri.tanggal_masuk as string, 'dd MMMM yyyy')}
+            />
+            {santri.tanggal_keluar ? (
+              <FieldItem
+                label="Tanggal Keluar"
+                value={safeFormat(santri.tanggal_keluar as string, 'dd MMMM yyyy')}
+              />
+            ) : null}
+          </SectionCard>
+
+          {/* SEKSI 2: TEMPAT TINGGAL & FASILITAS PONDOK */}
+          <SectionCard title="Tempat Tinggal & Fasilitas Pondok" icon={Home}>
+            <FieldItem label="Asrama" value={(santri.asrama as string) || '-'} />
+            <FieldItem label="Kamar" value={(santri.kamar as string) || '-'} />
+            <FieldItem label="Kelas Diniyah" value={santri.info_kelas || '-'} />
+            <FieldItem
+              label="Tempat Makan (Katering)"
+              value={(santri.nama_tempat_makan as string) || 'Belum diatur'}
+              icon={<Utensils className="w-3.5 h-3.5 text-slate-400 inline mr-1" />}
+            />
+            <FieldItem
+              label="Tempat Cuci (Laundry)"
+              value={(santri.nama_tempat_mencuci as string) || 'Belum diatur'}
+              icon={<Shirt className="w-3.5 h-3.5 text-slate-400 inline mr-1" />}
+            />
+          </SectionCard>
+
+          {/* SEKSI 3: PENDIDIKAN FORMAL & KELUARGA */}
+          <SectionCard title="Pendidikan Formal & Orang Tua" icon={School}>
+            {santri.kategori_santri === 'SADESA' ? (
+              <div className="col-span-full py-2">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-0.5">
+                  Sekolah Formal
+                </span>
+                <span className="text-xs sm:text-sm font-medium text-slate-600 italic">
+                  Santri program SADESA (Tanpa sekolah formal)
+                </span>
+              </div>
+            ) : (
+              <>
+                <FieldItem label="Sekolah Formal" value={(santri.sekolah as string) || '-'} />
+                <FieldItem
+                  label="Kelas Formal"
+                  value={santri.kelas_sekolah ? `Kelas ${santri.kelas_sekolah}` : '-'}
+                />
+              </>
+            )}
+            <div className="col-span-full border-t border-slate-100 my-1 pt-2">
+              <span className="text-xs font-bold text-slate-500 flex items-center gap-1.5 mb-2">
+                <Users className="w-3.5 h-3.5 text-slate-400" /> Data Orang Tua
+              </span>
+              <div className="grid grid-cols-2 gap-x-4">
+                <FieldItem label="Nama Ayah" value={(santri.nama_ayah as string) || '-'} />
+                <FieldItem label="Nama Ibu" value={(santri.nama_ibu as string) || '-'} />
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* SEKSI 4: DOMISILI & ALAMAT */}
+          <SectionCard title="Domisili Asal & Alamat" icon={MapPin}>
+            <div className="col-span-full py-1">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                Alamat Lengkap
+              </span>
+              <p className="text-xs sm:text-sm text-slate-800 bg-slate-50/70 p-2.5 rounded-xl border border-slate-100 leading-relaxed">
+                {(santri.alamat_lengkap as string) || (santri.alamat as string) || 'Alamat belum diisi.'}
+              </p>
+            </div>
+            <FieldItem label="Kecamatan" value={(santri.kecamatan as string) || '-'} />
+            <FieldItem label="Kab/Kota" value={(santri.kab_kota as string) || '-'} />
+            <FieldItem label="Provinsi" value={(santri.provinsi as string) || '-'} />
+            {santri.jemaah ? <FieldItem label="Jemaah" value={santri.jemaah as string} /> : null}
+          </SectionCard>
         </div>
       )}
 
-      {/* --- TAB AKADEMIK --- */}
+      {/* ── TAB AKADEMIK ── */}
       {activeTab === 'AKADEMIK' && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-           {akademik.length === 0 ? <EmptyState text="Belum ada riwayat pendidikan."/> : akademik.map((riwayat: any) => (
-             <div key={riwayat.id} className="bg-white rounded-xl border shadow-sm overflow-hidden">
-                <div className="bg-blue-50 p-4 border-b border-blue-100 flex justify-between items-center">
-                   <div>
-                      <h3 className="font-bold text-blue-900 text-lg">{riwayat.kelas?.nama_kelas}</h3>
-                      <p className="text-xs text-blue-600 font-medium">{riwayat.kelas?.marhalah?.nama} • {riwayat.kelas?.tahun_ajaran?.nama || 'Tahun Ajar Aktif'}</p>
-                   </div>
-                   {riwayat.ranking?.[0] && (
-                     <div className="text-right bg-white px-3 py-1 rounded-lg border border-blue-100 shadow-sm">
-                        <span className="text-sm font-bold text-orange-600 flex items-center gap-1 justify-end"><Trophy className="w-4 h-4"/> Rank {riwayat.ranking[0].ranking_kelas}</span>
-                        <span className="text-xs text-gray-500 block">Rata-rata: {riwayat.ranking[0].rata_rata}</span>
-                     </div>
-                   )}
-                </div>
-                
-                {/* Tabel Nilai */}
-                {riwayat.nilai_detail.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                       <thead className="bg-gray-50 text-gray-600 font-bold border-b"><tr><th className="p-3 pl-6">Mata Pelajaran</th><th className="p-3 w-32 text-center">Semester 1</th><th className="p-3 w-32 text-center">Semester 2</th></tr></thead>
-                       <tbody className="divide-y">
-                          {Array.from(new Set(riwayat.nilai_detail.map((n:any) => n.mapel_nama))).map((mapelNama: any) => {
-                              const s1 = riwayat.nilai_detail.find((n:any) => n.mapel_nama === mapelNama && n.semester === 1)?.nilai
-                              const s2 = riwayat.nilai_detail.find((n:any) => n.mapel_nama === mapelNama && n.semester === 2)?.nilai
-                              return (
-                                <tr key={mapelNama} className="hover:bg-gray-50">
-                                    <td className="p-3 pl-6 font-medium text-gray-700">{mapelNama}</td>
-                                    <td className="p-3 text-center font-mono">{s1 ?? '-'}</td>
-                                    <td className="p-3 text-center font-mono">{s2 ?? '-'}</td>
-                                </tr>
-                              )
-                          })}
-                       </tbody>
-                    </table>
+        <div className="space-y-4 animate-in fade-in duration-150">
+          {akademik.length === 0 ? (
+            <EmptyState text="Belum ada riwayat pendidikan atau nilai akademik tercatat." />
+          ) : (
+            akademik.map((riwayat) => {
+              const kelasNama = riwayat.nama_kelas || 'Kelas'
+              const marhalah = riwayat.marhalah_nama || ''
+              const tahunAjaran = riwayat.tahun_ajaran_nama || 'Tahun Ajar Aktif'
+              const rank = riwayat.ranking_kelas
+              const rataRata = riwayat.rata_rata
+
+              // Mapels
+              const mapelList = Array.from(
+                new Set(riwayat.nilai_detail.map((n) => n.mapel_nama).filter(Boolean))
+              )
+
+              return (
+                <div
+                  key={riwayat.id}
+                  className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden"
+                >
+                  {/* Header Kelas */}
+                  <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex flex-wrap justify-between items-center gap-2">
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm sm:text-base">{kelasNama}</h3>
+                      <p className="text-xs text-slate-500 font-medium">
+                        {marhalah ? `${marhalah} · ` : ''}
+                        {tahunAjaran}
+                      </p>
+                    </div>
+                    {rank != null && (
+                      <div className="flex items-center gap-2 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-xs">
+                        <span className="text-xs font-bold text-amber-600 flex items-center gap-1">
+                          <Trophy className="w-3.5 h-3.5" /> Rank {rank}
+                        </span>
+                        {rataRata != null && (
+                          <span className="text-xs text-slate-500 font-mono">
+                            Rata-rata: {rataRata}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                ) : <div className="p-8 text-center text-gray-400 text-sm italic">Belum ada data nilai di kelas ini.</div>}
-             </div>
-           ))}
+
+                  {/* Tabel Nilai */}
+                  {mapelList.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs sm:text-sm text-left">
+                        <thead className="bg-slate-50/50 text-slate-500 font-semibold border-b border-slate-100 uppercase text-[11px] tracking-wider">
+                          <tr>
+                            <th className="py-2.5 px-4">Mata Pelajaran</th>
+                            <th className="py-2.5 px-3 w-28 text-center">Semester 1</th>
+                            <th className="py-2.5 px-3 w-28 text-center">Semester 2</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {mapelList.map((mapelNama) => {
+                            const s1 = riwayat.nilai_detail.find(
+                              (n) => n.mapel_nama === mapelNama && n.semester === 1
+                            )?.nilai
+                            const s2 = riwayat.nilai_detail.find(
+                              (n) => n.mapel_nama === mapelNama && n.semester === 2
+                            )?.nilai
+                            return (
+                              <tr key={mapelNama} className="hover:bg-slate-50/60 transition-colors">
+                                <td className="py-2 px-4 font-medium text-slate-800">{mapelNama}</td>
+                                <td className="py-2 px-3 text-center font-mono text-slate-700">
+                                  {s1 ?? '-'}
+                                </td>
+                                <td className="py-2 px-3 text-center font-mono text-slate-700">
+                                  {s2 ?? '-'}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center text-slate-400 text-xs italic">
+                      Belum ada rincian nilai di kelas ini.
+                    </div>
+                  )}
+                </div>
+              )
+            })
+          )}
         </div>
       )}
 
-      {/* --- TAB KEUANGAN --- */}
+      {/* ── TAB KEUANGAN ── */}
       {activeTab === 'KEUANGAN' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2">
-           {/* SPP */}
-           <div className="bg-white rounded-xl border shadow-sm overflow-hidden h-fit">
-              <div className="bg-emerald-50 p-4 border-b border-emerald-100 flex justify-between items-center">
-                  <h3 className="font-bold text-emerald-900 flex items-center gap-2"><CreditCard className="w-5 h-5"/> Riwayat SPP</h3>
-                  <span className="text-xs bg-white text-emerald-700 px-2 py-0.5 rounded font-bold border border-emerald-200">{spp.length} Transaksi</span>
-              </div>
-              <div className="max-h-96 overflow-y-auto">
-                {spp.length === 0 ? <EmptyState text="Belum ada pembayaran SPP."/> : (
-                  <table className="w-full text-sm text-left">
-                     <thead className="bg-gray-50 font-bold text-gray-600 sticky top-0"><tr><th className="p-3">Periode</th><th className="p-3 text-right">Nominal</th><th className="p-3 text-right">Tgl Bayar</th></tr></thead>
-                     <tbody className="divide-y">
-                        {spp.map((s:any) => (
-                           <tr key={s.id} className="hover:bg-gray-50">
-                              <td className="p-3 font-medium text-gray-800">{s.bulan}/{s.tahun}</td>
-                              <td className="p-3 text-right font-mono font-bold text-emerald-600">Rp {Number(s.nominal_bayar || 0).toLocaleString()}</td>
-                              <td className="p-3 text-right text-xs text-gray-500">{safeFormat(s.tanggal_bayar, 'dd/MM/yy')}</td>
-                           </tr>
-                        ))}
-                     </tbody>
-                  </table>
-                )}
-              </div>
-           </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-150">
+          {/* SPP */}
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-emerald-600" /> Riwayat SPP
+              </h3>
+              <span className="text-[11px] bg-white text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-200">
+                {spp.length} Transaksi
+              </span>
+            </div>
+            <div className="max-h-80 overflow-y-auto">
+              {spp.length === 0 ? (
+                <EmptyState text="Belum ada riwayat pembayaran SPP." />
+              ) : (
+                <table className="w-full text-xs sm:text-sm text-left">
+                  <thead className="bg-slate-50/50 font-semibold text-slate-500 uppercase text-[11px] sticky top-0 border-b border-slate-100">
+                    <tr>
+                      <th className="py-2 px-3">Periode</th>
+                      <th className="py-2 px-3 text-right">Nominal</th>
+                      <th className="py-2 px-3 text-right">Tanggal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {spp.map((s) => (
+                      <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-2 px-3 font-medium text-slate-800">
+                          {s.bulan}/{s.tahun}
+                        </td>
+                        <td className="py-2 px-3 text-right font-mono font-bold text-emerald-700">
+                          Rp {Number(s.nominal_bayar || 0).toLocaleString()}
+                        </td>
+                        <td className="py-2 px-3 text-right text-xs text-slate-400">
+                          {safeFormat(s.tanggal_bayar, 'dd/MM/yy')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
 
-           {/* TABUNGAN */}
-           <div className="bg-white rounded-xl border shadow-sm overflow-hidden h-fit">
-              <div className="bg-orange-50 p-4 border-b border-orange-100 flex justify-between items-center">
-                  <h3 className="font-bold text-orange-900 flex items-center gap-2"><Wallet className="w-5 h-5"/> Mutasi Tabungan</h3>
-                  <span className="text-xs bg-white text-orange-700 px-2 py-0.5 rounded font-bold border border-orange-200">{tabungan.length} Mutasi</span>
-              </div>
-              <div className="max-h-96 overflow-y-auto">
-                {tabungan.length === 0 ? <EmptyState text="Belum ada transaksi tabungan."/> : (
-                  <table className="w-full text-sm text-left">
-                     <thead className="bg-gray-50 font-bold text-gray-600 sticky top-0"><tr><th className="p-3">Ket</th><th className="p-3 text-right">Nominal</th><th className="p-3 text-right">Tgl</th></tr></thead>
-                     <tbody className="divide-y">
-                        {tabungan.map((t:any) => (
-                           <tr key={t.id} className="hover:bg-gray-50">
-                              <td className="p-3 flex items-center gap-2">
-                                 {t.jenis==='MASUK'?<CheckCircle className="w-4 h-4 text-green-500"/>:<XCircle className="w-4 h-4 text-red-500"/>}
-                                 <span className="truncate max-w-[120px]">{t.keterangan}</span>
-                              </td>
-                              <td className={`p-3 text-right font-mono font-bold ${t.jenis==='MASUK'?'text-green-600':'text-red-600'}`}>
-                                 {t.jenis==='MASUK'?'+':'-'} {Number(t.nominal || 0).toLocaleString()}
-                              </td>
-                              <td className="p-3 text-right text-xs text-gray-500">{safeFormat(t.created_at, 'dd/MM')}</td>
-                           </tr>
-                        ))}
-                     </tbody>
-                  </table>
-                )}
-              </div>
-           </div>
+          {/* TABUNGAN */}
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-amber-600" /> Mutasi Tabungan
+              </h3>
+              <span className="text-[11px] bg-white text-amber-700 px-2 py-0.5 rounded-full font-bold border border-amber-200">
+                {tabungan.length} Mutasi
+              </span>
+            </div>
+            <div className="max-h-80 overflow-y-auto">
+              {tabungan.length === 0 ? (
+                <EmptyState text="Belum ada transaksi tabungan." />
+              ) : (
+                <table className="w-full text-xs sm:text-sm text-left">
+                  <thead className="bg-slate-50/50 font-semibold text-slate-500 uppercase text-[11px] sticky top-0 border-b border-slate-100">
+                    <tr>
+                      <th className="py-2 px-3">Keterangan</th>
+                      <th className="py-2 px-3 text-right">Nominal</th>
+                      <th className="py-2 px-3 text-right">Tanggal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {tabungan.map((t) => (
+                      <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-2 px-3 flex items-center gap-1.5">
+                          {t.jenis === 'MASUK' ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          ) : (
+                            <XCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                          )}
+                          <span className="truncate max-w-[130px] font-medium text-slate-800">
+                            {t.keterangan}
+                          </span>
+                        </td>
+                        <td
+                          className={`py-2 px-3 text-right font-mono font-bold ${
+                            t.jenis === 'MASUK' ? 'text-emerald-700' : 'text-rose-700'
+                          }`}
+                        >
+                          {t.jenis === 'MASUK' ? '+' : '-'} Rp{' '}
+                          {Number(t.nominal || 0).toLocaleString()}
+                        </td>
+                        <td className="py-2 px-3 text-right text-xs text-slate-400">
+                          {safeFormat(t.created_at, 'dd/MM/yy')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* --- TAB DISIPLIN --- */}
+      {/* ── TAB KEDISIPLINAN ── */}
       {activeTab === 'DISIPLIN' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2">
-           {/* PERIZINAN */}
-           <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-              <div className="bg-purple-50 p-4 border-b border-purple-100"><h3 className="font-bold text-purple-900 flex items-center gap-2"><Clock className="w-5 h-5"/> Riwayat Izin</h3></div>
-              <div className="divide-y max-h-80 overflow-y-auto">
-                 {perizinan.length===0?<EmptyState text="Belum ada riwayat izin."/>:perizinan.map((p:any)=>(
-                    <div key={p.id} className="p-4 hover:bg-gray-50 transition-colors">
-                       <div className="flex justify-between mb-2">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${p.status==='KEMBALI'?'bg-green-50 text-green-700 border-green-200':'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>{p.status}</span>
-                          <span className="text-xs text-gray-500">{safeFormat(p.created_at, 'dd MMM yyyy')}</span>
-                       </div>
-                       <p className="font-medium text-gray-800 text-sm mb-1">{p.alasan}</p>
-                       <p className="text-xs text-gray-500 flex items-center gap-1"><Home className="w-3 h-3"/> {p.jenis === 'PULANG' ? 'IZIN PULANG' : 'IZIN'}</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-150">
+          {/* PERIZINAN */}
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                <Clock className="w-4 h-4 text-slate-600" /> Riwayat Izin
+              </h3>
+              <span className="text-[11px] bg-white text-slate-700 px-2 py-0.5 rounded-full font-bold border border-slate-200">
+                {perizinan.length} Izin
+              </span>
+            </div>
+            <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
+              {perizinan.length === 0 ? (
+                <EmptyState text="Belum ada riwayat perizinan santri." />
+              ) : (
+                perizinan.map((p) => (
+                  <div key={p.id} className="p-3 hover:bg-slate-50/60 transition-colors">
+                    <div className="flex justify-between items-center mb-1">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ring-1 ring-inset ${
+                          p.status === 'KEMBALI'
+                            ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+                            : 'bg-amber-50 text-amber-700 ring-amber-600/20'
+                        }`}
+                      >
+                        {p.status}
+                      </span>
+                      <span className="text-xs text-slate-400 font-mono">
+                        {safeFormat(p.created_at, 'dd MMM yyyy')}
+                      </span>
                     </div>
-                 ))}
-              </div>
-           </div>
-           
-           {/* PELANGGARAN */}
-           <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-              <div className="bg-red-50 p-4 border-b border-red-100"><h3 className="font-bold text-red-900 flex items-center gap-2"><AlertTriangle className="w-5 h-5"/> Riwayat Pelanggaran · {pelanggaran.reduce((sum:number,p:any)=>sum+(p.jumlah_kejadian??0),0)} kejadian{pelanggaran.some((p:{perlu_verifikasi:number})=>p.perlu_verifikasi>0)&&' · histori perlu verifikasi'}</h3></div>
-              <div className="divide-y max-h-80 overflow-y-auto">
-                 {pelanggaran.length===0?<EmptyState text="Alhamdulillah, nihil pelanggaran."/>:pelanggaran.map((p:any)=>(
-                    <div key={p.id} className="p-4 hover:bg-gray-50 transition-colors">
-                       <div className="flex justify-between mb-2">
-                          <span className="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100 text-xs">{p.perlu_verifikasi?'Perlu verifikasi':'1 kejadian'}</span>
-                          <span className="text-xs text-gray-500">{safeFormat(p.tanggal, 'dd MMM yyyy')}</span>
-                       </div>
-                       <p className="font-medium text-gray-800 text-sm mb-1">{p.deskripsi}</p>
-                       <p className="text-xs text-gray-500 flex items-center gap-1"><AlertCircle className="w-3 h-3"/> {incidentLabel(p.jenis)} · {p.source==='pengajian'?'Pengajian':'Umum'}{p.sesi&&` · ${sessionLabel(p.sesi,p.jenis,p.source)}`}</p>
+                    <p className="font-medium text-slate-800 text-xs sm:text-sm mb-1">{p.alasan}</p>
+                    <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                      <Home className="w-3 h-3 text-slate-400" />{' '}
+                      {p.jenis === 'PULANG' ? 'Izin Pulang' : 'Izin Keluar'}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* PELANGGARAN */}
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600" /> Riwayat Pelanggaran
+              </h3>
+              <span className="text-[11px] bg-white text-rose-700 px-2 py-0.5 rounded-full font-bold border border-rose-200">
+                {pelanggaran.reduce((sum, p) => sum + (p.jumlah_kejadian ?? 0), 0)} Kejadian
+              </span>
+            </div>
+            <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
+              {pelanggaran.length === 0 ? (
+                <EmptyState text="Alhamdulillah, tidak ada riwayat pelanggaran." />
+              ) : (
+                pelanggaran.map((p) => (
+                  <div key={p.id} className="p-3 hover:bg-slate-50/60 transition-colors">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-rose-700 font-semibold bg-rose-50 px-2 py-0.5 rounded text-[10px] ring-1 ring-inset ring-rose-600/20">
+                        {p.perlu_verifikasi ? 'Perlu verifikasi' : `${p.jumlah_kejadian ?? 1} kejadian`}
+                      </span>
+                      <span className="text-xs text-slate-400 font-mono">
+                        {safeFormat(p.tanggal, 'dd MMM yyyy')}
+                      </span>
                     </div>
-                 ))}
-              </div>
-           </div>
+                    <p className="font-medium text-slate-800 text-xs sm:text-sm mb-1">{p.deskripsi}</p>
+                    <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 text-slate-400" />
+                      <span>{incidentLabel(p.jenis)}</span>
+                      <span>· {p.source === 'pengajian' ? 'Pengajian' : 'Umum'}</span>
+                      {p.sesi && <span>· {sessionLabel(p.sesi, p.jenis, p.source || '')}</span>}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
-
     </div>
   )
 }
 
-function TabButton({ active, onClick, icon: Icon, label }: any) {
-    return (
-        <button onClick={onClick} className={`flex items-center gap-2 px-6 py-4 text-sm font-bold border-b-2 transition-all whitespace-nowrap outline-none ${active ? 'border-green-600 text-green-700 bg-green-50/30' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
-            <Icon className={`w-4 h-4 ${active ? 'text-green-600' : 'text-gray-400'}`}/> {label}
-        </button>
-    )
+function TabButton({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+  count,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  count?: number
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-1.5 py-2.5 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 transition-all whitespace-nowrap outline-none ${
+        active
+          ? 'border-emerald-600 text-emerald-700 bg-white shadow-xs -mb-px'
+          : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
+      }`}
+    >
+      <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${active ? 'text-emerald-600' : 'text-slate-400'}`} />
+      <span>{label}</span>
+      {typeof count === 'number' && count > 0 && (
+        <span
+          className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+            active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200/80 text-slate-600'
+          }`}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  )
 }
 
-function InfoRow({ label, value, isBold, isMono, isCustom }: any) {
-    if (isCustom) {
-        return <div className="flex justify-between border-b border-gray-100 pb-2 last:border-0"><span className="text-xs text-gray-400 font-bold uppercase tracking-wider">{label}</span>{value}</div>
-    }
-    return <div className="flex justify-between border-b border-gray-100 pb-2 last:border-0"><span className="text-xs text-gray-400 font-bold uppercase tracking-wider">{label}</span><span className={`text-sm text-gray-900 text-right ${isBold ? 'font-bold' : 'font-medium'} ${isMono ? 'font-mono' : ''}`}>{value || '-'}</span></div>
+function SectionCard({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string
+  icon: React.ComponentType<{ className?: string }>
+  children: React.ReactNode
+}) {
+  return (
+    <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 sm:p-4 shadow-sm">
+      <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100 mb-2">
+        <Icon className="w-4 h-4 text-slate-500" />
+        <h3 className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-wide">
+          {title}
+        </h3>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 sm:gap-x-4 gap-y-1">{children}</div>
+    </div>
+  )
 }
 
-function EmptyState({ text }: any) {
-    return <div className="p-10 text-center text-gray-400 italic text-sm border-2 border-dashed border-gray-100 rounded-lg m-4">{text}</div>
+function FieldItem({
+  label,
+  value,
+  isMono = false,
+  badge = null,
+  icon = null,
+}: {
+  label: string
+  value?: string | number | null
+  isMono?: boolean
+  badge?: React.ReactNode
+  icon?: React.ReactNode
+}) {
+  return (
+    <div className="py-1">
+      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+        {label}
+      </span>
+      {badge ? (
+        <div className="mt-0.5">{badge}</div>
+      ) : (
+        <span
+          className={`text-xs sm:text-sm text-slate-800 break-words flex items-center ${
+            isMono ? 'font-mono' : 'font-medium'
+          }`}
+        >
+          {icon}
+          {value || '-'}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="p-8 text-center text-slate-400 italic text-xs sm:text-sm border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+      {text}
+    </div>
+  )
 }
