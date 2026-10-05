@@ -28,6 +28,7 @@ import {
   Table,
   ChartBar,
   Gear,
+  CaretLeft,
   CaretRight,
   CircleNotch,
   WarningCircle,
@@ -51,6 +52,13 @@ const STATUS_LABELS: Record<string, { label: string; badgeClass: string }> = {
     label: 'Selesai',
     badgeClass: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
   },
+}
+
+function getPageRange(current: number, total: number): (number | string)[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  if (current <= 4) return [1, 2, 3, 4, 5, '...', total]
+  if (current >= total - 3) return [1, '...', total - 4, total - 3, total - 2, total - 1, total]
+  return [1, '...', current - 1, current, current + 1, '...', total]
 }
 
 export default function SupervisiHome({
@@ -197,6 +205,7 @@ export default function SupervisiHome({
   const totals = coverage?.totals ?? []
   const countByStatus = (s: string) => totals.find((t) => t.status === s)?.n ?? 0
   const totalTarget = totals.reduce((a, b) => a + b.n, 0)
+  const totalPages = Math.max(1, Math.ceil((coverage?.total ?? 0) / 20))
 
   return (
     <div className="space-y-6 pb-20">
@@ -209,7 +218,7 @@ export default function SupervisiHome({
             <button
               disabled={busy}
               onClick={() => begin()}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs sm:text-sm font-bold shadow-xs transition"
+              className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs sm:text-sm font-bold shadow-xs transition"
             >
               <Plus className="w-4 h-4" weight="bold" />
               <span>Mulai Wawancara</span>
@@ -217,6 +226,21 @@ export default function SupervisiHome({
           ) : undefined
         }
       />
+
+      {/* Tombol Mulai Wawancara Mobile (Lebar Penuh Kiri-Kanan) */}
+      {activity?.status === 'terbuka' && (
+        <div className="sm:hidden">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => begin()}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white py-3 px-4 text-sm font-bold shadow-sm transition"
+          >
+            <Plus className="w-4.5 h-4.5" weight="bold" />
+            <span>Mulai Wawancara</span>
+          </button>
+        </div>
+      )}
 
       {/* Pesan Kesalahan Global */}
       {error && (
@@ -226,37 +250,37 @@ export default function SupervisiHome({
         </div>
       )}
 
-      {/* ── 2. ACTIVITY BAR (PILIH KEGIATAN & STATUS) ── */}
-      <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1 min-w-0">
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0">
-            Kegiatan Supervisi:
-          </label>
-          <div className="flex items-center gap-2 flex-1 max-w-md">
-            <select
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
-              value={activityId}
-              onChange={(e) => {
-                setActivityId(e.target.value)
-                setPage(1)
-                setCoverage(null)
-                setAnalytics(null)
-                setStarting(false)
-              }}
-            >
-              <option value="">-- Pilih Kegiatan --</option>
-              {home.activities.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.nama} ({a.tahun_nama})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Badge Status Kegiatan */}
-          {activity && (
+      {/* ── 2. SLIM ACTIVITY INFO & SWITCHER ── */}
+      {activity && (
+        <div className="flex flex-wrap items-center justify-between gap-2.5 px-0.5 text-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold text-slate-500 shrink-0">Kegiatan:</span>
+            {home.activities.length > 1 ? (
+              <select
+                aria-label="Pilih Kegiatan Supervisi"
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 max-w-[240px] truncate"
+                value={activityId}
+                onChange={(e) => {
+                  setActivityId(e.target.value)
+                  setPage(1)
+                  setCoverage(null)
+                  setAnalytics(null)
+                  setStarting(false)
+                }}
+              >
+                {home.activities.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nama} ({a.tahun_nama})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="font-bold text-slate-800 truncate">
+                {activity.nama} ({activity.tahun_nama})
+              </span>
+            )}
             <span
-              className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 capitalize ${
+              className={`px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0 capitalize ${
                 activity.status === 'terbuka'
                   ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
                   : activity.status === 'persiapan'
@@ -270,21 +294,24 @@ export default function SupervisiHome({
                   ? 'Persiapan'
                   : 'Ditutup'}
             </span>
+          </div>
+
+          {/* Akses cepat ke tab Kelola Kegiatan untuk Admin */}
+          {home.admin && tab !== 'kegiatan' && (
+            <button
+              type="button"
+              onClick={() => {
+                setTab('kegiatan')
+                setStarting(false)
+              }}
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-emerald-700 transition"
+            >
+              <Gear className="w-3.5 h-3.5" />
+              <span>Kelola Agenda</span>
+            </button>
           )}
         </div>
-
-        {/* Tombol Kegiatan Baru (Admin) */}
-        {home.admin && (
-          <button
-            type="button"
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100/80 px-3.5 py-2 text-xs font-bold text-slate-700 transition shrink-0"
-            onClick={() => setEditor('new')}
-          >
-            <PlusCircle className="w-4 h-4 text-emerald-600" weight="bold" />
-            <span>Kegiatan Baru</span>
-          </button>
-        )}
-      </div>
+      )}
 
       {/* Modal Activity Editor */}
       {editor && (
@@ -629,75 +656,140 @@ export default function SupervisiHome({
                       const progressPct = Math.round((r.completed_count / 53) * 100)
 
                       return (
-                        <div
-                          key={r.guru_id}
-                          className="p-4 sm:px-5 sm:py-3.5 flex flex-col sm:grid sm:grid-cols-[2.5fr_1.2fr_1.5fr_120px] sm:items-center gap-3 hover:bg-slate-50/50 transition"
-                        >
-                          {/* Nama & Kelas */}
-                          <div>
-                            <p className="text-xs sm:text-sm font-bold text-slate-900">
-                              {r.guru_nama}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                              {r.kelas.length > 0 ? r.kelas.join(', ') : 'Belum ada kelas'}
-                            </p>
-                          </div>
+                        <div key={r.guru_id}>
+                          {/* ── Tampilan Mobile: Super Compact (2 Baris Ringkas & Padat) ── */}
+                          <div className="sm:hidden p-3.5 hover:bg-slate-50/50 transition flex flex-col gap-2">
+                            {/* Baris 1: Nama Guru, Status Badge, dan Tombol Aksi */}
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-xs font-bold text-slate-900 truncate">
+                                  {r.guru_nama}
+                                </span>
+                                <span
+                                  className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${statusConfig.badgeClass}`}
+                                >
+                                  {statusConfig.label}
+                                </span>
+                              </div>
 
-                          {/* Status Wawancara */}
-                          <div>
-                            <span
-                              className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${statusConfig.badgeClass}`}
-                            >
-                              {statusConfig.label}
-                            </span>
-                          </div>
-
-                          {/* Progress Pengisian */}
-                          <div>
-                            <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 mb-1">
-                              <span>
-                                {r.completed_count} / 53 item
-                              </span>
-                              <span className="font-mono text-slate-400">{progressPct}%</span>
+                              <div className="shrink-0">
+                                {r.interview_id ? (
+                                  <Link
+                                    href={`/dashboard/sekpen/supervisi/${r.interview_id}`}
+                                    className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100/70 px-2.5 py-1 rounded-lg transition"
+                                  >
+                                    <span>{r.status === 'selesai' ? 'Lihat' : 'Draft'}</span>
+                                    <CaretRight className="w-3 h-3" />
+                                  </Link>
+                                ) : r.status === 'belum' && activity.status === 'terbuka' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => begin(r.guru_id)}
+                                    className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 rounded-lg shadow-xs transition"
+                                  >
+                                    <Plus className="w-3 h-3" weight="bold" />
+                                    <span>Mulai</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-[11px] text-slate-400">
+                                    {r.status === 'belum' ? '—' : 'Lain'}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all ${
-                                  r.completed_count === 53
-                                    ? 'bg-emerald-600'
-                                    : r.completed_count > 0
-                                      ? 'bg-amber-500'
-                                      : 'bg-slate-200'
-                                }`}
-                                style={{ width: `${progressPct}%` }}
-                              />
+
+                            {/* Baris 2: Kelas & Progress */}
+                            <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                              <span className="truncate flex-1 min-w-0">
+                                {r.kelas.length > 0 ? r.kelas.join(', ') : 'Belum ada kelas'}
+                              </span>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="font-semibold text-slate-600 tabular-nums text-[11px]">
+                                  {r.completed_count}/53
+                                </span>
+                                <div className="w-14 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${
+                                      r.completed_count === 53
+                                        ? 'bg-emerald-600'
+                                        : r.completed_count > 0
+                                          ? 'bg-amber-500'
+                                          : 'bg-slate-200'
+                                    }`}
+                                    style={{ width: `${progressPct}%` }}
+                                  />
+                                </div>
+                              </div>
                             </div>
                           </div>
 
-                          {/* Tombol Aksi */}
-                          <div className="flex items-center justify-end sm:justify-end">
-                            {r.interview_id ? (
-                              <Link
-                                href={`/dashboard/sekpen/supervisi/${r.interview_id}`}
-                                className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/70 px-3 py-1.5 rounded-xl transition"
+                          {/* ── Tampilan Desktop: Grid 4 Kolom Proporsional ── */}
+                          <div className="hidden sm:grid sm:grid-cols-[2.5fr_1.2fr_1.5fr_120px] sm:items-center gap-4 px-5 py-3.5 hover:bg-slate-50/50 transition">
+                            {/* Nama & Kelas */}
+                            <div>
+                              <p className="text-xs sm:text-sm font-bold text-slate-900">
+                                {r.guru_nama}
+                              </p>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                {r.kelas.length > 0 ? r.kelas.join(', ') : 'Belum ada kelas'}
+                              </p>
+                            </div>
+
+                            {/* Status Wawancara */}
+                            <div>
+                              <span
+                                className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${statusConfig.badgeClass}`}
                               >
-                                <span>{r.status === 'selesai' ? 'Lihat Hasil' : 'Buka Draft'}</span>
-                                <CaretRight className="w-3.5 h-3.5" />
-                              </Link>
-                            ) : r.status === 'belum' && activity.status === 'terbuka' ? (
-                              <button
-                                type="button"
-                                onClick={() => begin(r.guru_id)}
-                                className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-xl shadow-xs transition"
-                              >
-                                <Plus className="w-3.5 h-3.5" weight="bold" />
-                                <span>Mulai</span>
-                              </button>
-                            ) : (
-                              <span className="text-xs text-slate-400">
-                                {r.status === 'belum' ? '—' : 'Petugas lain'}
+                                {statusConfig.label}
                               </span>
-                            )}
+                            </div>
+
+                            {/* Progress Pengisian */}
+                            <div>
+                              <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 mb-1">
+                                <span>{r.completed_count} / 53 item</span>
+                                <span className="font-mono text-slate-400">{progressPct}%</span>
+                              </div>
+                              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all ${
+                                    r.completed_count === 53
+                                      ? 'bg-emerald-600'
+                                      : r.completed_count > 0
+                                        ? 'bg-amber-500'
+                                        : 'bg-slate-200'
+                                  }`}
+                                  style={{ width: `${progressPct}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Tombol Aksi */}
+                            <div className="flex items-center justify-end">
+                              {r.interview_id ? (
+                                <Link
+                                  href={`/dashboard/sekpen/supervisi/${r.interview_id}`}
+                                  className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/70 px-3 py-1.5 rounded-xl transition"
+                                >
+                                  <span>{r.status === 'selesai' ? 'Lihat Hasil' : 'Buka Draft'}</span>
+                                  <CaretRight className="w-3.5 h-3.5" />
+                                </Link>
+                              ) : r.status === 'belum' && activity.status === 'terbuka' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => begin(r.guru_id)}
+                                  className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-xl shadow-xs transition"
+                                >
+                                  <Plus className="w-3.5 h-3.5" weight="bold" />
+                                  <span>Mulai</span>
+                                </button>
+                              ) : (
+                                <span className="text-xs text-slate-400">
+                                  {r.status === 'belum' ? '—' : 'Petugas lain'}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )
@@ -713,28 +805,67 @@ export default function SupervisiHome({
               )}
 
               {/* Pagination Controls */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 px-1">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 px-1 pt-2">
                 <span>
-                  Menampilkan {coverage?.rows.length ?? 0} dari {coverage?.total ?? 0} guru · Halaman {page}
+                  Menampilkan{' '}
+                  <span className="font-semibold text-slate-800">
+                    {coverage?.total === 0 ? 0 : (page - 1) * 20 + 1}–{Math.min(page * 20, coverage?.total ?? 0)}
+                  </span>{' '}
+                  dari <span className="font-semibold text-slate-800">{coverage?.total ?? 0}</span> guru
                 </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className={secondaryClass}
-                    disabled={page === 1 || loading}
-                    onClick={() => setPage((p) => p - 1)}
-                  >
-                    Sebelumnya
-                  </button>
-                  <button
-                    type="button"
-                    className={secondaryClass}
-                    disabled={loading || page * 20 >= (coverage?.total ?? 0)}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    Berikutnya
-                  </button>
-                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    {/* Tombol Sebelumnya */}
+                    <button
+                      type="button"
+                      disabled={page === 1 || loading}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      title="Halaman sebelumnya"
+                      aria-label="Halaman sebelumnya"
+                    >
+                      <CaretLeft className="w-4 h-4" />
+                    </button>
+
+                    {/* Nomor Halaman */}
+                    <div className="flex items-center gap-1">
+                      {getPageRange(page, totalPages).map((p, i) =>
+                        p === '...' ? (
+                          <span key={`dots-${i}`} className="px-1.5 text-slate-400 select-none">
+                            …
+                          </span>
+                        ) : (
+                          <button
+                            key={p}
+                            type="button"
+                            disabled={loading}
+                            onClick={() => setPage(Number(p))}
+                            className={`h-8 min-w-[2rem] px-2 rounded-lg text-xs font-semibold transition-colors ${
+                              p === page
+                                ? 'bg-slate-900 text-white shadow-xs'
+                                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        )
+                      )}
+                    </div>
+
+                    {/* Tombol Berikutnya */}
+                    <button
+                      type="button"
+                      disabled={page >= totalPages || loading}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      title="Halaman berikutnya"
+                      aria-label="Halaman berikutnya"
+                    >
+                      <CaretRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -849,115 +980,255 @@ export default function SupervisiHome({
 
           {/* ── 7. KONTEN TAB: KEGIATAN (ADMIN ONLY) ── */}
           {tab === 'kegiatan' && home.admin && (
-            <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-sm space-y-5">
-              <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Pengaturan Status Kegiatan
-                </span>
-                <h3 className="text-base sm:text-lg font-bold text-slate-900 mt-0.5">
-                  {activity.nama}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Tahun ajaran: {activity.tahun_nama} · Status: <span className="capitalize font-semibold text-slate-700">{activity.status}</span>.
-                  Daftar target guru dibekukan setelah kegiatan dibuka.
-                </p>
+            <div className="space-y-6">
+              {/* Header Tab Kelola Kegiatan dengan Tombol + Buat Kegiatan Baru */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-5 rounded-2xl border border-slate-200/90 bg-white shadow-sm">
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                    Kelola Kegiatan Supervisi
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                    Atur agenda supervisi, konfigurasi target guru, dan kelola status pembukaan/penutupan kegiatan.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 text-xs sm:text-sm font-bold shadow-xs transition shrink-0"
+                  onClick={() => setEditor('new')}
+                >
+                  <PlusCircle className="w-4 h-4" weight="bold" />
+                  <span>Buat Kegiatan Baru</span>
+                </button>
               </div>
 
-              {/* Status Persiapan */}
-              {activity.status === 'persiapan' && (
-                <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-3">
-                  <p className="text-xs font-semibold text-amber-900">
-                    Kegiatan masih dalam tahap persiapan. Anda dapat menyusun target guru sebelum membuka kegiatan.
-                  </p>
-                  <div className="flex flex-wrap gap-2.5">
-                    <button
-                      type="button"
-                      className={secondaryClass}
-                      onClick={() => setEditor(activity.id)}
+              {/* Panel Pengaturan Kegiatan yang Dipilih */}
+              <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-sm space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Detail & Status Kegiatan Aktif
+                    </span>
+                    <h4 className="text-base font-bold text-slate-900 mt-0.5">
+                      {activity.nama}
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Tahun ajaran: <span className="font-semibold text-slate-700">{activity.tahun_nama}</span> · Revisi #{activity.revision}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Dropdown pilih kegiatan jika ada lebih dari 1 */}
+                    {home.activities.length > 1 && (
+                      <div className="flex items-center gap-2">
+                        <label htmlFor="kegiatan-select-admin" className="text-xs text-slate-500 font-medium">
+                          Pilih:
+                        </label>
+                        <select
+                          id="kegiatan-select-admin"
+                          className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
+                          value={activityId}
+                          onChange={(e) => {
+                            setActivityId(e.target.value)
+                            setPage(1)
+                            setCoverage(null)
+                            setAnalytics(null)
+                            setStarting(false)
+                          }}
+                        >
+                          {home.activities.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.nama} ({a.tahun_nama})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${
+                        activity.status === 'terbuka'
+                          ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
+                          : activity.status === 'persiapan'
+                            ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20'
+                            : 'bg-slate-100 text-slate-700 ring-1 ring-slate-600/10'
+                      }`}
                     >
-                      <ChalkboardTeacher className="w-4 h-4" />
-                      <span>Atur Target Guru</span>
-                    </button>
+                      {activity.status === 'terbuka'
+                        ? 'Terbuka'
+                        : activity.status === 'persiapan'
+                          ? 'Persiapan'
+                          : 'Ditutup'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status Persiapan */}
+                {activity.status === 'persiapan' && (
+                  <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-3">
+                    <p className="text-xs font-semibold text-amber-900">
+                      Kegiatan masih dalam tahap persiapan. Anda dapat menyusun target guru sebelum membuka kegiatan.
+                    </p>
+                    <div className="flex flex-wrap gap-2.5">
+                      <button
+                        type="button"
+                        className={secondaryClass}
+                        onClick={() => setEditor(activity.id)}
+                      >
+                        <ChalkboardTeacher className="w-4 h-4" />
+                        <span>Atur Target Guru</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className={buttonClass}
+                        onClick={() => transition('terbuka')}
+                      >
+                        <LockOpen className="w-4 h-4" />
+                        <span>Buka Kegiatan Supervisi</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Status Terbuka */}
+                {activity.status === 'terbuka' && (
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div>
+                      <h5 className="text-xs font-bold text-slate-800">Tutup Kegiatan Supervisi</h5>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Jika kegiatan ditutup, seluruh draft dan hasil wawancara akan dikunci (read-only) sampai dibuka kembali.
+                      </p>
+                    </div>
                     <button
                       type="button"
+                      className="inline-flex items-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 text-xs font-bold transition shadow-xs"
                       disabled={busy}
+                      onClick={() => transition('ditutup')}
+                    >
+                      <Lock className="w-4 h-4" />
+                      <span>Konfirmasi Tutup Kegiatan</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Status Ditutup */}
+                {activity.status === 'ditutup' && (
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div>
+                      <h5 className="text-xs font-bold text-slate-800">Buka Kembali Kegiatan</h5>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Masukkan alasan membuka kembali kegiatan supervisi untuk kebutuhan audit trail.
+                      </p>
+                    </div>
+                    <textarea
+                      maxLength={1000}
+                      placeholder="Contoh: Koreksi data pengajar dan penambahan wawancara susulan"
+                      className={`${inputClass} text-xs`}
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      disabled={busy || !reason.trim()}
                       className={buttonClass}
                       onClick={() => transition('terbuka')}
                     >
                       <LockOpen className="w-4 h-4" />
-                      <span>Buka Kegiatan Supervisi</span>
+                      <span>Buka Kembali Kegiatan</span>
                     </button>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Status Terbuka */}
-              {activity.status === 'terbuka' && (
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                {/* Hapus Kegiatan */}
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                   <div>
-                    <h4 className="text-xs font-bold text-slate-800">Tutup Kegiatan Supervisi</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Jika kegiatan ditutup, seluruh draft dan hasil wawancara akan dikunci (read-only) sampai dibuka kembali.
+                    <h5 className="text-xs font-bold text-rose-700">Zona Bahaya</h5>
+                    <p className="text-xs text-slate-500">
+                      Menghapus seluruh kegiatan beserta seluruh wawancara di dalamnya secara permanen.
                     </p>
                   </div>
                   <button
                     type="button"
-                    className="inline-flex items-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 text-xs font-bold transition shadow-xs"
                     disabled={busy}
-                    onClick={() => transition('ditutup')}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-700 hover:bg-rose-50 border border-rose-200/80 transition"
+                    onClick={() => setDeleting(true)}
                   >
-                    <Lock className="w-4 h-4" />
-                    <span>Konfirmasi Tutup Kegiatan</span>
+                    <Trash className="w-4 h-4" />
+                    <span>Hapus Kegiatan</span>
                   </button>
                 </div>
-              )}
-
-              {/* Status Ditutup */}
-              {activity.status === 'ditutup' && (
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800">Buka Kembali Kegiatan</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Masukkan alasan membuka kembali kegiatan supervisi untuk kebutuhan audit trail.
-                    </p>
-                  </div>
-                  <textarea
-                    maxLength={1000}
-                    placeholder="Contoh: Koreksi data pengajar dan penambahan wawancara susulan"
-                    className={`${inputClass} text-xs`}
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    disabled={busy || !reason.trim()}
-                    className={buttonClass}
-                    onClick={() => transition('terbuka')}
-                  >
-                    <LockOpen className="w-4 h-4" />
-                    <span>Buka Kembali Kegiatan</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Hapus Kegiatan */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-bold text-rose-700">Zona Bahaya</h4>
-                  <p className="text-xs text-slate-500">
-                    Menghapus seluruh kegiatan beserta seluruh wawancara di dalamnya secara permanen.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={busy}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-700 hover:bg-rose-50 border border-rose-200/80 transition"
-                  onClick={() => setDeleting(true)}
-                >
-                  <Trash className="w-4 h-4" />
-                  <span>Hapus Kegiatan</span>
-                </button>
               </div>
+
+              {/* Riwayat / Daftar Seluruh Kegiatan */}
+              {home.activities.length > 0 && (
+                <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-sm space-y-3">
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Daftar Semua Agenda Supervisi ({home.activities.length})
+                  </h4>
+                  <div className="divide-y divide-slate-100 rounded-xl border border-slate-200/80 overflow-hidden">
+                    {home.activities.map((a) => (
+                      <div
+                        key={a.id}
+                        className={`p-3.5 sm:px-4 sm:py-3 flex items-center justify-between gap-3 text-xs transition ${
+                          a.id === activityId ? 'bg-emerald-50/50' : 'hover:bg-slate-50/60'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 truncate">{a.nama}</span>
+                            {a.id === activityId && (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-1.5 py-0.2 rounded">
+                                Sedang Aktif
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-slate-500 mt-0.5">
+                            Tahun: {a.tahun_nama}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold capitalize ${
+                              a.status === 'terbuka'
+                                ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
+                                : a.status === 'persiapan'
+                                  ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20'
+                                  : 'bg-slate-100 text-slate-700 ring-1 ring-slate-600/10'
+                            }`}
+                          >
+                            {a.status}
+                          </span>
+
+                          {a.id !== activityId ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActivityId(a.id)
+                                setPage(1)
+                                setCoverage(null)
+                                setAnalytics(null)
+                              }}
+                              className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold transition"
+                            >
+                              Pilih
+                            </button>
+                          ) : a.status === 'persiapan' ? (
+                            <button
+                              type="button"
+                              onClick={() => setEditor(a.id)}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold transition"
+                            >
+                              Edit Target
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

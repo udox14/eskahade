@@ -73,5 +73,4 @@ CREATE TRIGGER IF NOT EXISTS supervisi_kegiatan_insert_audit AFTER INSERT ON sup
 CREATE TRIGGER IF NOT EXISTS supervisi_kegiatan_update_audit AFTER UPDATE ON supervisi_kegiatan BEGIN
  INSERT INTO supervisi_kegiatan_history(kegiatan_id,actor_id,before_status,after_status,reason) VALUES(NEW.id,NEW.actor_id,OLD.status,NEW.status,NEW.reason); END;
 INSERT OR IGNORE INTO fitur_akses(group_name,title,href,icon,roles,is_active,urutan)
- VALUES('Sekpen','Supervisi','/dashboard/sekpen/supervisi','ClipboardCheck','["admin"]',1,20);
-INSERT OR IGNORE INTO sidebar_groups(group_name,label,urutan,is_active) VALUES('Sekpen','Sekpen',35,1);
+ VALUES('Akademik','Supervisi','/dashboard/sekpen/supervisi','ClipboardCheck','["admin"]',1,20);
