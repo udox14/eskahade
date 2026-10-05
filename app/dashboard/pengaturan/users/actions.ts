@@ -1077,6 +1077,8 @@ export async function setUserFiturOverride(
     [fiturId]
   )
 
+  if (fitur?.href === '/dashboard/sekpen/supervisi' && !isAdmin(session)) return { error: 'Hanya admin yang dapat mengatur akses Supervisi.' }
+
   await execute(
     `INSERT INTO user_fitur_override (user_id, fitur_id, action, created_at)
      VALUES (?, ?, ?, datetime('now'))
@@ -1113,6 +1115,8 @@ export async function removeUserFiturOverride(
     'SELECT title, href FROM fitur_akses WHERE id = ?',
     [fiturId]
   )
+
+  if (fitur?.href === '/dashboard/sekpen/supervisi' && !isAdmin(session)) return { error: 'Hanya admin yang dapat mengatur akses Supervisi.' }
 
   await execute(
     'DELETE FROM user_fitur_override WHERE user_id = ? AND fitur_id = ?',

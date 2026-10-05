@@ -17,7 +17,8 @@
     "test:poskestren:ui": "node scripts/test-poskestren-ui.cjs",
     "test:discipline": "node scripts/test-discipline-occurrences.cjs",
     "test:pengajian-violations": "node scripts/test-pengajian-violations.cjs",
-    "test:pengajian-photos": "node scripts/test-pengajian-photos.cjs"
+    "test:pengajian-photos": "node scripts/test-pengajian-photos.cjs",
+    "test:supervisi": "node scripts/test-supervisi.cjs"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "latest",

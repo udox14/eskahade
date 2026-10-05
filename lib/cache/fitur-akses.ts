@@ -185,7 +185,14 @@ async function getUserOverrides(userId: string): Promise<OverrideRow[]> {
 // Helper: filter fitur yang aktif DAN salah satu role user ada di dalamnya,
 // PLUS apply per-user overrides (grant/revoke)
 export async function getFiturForRoles(roles: string[], userId?: string): Promise<FiturAkses[]> {
-  const all = await getCachedFiturAkses()
+  let all = await getCachedFiturAkses()
+  const overrides = userId && !roles.includes('admin') && !roles.includes('tester') ? await getUserOverrides(userId) : []
+  // Supervisi contains confidential interview results. Global tester/demo menu
+  // bypasses must not make it available without an explicit per-user grant.
+  if (!roles.includes('admin')) {
+    const granted = new Set(overrides.filter(o => o.action === 'grant').map(o => o.fitur_id))
+    all = all.filter(f => f.href !== '/dashboard/sekpen/supervisi' || (!roles.includes('tester') && granted.has(f.id)))
+  }
 
   // Admin & akun demo: lihat SEMUA fitur aktif (akses penuh)
   if (roles.includes('admin') || roles.includes('demo')) {
@@ -197,8 +204,6 @@ export async function getFiturForRoles(roles: string[], userId?: string): Promis
   if (roles.includes('tester')) {
     return all.filter(f => f.is_active)
   }
-
-  const overrides = userId ? await getUserOverrides(userId) : []
 
   const grantedIds = new Set(overrides.filter(o => o.action === 'grant').map(o => o.fitur_id))
   const revokedIds = new Set(overrides.filter(o => o.action === 'revoke').map(o => o.fitur_id))
@@ -235,6 +240,13 @@ export async function canAccessHref(href: string, roles: string[], userId?: stri
   const fitur = all.find(f => f.href === href)
   if (!fitur) return false           // href tidak terdaftar → blokir
   if (!fitur.is_active) return false // fitur dinonaktifkan admin → blokir
+
+  if (href === '/dashboard/sekpen/supervisi') {
+    if (roles.includes('admin')) return true
+    if (!userId || roles.includes('tester')) return false
+    const grant = (await getUserOverrides(userId)).find(o => o.fitur_id === fitur.id)
+    return grant?.action === 'grant'
+  }
 
   // Cek per-user overrides
   if (userId) {
