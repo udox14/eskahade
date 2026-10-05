@@ -34,6 +34,7 @@ import {
   Clock,
   Quotes,
   LockOpen,
+  X,
 } from '@phosphor-icons/react'
 
 type History = Awaited<ReturnType<typeof getInterviewHistory>>
@@ -127,12 +128,98 @@ export default function InterviewForm({
     }
   }
 
-  function navigate(n: number) {
+  function scrollToTop() {
+    if (typeof document !== 'undefined') {
+      const mainEl = document.querySelector('main')
+      if (mainEl) {
+        mainEl.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  useEffect(() => {
+    if (!printOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPrintOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [printOpen])
+
+  const touchStartRef = useRef<{
+    x: number
+    y: number
+    time: number
+    isInteractive: boolean
+  } | null>(null)
+
+  function handleTouchStart(e: React.TouchEvent<HTMLDivElement>) {
+    if (busy || e.touches.length !== 1) {
+      touchStartRef.current = null
+      return
+    }
+    const touch = e.touches[0]
+    const target = e.target as HTMLElement | null
+    const isInteractive = Boolean(
+      target?.closest(
+        'input, textarea, select, button, a, [contenteditable="true"], [role="button"], [role="slider"]'
+      )
+    )
+
+    touchStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now(),
+      isInteractive,
+    }
+  }
+
+  function handleTouchEnd(e: React.TouchEvent<HTMLDivElement>) {
+    if (!touchStartRef.current || busy || e.changedTouches.length !== 1) {
+      touchStartRef.current = null
+      return
+    }
+
+    if (touchStartRef.current.isInteractive) {
+      touchStartRef.current = null
+      return
+    }
+
+    const touch = e.changedTouches[0]
+    const deltaX = touch.clientX - touchStartRef.current.x
+    const deltaY = touch.clientY - touchStartRef.current.y
+    const elapsed = Date.now() - touchStartRef.current.time
+    touchStartRef.current = null
+
+    // Toleransi swipe agar tidak terlalu sensitif & tidak mengganggu scroll vertikal:
+    // Waktu sentuh 70ms - 600ms, jarak horizontal minimal 75px,
+    // jarak vertikal maksimal 50px, dan dominan horizontal > 1.6x vertikal.
+    // Swipe layar TIDAK melakukan auto-scroll ke atas (auto scroll hanya via tombol).
+    if (elapsed >= 70 && elapsed <= 600) {
+      const absX = Math.abs(deltaX)
+      const absY = Math.abs(deltaY)
+      if (absX >= 75 && absY <= 50 && absX > absY * 1.6) {
+        if (deltaX < 0) {
+          if (position < 11) navigate(position + 1, false)
+        } else {
+          if (position > 0) navigate(position - 1, false)
+        }
+      }
+    }
+  }
+
+  function navigate(n: number, shouldScroll = true) {
     if (busy) return
     if (timer.current) clearTimeout(timer.current)
     void queue.flush()
-    setPosition(Math.max(0, Math.min(11, n)))
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const target = Math.max(0, Math.min(11, n))
+    setPosition(target)
+    if (shouldScroll) {
+      scrollToTop()
+    }
   }
 
   async function leave() {
@@ -273,7 +360,11 @@ export default function InterviewForm({
   const progressPercentage = Math.round((count / 53) * 100)
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-28">
+    <div
+      className="max-w-4xl mx-auto space-y-6 pb-28"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* ── 1. TOP BAR NAVIGASI & AKSI ── */}
       <div className="flex items-center justify-between gap-3">
         <button
@@ -458,7 +549,7 @@ export default function InterviewForm({
           </div>
         </div>
 
-        {/* Step Track Buttons */}
+        {/* Step Track Buttons (Ukuran Konsisten & Simetris) */}
         <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5 pt-1">
           {steps.map((s, idx) => {
             const isActive = position === idx
@@ -468,17 +559,22 @@ export default function InterviewForm({
                 type="button"
                 onClick={() => navigate(s.position)}
                 title={`${idx + 1}. ${s.title}`}
-                className={`py-2 px-1 text-xs font-bold rounded-xl transition-all flex flex-col items-center justify-center gap-0.5 ${
+                className={`relative h-11 sm:h-12 w-full rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center ${
                   isActive
-                    ? 'bg-slate-900 text-white shadow-xs'
+                    ? 'bg-slate-900 text-white shadow-xs ring-2 ring-slate-900/10'
                     : s.complete
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60 hover:bg-emerald-100/60'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70 hover:bg-emerald-100/70'
                       : 'bg-slate-100 text-slate-500 hover:bg-slate-200/70 border border-transparent'
                 }`}
               >
                 <span>{idx + 1}</span>
-                {s.complete && !isActive && (
-                  <Check className="w-3 h-3 text-emerald-600" weight="bold" />
+                {s.complete && (
+                  <span className="absolute top-1 right-1 flex items-center justify-center pointer-events-none">
+                    <Check
+                      className={`w-3 h-3 ${isActive ? 'text-emerald-300' : 'text-emerald-600'}`}
+                      weight="bold"
+                    />
+                  </span>
                 )}
               </button>
             )
@@ -1055,20 +1151,65 @@ export default function InterviewForm({
         </details>
       </div>
 
-      {/* ── 6. MODAL / SECTION PRINT PREVIEW ── */}
+      {/* ── 6. MODAL PRATINJAU CETAK DOKUMEN ── */}
       {printOpen && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 animate-in fade-in duration-150">
-          <div className="flex items-center justify-between border-b pb-3">
-            <h3 className="font-bold text-slate-900 text-sm">Pratinjau Dokumen Cetak</h3>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className={buttonClass}
-                onClick={() => void print()}
-              >
-                <Printer className="w-4 h-4" />
-                <span>Cetak Sekarang</span>
-              </button>
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-3 sm:p-6 overflow-hidden animate-in fade-in duration-150"
+        >
+          <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden">
+            {/* Header Modal */}
+            <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                  <Printer className="w-4 h-4" weight="duotone" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">
+                    Pratinjau Dokumen Cetak Supervisi
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {interview.identity.guru_nama} · Kelas {interview.identity.kelas_nama}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
+                  onClick={() => void print()}
+                >
+                  <Printer className="w-4 h-4" weight="bold" />
+                  <span>Cetak Dokumen Sekarang (PDF)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPrintOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition"
+                  title="Tutup Modal"
+                >
+                  <X className="w-4 h-4" weight="bold" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: Kertas Dokumen Scrollable */}
+            <div className="p-4 sm:p-8 overflow-y-auto bg-slate-100/90 flex justify-center flex-1">
+              <div className="bg-white shadow-md border border-slate-200/90 rounded-sm p-6 sm:p-10 max-w-3xl w-full">
+                <PrintView
+                  ref={printRef}
+                  interview={printable}
+                  profile={letterhead.profile}
+                  mode={letterhead.mode}
+                />
+              </div>
+            </div>
+
+            {/* Footer Modal */}
+            <div className="px-6 py-3 border-t border-slate-100 bg-white flex items-center justify-between text-xs text-slate-500 shrink-0">
+              <span>Format kertas: A4 Portrait · Pengesahan resmi & rekap nilai tercakup</span>
               <button
                 type="button"
                 className={secondaryClass}
@@ -1077,15 +1218,6 @@ export default function InterviewForm({
                 Tutup
               </button>
             </div>
-          </div>
-
-          <div className="border rounded-xl p-4 bg-slate-50 overflow-x-auto">
-            <PrintView
-              ref={printRef}
-              interview={printable}
-              profile={letterhead.profile}
-              mode={letterhead.mode}
-            />
           </div>
         </div>
       )}
@@ -1103,11 +1235,11 @@ export default function InterviewForm({
             <span>Kembali</span>
           </button>
 
-          <span className="text-xs font-semibold text-slate-500">
+          <span className="text-xs font-semibold text-slate-600 text-center truncate max-w-xs sm:max-w-md">
             {position === 0
-              ? 'Langkah 1: Pembukaan'
+              ? 'Langkah 1: Identitas & Pembukaan'
               : position === 11
-                ? 'Langkah 12: Review'
+                ? 'Langkah 12: Review & Penutup'
                 : `Langkah ${position + 1}/12 · ${currentStep.title}`}
           </span>
 

@@ -57,7 +57,7 @@ export default function IdentityEditor({
   }
 
   const teacher = teachers.find((t) => t.id === guru)
-  const selected = teacher ? classContext(teacher, key) : null
+  const selected = teacher ? classContext(teacher, key || 'all') : null
 
   if (!open) {
     return (
@@ -98,48 +98,31 @@ export default function IdentityEditor({
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-bold text-slate-600 mb-1">Guru Pengajar</label>
-          <select
-            className={inputClass}
-            disabled={busy}
-            value={guru}
-            onChange={(e) => {
-              const id = Number(e.target.value)
-              setGuru(id)
-              const contexts = teachers.find((t) => t.id === id)?.classes ?? []
-              setKey(contexts.length === 1 ? contexts[0].id : '')
-            }}
-          >
-            {teachers.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.nama}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-bold text-slate-600 mb-1">Kelas Diniyah</label>
-          <select
-            className={inputClass}
-            disabled={busy}
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-          >
-            <option value="">Pilih satu kelas</option>
-            {teacher?.classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nama}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div>
+        <label className="block text-xs font-bold text-slate-600 mb-1">Guru Pengajar</label>
+        <select
+          className={inputClass}
+          disabled={busy}
+          value={guru}
+          onChange={(e) => {
+            const id = Number(e.target.value)
+            setGuru(id)
+            setKey('all')
+          }}
+        >
+          {teachers.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.nama}
+            </option>
+          ))}
+        </select>
       </div>
 
       {selected && (
         <div className="bg-white p-3 rounded-xl border border-amber-200/80 text-xs text-slate-700 space-y-1">
+          <p className="font-semibold text-slate-900">
+            Kelas Diniyah: <span className="font-normal">{selected.kelas_nama || 'Semua Kelas'} (Otomatis)</span>
+          </p>
           <p className="font-semibold text-slate-900">
             Kitab / Pelajaran: <span className="font-normal">{contextBooks(selected)}</span>
           </p>
@@ -147,12 +130,6 @@ export default function IdentityEditor({
             Waktu Sesi: <span className="font-normal">{selected.sesi}</span>
           </p>
         </div>
-      )}
-
-      {key && !selected && (
-        <p className="text-xs text-amber-700">
-          Penugasan kitab/mapel guru ini belum lengkap di master akademik.
-        </p>
       )}
 
       <div className="flex items-center gap-2 pt-1">

@@ -97,7 +97,7 @@ export default function SupervisiHome({
 
   const activity = home.activities.find((a) => a.id === activityId)
   const teacher = teachers.find((t) => t.id === teacherId)
-  const selectedContext = teacher ? classContext(teacher, context) : null
+  const selectedContext = teacher ? classContext(teacher, context || 'all') : null
 
   // Fetch coverage & analytics
   useEffect(() => {
@@ -148,8 +148,7 @@ export default function SupervisiHome({
       const t = await getActivityTeachers(activityId)
       setTeachers(t)
       setTeacherId(guruId)
-      const classes = t.find((x) => x.id === guruId)?.classes ?? []
-      setContext(classes.length === 1 ? classes[0].id : '')
+      setContext('all')
       setStarting(true)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch {
@@ -163,7 +162,7 @@ export default function SupervisiHome({
     setBusy(true)
     setError('')
     try {
-      const r = await startInterview(activityId, teacherId, context, date)
+      const r = await startInterview(activityId, teacherId, context || 'all', date)
       if (r.ok) {
         router.push(`/dashboard/sekpen/supervisi/${r.data}`)
       } else {
@@ -444,7 +443,7 @@ export default function SupervisiHome({
                     Mulai Wawancara Pengajar
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Wawancara satu kelompok santri dari satu kelas pengajian. Identitas santri dijaga dan tidak dicatat.
+                    Instrumen supervisi pengajaran santri. Seluruh kelas dan kitab guru terpilih otomatis.
                   </p>
                 </div>
               </div>
@@ -462,11 +461,10 @@ export default function SupervisiHome({
                       onChange={(e) => {
                         const id = Number(e.target.value)
                         setTeacherId(id)
-                        const c = teachers.find((t) => t.id === id)?.classes ?? []
-                        setContext(c.length === 1 ? c[0].id : '')
+                        setContext('all')
                       }}
                     >
-                      <option value={0}>-- Pilih Guru --</option>
+                      <option value={0}>-- Pilih Guru Pengajar --</option>
                       {teachers.map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.nama}
@@ -475,31 +473,36 @@ export default function SupervisiHome({
                     </select>
                   </div>
 
-                  {/* Kelas */}
+                  {/* Tanggal Wawancara */}
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                      Kelas Diniyah <span className="text-rose-500">*</span>
+                      Tanggal Wawancara <span className="text-rose-500">*</span>
                     </label>
-                    <select
+                    <input
+                      type="date"
                       className={inputClass}
-                      disabled={!teacher}
-                      value={context}
-                      onChange={(e) => setContext(e.target.value)}
-                    >
-                      <option value="">-- Pilih Satu Kelas --</option>
-                      {teacher?.classes.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.nama}
-                        </option>
-                      ))}
-                    </select>
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                    />
                   </div>
                 </div>
 
-                {/* Info Konteks Kitab & Sesi */}
+                {/* Info Otomatis: Kelas, Kitab & Sesi Pengajian */}
                 {selectedContext && (
-                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs sm:text-sm text-slate-800 space-y-2">
-                    <div className="flex items-start gap-2">
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs sm:text-sm text-slate-800 space-y-3">
+                    <div className="flex items-start gap-2.5">
+                      <ChalkboardTeacher className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" weight="duotone" />
+                      <div>
+                        <span className="font-bold text-slate-500 block text-[11px] uppercase tracking-wider">
+                          Kelas Diniyah (Otomatis Terpilih Semua)
+                        </span>
+                        <span className="font-semibold text-slate-900">
+                          {selectedContext.kelas_nama || 'Semua Kelas'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2.5">
                       <BookOpen className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" weight="duotone" />
                       <div>
                         <span className="font-bold text-slate-500 block text-[11px] uppercase tracking-wider">
@@ -510,7 +513,8 @@ export default function SupervisiHome({
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-start gap-2">
+
+                    <div className="flex items-start gap-2.5">
                       <Clock className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" weight="duotone" />
                       <div>
                         <span className="font-bold text-slate-500 block text-[11px] uppercase tracking-wider">
@@ -523,25 +527,6 @@ export default function SupervisiHome({
                     </div>
                   </div>
                 )}
-
-                {context && !selectedContext && (
-                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
-                    Penugasan kitab/mapel pengajar ini belum lengkap. Harap minta admin memeriksa master penugasan guru.
-                  </div>
-                )}
-
-                {/* Tanggal Wawancara */}
-                <div className="max-w-xs">
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                    Tanggal Wawancara <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    className={inputClass}
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
-                </div>
 
                 {/* Tombol Aksi */}
                 <div className="flex items-center gap-2.5 pt-3 border-t border-slate-100">

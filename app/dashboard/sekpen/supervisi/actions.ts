@@ -3,7 +3,7 @@ import { batch, execute, query, queryOne } from '@/lib/db';
 import { requireSupervisi, teachersForYear, validDate, boundedText, HREF } from '@/lib/supervisi/server';
 import { completedCount, normalizeAnswers, summarize, type Answers } from '@/lib/supervisi/instrument';
 import { classContext } from '@/lib/supervisi/context';
-import type { Activity, Coverage, Interview, Identity, Teacher } from '@/lib/supervisi/types';
+import type { Activity, Context, Coverage, Interview, Identity, Teacher } from '@/lib/supervisi/types';
 import { getSession, isAdmin } from '@/lib/auth/session';
 import { revalidatePath } from 'next/cache';
 import { actorFromSession, logActivity } from '@/lib/activity-log';
@@ -194,8 +194,17 @@ async function identityFor(activityId: string, guruId: number, key: string, pewa
         throw new Error('Guru bukan target kegiatan.');
     const teachers = await teachersForYear(activity.tahun_ajaran_id);
     const teacher = teachers.find(t => t.id === guruId);
-    const classId = teacher?.classes.some(c => c.id === key) ? key : teacher?.contexts.find(c => c.key === key)?.kelas_id;
-    const context = teacher && classId ? classContext(teacher, classId) : null;
+    if (!teacher)
+        throw new Error('Guru tidak terdaftar dalam target.');
+    let context: Context | null = null;
+    if (key && key !== 'all') {
+        const classId = teacher.classes.some(c => c.id === key) ? key : teacher.contexts.find(c => c.key === key)?.kelas_id;
+        if (!classId)
+            throw new Error('Konteks kelas tidak valid.');
+        context = classContext(teacher, classId);
+    } else {
+        context = classContext(teacher, 'all');
+    }
     if (!context)
         throw new Error('Kelas, waktu, atau pembagian kitab belum lengkap. Perbaiki master penugasan terlebih dahulu.');
     return { ...context, guru_nama: target.guru_nama, pewawancara, kegiatan_nama: activity.nama, tahun_nama: activity.tahun_nama };
