@@ -2,6 +2,7 @@
 import { batch, execute, query, queryOne } from '@/lib/db';
 import { requireSupervisi, teachersForYear, validDate, boundedText, HREF } from '@/lib/supervisi/server';
 import { completedCount, normalizeAnswers, summarize, type Answers } from '@/lib/supervisi/instrument';
+import { classContext } from '@/lib/supervisi/context';
 import type { Activity, Coverage, Interview, Identity, Teacher } from '@/lib/supervisi/types';
 import { getSession, isAdmin } from '@/lib/auth/session';
 import { revalidatePath } from 'next/cache';
@@ -192,7 +193,9 @@ async function identityFor(activityId: string, guruId: number, key: string, pewa
     if (!target)
         throw new Error('Guru bukan target kegiatan.');
     const teachers = await teachersForYear(activity.tahun_ajaran_id);
-    const context = teachers.find(t => t.id === guruId)?.contexts.find(c => c.key === key);
+    const teacher = teachers.find(t => t.id === guruId);
+    const classId = teacher?.classes.some(c => c.id === key) ? key : teacher?.contexts.find(c => c.key === key)?.kelas_id;
+    const context = teacher && classId ? classContext(teacher, classId) : null;
     if (!context)
         throw new Error('Kelas, waktu, atau pembagian kitab belum lengkap. Perbaiki master penugasan terlebih dahulu.');
     return { ...context, guru_nama: target.guru_nama, pewawancara, kegiatan_nama: activity.nama, tahun_nama: activity.tahun_nama };
@@ -308,6 +311,41 @@ export async function setSupervisiUserPermission(userId: string, all: boolean) {
         await execute('INSERT INTO supervisi_user_permission(user_id,can_manage_all) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET can_manage_all=excluded.can_manage_all', [userId, all ? 1 : 0]);
         await logActivity({ actor: actorFromSession(session), module: 'supervisi', action: 'access_change', fiturHref: HREF, logKind: 'update', entityType: 'user', entityId: userId, summary: all ? 'Memberikan izin kelola semua Supervisi' : 'Mencabut izin kelola semua Supervisi' });
         revalidatePath('/dashboard/pengaturan/users');
+        return true;
+    });
+}
+
+export async function prepareActivityDeletion(id: string, revision: number) {
+    return attempt(async () => {
+        const { session } = await requireSupervisi(true);
+        const activity = await queryOne<Activity>('SELECT * FROM supervisi_kegiatan WHERE id=? AND revision=?', [id, revision]);
+        if (!activity) throw new Error('Kegiatan berubah. Muat ulang terlebih dahulu.');
+        const counts = await queryOne<{ total: number; selesai: number }>("SELECT COUNT(*) AS total, COALESCE(SUM(status='selesai'),0) AS selesai FROM supervisi_wawancara WHERE kegiatan_id=?", [id]);
+        const token = crypto.randomUUID();
+        await execute("DELETE FROM supervisi_delete_request WHERE authorized=0 AND created_at<datetime('now','-10 minutes')");
+        await execute('INSERT INTO supervisi_delete_request(token,kegiatan_id,revision,actor_id) VALUES(?,?,?,?)', [token, id, revision, session.id]);
+        return { token, total: counts?.total ?? 0, selesai: counts?.selesai ?? 0 };
+    });
+}
+export async function deleteActivity(id: string, revision: number, token: string, confirmationName: string) {
+    return attempt(async () => {
+        const { session } = await requireSupervisi(true);
+        const activity = await queryOne<Activity>('SELECT * FROM supervisi_kegiatan WHERE id=? AND revision=?', [id, revision]);
+        if (!activity) throw new Error('Kegiatan berubah. Ulangi konfirmasi penghapusan.');
+        if (confirmationName !== activity.nama) throw new Error('Nama kegiatan tidak sesuai.');
+        const request = await queryOne("SELECT token FROM supervisi_delete_request WHERE token=? AND kegiatan_id=? AND revision=? AND actor_id=? AND authorized=0 AND created_at>=datetime('now','-10 minutes')", [token,id,revision,session.id]);
+        if (!request) throw new Error('Konfirmasi kedaluwarsa atau tidak valid. Ulangi dari awal.');
+        await batch([
+            { sql: 'UPDATE supervisi_delete_request SET authorized=1 WHERE token=? AND actor_id=?', params: [token,session.id] },
+            { sql: 'DELETE FROM supervisi_history WHERE wawancara_id IN (SELECT id FROM supervisi_wawancara WHERE kegiatan_id=?)', params: [id] },
+            { sql: 'DELETE FROM supervisi_wawancara WHERE kegiatan_id=?', params: [id] },
+            { sql: 'DELETE FROM supervisi_target WHERE kegiatan_id=?', params: [id] },
+            { sql: 'DELETE FROM supervisi_kegiatan_history WHERE kegiatan_id=?', params: [id] },
+            { sql: 'DELETE FROM supervisi_kegiatan WHERE id=?', params: [id] },
+            { sql: 'DELETE FROM supervisi_delete_request WHERE kegiatan_id=?', params: [id] },
+        ]);
+        await logActivity({ actor: actorFromSession(session), module: 'supervisi', action: 'activity_delete', fiturHref: HREF, logKind: 'delete', entityType: 'supervisi_kegiatan', entityId: id, summary: 'Menghapus kegiatan supervisi: ' + activity.nama });
+        revalidatePath(HREF);
         return true;
     });
 }

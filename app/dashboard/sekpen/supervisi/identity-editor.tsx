@@ -1,40 +1,179 @@
-'use client';
-import { useState } from 'react';
-import { getActivityTeachers, updateInterviewIdentity } from './actions';
-import type { Interview, Teacher } from '@/lib/supervisi/types';
-import { inputClass, buttonClass, secondaryClass } from '@/components/supervisi/styles';
-export default function IdentityEditor({ interview, onSaved, onBusyChange }: {
-    interview: Interview;
-    onSaved: () => Promise<void>;
-    onBusyChange: (busy: boolean) => void;
+'use client'
+
+import { classContext, contextBooks } from '@/lib/supervisi/context'
+import { useState } from 'react'
+import { getActivityTeachers, updateInterviewIdentity } from './actions'
+import type { Interview, Teacher } from '@/lib/supervisi/types'
+import { inputClass, buttonClass, secondaryClass } from '@/components/supervisi/styles'
+import { PencilSimple, CircleNotch, WarningCircle } from '@phosphor-icons/react'
+
+export default function IdentityEditor({
+  interview,
+  onSaved,
+  onBusyChange,
+}: {
+  interview: Interview
+  onSaved: () => Promise<void>
+  onBusyChange: (busy: boolean) => void
 }) {
-    const [teachers, setTeachers] = useState<Teacher[]>([]), [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [guru, setGuru] = useState(interview.guru_id), [key, setKey] = useState(interview.identity.key), [error, setError] = useState('');
-    async function load() { setBusy(true); setError(''); try {
-        setTeachers(await getActivityTeachers(interview.kegiatan_id));
-        setOpen(true);
+  const [teachers, setTeachers] = useState<Teacher[]>([])
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [guru, setGuru] = useState(interview.guru_id)
+  const [key, setKey] = useState(interview.identity.kelas_id)
+  const [error, setError] = useState('')
+
+  async function load() {
+    setBusy(true)
+    setError('')
+    try {
+      setTeachers(await getActivityTeachers(interview.kegiatan_id))
+      setOpen(true)
+    } catch {
+      setError('Pilihan identitas guru belum dapat dimuat.')
+    } finally {
+      setBusy(false)
     }
-    catch {
-        setError('Pilihan identitas belum dapat dimuat.');
+  }
+
+  async function save() {
+    setBusy(true)
+    onBusyChange(true)
+    setError('')
+    try {
+      const r = await updateInterviewIdentity(interview.id, interview.revision, guru, key)
+      if (r.ok) {
+        await onSaved()
+        setOpen(false)
+      } else {
+        setError(r.error)
+      }
+    } catch {
+      setError('Identitas belum tersimpan. Coba lagi.')
+    } finally {
+      setBusy(false)
+      onBusyChange(false)
     }
-    finally {
-        setBusy(false);
-    } }
-    async function save() { setBusy(true); onBusyChange(true); setError(''); try {
-        const r = await updateInterviewIdentity(interview.id, interview.revision, guru, key);
-        if (r.ok) {
-            await onSaved();
-            setOpen(false);
-        }
-        else
-            setError(r.error);
-    }
-    catch {
-        setError('Identitas belum tersimpan. Muat ulang untuk memeriksa status.');
-    }
-    finally {
-        setBusy(false);
-        onBusyChange(false);
-    } }
-    const teacher = teachers.find(t => t.id === guru);
-    return <div className="space-y-3">{error && <p role="alert" className="text-sm text-amber-700">{error}</p>}{!open ? <button disabled={busy} className={secondaryClass} onClick={load}>Koreksi pilihan guru / kelas</button> : <div className="space-y-3 rounded-lg border border-slate-200 p-3"><p className="text-xs text-slate-500">Pilihan hanya dapat dikoreksi sebelum jawaban pertama disimpan.</p><label className="block text-sm font-medium">Guru<select className={`${inputClass} mt-1`} disabled={busy} value={guru} onChange={e => { const id = Number(e.target.value); setGuru(id); const contexts = teachers.find(t => t.id === id)?.contexts ?? []; setKey(contexts.length === 1 ? contexts[0].key : ''); }}>{teachers.map(t => <option key={t.id} value={t.id}>{t.nama}</option>)}</select></label><label className="block text-sm font-medium">Kelas · waktu · kitab / mata pelajaran<select className={`${inputClass} mt-1`} disabled={busy} value={key} onChange={e => setKey(e.target.value)}><option value="">Pilih konteks pengajian</option>{teacher?.contexts.map(c => <option key={c.key} value={c.key}>{c.kelas_nama} · {c.hari}, {c.sesi} · {c.kitab_nama} / {c.mapel_nama}</option>)}</select></label><div className="flex flex-wrap gap-3"><button className={buttonClass} disabled={busy || !key} onClick={save}>Simpan identitas</button><button className={secondaryClass} disabled={busy} onClick={() => setOpen(false)}>Batal</button></div></div>}</div>;
+  }
+
+  const teacher = teachers.find((t) => t.id === guru)
+  const selected = teacher ? classContext(teacher, key) : null
+
+  if (!open) {
+    return (
+      <div>
+        <button
+          type="button"
+          disabled={busy}
+          className={`${secondaryClass} text-xs py-2`}
+          onClick={load}
+        >
+          {busy ? (
+            <CircleNotch className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <PencilSimple className="w-3.5 h-3.5" weight="bold" />
+          )}
+          <span>Koreksi Pilihan Guru / Kelas</span>
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50/40 p-4 sm:p-5 space-y-4">
+      <div>
+        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <PencilSimple className="w-4 h-4 text-amber-600" weight="duotone" />
+          <span>Koreksi Identitas Wawancara</span>
+        </h3>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Pilihan guru dan kelas hanya dapat dikoreksi sebelum jawaban pertama disimpan.
+        </p>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-50 border border-rose-100 text-xs text-rose-700">
+          <WarningCircle className="w-4 h-4 shrink-0" weight="bold" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-bold text-slate-600 mb-1">Guru Pengajar</label>
+          <select
+            className={inputClass}
+            disabled={busy}
+            value={guru}
+            onChange={(e) => {
+              const id = Number(e.target.value)
+              setGuru(id)
+              const contexts = teachers.find((t) => t.id === id)?.classes ?? []
+              setKey(contexts.length === 1 ? contexts[0].id : '')
+            }}
+          >
+            {teachers.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.nama}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-600 mb-1">Kelas Diniyah</label>
+          <select
+            className={inputClass}
+            disabled={busy}
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+          >
+            <option value="">Pilih satu kelas</option>
+            {teacher?.classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nama}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {selected && (
+        <div className="bg-white p-3 rounded-xl border border-amber-200/80 text-xs text-slate-700 space-y-1">
+          <p className="font-semibold text-slate-900">
+            Kitab / Pelajaran: <span className="font-normal">{contextBooks(selected)}</span>
+          </p>
+          <p className="font-semibold text-slate-900">
+            Waktu Sesi: <span className="font-normal">{selected.sesi}</span>
+          </p>
+        </div>
+      )}
+
+      {key && !selected && (
+        <p className="text-xs text-amber-700">
+          Penugasan kitab/mapel guru ini belum lengkap di master akademik.
+        </p>
+      )}
+
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          type="button"
+          className={`${buttonClass} text-xs py-2`}
+          disabled={busy || !selected}
+          onClick={save}
+        >
+          {busy && <CircleNotch className="w-3.5 h-3.5 animate-spin" />}
+          <span>Simpan Koreksi</span>
+        </button>
+        <button
+          type="button"
+          className={`${secondaryClass} text-xs py-2`}
+          disabled={busy}
+          onClick={() => setOpen(false)}
+        >
+          Batal
+        </button>
+      </div>
+    </div>
+  )
 }

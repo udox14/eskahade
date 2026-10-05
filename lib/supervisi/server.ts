@@ -45,13 +45,16 @@ export async function teachersForYear(year: number): Promise<Teacher[]> {
     ]);
     const weekly = buildWeeklyGuruRuleMap(rules);
     const result = new Map<number, Teacher>();
-    function teacher(id: number, kelas: string) {
+    function teacher(id: number, kelas: string, classId: string, sesi: string) {
         const guru = gurus.find(g => g.id === id);
         if (!guru)
             return null;
-        const t = result.get(id) ?? { id, nama: [guru.nama_lengkap, guru.gelar].filter(Boolean).join(', '), contexts: [], kelas: [] };
+        const t = result.get(id) ?? { id, nama: [guru.nama_lengkap, guru.gelar].filter(Boolean).join(', '), contexts: [], kelas: [], classes: [] };
         if (!t.kelas.includes(kelas))
             t.kelas.push(kelas);
+        let classOption = t.classes.find(c => c.id === classId);
+        if (!classOption) { classOption = { id: classId, nama: kelas, sessions: [] }; t.classes.push(classOption); }
+        if (!classOption.sessions.includes(sesi)) classOption.sessions.push(sesi);
         result.set(id, t);
         return t;
     }
@@ -60,12 +63,12 @@ export async function teachersForYear(year: number): Promise<Teacher[]> {
             for (let day = 0; day < 7; day++) {
                 const resolved = resolveGuruForHariIndex(k, day, weekly)[sesi];
                 if (resolved.id)
-                    teacher(resolved.id, k.nama_kelas);
+                    teacher(resolved.id, k.nama_kelas, k.id, sesi);
                 const candidates = assignments.filter(a => a.kelas_id === k.id && a.sesi === sesi && a.is_active === 1 && (a.hari_index === null || a.hari_index === day));
                 // A specific day assignment supersedes the default for the same kitab.
                 const applicable = candidates.filter(a => a.hari_index !== null || !candidates.some(b => b.kitab_id === a.kitab_id && b.hari_index === day));
                 for (const a of applicable) {
-                    const t = teacher(a.guru_id, k.nama_kelas);
+                    const t = teacher(a.guru_id, k.nama_kelas, k.id, sesi);
                     if (!t)
                         continue;
                     const c: Context = { key: `${k.id}:${sesi}:${day}:${a.kitab_id}`, kelas_id: k.id, kelas_nama: k.nama_kelas, sesi, hari: HARI_INDEX_LABEL[day], kitab_id: a.kitab_id, kitab_nama: a.kitab_nama, mapel_nama: a.mapel_nama };

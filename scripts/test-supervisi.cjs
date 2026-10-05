@@ -16,6 +16,7 @@ INSERT INTO tahun_ajaran VALUES(1,'2026/2027',1),(2,'2025/2026',0);
 INSERT INTO data_guru VALUES(1,'Guru Satu',NULL),(2,'Guru Dua',NULL),(3,'Guru Jadwal',NULL);
 INSERT INTO kelas VALUES('k1','Kelas A',1,1,2,1),('k2','Kelas B',1,1,2,1),('old','Kelas Lama',2,1,NULL,NULL);`)
 const migration=fs.readFileSync(path.join(root,'migrations/0179_supervisi.sql'),'utf8');db.exec(migration);db.exec(migration)
+const deletionMigration=fs.readFileSync(path.join(root,'migrations/0180_supervisi_activity_delete.sql'),'utf8');db.exec(deletionMigration);db.exec(deletionMigration)
 db.exec(`INSERT INTO user_fitur_override SELECT 'a',id,'grant' FROM fitur_akses;INSERT INTO user_fitur_override SELECT 'b',id,'grant' FROM fitur_akses;INSERT INTO user_fitur_override SELECT 'c',id,'grant' FROM fitur_akses;INSERT INTO supervisi_user_permission VALUES('c',1);`)
 let session={id:'admin',full_name:'Admin',roles:['admin'],role:'admin'}
 function as(id,roles=['sekpen']){session=id?{id,full_name:id,roles,role:roles[0]}:null}
@@ -92,6 +93,61 @@ async function main(){
  check((await actions.saveInterview({id:blank.data,revision:1,operationId:'answer-lock',patch:{s1:{score:3}}})).ok)
  check(!(await actions.updateInterviewIdentity(blank.data,2,1,key)).ok)
  const identityHistory=db.prepare("SELECT before_json,after_json FROM supervisi_history WHERE wawancara_id=? AND action='identity'").get(blank.data);check(JSON.parse(identityHistory.before_json).guru_id===1&&JSON.parse(identityHistory.after_json).guru_id===2)
+
+ as('admin',['admin']);
+ // Automatic class context includes every book and all effective teaching sessions.
+ const {classContext,timeLabel,contextBooks}=load('@/lib/supervisi/context');
+ check(timeLabel(['maghrib','shubuh','ashar'])==='Semua waktu');
+ check(timeLabel(['maghrib','ashar','ashar'])==='Ashar dan Maghrib');
+ check(timeLabel(['shubuh'])==='Shubuh');
+ assignments.push({...assignments[0],id:3,kitab_id:3,kitab_nama:'Kitab C',mapel_nama:'Mapel C'});
+ const aggregated=(await actions.getTeacherCandidates(1)).find(t=>t.id===1);
+ const summary=classContext(aggregated,'k1');
+ check(summary.kitab_nama==='Kitab A; Kitab C');check(summary.sesi==='Shubuh dan Maghrib');
+ check(summary.key==='k1'&&summary.hari==='');check(contextBooks(summary)==='Kitab A / Mapel A; Kitab C / Mapel C');check(classContext(aggregated,'invalid')===null);
+ const weekly=(await actions.getTeacherCandidates(1)).find(t=>t.id===3);
+ check(weekly.classes[0].id==='k2'&&weekly.classes[0].sessions[0]==='maghrib');
+ const autoActivity=await actions.createActivity('Auto context',1,[1,3]);check(autoActivity.ok);
+ check((await actions.changeActivityStatus(autoActivity.data,'terbuka',0)).ok);
+ const autoInterview=await actions.startInterview(autoActivity.data,1,'k1','2026-10-05');check(autoInterview.ok);
+ check((await actions.getInterview(autoInterview.data)).identity.kitab_nama==='Kitab A; Kitab C');
+ check(!(await actions.startInterview(autoActivity.data,3,'k2','2026-10-05')).ok);
+ // Two-step confirmation is scoped to admin, actor, activity, revision, name and expiration.
+ const originalCount=db.prepare('SELECT COUNT(*) n FROM supervisi_wawancara').get().n;
+ as('b');check(!(await actions.prepareActivityDeletion(activity,4)).ok);
+ as('admin',['admin']);const activityRow=db.prepare('SELECT * FROM supervisi_kegiatan WHERE id=?').get(activity);
+ const deletion=await actions.prepareActivityDeletion(activity,activityRow.revision);check(deletion.ok);
+ check(!(await actions.deleteActivity(activity,activityRow.revision,deletion.data.token,'Wrong')).ok);
+ check(!(await actions.deleteActivity(correction.data,1,deletion.data.token,'Koreksi identitas')).ok);
+ check(!(await actions.deleteActivity(activity,activityRow.revision,'forged',activityRow.nama)).ok);
+ as('b');check(!(await actions.deleteActivity(activity,activityRow.revision,deletion.data.token,activityRow.nama)).ok);
+ as('admin',['admin']);check(db.prepare('SELECT COUNT(*) n FROM supervisi_wawancara').get().n===originalCount);
+ assert.throws(()=>db.prepare('DELETE FROM supervisi_history WHERE wawancara_id=?').run(id));
+ assert.throws(()=>db.prepare('DELETE FROM supervisi_kegiatan WHERE id=?').run(activity));
+ // A failed deletion batch must roll back authorization and previously removed history.
+ db.exec("CREATE TRIGGER test_delete_failure BEFORE DELETE ON supervisi_target BEGIN SELECT RAISE(ABORT,'Simulated failure'); END;");
+ check(!(await actions.deleteActivity(activity,activityRow.revision,deletion.data.token,activityRow.nama)).ok);
+ check(db.prepare('SELECT COUNT(*) n FROM supervisi_history WHERE wawancara_id=?').get(id).n>0);
+ check(db.prepare('SELECT authorized FROM supervisi_delete_request WHERE token=?').get(deletion.data.token).authorized===0);
+ db.exec('DROP TRIGGER test_delete_failure');
+ check((await actions.deleteActivity(activity,activityRow.revision,deletion.data.token,activityRow.nama)).ok);
+ check(!db.prepare('SELECT id FROM supervisi_kegiatan WHERE id=?').get(activity));
+ for(const table of ['supervisi_target','supervisi_kegiatan_history','supervisi_delete_request','supervisi_wawancara'])check(db.prepare('SELECT COUNT(*) n FROM '+table+' WHERE kegiatan_id=?').get(activity).n===0);
+ check(db.prepare('SELECT COUNT(*) n FROM supervisi_history WHERE wawancara_id=?').get(id).n===0);
+ check(db.prepare('SELECT id FROM supervisi_wawancara WHERE id=?').get(blank.data));
+ await assert.rejects(actions.getInterview(id));
+ check(!(await actions.saveInterview({id,revision:5,operationId:'deleted',patch:{s1:{score:1}}})).ok);
+ const stale=await actions.prepareActivityDeletion(correction.data,1);check(stale.ok);
+ check((await actions.changeActivityStatus(correction.data,'ditutup',1)).ok);
+ check(!(await actions.deleteActivity(correction.data,1,stale.data.token,'Koreksi identitas')).ok);
+ const closedDeletion=await actions.prepareActivityDeletion(correction.data,2);check(closedDeletion.ok);
+ check((await actions.deleteActivity(correction.data,2,closedDeletion.data.token,'Koreksi identitas')).ok);
+ const prep=await actions.createActivity('Persiapan hapus',1,[1]);check(prep.ok);
+ const prepDeletion=await actions.prepareActivityDeletion(prep.data,0);check(prepDeletion.ok);
+ db.prepare("UPDATE supervisi_delete_request SET created_at=datetime('now','-11 minutes') WHERE token=?").run(prepDeletion.data.token);
+ check(!(await actions.deleteActivity(prep.data,0,prepDeletion.data.token,'Persiapan hapus')).ok);
+ const freshPrep=await actions.prepareActivityDeletion(prep.data,0);check(freshPrep.ok);
+ check((await actions.deleteActivity(prep.data,0,freshPrep.data.token,'Persiapan hapus')).ok);
  console.log(`Supervisi: ${checks} assertions passed; authorization, lifecycle, CAS/idempotency, history, analytics and autosave queue.`)
 }
 main().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>db.close())

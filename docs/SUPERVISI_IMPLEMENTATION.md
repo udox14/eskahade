@@ -4,12 +4,20 @@ Menu: **Sekpen → Supervisi**, `/dashboard/sekpen/supervisi`.
 
 ## Aktivasi
 
-1. Terapkan `migrations/0179_supervisi.sql` melalui workflow migration D1 existing. Migration menambah tabel, trigger, dan menu tanpa mengubah master atau data keuangan.
+1. Terapkan `migrations/0179_supervisi.sql`, lalu `migrations/0180_supervisi_activity_delete.sql` melalui workflow migration D1 existing. Migration menambah tabel, trigger, dan menu tanpa mengubah master atau data keuangan. Tidak ada kegiatan yang dihapus saat migration diterapkan.
 2. Di **Pengaturan → Pengguna → Akses fitur**, berikan grant Supervisi kepada petugas. Checkbox **Lihat dan kelola semua** berlaku setelah grant modul aktif. Role Sekpen sendiri tidak memberikan akses.
 3. Admin membuat kegiatan, memilih tahun ajaran dan target guru, lalu membuka kegiatan. Target dibekukan setelah kegiatan dibuka. Kegiatan ditutup membekukan seluruh hasil dan draft; membuka kembali membutuhkan alasan.
 4. Jalur unduh PDF mobile memakai layanan PDF existing (`/api/pdf/from-html`). Desktop memakai dialog cetak/Simpan PDF.
 
 Implementasi ini tidak menjalankan migration atau deployment produksi. Periksa master guru, kelas, jadwal mingguan dan pembagian kitab/mapel sebelum aktivasi. Penugasan yang tidak lengkap harus diperbaiki di master; sistem tidak menyediakan identitas bebas sebagai pengganti.
+
+## Form, identitas, dan penghapusan kegiatan
+
+Form memakai 12 halaman bagian: identitas/pembukaan, delapan aspek, refleksi, catatan, dan review. Seluruh pertanyaan satu bagian tampil bersama; autosave tetap per jawaban.
+
+Pilih guru dan satu kelas. Semua kitab/mapel kelas itu otomatis dirangkum tanpa duplikasi hari. Waktu mengikuti jadwal dasar, mingguan, dan pembagian kitab. Tiga sesi ditampilkan sebagai **Semua waktu**, dua sesi digabung dengan **dan**. Snapshot lama tidak diubah otomatis.
+
+Admin dapat menghapus kegiatan dari tab Kegiatan. Dialog pertama menjelaskan dampak; dialog kedua menampilkan jumlah wawancara dan mewajibkan nama kegiatan persis. Token konfirmasi terikat admin/kegiatan/revisi dan berlaku 10 menit. Server memeriksa ulang akses dan menghapus wawancara beserta jawaban, riwayat, target, dan kegiatan dalam satu batch atomik. Penghapusan wawancara/riwayat secara terpisah tetap diblokir. Log aktivitas umum mencatat tindakan sesuai pengaturan logging existing. Penghapusan tidak dapat dipulihkan melalui aplikasi.
 
 ## Data dan keamanan
 

@@ -8,12 +8,15 @@ export type Context = {
     kitab_id: number;
     kitab_nama: string;
     mapel_nama: string;
+    kitab?: { id: number; nama: string; mapel: string }[];
+    sessions?: string[];
 };
 export type Teacher = {
     id: number;
     nama: string;
     contexts: Context[];
     kelas: string[];
+    classes: { id: string; nama: string; sessions: string[] }[];
 };
 export type Activity = {
     id: string;
