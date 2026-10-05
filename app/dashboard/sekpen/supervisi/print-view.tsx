@@ -275,7 +275,7 @@ export default forwardRef<
           <thead>
             <tr>
               <th style={{ width: '5%', textAlign: 'center' }}>No</th>
-              <th style={{ width: '45%' }}>Aspek / Seksi Supervisi</th>
+              <th style={{ width: '45%' }}>Aspek / Bagian Supervisi</th>
               <th style={{ width: '15%', textAlign: 'center' }}>Butir Dinilai</th>
               <th style={{ width: '15%', textAlign: 'center' }}>Rata-rata Skor</th>
               <th style={{ width: '20%', textAlign: 'center' }}>Kategori / Predikat</th>
@@ -329,7 +329,7 @@ export default forwardRef<
         return (
           <div key={sec.title} className="print-avoid-break mb-3">
             <div className="section-title">
-              Seksi {sIdx + 1}. {sec.title}
+              Bagian {sIdx + 1}. {sec.title}
             </div>
 
             {/* Tabel Butir Skala */}

@@ -709,7 +709,7 @@ export default function InterviewForm({
         <div className="space-y-5 animate-in fade-in duration-150">
           <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Seksi {position} dari 8
+              Bagian {position} dari 8
             </span>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 mt-0.5">
               {currentSection.title}
@@ -976,7 +976,7 @@ export default function InterviewForm({
           <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden divide-y divide-slate-100">
             <div className="p-4 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
               <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Ringkasan Pengisian 10 Seksi
+                Ringkasan Pengisian 10 Bagian
               </span>
               <span className="text-xs font-bold text-emerald-700">
                 {count} / 53 Selesai ({progressPercentage}%)
