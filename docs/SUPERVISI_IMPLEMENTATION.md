@@ -5,9 +5,10 @@ Menu: **Sekpen → Supervisi**, `/dashboard/sekpen/supervisi`.
 ## Aktivasi
 
 1. Terapkan `migrations/0179_supervisi.sql`, lalu `migrations/0180_supervisi_activity_delete.sql` melalui workflow migration D1 existing. Migration menambah tabel, trigger, dan menu tanpa mengubah master atau data keuangan. Tidak ada kegiatan yang dihapus saat migration diterapkan.
-2. Di **Pengaturan → Pengguna → Akses fitur**, berikan grant Supervisi kepada petugas. Checkbox **Lihat dan kelola semua** berlaku setelah grant modul aktif. Role Sekpen sendiri tidak memberikan akses.
+2. Admin membuka **Pengaturan → Tim & Kepengurusan → Tim Supervisi**, menambah petugas dan memilih cakupan **Hasil sendiri** atau **Semua hasil dan draft**. Penugasan langsung mengatur grant modul dan izin tambahan secara atomik. Role Sekpen sendiri tidak memberikan akses. Mencabut penugasan tidak menghapus hasil wawancara; grant dan izin yang sudah ada tetap terbaca tanpa migrasi data baru.
 3. Admin membuat kegiatan, memilih tahun ajaran dan target guru, lalu membuka kegiatan. Target dibekukan setelah kegiatan dibuka. Kegiatan ditutup membekukan seluruh hasil dan draft; membuka kembali membutuhkan alasan.
-4. Jalur unduh PDF mobile memakai layanan PDF existing (`/api/pdf/from-html`). Desktop memakai dialog cetak/Simpan PDF.
+4. Sidebar desktop, drawer samping mobile, dan drawer Semua Menu memakai daftar fitur hasil grant petugas yang sama. Jika petugas sudah membuka aplikasi saat ditugaskan, refresh halaman untuk memuat menu terbaru. Pencabutan penugasan langsung memblokir request hasil Supervisi berikutnya.
+5. Jalur unduh PDF mobile memakai layanan PDF existing (`/api/pdf/from-html`). Desktop memakai dialog cetak/Simpan PDF.
 
 Implementasi ini tidak menjalankan migration atau deployment produksi. Periksa master guru, kelas, jadwal mingguan dan pembagian kitab/mapel sebelum aktivasi. Penugasan yang tidak lengkap harus diperbaiki di master; sistem tidak menyediakan identitas bebas sebagai pengganti.
 

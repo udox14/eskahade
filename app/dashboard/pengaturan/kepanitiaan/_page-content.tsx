@@ -1,5 +1,6 @@
 'use client'
 
+import SupervisiTeam from './supervisi-team'
 import React, { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { getPanitiaPsb, getPanitiaUpk, getKepengurusanAsrama, addPanitiaPsb, addPanitiaUpk, addKepengurusanAsrama, removePanitiaPsb, removePanitiaUpk, removeKepengurusanAsrama, resetPanitiaPsb, resetPanitiaUpk, resetKepengurusanAsrama, getAvailableUsersForDropdown, PanitiaMember } from './actions'
@@ -7,8 +8,8 @@ import { Users, Search, Plus, Trash2, ShieldAlert, CheckCircle, Shield, X, Loade
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { ALL_ASRAMA_LIST } from '@/lib/asrama'
 
-export default function KepanitiaanPageContent() {
-  const [activeTab, setActiveTab] = useState<'PSB' | 'UPK' | 'ASRAMA'>('PSB')
+export default function KepanitiaanPageContent({ canManageSupervisi = false }: { canManageSupervisi?: boolean }) {
+  const [activeTab, setActiveTab] = useState<'PSB' | 'UPK' | 'ASRAMA' | 'SUPERVISI'>('PSB')
   const [psbMembers, setPsbMembers] = useState<PanitiaMember[]>([])
   const [upkMembers, setUpkMembers] = useState<PanitiaMember[]>([])
   const [asramaMembers, setAsramaMembers] = useState<PanitiaMember[]>([])
@@ -118,7 +119,7 @@ export default function KepanitiaanPageContent() {
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
       <DashboardPageHeader
         title="Manajemen Tim & Kepengurusan"
-        description="Atur hak akses secara massal untuk event tahunan PSB, UPK, dan Kepengurusan Asrama."
+        description="Atur anggota tim PSB, UPK, Supervisi, dan kepengurusan asrama."
       />
 
       {/* Tabs */}
@@ -141,8 +142,11 @@ export default function KepanitiaanPageContent() {
         >
           Pengurus Asrama
         </button>
+        {canManageSupervisi && <button onClick={() => setActiveTab('SUPERVISI')} className={`whitespace-nowrap px-6 py-3 font-bold text-sm transition-colors border-b-2 ${activeTab === 'SUPERVISI' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Tim Supervisi</button>}
       </div>
 
+      {activeTab === 'SUPERVISI' && canManageSupervisi && <SupervisiTeam />}
+      {activeTab !== 'SUPERVISI' && <>
       <div className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-sm">
         <div>
           <h2 className="font-bold text-lg text-slate-800">
@@ -405,6 +409,7 @@ export default function KepanitiaanPageContent() {
           </div>
         </div>
       )}
+      </>}
     </div>
   )
 }

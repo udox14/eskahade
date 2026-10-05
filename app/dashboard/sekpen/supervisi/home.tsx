@@ -212,7 +212,7 @@ export default function SupervisiHome({
       {/* ── 1. HEADER HALAMAN ── */}
       <DashboardPageHeader
         title="Supervisi Pengajaran"
-        description="Evaluasi pengalaman belajar santri, pantau keterlaksanaan pengajian, dan siapkan bahan pembinaan guru."
+        description="Evaluasi pengalaman belajar santri dan siapkan bahan pembinaan guru."
         action={
           activity?.status === 'terbuka' ? (
             <button
@@ -234,40 +234,6 @@ export default function SupervisiHome({
           ) : undefined
         }
       />
-
-      {/* Tombol Mulai Wawancara Mobile (Lebar Penuh Kiri-Kanan) */}
-      {activity?.status === 'terbuka' ? (
-        <div className="sm:hidden">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => begin()}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white py-3 px-4 text-sm font-bold shadow-sm transition"
-          >
-            <Plus className="w-4.5 h-4.5" weight="bold" />
-            <span>Mulai Wawancara</span>
-          </button>
-        </div>
-      ) : home.admin && !activity ? (
-        <div className="sm:hidden">
-          <button
-            type="button"
-            onClick={() => setEditor('new')}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white py-3 px-4 text-sm font-bold shadow-sm transition"
-          >
-            <PlusCircle className="w-4.5 h-4.5" weight="bold" />
-            <span>Buat Kegiatan Baru</span>
-          </button>
-        </div>
-      ) : null}
-
-      {/* Pesan Kesalahan Global */}
-      {error && (
-        <div className="flex items-center gap-2 p-3.5 rounded-xl bg-rose-50 border border-rose-100 text-xs sm:text-sm text-rose-700">
-          <WarningCircle className="w-4 h-4 shrink-0" weight="bold" />
-          <span>{error}</span>
-        </div>
-      )}
 
       {/* ── 2. KOTAK INFORMASI KEGIATAN AKTIF ── */}
       {activity && (
@@ -317,6 +283,40 @@ export default function SupervisiHome({
                 ? 'Persiapan'
                 : 'Ditutup'}
           </span>
+        </div>
+      )}
+
+      {/* Tombol Mulai Wawancara Mobile (Lebar Penuh Kiri-Kanan) */}
+      {activity?.status === 'terbuka' ? (
+        <div className="sm:hidden">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => begin()}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white py-3 px-4 text-sm font-bold shadow-sm transition"
+          >
+            <Plus className="w-4.5 h-4.5" weight="bold" />
+            <span>Mulai Wawancara</span>
+          </button>
+        </div>
+      ) : home.admin && !activity ? (
+        <div className="sm:hidden">
+          <button
+            type="button"
+            onClick={() => setEditor('new')}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white py-3 px-4 text-sm font-bold shadow-sm transition"
+          >
+            <PlusCircle className="w-4.5 h-4.5" weight="bold" />
+            <span>Buat Kegiatan Baru</span>
+          </button>
+        </div>
+      ) : null}
+
+      {/* Pesan Kesalahan Global */}
+      {error && (
+        <div className="flex items-center gap-2 p-3.5 rounded-xl bg-rose-50 border border-rose-100 text-xs sm:text-sm text-rose-700">
+          <WarningCircle className="w-4 h-4 shrink-0" weight="bold" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -533,14 +533,14 @@ export default function SupervisiHome({
                   </div>
                 </div>
 
-                {/* Info Otomatis: Kelas, Kitab & Sesi Pengajian */}
+                {/* Info Kelas, Kitab & Sesi Pengajian */}
                 {selectedContext && (
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs sm:text-sm text-slate-800 space-y-3">
                     <div className="flex items-start gap-2.5">
                       <ChalkboardTeacher className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" weight="duotone" />
                       <div>
                         <span className="font-bold text-slate-500 block text-[11px] uppercase tracking-wider">
-                          Kelas Diniyah (Otomatis Terpilih Semua)
+                          Kelas Diniyah
                         </span>
                         <span className="font-semibold text-slate-900">
                           {selectedContext.kelas_nama || 'Semua Kelas'}
@@ -552,7 +552,7 @@ export default function SupervisiHome({
                       <BookOpen className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" weight="duotone" />
                       <div>
                         <span className="font-bold text-slate-500 block text-[11px] uppercase tracking-wider">
-                          Kitab / Mata Pelajaran (Otomatis)
+                          Kitab / Mata Pelajaran
                         </span>
                         <span className="font-semibold text-slate-900">
                           {contextBooks(selectedContext)}
@@ -564,7 +564,7 @@ export default function SupervisiHome({
                       <Clock className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" weight="duotone" />
                       <div>
                         <span className="font-bold text-slate-500 block text-[11px] uppercase tracking-wider">
-                          Waktu Pengajian (Otomatis)
+                          Waktu Pengajian
                         </span>
                         <span className="font-semibold text-slate-900">
                           {selectedContext.sesi}

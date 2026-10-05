@@ -4,7 +4,6 @@ import { requireSupervisi, teachersForYear, validDate, boundedText, HREF } from 
 import { completedCount, normalizeAnswers, summarize, type Answers } from '@/lib/supervisi/instrument';
 import { classContext } from '@/lib/supervisi/context';
 import type { Activity, Context, Coverage, Interview, Identity, Teacher } from '@/lib/supervisi/types';
-import { getSession, isAdmin } from '@/lib/auth/session';
 import { revalidatePath } from 'next/cache';
 import { actorFromSession, logActivity } from '@/lib/activity-log';
 type Result<T> = {
@@ -301,29 +300,6 @@ export async function saveInterview(input: {
         return { revision: row.revision + 1, replayed: false };
     });
 }
-export async function getSupervisiUserPermission(userId: string) {
-    const session = await getSession();
-    if (!isAdmin(session))
-        throw new Error('Akses ditolak.');
-    const row = await queryOne<{
-        can_manage_all: number;
-    }>('SELECT can_manage_all FROM supervisi_user_permission WHERE user_id=?', [userId]);
-    return Boolean(row?.can_manage_all);
-}
-export async function setSupervisiUserPermission(userId: string, all: boolean) {
-    return attempt(async () => {
-        const session = await getSession();
-        if (!session || !isAdmin(session))
-            throw new Error('Akses ditolak.');
-        if (typeof all !== 'boolean' || !await queryOne('SELECT id FROM users WHERE id=?', [userId]))
-            throw new Error('User tidak valid.');
-        await execute('INSERT INTO supervisi_user_permission(user_id,can_manage_all) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET can_manage_all=excluded.can_manage_all', [userId, all ? 1 : 0]);
-        await logActivity({ actor: actorFromSession(session), module: 'supervisi', action: 'access_change', fiturHref: HREF, logKind: 'update', entityType: 'user', entityId: userId, summary: all ? 'Memberikan izin kelola semua Supervisi' : 'Mencabut izin kelola semua Supervisi' });
-        revalidatePath('/dashboard/pengaturan/users');
-        return true;
-    });
-}
-
 export async function prepareActivityDeletion(id: string, revision: number) {
     return attempt(async () => {
         const { session } = await requireSupervisi(true);
@@ -355,6 +331,43 @@ export async function deleteActivity(id: string, revision: number, token: string
         ]);
         await logActivity({ actor: actorFromSession(session), module: 'supervisi', action: 'activity_delete', fiturHref: HREF, logKind: 'delete', entityType: 'supervisi_kegiatan', entityId: id, summary: 'Menghapus kegiatan supervisi: ' + activity.nama });
         revalidatePath(HREF);
+        return true;
+    });
+}
+
+export async function getSupervisiTeam() {
+    const { featureId } = await requireSupervisi(true);
+    const [members, users] = await Promise.all([
+        query<{ id: string; full_name: string; can_manage_all: number }>("SELECT u.id,u.full_name,COALESCE(p.can_manage_all,0) AS can_manage_all FROM users u JOIN user_fitur_override o ON o.user_id=u.id AND o.fitur_id=? AND o.action='grant' LEFT JOIN supervisi_user_permission p ON p.user_id=u.id ORDER BY u.full_name", [featureId]),
+        query<{ id: string; full_name: string }>('SELECT id,full_name FROM users ORDER BY full_name'),
+    ]);
+    return { members, users };
+}
+export async function setSupervisiTeamMember(userId: string, all: boolean) {
+    return attempt(async () => {
+        const { session, featureId } = await requireSupervisi(true);
+        if (typeof all !== 'boolean' || !await queryOne('SELECT id FROM users WHERE id=?', [userId])) throw new Error('User tidak valid.');
+        await batch([
+            { sql: "INSERT INTO user_fitur_override(user_id,fitur_id,action) VALUES(?,?,'grant') ON CONFLICT(user_id,fitur_id) DO UPDATE SET action='grant'", params: [userId,featureId] },
+            { sql: 'INSERT INTO supervisi_user_permission(user_id,can_manage_all) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET can_manage_all=excluded.can_manage_all', params: [userId,all ? 1 : 0] },
+        ]);
+        await logActivity({ actor: actorFromSession(session), module: 'supervisi', action: 'access_change', fiturHref: HREF, logKind: 'update', entityType: 'user', entityId: userId, summary: all ? 'Menugaskan tim Supervisi dengan akses semua hasil' : 'Menugaskan tim Supervisi dengan akses hasil sendiri' });
+        revalidatePath('/dashboard/pengaturan/kepanitiaan');
+        revalidatePath('/dashboard', 'layout');
+        return true;
+    });
+}
+export async function removeSupervisiTeamMember(userId: string) {
+    return attempt(async () => {
+        const { session, featureId } = await requireSupervisi(true);
+        if (!await queryOne('SELECT id FROM users WHERE id=?', [userId])) throw new Error('User tidak valid.');
+        await batch([
+            { sql: "INSERT INTO user_fitur_override(user_id,fitur_id,action) VALUES(?,?,'revoke') ON CONFLICT(user_id,fitur_id) DO UPDATE SET action='revoke'", params: [userId,featureId] },
+            { sql: 'UPDATE supervisi_user_permission SET can_manage_all=0 WHERE user_id=?', params: [userId] },
+        ]);
+        await logActivity({ actor: actorFromSession(session), module: 'supervisi', action: 'access_change', fiturHref: HREF, logKind: 'update', entityType: 'user', entityId: userId, summary: 'Mencabut penugasan tim Supervisi' });
+        revalidatePath('/dashboard/pengaturan/kepanitiaan');
+        revalidatePath('/dashboard', 'layout');
         return true;
     });
 }

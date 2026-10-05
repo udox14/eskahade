@@ -121,7 +121,7 @@ export default function IdentityEditor({
       {selected && (
         <div className="bg-white p-3 rounded-xl border border-amber-200/80 text-xs text-slate-700 space-y-1">
           <p className="font-semibold text-slate-900">
-            Kelas Diniyah: <span className="font-normal">{selected.kelas_nama || 'Semua Kelas'} (Otomatis)</span>
+            Kelas Diniyah: <span className="font-normal">{selected.kelas_nama || 'Semua Kelas'}</span>
           </p>
           <p className="font-semibold text-slate-900">
             Kitab / Pelajaran: <span className="font-normal">{contextBooks(selected)}</span>

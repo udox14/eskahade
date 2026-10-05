@@ -9,7 +9,7 @@ CREATE TABLE tahun_ajaran(id INTEGER PRIMARY KEY,nama TEXT,is_active INTEGER);
 CREATE TABLE data_guru(id INTEGER PRIMARY KEY,nama_lengkap TEXT,gelar TEXT);
 CREATE TABLE kelas(id TEXT PRIMARY KEY,nama_kelas TEXT,tahun_ajaran_id INTEGER,guru_shubuh_id INTEGER,guru_ashar_id INTEGER,guru_maghrib_id INTEGER);
 CREATE TABLE fitur_akses(id INTEGER PRIMARY KEY,group_name TEXT,title TEXT,href TEXT UNIQUE,icon TEXT,roles TEXT,is_active INTEGER,urutan INTEGER);
-CREATE TABLE sidebar_groups(group_name TEXT PRIMARY KEY,label TEXT,urutan INTEGER,is_active INTEGER);
+CREATE TABLE sidebar_groups(group_name TEXT PRIMARY KEY,label TEXT,urutan INTEGER,is_active INTEGER DEFAULT 1);
 CREATE TABLE user_fitur_override(user_id TEXT,fitur_id INTEGER,action TEXT,UNIQUE(user_id,fitur_id));
 INSERT INTO users VALUES('admin','Admin'),('a','Petugas A'),('b','Petugas B'),('c','Koordinator'),('sekpen','Sekpen');
 INSERT INTO tahun_ajaran VALUES(1,'2026/2027',1),(2,'2025/2026',0);
@@ -74,7 +74,7 @@ async function main(){
  db.prepare("UPDATE data_guru SET nama_lengkap='Nama baru' WHERE id=1").run();check((await actions.getInterview(id)).identity.guru_nama==='Guru Satu')
  assert.throws(()=>db.prepare('DELETE FROM supervisi_wawancara WHERE id=?').run(id));assert.throws(()=>db.prepare('UPDATE supervisi_history SET action=? WHERE wawancara_id=?').run('tamper',id))
  db.prepare("UPDATE user_fitur_override SET action='revoke' WHERE user_id='a'").run();as('a');await assert.rejects(actions.getInterview(id));check(!(await actions.saveInterview({id,revision:4,operationId:'revoked',patch:{s1:{score:1}}})).ok)
- as('b');check(!(await actions.setSupervisiUserPermission('b',true)).ok);as('admin',['admin']);check((await actions.setSupervisiUserPermission('b',true)).ok);as('b');check((await actions.getInterview(id)).editable)
+ as('b');check(!(await actions.setSupervisiTeamMember('b',true)).ok);as('admin',['admin']);check((await actions.setSupervisiTeamMember('b',true)).ok);as('b');check((await actions.getInterview(id)).editable)
  // In-flight changes, ambiguous network failure, same operation retry, and explicit conflict resolution.
  let release,requests=[];const q=new AutosaveQueue('q',0,async p=>{requests.push(structuredClone(p));if(requests.length===1)return await new Promise(r=>release=r);return{ok:true,data:{revision:p.revision+1,replayed:false}}},()=>{})
  q.edit('s1',{score:1});const saving=q.flush();q.edit('s1',{score:4});check(q.saving);release({ok:true,data:{revision:1,replayed:false}});check(await saving);check(requests.length===2&&requests[1].patch.s1.score===4&&q.revision===2&&!q.dirty)
@@ -148,6 +148,49 @@ async function main(){
  check(!(await actions.deleteActivity(prep.data,0,prepDeletion.data.token,'Persiapan hapus')).ok);
  const freshPrep=await actions.prepareActivityDeletion(prep.data,0);check(freshPrep.ok);
  check((await actions.deleteActivity(prep.data,0,freshPrep.data.token,'Persiapan hapus')).ok);
- console.log(`Supervisi: ${checks} assertions passed; authorization, lifecycle, CAS/idempotency, history, analytics and autosave queue.`)
+
+ // Team management reuses existing grants and keeps interview history after revocation.
+ as('b');await assert.rejects(actions.getSupervisiTeam());check(!(await actions.setSupervisiTeamMember('sekpen',true)).ok);check(!(await actions.removeSupervisiTeamMember('c')).ok);
+ as('admin',['admin']);const teamBefore=await actions.getSupervisiTeam();check(teamBefore.members.some(m=>m.id==='b'&&m.can_manage_all===1));
+ check(!(await actions.setSupervisiTeamMember('unknown',false)).ok);check(!(await actions.setSupervisiTeamMember('sekpen','invalid')).ok);
+ db.exec("CREATE TRIGGER test_team_failure BEFORE INSERT ON supervisi_user_permission WHEN NEW.user_id='a' BEGIN SELECT RAISE(ABORT,'Permission failure'); END;");
+ check(!(await actions.setSupervisiTeamMember('a',true)).ok);
+ check(db.prepare("SELECT action FROM user_fitur_override WHERE user_id='a'").get().action==='revoke');
+ db.exec('DROP TRIGGER test_team_failure');
+ const countBeforeTeamChange=db.prepare('SELECT COUNT(*) n FROM supervisi_wawancara').get().n;
+ check((await actions.setSupervisiTeamMember('sekpen',false)).ok);
+ as('sekpen');check((await actions.getSupervisiHome()).all===false);
+ as('admin',['admin']);check((await actions.setSupervisiTeamMember('sekpen',true)).ok);
+ check((await actions.getSupervisiTeam()).members.filter(m=>m.id==='sekpen').length===1);
+ as('sekpen');check((await actions.getSupervisiHome()).all===true);
+ as('admin',['admin']);check((await actions.removeSupervisiTeamMember('sekpen')).ok);
+ check(!(await actions.getSupervisiTeam()).members.some(m=>m.id==='sekpen'));
+ as('sekpen');await assert.rejects(actions.getSupervisiHome());
+ check(db.prepare('SELECT COUNT(*) n FROM supervisi_wawancara').get().n===countBeforeTeamChange);
+ as('admin',['admin']);check((await actions.setSupervisiTeamMember('sekpen',false)).ok);
+ as('sekpen');check((await actions.getSupervisiHome()).all===false);
+ // Real menu engine feeds both desktop sidebar and mobile drawers in DashboardLayout.
+ const navigation=load('@/lib/cache/fitur-akses'),href='/dashboard/sekpen/supervisi';
+ for(const role of ['sekpen','guru','wali_kelas','bendahara']) {
+   check((await navigation.getFiturForRoles([role],'sekpen')).some(f=>f.href===href));
+   check(await navigation.canAccessHref(href,[role],'sekpen'));
+   as('sekpen',[role]);check((await actions.getSupervisiHome()).admin===false);
+ }
+ as('admin',['admin']);check((await actions.removeSupervisiTeamMember('sekpen')).ok);
+ check(!(await navigation.getFiturForRoles(['sekpen'],'sekpen')).some(f=>f.href===href));
+ check(!await navigation.canAccessHref(href,['sekpen'],'sekpen'));
+ check(!(await navigation.getFiturForRoles(['tester'],'b')).some(f=>f.href===href));
+ check(!await navigation.canAccessHref(href,['tester'],'b'));
+ check(!(await navigation.getFiturForRoles(['demo'],'sekpen')).some(f=>f.href===href));
+ check((await actions.setSupervisiTeamMember('sekpen',false)).ok);
+ const assignedMenu=await navigation.getFiturForRoles(['guru'],'sekpen');
+ check(assignedMenu.filter(f=>f.href===href).length===1);
+ check((await navigation.getFiturForRoles(['admin'],'admin')).some(f=>f.href===href));
+ const groups=await load('@/lib/menu/groups').getSidebarGroups();
+ check(groups.some(g=>g.group_name===assignedMenu.find(f=>f.href===href).group_name&&g.is_active));
+ // Warm feature cache must not cache user grants: removal and re-addition above are immediate.
+ const fixtureDir=path.join(root,'.codex-temp');fs.mkdirSync(fixtureDir,{recursive:true});
+ fs.writeFileSync(path.join(fixtureDir,'supervisi-menu-fixture.json'),JSON.stringify({features:assignedMenu,groups}));
+ console.log(`Supervisi: ${checks} assertions passed; authorization, lifecycle, CAS/idempotency, history, analytics, autosave queue and granted sidebar/drawer navigation.`)
 }
 main().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>db.close())

@@ -1,6 +1,5 @@
 'use client'
 
-import SupervisiUserPermission from '@/components/supervisi/user-permission'
 
 import React from 'react'
 
@@ -1688,8 +1687,7 @@ export default function ManajemenUserPage() {
                 <div className="flex items-center justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-slate-400" /></div>
               ) : (
                 <div className="space-y-1">
-                  <SupervisiUserPermission userId={overrideUser.id} />
-                  {allFitur.filter(f => f.href !== '/dashboard').map(f => {
+                  {allFitur.filter(f => f.href !== '/dashboard' && f.href !== '/dashboard/sekpen/supervisi').map(f => {
                     const userRoles = getEffectiveUserRoles(overrideUser)
                     const hasViaRole = rolesCanAccessFeature(f.roles, userRoles)
                     const override = overrideList.find(o => o.fitur_id === f.id)
