@@ -6,7 +6,7 @@ export function redactSecrets(text: string): string {
   return text
     .replace(/Bearer\s+[a-zA-Z0-9_\-\.]+/gi, 'Bearer [REDACTED_TOKEN]')
     .replace(/-----BEGIN[ A-Z0-9_-]+PRIVATE KEY-----[\s\S]*?-----END[ A-Z0-9_-]+PRIVATE KEY-----/g, '[REDACTED_PRIVATE_KEY]')
-    .replace(/(client_secret|clientSecret|secret)=([^&\s]+)/gi, '$1=[REDACTED]')
+    .replace(/(client_secret|clientSecret|secret|passApp|pass_app)=([^&\s]+)/gi, '$1=[REDACTED]')
 }
 
 export function maskVa(va: string): string {
@@ -34,7 +34,14 @@ export function sanitizePayload(data: unknown): unknown {
   const sanitized: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
     const lowerKey = key.toLowerCase()
-    if (lowerKey.includes('secret') || lowerKey.includes('privatekey') || lowerKey.includes('token') || lowerKey.includes('password') || lowerKey.includes('pin')) {
+    if (
+      lowerKey.includes('secret') ||
+      lowerKey.includes('privatekey') ||
+      lowerKey.includes('token') ||
+      lowerKey.includes('password') ||
+      lowerKey.includes('pin') ||
+      lowerKey.includes('passapp')
+    ) {
       sanitized[key] = '[REDACTED]'
     } else if (lowerKey.includes('va') || lowerKey.includes('virtualaccount')) {
       sanitized[key] = typeof value === 'string' ? maskVa(value) : value
