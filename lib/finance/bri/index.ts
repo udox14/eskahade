@@ -1,5 +1,5 @@
 // lib/finance/bri/index.ts
-// Public exports for BRI Security & Core Adapter (BRI-2)
+// Public exports for BRI Security, Core Adapter, BRIVA Collection & Settlement/Recovery (BRI-2, BRI-3, BRI-4)
 
 export * from './types'
 export * from './errors'
@@ -13,3 +13,11 @@ export * from './briva-types'
 export * from './briva-policy'
 export * from './briva-service'
 export * from './money'
+export * from './statement-types'
+export * from './statement-policy'
+export * from './statement-service'
+export * from './matching-engine'
+export * from './settlement-service'
+export * from './recovery-service'
+export * from './unallocated-service'
+export * from './reconciliation-session-service'

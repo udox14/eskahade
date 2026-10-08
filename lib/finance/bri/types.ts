@@ -67,6 +67,8 @@ export interface BriConfig {
   readonly timeoutMs: number
   /** Server-side outbound kill switch. If false, all outbound network requests are blocked */
   readonly outboundEnabled: boolean
+  /** Authoritative Cooperative Collection Account Number (e.g. '001901000123301'). Mandatory fail-closed in production */
+  readonly collectionAccountNo?: string
 }
 
 export type BriErrorCategory =

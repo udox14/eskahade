@@ -128,6 +128,12 @@ export function loadBriConfig(overrides?: Partial<BriConfig>, rawEnvDictionary?:
     outboundEnabled = true
   }
 
+  // 12. Authoritative Collection Account (Mandatory fail-closed in production)
+  const collectionAccountNo = (overrides?.collectionAccountNo || rawEnv.BRI_COLLECTION_ACCOUNT_NO || '').trim()
+  if (env === 'production' && !collectionAccountNo) {
+    throw new BriError('CONFIG_ERROR', 'Missing required configuration in production: BRI_COLLECTION_ACCOUNT_NO.')
+  }
+
   const config: BriConfig = Object.freeze({
     env,
     baseUrl,
@@ -140,6 +146,7 @@ export function loadBriConfig(overrides?: Partial<BriConfig>, rawEnvDictionary?:
     channelId,
     timeoutMs,
     outboundEnabled,
+    collectionAccountNo: collectionAccountNo || undefined,
   })
 
   return config
