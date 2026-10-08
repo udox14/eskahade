@@ -1,7 +1,7 @@
 'use client'
 
 // app/dashboard/keuangan/rekonsiliasi/input-settlement-modal.tsx
-// Modal Pencatatan Batch Settlement Bank dari Duitku
+// Modal Pencatatan Batch Settlement Bank dari BRI (Fase 8 / BRI-1)
 
 import React, { useState, useMemo } from 'react'
 import {
@@ -131,7 +131,7 @@ export default function InputSettlementModal({
             </div>
             <div>
               <h3 className="text-base font-semibold text-slate-800">
-                Pencatatan Settlement Bank (Duitku)
+                Pencatatan Settlement Bank (BRI)
               </h3>
               <p className="text-xs text-slate-500">
                 Cocokkan pencairan rekening koran bank dengan pembayaran online berstatus PAID
@@ -312,7 +312,7 @@ export default function InputSettlementModal({
                 type="text"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Contoh: Pencairan Duitku Batch Harian tanggal 19/09"
+                placeholder="Contoh: Pencairan BRI Batch Harian tanggal 19/09"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-emerald-500 focus:outline-hidden"
               />
             </div>

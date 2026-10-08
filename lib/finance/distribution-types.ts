@@ -2,9 +2,45 @@
 // Tipe data Penyaluran Dana (Fase 7: Distribution Engine & Provider Accounts)
 // Berdasarkan PRD Bab 24 s.d. 29 & Implementation Plan #3.4
 
-export type FinanceDistributionRecipientType = 'BENDAHARA' | 'KATERING' | 'LAUNDRY'
+export type FinanceDistributionRecipientType = 'PESANTREN' | 'KATERING' | 'LAUNDRY' | 'BENDAHARA'
 
-export type FinanceDistributionMethod = 'TRANSFER' | 'CASH'
+export type FinanceDistributionMethod = 'BRI_QLOLA' | 'CASH' | 'MANUAL_TRANSFER' | 'TRANSFER'
+
+export type FinanceDistributionStatus =
+  | 'DRAFT'
+  | 'PENDING_APPROVAL'
+  | 'PROCESSING'
+  | 'CANCEL_PENDING'
+  | 'DISTRIBUTED'
+  | 'FAILED'
+  | 'REJECTED'
+  | 'CANCELLED'
+
+export interface FinanceDistributionRecipient {
+  id: string
+  recipient_type: 'PESANTREN' | 'KATERING' | 'LAUNDRY'
+  name: string
+  provider_id: string | null
+  is_active: number
+  allowed_methods: string
+  created_by?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface FinanceRecipientAccount {
+  id: string
+  recipient_id: string
+  bank_code: string
+  account_number: string
+  account_holder: string
+  is_primary: number // 0 | 1
+  is_active: number // 0 | 1
+  notes: string | null
+  created_by?: string | null
+  created_at: string
+  updated_at: string
+}
 
 export interface FinanceDistribution {
   id: string
@@ -15,15 +51,20 @@ export interface FinanceDistribution {
   period: string
   total_amount: number
   method: FinanceDistributionMethod
+  status: FinanceDistributionStatus
   destination_bank: string | null
   destination_account: string | null
   account_holder_name: string | null
+  external_reference: string | null
   proof_attachment_url: string | null
+  submitted_by?: string | null
+  submitted_at?: string | null
   transferred_by: string
   transferred_by_name?: string | null
   transferred_at: string
   notes: string | null
   created_at: string
+  updated_at?: string
 }
 
 export interface FinanceDistributionItem {

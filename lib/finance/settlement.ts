@@ -1,6 +1,6 @@
 // lib/finance/settlement.ts
-// Modul Settlement Bank Payment Gateway (Fase 8)
-// Menangani pencairan batch dana Duitku ke rekening bank pesantren,
+// Modul Settlement Bank Payment Gateway (Fase 8 / BRI-1)
+// Menangani pencairan batch dana online BRI ke rekening bank pesantren,
 // penegakan invariant PAID != SETTLED, pencocokan 1-to-1, dan deteksi selisih nominal.
 
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
@@ -20,207 +20,24 @@ function generateSettlementNumber(): string {
 }
 
 /**
- * Mengambil daftar pembayaran online Duitku yang berstatus 'PAID' (belum di-settle)
- * dan siap untuk dimasukkan ke dalam batch settlement bank.
+ * Mengambil daftar pembayaran online untuk batch settlement bank.
+ * Pada Fase BRI-1, flow settlement online BRI dinonaktifkan hingga integrasi Rekening Koran BRIAPI (BRI-4) aktif.
+ * Mengembalikan array kosong untuk mencegah repurposing settlement manual legacy menjadi transaksi BRI palsu.
  */
 export async function getCandidatePaymentsForSettlement(
-  period?: string
+  _period?: string
 ): Promise<SettlementPaymentCandidate[]> {
-  const params: unknown[] = []
-  let sql = `
-    SELECT
-      p.id AS payment_id,
-      p.payment_number,
-      p.santri_id,
-      s.nama_lengkap AS santri_name,
-      s.nis,
-      p.paid_at,
-      p.external_reference,
-      p.channel,
-      p.method,
-      p.gross_amount,
-      p.gateway_fee,
-      p.net_amount,
-      p.status
-    FROM finance_payments p
-    JOIN santri s ON s.id = p.santri_id
-    LEFT JOIN finance_settlement_items si ON si.payment_id = p.id
-    WHERE p.channel = 'DUITKU'
-      AND p.status = 'PAID'
-      AND si.id IS NULL
-      AND p.correction_status != 'FULLY_CORRECTED'
-      AND ${nonBillableSantriSqlPredicate('s.asrama')}
-  `
-
-  if (period) {
-    sql += ` AND p.paid_at LIKE ?`
-    params.push(`${period}%`)
-  }
-
-  sql += ` ORDER BY p.paid_at ASC`
-
-  const rows = await query<SettlementPaymentCandidate>(sql, params)
-  return rows || []
+  return []
 }
 
 /**
- * Membuat batch settlement bank baru dan menautkan pembayaran online yang dicairkan.
- *
- * Penegakan Invariant:
- * 1. Setiap pembayaran hanya boleh di-settle tepat satu kali (1-to-1 via UNIQUE(payment_id)).
- * 2. Hanya pembayaran online berstatus 'PAID' yang dapat dimasukkan ke settlement bank.
- * 3. Status pembayaran internal beralih dari 'PAID' menjadi 'SETTLED'.
- * 4. Jika nominal net yang dicairkan bank tidak sama persis dengan perhitungan sistem (expectedTotalNet != calculatedTotalNet),
- *    batch settlement ditandai 'DISCREPANCY' dan baris selisih dicatat ke finance_reconciliation_items.
- * 5. Seluruh mutasi dieksekusi secara atomik dalam satu batch statement D1.
+ * Membuat batch settlement bank baru.
+ * Dinonaktifkan pada Fase BRI-1 sesuai invariant PAID != SETTLED hingga Rekening Koran BRIAPI (BRI-4) aktif.
  */
 export async function createSettlementBatch(
-  input: CreateSettlementBatchInput
+  _input: CreateSettlementBatchInput
 ): Promise<{ settlement: FinanceSettlement; itemsCount: number }> {
-  if (!input.paymentIds || input.paymentIds.length === 0) {
-    throw new Error('Batch settlement harus memuat minimal satu pembayaran.')
-  }
-
-  const settlementId = generateId()
-  const settlementNumber = generateSettlementNumber()
-  const createdAt = now()
-  const provider = input.provider || 'DUITKU'
-
-  // 1. Ambil dan validasi seluruh payment yang dipilih
-  const placeholders = input.paymentIds.map(() => '?').join(',')
-  const payments = await query<{
-    id: string
-    payment_number: string
-    channel: string
-    status: string
-    gross_amount: number
-    gateway_fee: number
-    net_amount: number
-    already_settled: number
-  }>(
-    `SELECT
-       p.id, p.payment_number, p.channel, p.status, p.gross_amount, p.gateway_fee, p.net_amount,
-       CASE WHEN si.id IS NOT NULL THEN 1 ELSE 0 END AS already_settled
-     FROM finance_payments p
-     LEFT JOIN finance_settlement_items si ON si.payment_id = p.id
-     WHERE p.id IN (${placeholders})`,
-    input.paymentIds
-  )
-
-  if (payments.length !== input.paymentIds.length) {
-    throw new Error('Satu atau lebih ID pembayaran dalam batch tidak ditemukan pada database.')
-  }
-
-  let totalGross = 0
-  let totalFee = 0
-  let totalNet = 0
-
-  for (const p of payments) {
-    if (p.channel !== 'DUITKU') {
-      throw new Error(`Pembayaran "${p.payment_number}" bukan transaksi gateway online (channel: ${p.channel}).`)
-    }
-    if (p.already_settled === 1 || p.status === 'SETTLED') {
-      throw new Error(`Pembayaran "${p.payment_number}" sudah pernah dicairkan pada settlement lain (PAID != SETTLED violation).`)
-    }
-    totalGross += p.gross_amount
-    totalFee += p.gateway_fee
-    totalNet += p.net_amount
-  }
-
-  // 2. Evaluasi status settlement (apakah ada selisih dari bank statement)
-  let status: 'COMPLETED' | 'DISCREPANCY' = 'COMPLETED'
-  let discrepancyAmount = 0
-  const expectedNet = input.expectedTotalNet !== undefined ? Math.floor(input.expectedTotalNet) : totalNet
-
-  if (expectedNet !== totalNet) {
-    status = 'DISCREPANCY'
-    discrepancyAmount = Math.abs(expectedNet - totalNet)
-  }
-
-  const statements: Array<{ sql: string; params: unknown[] }> = []
-
-  // A. Insert Header Settlement
-  statements.push({
-    sql: `
-      INSERT INTO finance_settlements (
-        id, settlement_number, provider, settlement_date, destination_bank,
-        destination_account, total_payments_count, total_gross_amount,
-        total_fee_amount, total_net_amount, status, notes, verified_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    params: [
-      settlementId,
-      settlementNumber,
-      provider,
-      input.settlementDate,
-      input.destinationBank,
-      input.destinationAccount,
-      payments.length,
-      totalGross,
-      totalFee,
-      totalNet,
-      status,
-      input.notes || null,
-      input.verifiedBy,
-      createdAt,
-    ],
-  })
-
-  // B. Insert Settlement Items & Update Status Payment ke 'SETTLED'
-  for (const p of payments) {
-    const itemId = generateId()
-    statements.push({
-      sql: `
-        INSERT INTO finance_settlement_items (
-          id, settlement_id, payment_id, gross_amount, gateway_fee, net_amount, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      `,
-      params: [itemId, settlementId, p.id, p.gross_amount, p.gateway_fee, p.net_amount, createdAt],
-    })
-
-    statements.push({
-      sql: `UPDATE finance_payments SET status = 'SETTLED' WHERE id = ?`,
-      params: [p.id],
-    })
-  }
-
-  // C. Jika ada selisih nominal, catat ke finance_reconciliation_items
-  if (status === 'DISCREPANCY') {
-    const recItemId = generateId()
-    statements.push({
-      sql: `
-        INSERT INTO finance_reconciliation_items (
-          id, reconciliation_id, payment_id, settlement_id, cash_session_id,
-          external_reference, internal_amount, external_amount, discrepancy_amount,
-          match_status, resolution_action, resolution_notes, resolved_by,
-          resolved_at, created_at
-        ) VALUES (?, NULL, NULL, ?, NULL, ?, ?, ?, ?, 'AMOUNT_MISMATCH', 'NONE', ?, NULL, NULL, ?)
-      `,
-      params: [
-        recItemId,
-        settlementId,
-        settlementNumber,
-        totalNet,
-        expectedNet,
-        discrepancyAmount,
-        `Selisih pencairan settlement ${settlementNumber}: kalkulasi internal Rp ${totalNet.toLocaleString('id-ID')} vs bank Rp ${expectedNet.toLocaleString('id-ID')}. Periksa pemotongan fee gateway.`,
-        createdAt,
-      ],
-    })
-  }
-
-  await batch(statements)
-
-  const created = await queryOne<FinanceSettlement>(
-    `SELECT * FROM finance_settlements WHERE id = ?`,
-    [settlementId]
-  )
-
-  if (!created) {
-    throw new Error('Gagal memuat batch settlement setelah disimpan.')
-  }
-
-  return { settlement: created, itemsCount: payments.length }
+  throw new Error('Pencatatan settlement online dinonaktifkan hingga integrasi Rekening Koran BRIAPI (BRI-4) aktif.')
 }
 
 /**
@@ -317,7 +134,7 @@ export async function getSettlementDetail(
        si.*,
        p.payment_number,
        p.paid_at,
-       p.external_reference,
+       COALESCE(p.bri_trx_id, p.bri_payment_request_id) AS external_reference,
        p.method,
        san.nama_lengkap AS santri_name,
        san.nis

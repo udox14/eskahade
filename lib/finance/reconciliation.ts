@@ -32,10 +32,10 @@ export async function getReconciliationOverview(
     `SELECT
        COALESCE(SUM(p.gross_amount), 0) AS total_gross,
        COALESCE(SUM(CASE WHEN p.status = 'SETTLED' THEN p.gross_amount ELSE 0 END), 0) AS settled_gross,
-       COALESCE(SUM(CASE WHEN p.status = 'PAID' AND p.channel = 'DUITKU' AND p.correction_status != 'FULLY_CORRECTED' THEN p.net_amount ELSE 0 END), 0) AS pending_net,
-       COALESCE(SUM(CASE WHEN p.status = 'PAID' AND p.channel = 'DUITKU' AND p.correction_status != 'FULLY_CORRECTED' THEN 1 ELSE 0 END), 0) AS pending_count
+       COALESCE(SUM(CASE WHEN p.status = 'PAID' AND p.channel = 'BRI' AND p.correction_status != 'FULLY_CORRECTED' THEN p.net_amount ELSE 0 END), 0) AS pending_net,
+       COALESCE(SUM(CASE WHEN p.status = 'PAID' AND p.channel = 'BRI' AND p.correction_status != 'FULLY_CORRECTED' THEN 1 ELSE 0 END), 0) AS pending_count
      FROM finance_payments p
-     WHERE p.channel = 'DUITKU' AND p.paid_at LIKE ?`,
+     WHERE p.channel = 'BRI' AND p.paid_at LIKE ?`,
     [periodPrefix]
   )
 
@@ -168,10 +168,10 @@ export async function getUnallocatedReconciliationItems(filters?: {
        COALESCE(s.nis, '-') AS nis,
        s.asrama,
        COALESCE(p.paid_at, ri.created_at) AS paid_at,
-       COALESCE(p.channel, 'DUITKU') AS channel,
+       COALESCE(p.channel, 'BRI') AS channel,
        COALESCE(p.method, '-') AS method,
        COALESCE(p.gross_amount, ri.external_amount) AS gross_amount,
-       COALESCE(p.gateway_fee, 0) AS gateway_fee,
+       COALESCE(p.cooperative_admin_fee, 0) AS gateway_fee,
        COALESCE(p.net_amount, ri.external_amount) AS net_amount,
        COALESCE(p.allocation_status, 'UNALLOCATED') AS allocation_status,
        COALESCE(p.correction_status, 'NONE') AS correction_status,

@@ -601,7 +601,7 @@ export function StatusPembayaranDetailDrawer({
                       <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-500 space-y-1">
                         <Receipt className="h-6 w-6 text-slate-300 mx-auto mb-2" />
                         <p className="font-medium text-slate-700">Belum ada riwayat pembayaran yang tercatat.</p>
-                        <p className="text-slate-400">Pembayaran melalui Duitku atau kasir loket akan muncul di sini.</p>
+                        <p className="text-slate-400">Pembayaran melalui BRIVA atau kasir loket akan muncul di sini.</p>
                       </div>
                     ) : (
                       <div className="space-y-3">

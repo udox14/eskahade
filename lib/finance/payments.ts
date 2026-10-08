@@ -6,6 +6,7 @@ import { query, queryOne, batch, generateId, now } from '@/lib/db'
 import { getPaymentOrderById } from '@/lib/finance/orders'
 import { resolveFundManagement } from '@/lib/finance/fund-management'
 import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
+import { getEffectiveCooperativeAdminFeeRule } from '@/lib/finance/cooperative-admin'
 import type {
   FinancePayment,
   FinanceAllocation,
@@ -59,11 +60,14 @@ export async function recordOrderPayment(
   const paymentId = generateId()
   const paymentNumber = generatePaymentNumber()
   const paidAt = input.paidAt ?? now()
-  const gatewayFee = input.gatewayFee !== undefined
-    ? Math.max(0, Math.floor(input.gatewayFee))
-    : order.gateway_fee
+  const cooperativeAdminFee = input.cooperativeAdminFee !== undefined
+    ? Math.max(0, Math.floor(input.cooperativeAdminFee))
+    : order.cooperative_admin_fee
+  const briFeeAmount = input.briFeeAmount ?? null
+  const briPaymentRequestId = input.briPaymentRequestId ?? null
+  const briTrxId = input.briTrxId ?? null
   const grossAmount = order.gross_amount
-  const netAmount = Math.max(0, grossAmount - gatewayFee)
+  const netAmount = Math.max(0, grossAmount - (briFeeAmount ?? 0))
   const cashSessionId = input.cashSessionId ?? order.cash_session_id ?? null
   const receivedBy = input.receivedBy ?? null
   const paymentSource = input.source ?? 'NEW_FINANCE'
@@ -85,10 +89,11 @@ export async function recordOrderPayment(
         sql: `
           INSERT INTO finance_payments (
             id, payment_number, order_id, santri_id, channel, method,
-            gross_amount, gateway_fee, net_amount, status, correction_status,
-            allocation_status, paid_at, external_reference, cash_session_id,
+            gross_amount, cooperative_admin_fee, bri_fee_amount, net_amount,
+            status, correction_status, allocation_status, paid_at,
+            bri_payment_request_id, bri_trx_id, external_reference, cash_session_id,
             received_by, source, fund_management, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', 'UNALLOCATED', ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', 'UNALLOCATED', ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         params: [
           paymentId,
@@ -98,9 +103,12 @@ export async function recordOrderPayment(
           input.channel,
           input.method,
           grossAmount,
-          gatewayFee,
+          cooperativeAdminFee,
+          briFeeAmount,
           netAmount,
           paidAt,
+          briPaymentRequestId,
+          briTrxId,
           externalRef,
           cashSessionId,
           receivedBy,
@@ -279,10 +287,11 @@ export async function recordOrderPayment(
     sql: `
       INSERT INTO finance_payments (
         id, payment_number, order_id, santri_id, channel, method,
-        gross_amount, gateway_fee, net_amount, status, correction_status,
-        allocation_status, paid_at, external_reference, cash_session_id,
+        gross_amount, cooperative_admin_fee, bri_fee_amount, net_amount,
+        status, correction_status, allocation_status, paid_at,
+        bri_payment_request_id, bri_trx_id, external_reference, cash_session_id,
         received_by, source, fund_management, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     params: [
       paymentId,
@@ -292,10 +301,13 @@ export async function recordOrderPayment(
       input.channel,
       input.method,
       grossAmount,
-      gatewayFee,
+      cooperativeAdminFee,
+      briFeeAmount,
       netAmount,
       allocationStatus,
       paidAt,
+      briPaymentRequestId,
+      briTrxId,
       externalRef,
       cashSessionId,
       receivedBy,
@@ -304,6 +316,36 @@ export async function recordOrderPayment(
       paidAt,
     ],
   })
+
+  // 5b. Append-Only Ledger: Catat pendapatan administrasi Koperasi jika berlaku
+  if (cooperativeAdminFee > 0) {
+    const incomeId = generateId()
+    const incomeNumber = `INC-KOP-${paidAt.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+    const coopRule = await getEffectiveCooperativeAdminFeeRule('ONLINE_CHECKOUT_FEE', paidAt).catch(() => null)
+    const ruleSnapshot = coopRule ? JSON.stringify({ id: coopRule.id, code: coopRule.code, amount: coopRule.amount }) : null
+
+    statements.push({
+      sql: `
+        INSERT INTO finance_cooperative_income (
+          id, income_number, entry_type, reference_income_id, correction_id,
+          payment_id, order_id, amount, rule_id, rule_snapshot,
+          reference_note, created_by, created_at
+        ) VALUES (?, ?, 'INCOME', NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      params: [
+        incomeId,
+        incomeNumber,
+        paymentId,
+        order.id,
+        cooperativeAdminFee,
+        coopRule?.id || null,
+        ruleSnapshot,
+        `Pendapatan Biaya Operasional Koperasi atas pembayaran ${paymentNumber}`,
+        receivedBy,
+        paidAt,
+      ],
+    })
+  }
 
   // 6. Alokasi item yang aman
   for (const alloc of allocatableItems) {
@@ -402,6 +444,34 @@ export async function recordOrderPayment(
     })
   }
 
+  // 7b. Invariant Cash vs Active BRI Order:
+  // Ketika pembayaran non-BRI (misal CASH di loket) melunasi kewajiban yang sedang direferensikan
+  // oleh active BRI order (status = 'PENDING', payment_method = 'BRI_VA'),
+  // order BRI tersebut harus di-invalidasi ('CANCELLED') secara atomik agar tidak ada tagihan stale yang terbayar lewat VA.
+  const paidObligationIds = allocatableItems
+    .map((a) => a.obligationId)
+    .filter((id): id is string => Boolean(id))
+
+  if (input.channel !== 'BRI' && paidObligationIds.length > 0) {
+    const placeholders = paidObligationIds.map(() => '?').join(', ')
+    statements.push({
+      sql: `
+        UPDATE finance_payment_orders
+        SET status = 'CANCELLED',
+            updated_at = ?
+        WHERE santri_id = ?
+          AND status = 'PENDING'
+          AND payment_method = 'BRI_VA'
+          AND id IN (
+            SELECT DISTINCT oi.order_id
+            FROM finance_order_items oi
+            WHERE oi.obligation_id IN (${placeholders})
+          )
+      `,
+      params: [paidAt, order.santri_id, ...paidObligationIds],
+    })
+  }
+
   // 8. Eksekusi batch dengan penanganan race condition
   try {
     await batch(statements)
@@ -433,10 +503,11 @@ export async function recordOrderPayment(
           sql: `
             INSERT INTO finance_payments (
               id, payment_number, order_id, santri_id, channel, method,
-              gross_amount, gateway_fee, net_amount, status, correction_status,
-              allocation_status, paid_at, external_reference, cash_session_id,
+              gross_amount, cooperative_admin_fee, bri_fee_amount, net_amount,
+              status, correction_status, allocation_status, paid_at,
+              bri_payment_request_id, bri_trx_id, external_reference, cash_session_id,
               received_by, source, fund_management, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', 'UNALLOCATED', ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', 'UNALLOCATED', ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `,
           params: [
             paymentId,
@@ -446,9 +517,12 @@ export async function recordOrderPayment(
             input.channel,
             input.method,
             grossAmount,
-            gatewayFee,
+            cooperativeAdminFee,
+            briFeeAmount,
             netAmount,
             paidAt,
+            briPaymentRequestId,
+            briTrxId,
             externalRef,
             cashSessionId,
             receivedBy,
@@ -534,8 +608,11 @@ export async function recordUnallocatedPayment(
   const paymentNumber = generatePaymentNumber()
   const reconciliationItemId = generateId()
   const paidAt = input.paidAt ?? now()
-  const gatewayFee = Math.max(0, Math.floor(input.gatewayFee ?? 0))
-  const netAmount = Math.max(0, amount - gatewayFee)
+  const cooperativeAdminFee = input.cooperativeAdminFee !== undefined ? Math.max(0, Math.floor(input.cooperativeAdminFee)) : 0
+  const briFeeAmount = input.briFeeAmount ?? null
+  const briPaymentRequestId = input.briPaymentRequestId ?? null
+  const briTrxId = input.briTrxId ?? null
+  const netAmount = Math.max(0, amount - (briFeeAmount ?? 0))
   const cashSessionId = input.cashSessionId ?? null
   const receivedBy = input.receivedBy ?? null
   const paymentSource = input.source ?? 'NEW_FINANCE'
@@ -548,10 +625,11 @@ export async function recordUnallocatedPayment(
     sql: `
       INSERT INTO finance_payments (
         id, payment_number, order_id, santri_id, channel, method,
-        gross_amount, gateway_fee, net_amount, status, correction_status,
-        allocation_status, paid_at, external_reference, cash_session_id,
+        gross_amount, cooperative_admin_fee, bri_fee_amount, net_amount,
+        status, correction_status, allocation_status, paid_at,
+        bri_payment_request_id, bri_trx_id, external_reference, cash_session_id,
         received_by, source, fund_management, created_at
-      ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', 'UNALLOCATED', ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', 'UNALLOCATED', ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     params: [
       paymentId,
@@ -560,9 +638,12 @@ export async function recordUnallocatedPayment(
       input.channel,
       input.method,
       amount,
-      gatewayFee,
+      cooperativeAdminFee,
+      briFeeAmount,
       netAmount,
       paidAt,
+      briPaymentRequestId,
+      briTrxId,
       externalRef,
       cashSessionId,
       receivedBy,
@@ -571,6 +652,28 @@ export async function recordUnallocatedPayment(
       paidAt,
     ],
   })
+
+  if (cooperativeAdminFee > 0) {
+    const incomeId = generateId()
+    const incomeNumber = `INC-KOP-${paidAt.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+    statements.push({
+      sql: `
+        INSERT INTO finance_cooperative_income (
+          id, income_number, entry_type, payment_id, order_id, amount,
+          reference_note, created_by, created_at
+        ) VALUES (?, ?, 'INCOME', ?, NULL, ?, ?, ?, ?)
+      `,
+      params: [
+        incomeId,
+        incomeNumber,
+        paymentId,
+        cooperativeAdminFee,
+        `Pendapatan Biaya Operasional Koperasi atas pembayaran unallocated ${paymentNumber}`,
+        receivedBy,
+        paidAt,
+      ],
+    })
+  }
 
   // 2. Masukkan ke finance_reconciliation_items dengan match_status = 'UNALLOCATED_TRANSFER'
   statements.push({
@@ -635,8 +738,8 @@ export async function getPaymentById(
 ): Promise<PaymentWithAllocations | null> {
   const payment = await queryOne<FinancePayment>(
     `SELECT id, payment_number, order_id, santri_id, channel, method,
-            gross_amount, gateway_fee, net_amount, status, correction_status,
-            allocation_status, paid_at, external_reference, cash_session_id,
+            gross_amount, cooperative_admin_fee, bri_fee_amount, net_amount, status, correction_status,
+            allocation_status, paid_at, bri_payment_request_id, bri_trx_id, external_reference, cash_session_id,
             received_by, source, fund_management, created_at
      FROM finance_payments
      WHERE id = ?`,
@@ -668,8 +771,8 @@ export async function getPaymentByNumber(
 ): Promise<PaymentWithAllocations | null> {
   const payment = await queryOne<FinancePayment>(
     `SELECT id, payment_number, order_id, santri_id, channel, method,
-            gross_amount, gateway_fee, net_amount, status, correction_status,
-            allocation_status, paid_at, external_reference, cash_session_id,
+            gross_amount, cooperative_admin_fee, bri_fee_amount, net_amount, status, correction_status,
+            allocation_status, paid_at, bri_payment_request_id, bri_trx_id, external_reference, cash_session_id,
             received_by, source, fund_management, created_at
      FROM finance_payments
      WHERE payment_number = ?`,
@@ -701,8 +804,8 @@ export async function getPaymentByOrderId(
 ): Promise<PaymentWithAllocations | null> {
   const payment = await queryOne<FinancePayment>(
     `SELECT id, payment_number, order_id, santri_id, channel, method,
-            gross_amount, gateway_fee, net_amount, status, correction_status,
-            allocation_status, paid_at, external_reference, cash_session_id,
+            gross_amount, cooperative_admin_fee, bri_fee_amount, net_amount, status, correction_status,
+            allocation_status, paid_at, bri_payment_request_id, bri_trx_id, external_reference, cash_session_id,
             received_by, source, fund_management, created_at
      FROM finance_payments
      WHERE order_id = ?
@@ -735,8 +838,8 @@ export async function getPaymentsByOrderId(
 ): Promise<PaymentWithAllocations[]> {
   const payments = await query<FinancePayment>(
     `SELECT id, payment_number, order_id, santri_id, channel, method,
-            gross_amount, gateway_fee, net_amount, status, correction_status,
-            allocation_status, paid_at, external_reference, cash_session_id,
+            gross_amount, cooperative_admin_fee, bri_fee_amount, net_amount, status, correction_status,
+            allocation_status, paid_at, bri_payment_request_id, bri_trx_id, external_reference, cash_session_id,
             received_by, source, fund_management, created_at
      FROM finance_payments
      WHERE order_id = ?
@@ -771,8 +874,8 @@ export async function listPaymentsByStudent(
 ): Promise<PaymentWithAllocations[]> {
   const payments = await query<FinancePayment>(
     `SELECT id, payment_number, order_id, santri_id, channel, method,
-            gross_amount, gateway_fee, net_amount, status, correction_status,
-            allocation_status, paid_at, external_reference, cash_session_id,
+            gross_amount, cooperative_admin_fee, bri_fee_amount, net_amount, status, correction_status,
+            allocation_status, paid_at, bri_payment_request_id, bri_trx_id, external_reference, cash_session_id,
             received_by, source, fund_management, created_at
      FROM finance_payments
      WHERE santri_id = ?
@@ -809,8 +912,8 @@ export async function getPaymentByExternalReference(
 ): Promise<PaymentWithAllocations | null> {
   const payment = await queryOne<FinancePayment>(
     `SELECT id, payment_number, order_id, santri_id, channel, method,
-            gross_amount, gateway_fee, net_amount, status, correction_status,
-            allocation_status, paid_at, external_reference, cash_session_id,
+            gross_amount, cooperative_admin_fee, bri_fee_amount, net_amount, status, correction_status,
+            allocation_status, paid_at, bri_payment_request_id, bri_trx_id, external_reference, cash_session_id,
             received_by, source, fund_management, created_at
      FROM finance_payments
      WHERE channel = ? AND external_reference = ?`,

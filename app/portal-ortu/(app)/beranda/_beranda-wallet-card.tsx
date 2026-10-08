@@ -26,14 +26,6 @@ interface BerandaWalletCardProps {
   fixedVa?: PortalStudentBillingData['fixedVa'] | null
 }
 
-const VA_BANKS = [
-  { code: 'BR', label: 'BRI' },
-  { code: 'NC', label: 'BNI' },
-  { code: 'M2', label: 'Mandiri' },
-  { code: 'BT', label: 'Permata' },
-  { code: 'BC', label: 'BCA' },
-]
-
 export function BerandaWalletCard({
   santriId,
   balance,
@@ -50,26 +42,14 @@ export function BerandaWalletCard({
 
   // Top Up form states
   const [topUpAmount, setTopUpAmount] = useState<number>(100000)
-  const enabledChannels = gatewayInfo?.enabledChannels || ['DUITKU_VA', 'DUITKU_QRIS']
-  const isVaEnabled = enabledChannels.includes('DUITKU_VA')
-  const isQrisEnabled = enabledChannels.includes('DUITKU_QRIS')
-
-  const [paymentMethod, setPaymentMethod] = useState<'DUITKU_VA' | 'DUITKU_QRIS'>(() => {
-    if (isVaEnabled) return 'DUITKU_VA'
-    if (isQrisEnabled) return 'DUITKU_QRIS'
-    return 'DUITKU_VA'
-  })
-  const [vaBank, setVaBank] = useState<string>('BR')
+  const paymentMethod = 'BRI_VA' as const
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [checkoutResult, setCheckoutResult] = useState<PortalCheckoutResponse | null>(null)
   const [copied, setCopied] = useState(false)
 
   // Fee calculation
-  const configuredFee = paymentMethod === 'DUITKU_VA'
-    ? (gatewayInfo?.defaultVaFee ?? 4000)
-    : Math.ceil(topUpAmount * ((gatewayInfo?.defaultQrisFeePercent ?? 0.7) / 100))
-  const gatewayFee = gatewayInfo?.feePayer === 'INSTITUTION' ? 0 : configuredFee
-  const totalCharged = topUpAmount > 0 ? topUpAmount + gatewayFee : 0
+  const cooperativeFee = gatewayInfo?.defaultVaFee ?? 0
+  const totalCharged = topUpAmount > 0 ? topUpAmount + cooperativeFee : 0
 
   const handleCopyVa = (vaText: string) => {
     navigator.clipboard.writeText(vaText)
@@ -88,8 +68,7 @@ export function BerandaWalletCard({
     try {
       const res = await createPortalCheckoutAction({
         santriId,
-        paymentMethod,
-        vaBank,
+        paymentMethod: 'BRI_VA',
         items: [
           {
             obligationId: null,
@@ -214,23 +193,39 @@ export function BerandaWalletCard({
             >
               Selesai
             </button>
-          ) : (
-            <button
-              type="button"
-              disabled={isCheckingOut || topUpAmount < 10000 || (!isVaEnabled && !isQrisEnabled)}
-              onClick={handleProceedTopUp}
-              className="w-full min-h-12 flex items-center justify-center gap-2 rounded-xl bg-[#064e3b] hover:bg-[#047857] px-4 py-3 text-sm font-bold text-[#bef264] shadow-xs active:scale-[0.98] transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isCheckingOut ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-[#bef264]" />
-                  <span>Memproses pembayaran…</span>
-                </>
-              ) : (
-                `Buat Pembayaran ${formatRupiah(totalCharged)}`
-              )}
-            </button>
-          )
+          ) : !gatewayInfo?.isOnlineAvailable ? (
+              <div className="w-full space-y-2">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/40 p-3 text-xs text-amber-800 dark:text-amber-200 text-left">
+                  <p className="font-semibold">Top-Up Online Belum Tersedia</p>
+                  <p className="mt-1 text-[11px] leading-relaxed">
+                    Kanal top-up online (BRIVA) belum diaktifkan. Setor titipan uang jajan dilayani secara tunai di loket kasir pesantren.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled
+                  className="w-full min-h-12 rounded-xl bg-slate-200 dark:bg-slate-800 px-4 py-3 text-sm font-bold text-slate-400 cursor-not-allowed"
+                >
+                  Top-Up Online Belum Dibuka
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={isCheckingOut || topUpAmount < 10000}
+                onClick={handleProceedTopUp}
+                className="w-full min-h-12 flex items-center justify-center gap-2 rounded-xl bg-[#064e3b] hover:bg-[#047857] px-4 py-3 text-sm font-bold text-[#bef264] shadow-xs active:scale-[0.98] transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCheckingOut ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-[#bef264]" />
+                    <span>Memproses pembayaran…</span>
+                  </>
+                ) : (
+                  `Buat Pembayaran ${formatRupiah(totalCharged)}`
+                )}
+              </button>
+            )
         }
       >
         {!checkoutResult ? (
@@ -290,60 +285,15 @@ export function BerandaWalletCard({
             </div>
 
             {/* Metode Pembayaran */}
-            <fieldset className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
-              <legend className="text-xs font-bold text-slate-700 dark:text-slate-300">Metode Pembayaran</legend>
-              <div className="grid grid-cols-2 gap-2">
-                {isVaEnabled && (
-                  <button
-                    type="button"
-                    aria-pressed={paymentMethod === 'DUITKU_VA'}
-                    onClick={() => setPaymentMethod('DUITKU_VA')}
-                    className={`min-h-11 rounded-xl border px-2 text-xs font-bold transition cursor-pointer ${
-                      paymentMethod === 'DUITKU_VA'
-                        ? 'border-emerald-700 bg-emerald-50 text-emerald-900 dark:border-emerald-500 dark:bg-emerald-950/60 dark:text-emerald-200'
-                        : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60'
-                    }`}
-                  >
-                    Virtual Account
-                  </button>
-                )}
-                {isQrisEnabled && (
-                  <button
-                    type="button"
-                    aria-pressed={paymentMethod === 'DUITKU_QRIS'}
-                    onClick={() => setPaymentMethod('DUITKU_QRIS')}
-                    className={`min-h-11 rounded-xl border px-2 text-xs font-bold transition cursor-pointer ${
-                      paymentMethod === 'DUITKU_QRIS'
-                        ? 'border-emerald-700 bg-emerald-50 text-emerald-900 dark:border-emerald-500 dark:bg-emerald-950/60 dark:text-emerald-200'
-                        : 'border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800/60'
-                    }`}
-                  >
-                    QRIS
-                  </button>
-                )}
-              </div>
-
-              {/* Pilihan Bank jika Virtual Account */}
-              {paymentMethod === 'DUITKU_VA' && isVaEnabled && (
-                <div className="grid grid-cols-3 gap-1.5 pt-1">
-                  {VA_BANKS.map(bank => (
-                    <button
-                      key={bank.code}
-                      type="button"
-                      aria-pressed={vaBank === bank.code}
-                      onClick={() => setVaBank(bank.code)}
-                      className={`min-h-10 rounded-xl border px-2 text-xs font-bold transition cursor-pointer active:scale-95 ${
-                        vaBank === bank.code
-                          ? 'border-emerald-700 bg-emerald-800 text-white dark:border-emerald-500 dark:bg-emerald-600'
-                          : 'border-slate-200 text-slate-700 hover:bg-slate-50 bg-white dark:border-slate-700 dark:text-slate-300 dark:bg-slate-800/60 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      {bank.label}
-                    </button>
-                  ))}
+            <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Metode Pembayaran</span>
+              <div className="rounded-xl border border-emerald-700 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/60 p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">Virtual Account BRI (BRIVA)</p>
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-0.5">Transfer via BRImo, ATM BRI, AgenBRILink, atau Bank Lain</p>
                 </div>
-              )}
-            </fieldset>
+              </div>
+            </div>
 
             {/* Rincian Subtotal & Biaya */}
             <div className="space-y-1.5 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs text-slate-600 dark:text-slate-400">
@@ -352,8 +302,8 @@ export function BerandaWalletCard({
                 <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{formatRupiah(topUpAmount)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Biaya Admin</span>
-                <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{formatRupiah(gatewayFee)}</span>
+                <span>Biaya Admin Koperasi</span>
+                <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{formatRupiah(cooperativeFee)}</span>
               </div>
               <div className="flex justify-between border-t border-slate-100 dark:border-slate-800 pt-2 font-bold text-slate-950 dark:text-slate-100 text-sm">
                 <span>Total Pembayaran</span>
@@ -373,14 +323,14 @@ export function BerandaWalletCard({
                 {formatRupiah(checkoutResult.order.totalCharged)}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Termasuk biaya admin {formatRupiah(checkoutResult.order.gatewayFee)}
+                Termasuk biaya admin Koperasi {formatRupiah(checkoutResult.order.cooperativeAdminFee)}
               </p>
             </div>
 
             {/* Virtual Account Number */}
-            {checkoutResult.checkout.vaNumber ? (
+            {checkoutResult.checkout.vaNumber && (
               <div className="rounded-2xl border border-emerald-200/80 dark:border-emerald-800/60 bg-emerald-50/60 dark:bg-emerald-950/40 p-4 text-center space-y-2">
-                <span className="text-xs font-bold text-emerald-950 dark:text-emerald-200">Nomor Virtual Account</span>
+                <span className="text-xs font-bold text-emerald-950 dark:text-emerald-200">Nomor Virtual Account BRI (BRIVA)</span>
                 <div className="flex items-center justify-center gap-2">
                   <span className="font-mono text-xl sm:text-2xl font-black text-emerald-950 dark:text-emerald-100 tracking-wider whitespace-nowrap overflow-x-auto no-scrollbar py-0.5">
                     {checkoutResult.checkout.vaNumber}
@@ -406,26 +356,15 @@ export function BerandaWalletCard({
                   </span>
                 </div>
               </div>
-            ) : checkoutResult.checkout.paymentUrl ? (
-              <div className="text-center py-1">
-                <a
-                  href={checkoutResult.checkout.paymentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center w-full min-h-[44px] rounded-xl bg-[#064e3b] hover:bg-[#047857] py-3 text-xs font-bold text-[#bef264] shadow-xs active:scale-[0.98] transition"
-                >
-                  Buka Halaman Pembayaran Duitku
-                </a>
-              </div>
-            ) : null}
+            )}
 
             {/* Petunjuk Pembayaran Singkat */}
             <div className="text-xs text-slate-600 dark:text-slate-400 space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3">
               <p className="font-bold text-slate-900 dark:text-slate-200">Langkah Pembayaran:</p>
               <ul className="list-disc pl-4 space-y-1 text-slate-600 dark:text-slate-400 leading-relaxed">
-                <li>Buka m-Banking atau ATM bank Anda.</li>
-                <li>Pilih menu <strong>Transfer Virtual Account / Bayar Tagihan</strong>.</li>
-                <li>Masukkan nomor Virtual Account di atas.</li>
+                <li>Buka aplikasi <strong>BRImo</strong> atau transfer dari ATM / m-Banking lain.</li>
+                <li>Pilih menu <strong>Bayar &gt; BRIVA</strong> (atau Transfer Antar-Bank kode 002 jika dari bank lain).</li>
+                <li>Masukkan nomor BRIVA di atas.</li>
                 <li>Pastikan nominal transfer tepat sama.</li>
                 <li>Saldo uang jajan bertambah otomatis setelah pembayaran berhasil.</li>
               </ul>

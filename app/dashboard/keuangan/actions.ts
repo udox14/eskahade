@@ -38,8 +38,7 @@ export async function getDashboardData(
     roles.includes('admin') ||
     roles.includes('bendahara') ||
     roles.includes('pimpinan') ||
-    roles.includes('demo') ||
-    roles.includes('tester')
+    roles.includes('demo')
 
   const hasFeatureAccess = await canAccessFeatureForSession(
     session,

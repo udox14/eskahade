@@ -157,7 +157,7 @@ export interface CorrectionDetailWithItems {
 
 // ─── RECONCILIATION TYPES ───────────────────────────────────────────────────
 
-export type FinanceReconciliationChannel = 'DUITKU' | 'CASH'
+export type FinanceReconciliationChannel = 'BRI' | 'CASH'
 export type FinanceReconciliationStatus = 'BALANCED' | 'DISCREPANCY_OPEN' | 'RESOLVED'
 
 export interface FinanceReconciliation {

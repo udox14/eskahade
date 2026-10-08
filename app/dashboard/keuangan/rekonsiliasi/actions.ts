@@ -1,4 +1,4 @@
-﻿'use server'
+'use server'
 
 // app/dashboard/keuangan/rekonsiliasi/actions.ts
 // Server actions untuk antarmuka modul Rekonsiliasi & Koreksi (Fase 8)
@@ -178,13 +178,12 @@ async function checkUserPermissions(): Promise<{
   )
 
   const isPimpinan = effectiveRoles.includes('pimpinan')
-  const isTester = effectiveRoles.includes('tester')
   // Role 'demo' hanya boleh menulis bila request benar-benar dilayani DEMO_DB.
   const demoRunsInSandbox = isDemoSandboxRequest(session)
   const isBendaharaOrAdmin = hasFinanceMutateRole(effectiveRoles, demoRunsInSandbox)
 
-  const canView = hasFeatureAccess || isPimpinan || isTester || isBendaharaOrAdmin
-  const canMutate = canView && isBendaharaOrAdmin && !isPimpinan && !isTester
+  const canView = hasFeatureAccess || isPimpinan || isBendaharaOrAdmin
+  const canMutate = canView && isBendaharaOrAdmin && !isPimpinan
 
   return {
     session,
@@ -286,34 +285,14 @@ export async function getReconciliationPageData(params?: {
 }
 
 /**
- * Server Action: Eksekusi Batch Settlement Bank
+ * Server Action: Eksekusi Batch Settlement Bank (Dinonaktifkan pada Fase BRI-1)
  */
 export async function createSettlementBatchAction(
-  input: Omit<CreateSettlementBatchInput, 'verifiedBy'>
+  _input: Omit<CreateSettlementBatchInput, 'verifiedBy'>
 ): Promise<{ success: boolean; message: string; settlementId?: string }> {
-  const { session, perms } = await checkUserPermissions()
-  if (!perms.canMutate || !session) {
-    return {
-      success: false,
-      message: 'Akses ditolak: Anda tidak memiliki wewenang untuk mencatat settlement bank.',
-    }
-  }
-
-  try {
-    const res = await createSettlementBatch({
-      ...input,
-      verifiedBy: session.id,
-    })
-    return {
-      success: true,
-      message: `Batch settlement ${res.settlement.settlement_number} berhasil dicatat (${res.itemsCount} pembayaran di-settle).`,
-      settlementId: res.settlement.id,
-    }
-  } catch (err: unknown) {
-    return {
-      success: false,
-      message: err instanceof Error ? err.message : 'Terjadi kesalahan saat mencatat settlement.',
-    }
+  return {
+    success: false,
+    message: 'Pencatatan settlement online dinonaktifkan hingga integrasi Rekening Koran BRIAPI (BRI-4) aktif.',
   }
 }
 

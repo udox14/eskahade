@@ -862,7 +862,9 @@ export async function getEligibleAllocationsForDistribution(params: {
       COALESCE((
         SELECT SUM(di.amount)
         FROM finance_distribution_items di
+        JOIN finance_distributions d ON di.distribution_id = d.id
         WHERE di.allocation_id = a.id
+          AND d.status = 'DISTRIBUTED'
       ), 0) AS disbursed_amount,
       ((a.amount - COALESCE((
         SELECT SUM(fci.amount)
@@ -871,7 +873,9 @@ export async function getEligibleAllocationsForDistribution(params: {
       ), 0)) - COALESCE((
         SELECT SUM(di.amount)
         FROM finance_distribution_items di
+        JOIN finance_distributions d ON di.distribution_id = d.id
         WHERE di.allocation_id = a.id
+          AND d.status IN ('PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING', 'DISTRIBUTED')
       ), 0)) AS available_amount,
       a.distribution_status,
       a.created_at
@@ -890,7 +894,9 @@ export async function getEligibleAllocationsForDistribution(params: {
       ), 0)) - COALESCE((
         SELECT SUM(di.amount)
         FROM finance_distribution_items di
+        JOIN finance_distributions d ON di.distribution_id = d.id
         WHERE di.allocation_id = a.id
+          AND d.status IN ('PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING', 'DISTRIBUTED')
       ), 0)) > 0
       ${providerClause}
     ORDER BY a.created_at ASC, a.id ASC
@@ -914,33 +920,46 @@ export async function executeDistribution(
     throw new Error('Nominal penyaluran harus berupa bilangan bulat positif lebih besar dari 0.')
   }
 
-  if (!['TRANSFER', 'CASH'].includes(input.method)) {
-    throw new Error(`Metode penyaluran tidak valid: "${input.method}". Wajib 'TRANSFER' atau 'CASH'.`)
+  const validMethods = ['BRI_QLOLA', 'CASH', 'MANUAL_TRANSFER', 'TRANSFER']
+  if (!validMethods.includes(input.method)) {
+    throw new Error(`Metode penyaluran tidak valid: "${input.method}". Wajib 'BRI_QLOLA', 'CASH', atau 'MANUAL_TRANSFER'.`)
   }
 
-  if (input.method === 'TRANSFER') {
+  const effectiveMethod: 'BRI_QLOLA' | 'CASH' | 'MANUAL_TRANSFER' =
+    input.method === 'TRANSFER' ? 'MANUAL_TRANSFER' : input.method as 'BRI_QLOLA' | 'CASH' | 'MANUAL_TRANSFER'
+
+  if (effectiveMethod === 'MANUAL_TRANSFER' || effectiveMethod === 'BRI_QLOLA') {
     if (!input.destinationBank || input.destinationBank.trim().length === 0) {
-      throw new Error('Penyaluran via TRANSFER wajib mencantumkan nama bank tujuan.')
+      throw new Error('Penyaluran transfer wajib mencantumkan nama bank tujuan.')
     }
     if (!input.destinationAccount || input.destinationAccount.trim().length === 0) {
-      throw new Error('Penyaluran via TRANSFER wajib mencantumkan nomor rekening tujuan.')
+      throw new Error('Penyaluran transfer wajib mencantumkan nomor rekening tujuan.')
     }
     if (!input.accountHolderName || input.accountHolderName.trim().length === 0) {
-      throw new Error('Penyaluran via TRANSFER wajib mencantumkan nama pemilik rekening tujuan.')
+      throw new Error('Penyaluran transfer wajib mencantumkan nama pemilik rekening tujuan.')
     }
   }
 
-  // Validasi Recipient
-  if (input.recipientType === 'BENDAHARA') {
+  // Non-STP: BRI_QLOLA wajib berstatus PENDING_APPROVAL untuk diverifikasi Signer QLola
+  const initialStatus: 'PENDING_APPROVAL' | 'DISTRIBUTED' =
+    effectiveMethod === 'BRI_QLOLA' ? 'PENDING_APPROVAL' : 'DISTRIBUTED'
+
+  // Validasi & Pemetaan Recipient
+  const targetRecipientType: 'PESANTREN' | 'KATERING' | 'LAUNDRY' =
+    input.recipientType === 'BENDAHARA' ? 'PESANTREN' : input.recipientType as 'PESANTREN' | 'KATERING' | 'LAUNDRY'
+
+  let resolvedRecipientId: string | null = null
+  if (targetRecipientType === 'PESANTREN') {
     if (!BENDAHARA_ITEM_TYPES.includes(input.itemType as FinanceItemType)) {
-      throw new Error(`Item "${input.itemType}" bukan merupakan pos dana Bendahara Pesantren.`)
+      throw new Error(`Item "${input.itemType}" bukan merupakan pos dana Pesantren.`)
     }
+    resolvedRecipientId = 'rec_pesantren'
   } else {
     if (!input.recipientId) {
       throw new Error(`Penyaluran ke ${input.recipientType} wajib menyertakan ID penyedia.`)
     }
-    const expectedJenis = input.recipientType === 'KATERING' ? 'Makan' : 'Cuci'
-    const expectedItem = input.recipientType === 'KATERING' ? 'UANG_MAKAN' : 'UANG_NYUCI'
+    const expectedJenis = targetRecipientType === 'KATERING' ? 'Makan' : 'Cuci'
+    const expectedItem = targetRecipientType === 'KATERING' ? 'UANG_MAKAN' : 'UANG_NYUCI'
 
     if (input.itemType !== expectedItem) {
       throw new Error(
@@ -955,6 +974,18 @@ export async function executeDistribution(
     if (!provider) {
       throw new Error(`Penyedia jasa "${input.recipientId}" tidak ditemukan atau jenisnya bukan "${expectedJenis}".`)
     }
+    resolvedRecipientId = input.recipientId.startsWith('rec_') ? input.recipientId : 'rec_' + input.recipientId
+  }
+
+  // Validasi allowed methods untuk penerima (PRD & Hardening BRI-1)
+  if (resolvedRecipientId) {
+    const isMethodAllowed = await queryOne<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM finance_recipient_allowed_methods WHERE recipient_id = ? AND method = ?`,
+      [resolvedRecipientId, effectiveMethod]
+    )
+    if (!isMethodAllowed || isMethodAllowed.count === 0) {
+      throw new Error(`Metode penyaluran "${effectiveMethod}" tidak diizinkan untuk penerima "${resolvedRecipientId}".`)
+    }
   }
 
   // Ambil alokasi eligible (FIFO)
@@ -963,7 +994,7 @@ export async function executeDistribution(
     recipientType: input.recipientType,
     itemType: input.itemType,
     period: normPeriod,
-    providerId: input.recipientType !== 'BENDAHARA' ? input.recipientId : null,
+    providerId: input.recipientType !== 'BENDAHARA' && input.recipientType !== 'PESANTREN' ? input.recipientId : null,
   })
 
   const totalAvailable = eligibleAllocations.reduce((acc, row) => acc + row.available_amount, 0)
@@ -978,9 +1009,9 @@ export async function executeDistribution(
   const transferredAt = input.transferredAt || now()
   const createdAt = now()
 
-  const destinationBank = input.method === 'TRANSFER' ? input.destinationBank!.trim() : null
-  const destinationAccount = input.method === 'TRANSFER' ? input.destinationAccount!.trim() : null
-  const accountHolderName = input.method === 'TRANSFER' ? input.accountHolderName!.trim() : null
+  const destinationBank = effectiveMethod !== 'CASH' ? input.destinationBank!.trim() : null
+  const destinationAccount = effectiveMethod !== 'CASH' ? input.destinationAccount!.trim() : null
+  const accountHolderName = effectiveMethod !== 'CASH' ? input.accountHolderName!.trim() : null
 
   const statements: Array<{ sql: string; params?: unknown[] }> = []
 
@@ -989,28 +1020,33 @@ export async function executeDistribution(
     sql: `
       INSERT INTO finance_distributions (
         id, distribution_number, recipient_type, recipient_id,
-        item_type, period, total_amount, method,
+        item_type, period, total_amount, method, status,
         destination_bank, destination_account, account_holder_name,
-        proof_attachment_url, transferred_by, transferred_at, notes, created_at
+        proof_attachment_url, submitted_by, submitted_at,
+        transferred_by, transferred_at, notes, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     params: [
       distributionId,
       distributionNumber,
-      input.recipientType,
-      input.recipientType !== 'BENDAHARA' ? input.recipientId : null,
+      targetRecipientType,
+      resolvedRecipientId,
       input.itemType,
       normPeriod,
       amountToDisburse,
-      input.method,
+      effectiveMethod,
+      initialStatus,
       destinationBank,
       destinationAccount,
       accountHolderName,
       input.proofAttachmentUrl || null,
       input.transferredBy,
+      createdAt,
+      input.transferredBy,
       transferredAt,
       input.notes || null,
+      createdAt,
       createdAt,
     ],
   })
@@ -1036,24 +1072,28 @@ export async function executeDistribution(
     })
 
     // Update allocation (disbursed_amount & distribution_status) secara authoritatif
+    // Hanya hitung alokasi yang berstatus final DISTRIBUTED
     statements.push({
       sql: `
         UPDATE finance_allocations
         SET disbursed_amount = (
-              SELECT COALESCE(SUM(amount), 0)
-              FROM finance_distribution_items
-              WHERE allocation_id = ?
+              SELECT COALESCE(SUM(di.amount), 0)
+              FROM finance_distribution_items di
+              JOIN finance_distributions d ON di.distribution_id = d.id
+              WHERE di.allocation_id = ? AND d.status = 'DISTRIBUTED'
             ),
             distribution_status = CASE
               WHEN (
-                SELECT COALESCE(SUM(amount), 0)
-                FROM finance_distribution_items
-                WHERE allocation_id = ?
+                SELECT COALESCE(SUM(di.amount), 0)
+                FROM finance_distribution_items di
+                JOIN finance_distributions d ON di.distribution_id = d.id
+                WHERE di.allocation_id = ? AND d.status = 'DISTRIBUTED'
               ) >= amount THEN 'DISBURSED'
               WHEN (
-                SELECT COALESCE(SUM(amount), 0)
-                FROM finance_distribution_items
-                WHERE allocation_id = ?
+                SELECT COALESCE(SUM(di.amount), 0)
+                FROM finance_distribution_items di
+                JOIN finance_distributions d ON di.distribution_id = d.id
+                WHERE di.allocation_id = ? AND d.status = 'DISTRIBUTED'
               ) > 0 THEN 'PARTIALLY_DISBURSED'
               ELSE 'UNDISBURSED'
             END
@@ -1072,20 +1112,147 @@ export async function executeDistribution(
     id: distributionId,
     distribution_number: distributionNumber,
     recipient_type: input.recipientType,
-    recipient_id: input.recipientType !== 'BENDAHARA' ? input.recipientId ?? null : null,
+    recipient_id: resolvedRecipientId,
     item_type: input.itemType,
     period: normPeriod,
     total_amount: amountToDisburse,
-    method: input.method,
+    method: effectiveMethod,
+    status: initialStatus,
     destination_bank: destinationBank,
     destination_account: destinationAccount,
     account_holder_name: accountHolderName,
+    external_reference: null,
     proof_attachment_url: input.proofAttachmentUrl || null,
+    submitted_by: input.transferredBy,
+    submitted_at: createdAt,
     transferred_by: input.transferredBy,
     transferred_at: transferredAt,
     notes: input.notes || null,
     created_at: createdAt,
+    updated_at: createdAt,
   }
+}
+
+/**
+ * Approve pengajuan penyaluran dana (misal setelah dieksekusi bank / disetujui Signer).
+ * Transisi status dari PENDING_APPROVAL -> DISTRIBUTED secara atomik.
+ */
+export async function approveDistribution(
+  distributionId: string,
+  approvedBy: string
+): Promise<{ success: boolean; error?: string }> {
+  const dist = await queryOne<{ id: string; status: string; total_amount: number }>(
+    `SELECT id, status, total_amount FROM finance_distributions WHERE id = ?`,
+    [distributionId]
+  )
+  if (!dist) return { success: false, error: 'Penyaluran tidak ditemukan.' }
+  if (dist.status !== 'PENDING_APPROVAL' && dist.status !== 'PROCESSING') {
+    return { success: false, error: `Penyaluran berstatus "${dist.status}" tidak dapat diapprove.` }
+  }
+
+  const timestamp = now()
+  const statements: Array<{ sql: string; params?: unknown[] }> = [
+    {
+      sql: `UPDATE finance_distributions SET status = 'DISTRIBUTED', transferred_by = ?, transferred_at = ?, updated_at = ? WHERE id = ?`,
+      params: [approvedBy, timestamp, timestamp, distributionId],
+    },
+    {
+      sql: `
+        UPDATE finance_allocations
+        SET disbursed_amount = (
+              SELECT COALESCE(SUM(di.amount), 0)
+              FROM finance_distribution_items di
+              JOIN finance_distributions d ON di.distribution_id = d.id
+              WHERE di.allocation_id = finance_allocations.id AND d.status = 'DISTRIBUTED'
+            ),
+            distribution_status = CASE
+              WHEN (
+                SELECT COALESCE(SUM(di.amount), 0)
+                FROM finance_distribution_items di
+                JOIN finance_distributions d ON di.distribution_id = d.id
+                WHERE di.allocation_id = finance_allocations.id AND d.status = 'DISTRIBUTED'
+              ) >= amount THEN 'DISBURSED'
+              ELSE 'PARTIALLY_DISBURSED'
+            END
+        WHERE id IN (
+          SELECT allocation_id FROM finance_distribution_items WHERE distribution_id = ?
+        )
+      `,
+      params: [distributionId],
+    },
+  ]
+
+  await batch(statements)
+  return { success: true }
+}
+
+/**
+ * Menolak pengajuan penyaluran (REJECTED).
+ * Melepaskan reservasi dana secara atomik sehingga dapat diajukan kembali.
+ */
+export async function rejectDistribution(
+  distributionId: string,
+  rejectedBy: string,
+  reason: string
+): Promise<{ success: boolean; error?: string }> {
+  const dist = await queryOne<{ id: string; status: string }>(
+    `SELECT id, status FROM finance_distributions WHERE id = ?`,
+    [distributionId]
+  )
+  if (!dist) return { success: false, error: 'Penyaluran tidak ditemukan.' }
+  if (dist.status !== 'PENDING_APPROVAL') {
+    return { success: false, error: `Penyaluran berstatus "${dist.status}" tidak dapat ditolak.` }
+  }
+
+  const timestamp = now()
+  await execute(
+    `UPDATE finance_distributions
+     SET status = 'REJECTED', notes = COALESCE(notes || ' | ', '') || 'Ditolak: ' || ?, updated_at = ?
+     WHERE id = ?`,
+    [reason.trim(), timestamp, distributionId]
+  )
+  return { success: true }
+}
+
+/**
+ * Membatalkan pengajuan penyaluran (CANCELLED).
+ * Melepaskan reservasi dana secara aman.
+ */
+export async function cancelDistribution(
+  distributionId: string,
+  cancelledBy: string,
+  reason: string
+): Promise<{ success: boolean; error?: string }> {
+  const dist = await queryOne<{ id: string; status: string }>(
+    `SELECT id, status FROM finance_distributions WHERE id = ?`,
+    [distributionId]
+  )
+  if (!dist) return { success: false, error: 'Penyaluran tidak ditemukan.' }
+
+  const timestamp = now()
+
+  if (dist.status === 'PROCESSING') {
+    // Untuk transaksi PROCESSING yang sedang berjalan di bank, tandai CANCEL_PENDING
+    await execute(
+      `UPDATE finance_distributions
+       SET status = 'CANCEL_PENDING', notes = COALESCE(notes || ' | ', '') || 'Pengajuan pembatalan (menunggu konfirmasi bank): ' || ?, updated_at = ?
+       WHERE id = ?`,
+      [reason.trim(), timestamp, distributionId]
+    )
+    return { success: true }
+  }
+
+  if (dist.status !== 'PENDING_APPROVAL' && dist.status !== 'DRAFT' && dist.status !== 'CANCEL_PENDING') {
+    return { success: false, error: `Penyaluran berstatus "${dist.status}" tidak dapat dibatalkan.` }
+  }
+
+  await execute(
+    `UPDATE finance_distributions
+     SET status = 'CANCELLED', notes = COALESCE(notes || ' | ', '') || 'Dibatalkan: ' || ?, updated_at = ?
+     WHERE id = ?`,
+    [reason.trim(), timestamp, distributionId]
+  )
+  return { success: true }
 }
 
 /**

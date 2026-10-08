@@ -1,4 +1,4 @@
-﻿'use server'
+'use server'
 
 import { query, queryOne, generateId, now } from '@/lib/db'
 import {
@@ -834,7 +834,7 @@ export async function executeLoketDepositOrPayment(
         items: obligationOrderItems,
         paymentMethod: 'CASH',
         feePayer: 'CUSTOMER',
-        gatewayFee: 0,
+        cooperativeAdminFee: 0,
         cashSessionId: activeSession.id,
       })
 
@@ -845,7 +845,7 @@ export async function executeLoketDepositOrPayment(
         channel: 'CASH',
         method: 'CASH',
         externalReference: extKey,
-        gatewayFee: 0,
+        cooperativeAdminFee: 0,
         cashSessionId: activeSession.id,
         receivedBy: userId,
       })

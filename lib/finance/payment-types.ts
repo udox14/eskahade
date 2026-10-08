@@ -1,17 +1,18 @@
 // lib/finance/payment-types.ts
-// Tipe data pembayaran, order, alokasi, dan gateway (Fase 3A: Payment Engine Core)
+// Tipe data pembayaran, order, alokasi, dan koperasi (Fase BRI-1)
+// Seluruh referensi Duitku telah direposisi ke BRI dan Biaya Administrasi Koperasi
 
 import type { FinanceItemType } from '@/lib/finance/types'
 
-export type FinancePaymentMethod = 'DUITKU_VA' | 'DUITKU_QRIS' | 'CASH'
+export type FinancePaymentMethod = 'BRI_VA' | 'CASH'
 
 export type FinancePayerType = 'PORTAL_ORTU' | 'LOKET'
 
 export type FinanceFeePayer = 'CUSTOMER' | 'INSTITUTION'
 
-export type FinanceOrderStatus = 'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED'
+export type FinanceOrderStatus = 'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED' | 'REPLACED'
 
-export type FinancePaymentChannel = 'DUITKU' | 'CASH'
+export type FinancePaymentChannel = 'BRI' | 'CASH'
 
 export type FinancePaymentSource = 'NEW_FINANCE' | 'LEGACY'
 
@@ -44,10 +45,15 @@ export type FinanceReconciliationResolutionAction =
   | 'ADJUSTMENT'
 
 export interface FinanceStudentVa {
+  id?: string
   santri_id: string
   va_number: string
-  bank_code: string
+  customer_no: string
+  status: 'ACTIVE' | 'INACTIVE'
+  activated_at?: string | null
+  deactivated_at?: string | null
   created_at: string
+  updated_at: string
 }
 
 export interface FinancePaymentOrder {
@@ -56,7 +62,7 @@ export interface FinancePaymentOrder {
   santri_id: string
   payer_type: FinancePayerType
   gross_amount: number
-  gateway_fee: number
+  cooperative_admin_fee: number
   fee_payer: FinanceFeePayer
   total_charged: number
   payment_method: FinancePaymentMethod | null
@@ -84,12 +90,15 @@ export interface FinancePayment {
   channel: FinancePaymentChannel
   method: string
   gross_amount: number
-  gateway_fee: number
+  cooperative_admin_fee: number
+  bri_fee_amount: number | null
   net_amount: number
   status: FinancePaymentStatus
   correction_status: FinanceCorrectionStatus
   allocation_status: FinanceAllocationStatus
   paid_at: string
+  bri_payment_request_id?: string | null
+  bri_trx_id?: string | null
   source: FinancePaymentSource
   fund_management: FinanceFundManagement
   external_reference: string | null
@@ -151,7 +160,7 @@ export interface CreatePaymentOrderInput {
   payerType: FinancePayerType
   paymentMethod?: FinancePaymentMethod | null
   feePayer?: FinanceFeePayer
-  gatewayFee?: number
+  cooperativeAdminFee?: number
   expiresInHours?: number
   cashSessionId?: string | null
   items: CreatePaymentOrderItemInput[]
@@ -168,7 +177,10 @@ export interface RecordOrderPaymentInput {
   source?: FinancePaymentSource
   fundManagement?: FinanceFundManagement
   externalReference?: string | null
-  gatewayFee?: number
+  cooperativeAdminFee?: number
+  briFeeAmount?: number | null
+  briPaymentRequestId?: string | null
+  briTrxId?: string | null
   cashSessionId?: string | null
   receivedBy?: string | null
   paidAt?: string
@@ -182,7 +194,10 @@ export interface RecordUnallocatedPaymentInput {
   source?: FinancePaymentSource
   fundManagement?: FinanceFundManagement
   externalReference?: string | null
-  gatewayFee?: number
+  cooperativeAdminFee?: number
+  briFeeAmount?: number | null
+  briPaymentRequestId?: string | null
+  briTrxId?: string | null
   cashSessionId?: string | null
   receivedBy?: string | null
   paidAt?: string
@@ -193,236 +208,38 @@ export interface PaymentWithAllocations extends FinancePayment {
 }
 
 // ============================================================
-// Duitku Payment Gateway Types (Fase 3B)
+// BIAYA ADMINISTRASI KOPERASI & APPEND-ONLY INCOME LEDGER
 // ============================================================
 
-export interface DuitkuConfig {
-  merchantCode: string
-  apiKey: string
-  environment: 'sandbox' | 'production'
-  callbackUrl?: string
-  returnUrl?: string
-  defaultExpiryMinutes: number
+export interface FinanceCooperativeAdminFeeRule {
+  id: string
+  code: string
+  name: string
+  is_enabled: number
+  amount: number
+  applies_to_channel: 'BRI'
+  effective_from: string
+  effective_until: string | null
+  closed_by?: string | null
+  closed_at?: string | null
+  created_by: string | null
+  created_at: string
 }
 
-export interface DuitkuCallbackPayload {
-  merchantCode: string
-  amount: string | number
-  merchantOrderId: string
-  productDetail?: string
-  additionalParam?: string
-  paymentCode?: string
-  resultCode: string // '00' = Success, '01' = Failed
-  merchantUserId?: string
-  reference: string
-  signature: string
-  publisherOrderId?: string
-  spUserHash?: string
-  settlementDate?: string
-  issuerCode?: string
-  customerName?: string
+export type FinanceCooperativeIncomeEntryType = 'INCOME' | 'REVERSAL' | 'REFUND'
+
+export interface FinanceCooperativeIncome {
+  id: string
+  income_number: string
+  entry_type: FinanceCooperativeIncomeEntryType
+  reference_income_id: string | null
+  correction_id: string | null
+  payment_id: string
+  order_id: string | null
+  amount: number
+  rule_id: string | null
+  rule_snapshot: string | null
+  reference_note: string | null
+  created_by: string | null
+  created_at: string
 }
-
-export interface DuitkuCreateTransactionInput {
-  paymentAmount: number
-  paymentMethod: string
-  merchantOrderId: string
-  productDetails: string
-  email: string
-  phoneNumber?: string
-  customerVaName: string
-  callbackUrl?: string
-  returnUrl?: string
-  expiryPeriod?: number // in minutes
-}
-
-export interface DuitkuCreateTransactionResponse {
-  merchantCode: string
-  reference: string
-  paymentUrl: string
-  vaNumber?: string
-  qrString?: string
-  amount: string
-  statusCode: string // '00' = Success
-  statusMessage: string
-}
-
-export interface DuitkuCheckTransactionResponse {
-  merchantOrderId: string
-  reference: string
-  amount: string
-  fee: string
-  statusCode: string // '00' = Success, '01' = Pending, '02' = Canceled
-  statusMessage: string
-}
-
-export interface ProcessDuitkuCallbackResult {
-  success: boolean
-  message: string
-  paymentId?: string
-  paymentNumber?: string
-  orderId?: string | null
-  reconciliationItemId?: string
-  isDuplicate: boolean
-  matchType:
-    | 'ORDER_ALLOCATED'
-    | 'UNALLOCATED_TRANSFER'
-    | 'UNMATCHED_EXTERNAL'
-    | 'EXPIRED_OR_CANCELLED_ORDER'
-    | 'AMOUNT_MISMATCH'
-    | 'ALREADY_PROCESSED'
-}
-
-// ============================================================
-// Duitku SNAP API Types (Fixed Virtual Account)
-// ============================================================
-
-export interface DuitkuSnapConfig {
-  partnerId: string
-  partnerServiceId: string // Prefix VA bank dari Duitku
-  clientSecret: string
-  privateKey: string
-  duitkuPublicKey?: string
-  environment: 'sandbox' | 'production'
-  defaultTrxType: 'C' | 'O' // 'C' = Close Amount, 'O' = Open Amount
-}
-
-export interface SnapTokenResponse {
-  responseCode: string // '2007300'
-  responseMessage: string
-  accessToken: string
-  tokenType: string // 'Bearer'
-  expiresIn: string // e.g. '900'
-}
-
-export interface SnapCreateVaInput {
-  customerNo: string
-  virtualAccountName: string
-  trxId: string
-  trxType?: 'C' | 'O'
-  amount?: number
-  expiredDate?: string // ISO-8601
-  minAmount?: number
-  maxAmount?: number
-}
-
-export interface SnapCreateVaResponse {
-  responseCode: string // '2002700'
-  responseMessage: string
-  virtualAccountData: {
-    partnerServiceId: string
-    customerNo: string
-    virtualAccountNo: string
-    virtualAccountName: string
-    trxId: string
-    totalAmount: {
-      value: string
-      currency: string
-    }
-    virtualAccountTrxType: 'C' | 'O'
-    expiredDate: string
-  }
-}
-
-export interface SnapUpdateVaInput {
-  customerNo: string
-  virtualAccountName?: string
-  trxId: string
-  amount?: number
-  expiredDate?: string
-}
-
-export interface SnapUpdateVaResponse {
-  responseCode: string // '2002800'
-  responseMessage: string
-  virtualAccountData: {
-    partnerServiceId: string
-    customerNo: string
-    virtualAccountNo: string
-    virtualAccountName: string
-    trxId: string
-    totalAmount: {
-      value: string
-      currency: string
-    }
-  }
-}
-
-export interface SnapInquiryVaResponse {
-  responseCode: string // '2003000'
-  responseMessage: string
-  virtualAccountData: {
-    partnerServiceId: string
-    customerNo: string
-    virtualAccountNo: string
-    virtualAccountName: string
-    trxId: string
-    totalAmount: {
-      value: string
-      currency: string
-    }
-    virtualAccountTrxType: 'C' | 'O'
-    expiredDate: string
-  }
-}
-
-export interface SnapPaymentNotificationPayload {
-  partnerServiceId: string
-  customerNo: string
-  virtualAccountNo: string
-  paymentRequestId: string
-  trxId: string
-  paidAmount: {
-    value: string
-    currency: string
-  }
-  additionalInfo: {
-    reference: string
-    paymentCode?: string
-    [key: string]: unknown
-  }
-}
-
-export interface SnapPaymentNotificationResponse {
-  responseCode: string // '2002500'
-  responseMessage: string
-  virtualAccountData?: {
-    partnerServiceId: string
-    customerNo: string
-    virtualAccountNo: string
-    virtualAccountName: string
-    paymentRequestId: string
-    paidAmount: {
-      value: string
-      currency: string
-    }
-  }
-}
-
-export interface ProcessSnapPaymentResult {
-  success: boolean
-  responseCode: string
-  responseMessage: string
-  paymentId?: string
-  paymentNumber?: string
-  orderId?: string | null
-  isDuplicate: boolean
-  matchType:
-    | 'ORDER_ALLOCATED'
-    | 'UNALLOCATED_TRANSFER'
-    | 'EXPIRED_OR_CANCELLED_ORDER'
-    | 'AMOUNT_MISMATCH'
-    | 'ALREADY_PROCESSED'
-  virtualAccountData?: {
-    partnerServiceId: string
-    customerNo: string
-    virtualAccountNo: string
-    virtualAccountName: string
-    paymentRequestId: string
-    paidAmount: {
-      value: string
-      currency: string
-    }
-  }
-}
-

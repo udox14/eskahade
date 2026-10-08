@@ -1,4 +1,4 @@
-﻿'use server'
+'use server'
 
 import {
   getSession,
@@ -12,6 +12,7 @@ import {
   getProviderDistributionList,
   getBendaharaDistributionList,
   executeDistribution,
+  cancelDistribution,
   getProviderAccounts,
   createProviderAccount,
   updateProviderAccount,
@@ -134,7 +135,7 @@ export async function authorizeUser(): Promise<{
 
   const hasAccess = await canAccessFeatureForSession(session, '/dashboard/keuangan/penyaluran')
   const isAllowedRole = roles.some((r) =>
-    ['admin', 'bendahara', 'pimpinan', 'tester', 'demo'].includes(r)
+    ['admin', 'bendahara', 'admin_koperasi', 'petugas_koperasi', 'pimpinan', 'demo'].includes(r)
   )
 
   if (!hasAccess && !isAllowedRole) {
@@ -143,7 +144,7 @@ export async function authorizeUser(): Promise<{
 
   // Role 'demo' hanya boleh menulis bila request benar-benar dilayani DEMO_DB.
   const demoRunsInSandbox = isDemoSandboxRequest(session)
-  const isViewOnly = roles.includes('pimpinan') || roles.includes('tester')
+  const isViewOnly = roles.includes('pimpinan')
   const canDisburse = !isViewOnly && hasFinanceMutateRole(roles, demoRunsInSandbox)
 
   return {
@@ -258,12 +259,33 @@ export async function getPenyaluranPageData(params?: {
 export async function recordDistributionAction(
   input: Omit<CreateDistributionInput, 'transferredBy'>
 ): Promise<{ success: boolean; data: FinanceDistribution }> {
-  const { userId, permissions } = await authorizeUser()
+  const { userId, roles, permissions } = await authorizeUser()
 
   if (!permissions.canDisburse) {
     throw new Error(
       'Akses ditolak: Pimpinan dan akun peninjau hanya memiliki hak baca (view-only) dan dilarang mencatat penyaluran dana.'
     )
+  }
+
+  // Admin Koperasi DILARANG mengajukan atau mencatat penyaluran dana (hak operasional/pesantren)
+  const isOnlyAdminKoperasi = roles.includes('admin_koperasi') && !roles.some(r => ['admin', 'bendahara', 'petugas_koperasi'].includes(r))
+  if (isOnlyAdminKoperasi) {
+    throw new Error('Akses ditolak: Role admin_koperasi tidak memiliki hak untuk mengajukan atau mencatat penyaluran dana.')
+  }
+
+  const effectiveMethod = (input.method === 'TRANSFER' ? 'MANUAL_TRANSFER' : input.method) || 'BRI_QLOLA'
+  if (effectiveMethod === 'MANUAL_TRANSFER') {
+    // Manual Transfer: ONLY 'admin', 'bendahara' (disallow 'petugas_koperasi')
+    const canManual = roles.some(r => r === 'admin' || r === 'bendahara')
+    if (!canManual) {
+      throw new Error('Akses ditolak: Penyaluran melalui Manual Transfer hanya dapat dilakukan oleh Admin atau Bendahara.')
+    }
+  } else if (effectiveMethod === 'BRI_QLOLA' || effectiveMethod === 'CASH') {
+    // BRI_QLOLA dan CASH: 'admin', 'bendahara', 'petugas_koperasi'
+    const canSubmit = roles.some(r => ['admin', 'bendahara', 'petugas_koperasi'].includes(r))
+    if (!canSubmit) {
+      throw new Error(`Akses ditolak: Penyaluran ${effectiveMethod} hanya dapat diajukan oleh Admin, Bendahara, atau Petugas Koperasi.`)
+    }
   }
 
   const result = await executeDistribution({
@@ -277,6 +299,28 @@ export async function recordDistributionAction(
   }
 }
 
+export async function cancelDistributionAction(
+  distributionId: string,
+  reason: string
+): Promise<{ success: boolean; error?: string }> {
+  const { userId, roles, permissions } = await authorizeUser()
+
+  if (!permissions.canDisburse) {
+    throw new Error('Akses ditolak: Anda tidak memiliki izin untuk membatalkan penyaluran dana.')
+  }
+
+  const canCancel = roles.some(r => r === 'admin' || r === 'bendahara')
+  if (!canCancel) {
+    throw new Error('Akses ditolak: Pembatalan penyaluran dana hanya dapat dilakukan oleh Admin atau Bendahara.')
+  }
+
+  if (!reason || reason.trim().length === 0) {
+    return { success: false, error: 'Alasan pembatalan wajib diisi.' }
+  }
+
+  return cancelDistribution(distributionId, userId, reason.trim())
+}
+
 export async function getProviderAccountsAction(
   providerId: string
 ): Promise<FinanceProviderAccount[]> {
@@ -287,10 +331,15 @@ export async function getProviderAccountsAction(
 export async function saveProviderAccountAction(
   input: CreateProviderAccountInput
 ): Promise<{ success: boolean; data: FinanceProviderAccount }> {
-  const { permissions } = await authorizeUser()
+  const { roles, permissions } = await authorizeUser()
 
   if (!permissions.canDisburse) {
     throw new Error('Akses ditolak: Anda tidak memiliki izin untuk mengelola rekening penyedia.')
+  }
+
+  const canManageAccounts = roles.some(r => ['admin', 'admin_koperasi', 'bendahara'].includes(r))
+  if (!canManageAccounts) {
+    throw new Error('Akses ditolak: Pengelolaan rekening penerima hanya dapat dilakukan oleh Admin, Admin Koperasi, atau Bendahara.')
   }
 
   const result = await createProviderAccount(input)
@@ -303,10 +352,15 @@ export async function saveProviderAccountAction(
 export async function updateProviderAccountAction(
   input: UpdateProviderAccountInput
 ): Promise<{ success: boolean; data: FinanceProviderAccount }> {
-  const { permissions } = await authorizeUser()
+  const { roles, permissions } = await authorizeUser()
 
   if (!permissions.canDisburse) {
     throw new Error('Akses ditolak: Anda tidak memiliki izin untuk mengelola rekening penyedia.')
+  }
+
+  const canManageAccounts = roles.some(r => ['admin', 'admin_koperasi', 'bendahara'].includes(r))
+  if (!canManageAccounts) {
+    throw new Error('Akses ditolak: Pengelolaan rekening penerima hanya dapat dilakukan oleh Admin, Admin Koperasi, atau Bendahara.')
   }
 
   const result = await updateProviderAccount(input)
@@ -319,10 +373,15 @@ export async function updateProviderAccountAction(
 export async function deleteProviderAccountAction(
   id: string
 ): Promise<{ success: boolean }> {
-  const { permissions } = await authorizeUser()
+  const { roles, permissions } = await authorizeUser()
 
   if (!permissions.canDisburse) {
     throw new Error('Akses ditolak: Anda tidak memiliki izin untuk mengelola rekening penyedia.')
+  }
+
+  const canManageAccounts = roles.some(r => ['admin', 'admin_koperasi', 'bendahara'].includes(r))
+  if (!canManageAccounts) {
+    throw new Error('Akses ditolak: Pengelolaan rekening penerima hanya dapat dilakukan oleh Admin, Admin Koperasi, atau Bendahara.')
   }
 
   await deleteProviderAccount(id)
@@ -367,12 +426,17 @@ export async function getProviderAccountTemplateDataAction(): Promise<ProviderAc
 export async function importProviderAccountsAction(
   rows: ValidatedImportAccountRow[]
 ): Promise<{ success: boolean; insertedCount: number; skippedCount: number; invalidCount: number }> {
-  const { permissions } = await authorizeUser()
+  const { roles, permissions } = await authorizeUser()
 
   if (!permissions.canDisburse) {
     throw new Error(
       'Akses ditolak: Pimpinan dan akun peninjau hanya memiliki hak baca (view-only) dan dilarang mengimpor rekening penyedia.'
     )
+  }
+
+  const canManageAccounts = roles.some(r => ['admin', 'admin_koperasi', 'bendahara'].includes(r))
+  if (!canManageAccounts) {
+    throw new Error('Akses ditolak: Pengelolaan rekening penerima hanya dapat dilakukan oleh Admin, Admin Koperasi, atau Bendahara.')
   }
 
   return importProviderAccounts(rows)
