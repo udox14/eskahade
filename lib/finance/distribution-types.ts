@@ -57,11 +57,42 @@ export interface FinanceDistribution {
   account_holder_name: string | null
   external_reference: string | null
   proof_attachment_url: string | null
+  recipient_name?: string | null
+  recipient_category?: FinanceDistributionRecipientType | null
+  destination_bank_code?: string | null
+  destination_account_holder?: string | null
+  account_id?: string | null
+  distribution_request_id?: string | null
+  batch_reference?: string | null
+  maker_reference?: string | null
+  approval_workflow_reference?: string | null
+  bank_transaction_reference?: string | null
+  provider_status?: string | null
+  bank_fee_amount?: number | null
+  bank_fee_bearer?: 'KOPERASI' | 'BENEFICIARY' | null
+  bank_fee_reference?: string | null
+  currency?: string
+  rejection_reason?: string | null
+  cancellation_reason?: string | null
   submitted_by?: string | null
   submitted_at?: string | null
   transferred_by: string
   transferred_by_name?: string | null
   transferred_at: string
+  cash_session_id?: string | null
+  cash_prepared_at?: string | null
+  cash_handed_over_at?: string | null
+  cash_receiver_name?: string | null
+  cash_returned_at?: string | null
+  cash_return_reason?: string | null
+  source_account_id?: string | null
+  source_account_number?: string | null
+  source_bank_code?: string | null
+  source_account_holder?: string | null
+  manual_transfer_initiated_at?: string | null
+  manual_transfer_executed_at?: string | null
+  manual_transfer_proof_ref?: string | null
+  statement_transaction_id?: string | null
   notes: string | null
   created_at: string
   updated_at?: string

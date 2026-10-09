@@ -20,6 +20,8 @@ export interface FinanceCashSession {
   total_cash_in: number
   total_cash_out: number
   expected_closing_balance: number
+  reserved_cash_out?: number
+  available_balance?: number
   actual_closing_balance: number | null
   difference: number | null
   difference_notes: string | null
@@ -230,7 +232,34 @@ export async function recalculateCashSession(
     correctionCashOut = correctionOutRes?.total_correction_out ?? 0
   }
 
-  const authoritativeCashOut = walletCashOut + correctionCashOut
+  // 3c. Hitung akumulasi tunai keluar authoritatif dari penyaluran tunai (finance_distributions method = 'CASH' AND status = 'DISTRIBUTED')
+  let distributionCashOut = 0
+  const distTable = await queryOne<{ name: string }>(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='finance_distributions'`
+  )
+  if (distTable) {
+    const distOutRes = await queryOne<{ total_dist_out: number }>(
+      `SELECT COALESCE(SUM(total_amount), 0) AS total_dist_out
+       FROM finance_distributions
+       WHERE cash_session_id = ? AND method = 'CASH' AND status = 'DISTRIBUTED'`,
+      [sessionId]
+    )
+    distributionCashOut = distOutRes?.total_dist_out ?? 0
+  }
+
+  // 3d. Hitung akumulasi kas fisik yang sedang dipesan / disiapkan (PROCESSING)
+  let reservedCashOut = 0
+  if (distTable) {
+    const reservedOutRes = await queryOne<{ total_reserved: number }>(
+      `SELECT COALESCE(SUM(total_amount), 0) AS total_reserved
+       FROM finance_distributions
+       WHERE cash_session_id = ? AND method = 'CASH' AND status = 'PROCESSING'`,
+      [sessionId]
+    )
+    reservedCashOut = reservedOutRes?.total_reserved ?? 0
+  }
+
+  const authoritativeCashOut = walletCashOut + correctionCashOut + distributionCashOut
 
   const expectedClosing = session.opening_balance + authoritativeCashIn - authoritativeCashOut
 
@@ -257,6 +286,12 @@ export async function recalculateCashSession(
      WHERE s.id = ?`,
     [sessionId]
   )
+
+  if (updated) {
+    updated.reserved_cash_out = reservedCashOut
+    updated.available_balance = Math.max(0, expectedClosing - reservedCashOut)
+  }
+
   return updated!
 }
 
@@ -292,7 +327,22 @@ export async function closeCashSession(
     throw new Error('Saldo fisik penutupan kas (actual closing balance) tidak boleh bernilai negatif.')
   }
 
-  // 1. Rekalkulasi authoritatif sebelum menutup untuk menjamin integritas expected closing balance
+  // 1. Cek apakah masih ada penyaluran kas fisik yang berstatus PROCESSING (uang fisik masih disiapkan di luar laci)
+  const outstandingPrepared = await queryOne<{ count: number; total_amount: number }>(
+    `SELECT COUNT(*) AS count, COALESCE(SUM(total_amount), 0) AS total_amount
+     FROM finance_distributions
+     WHERE cash_session_id = ? AND method = 'CASH' AND status = 'PROCESSING'`,
+    [sessionId]
+  )
+  if (outstandingPrepared && outstandingPrepared.count > 0) {
+    throw new Error(
+      `Sesi kas tidak dapat ditutup karena masih terdapat ${outstandingPrepared.count} penyaluran kas fisik berstatus PROCESSING (total Rp${outstandingPrepared.total_amount.toLocaleString(
+        'id-ID'
+      )}). Selesaikan serah terima (DISTRIBUTED) atau batalkan dengan pengembalian kas (CASH_RETURNED) terlebih dahulu.`
+    )
+  }
+
+  // 2. Rekalkulasi authoritatif sebelum menutup untuk menjamin integritas expected closing balance
   const recalculated = await recalculateCashSession(sessionId)
   const expectedClosing = recalculated.expected_closing_balance
   const difference = validActual - expectedClosing

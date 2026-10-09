@@ -875,7 +875,16 @@ export async function getEligibleAllocationsForDistribution(params: {
         FROM finance_distribution_items di
         JOIN finance_distributions d ON di.distribution_id = d.id
         WHERE di.allocation_id = a.id
-          AND d.status IN ('PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING', 'DISTRIBUTED')
+          AND (
+            d.status IN ('PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING', 'DISTRIBUTED')
+            OR (
+              d.status = 'DRAFT' AND EXISTS (
+                SELECT 1 FROM finance_qlola_transfer_intents ti
+                WHERE ti.distribution_id = d.id
+                  AND ti.intent_status IN ('SUBMISSION_PENDING', 'UNKNOWN', 'CANCEL_PENDING')
+              )
+            )
+          )
       ), 0)) AS available_amount,
       a.distribution_status,
       a.created_at
@@ -896,7 +905,16 @@ export async function getEligibleAllocationsForDistribution(params: {
         FROM finance_distribution_items di
         JOIN finance_distributions d ON di.distribution_id = d.id
         WHERE di.allocation_id = a.id
-          AND d.status IN ('PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING', 'DISTRIBUTED')
+          AND (
+            d.status IN ('PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING', 'DISTRIBUTED')
+            OR (
+              d.status = 'DRAFT' AND EXISTS (
+                SELECT 1 FROM finance_qlola_transfer_intents ti
+                WHERE ti.distribution_id = d.id
+                  AND ti.intent_status IN ('SUBMISSION_PENDING', 'UNKNOWN', 'CANCEL_PENDING')
+              )
+            )
+          )
       ), 0)) > 0
       ${providerClause}
     ORDER BY a.created_at ASC, a.id ASC
@@ -949,11 +967,13 @@ export async function executeDistribution(
     input.recipientType === 'BENDAHARA' ? 'PESANTREN' : input.recipientType as 'PESANTREN' | 'KATERING' | 'LAUNDRY'
 
   let resolvedRecipientId: string | null = null
+  let resolvedRecipientName = ''
   if (targetRecipientType === 'PESANTREN') {
     if (!BENDAHARA_ITEM_TYPES.includes(input.itemType as FinanceItemType)) {
       throw new Error(`Item "${input.itemType}" bukan merupakan pos dana Pesantren.`)
     }
     resolvedRecipientId = 'rec_pesantren'
+    resolvedRecipientName = 'Pesantren Sukahideng (Bendahara)'
   } else {
     if (!input.recipientId) {
       throw new Error(`Penyaluran ke ${input.recipientType} wajib menyertakan ID penyedia.`)
@@ -975,6 +995,7 @@ export async function executeDistribution(
       throw new Error(`Penyedia jasa "${input.recipientId}" tidak ditemukan atau jenisnya bukan "${expectedJenis}".`)
     }
     resolvedRecipientId = input.recipientId.startsWith('rec_') ? input.recipientId : 'rec_' + input.recipientId
+    resolvedRecipientName = provider.nama_jasa
   }
 
   // Validasi allowed methods untuk penerima (PRD & Hardening BRI-1)
@@ -1020,25 +1041,29 @@ export async function executeDistribution(
     sql: `
       INSERT INTO finance_distributions (
         id, distribution_number, recipient_type, recipient_id,
-        item_type, period, total_amount, method, status,
-        destination_bank, destination_account, account_holder_name,
+        recipient_name, recipient_category, item_type, period, total_amount, method, status,
+        destination_bank, destination_bank_code, destination_account, destination_account_holder, account_holder_name,
         proof_attachment_url, submitted_by, submitted_at,
-        transferred_by, transferred_at, notes, created_at, updated_at
+        transferred_by, transferred_at, notes, currency, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'IDR', ?, ?)
     `,
     params: [
       distributionId,
       distributionNumber,
       targetRecipientType,
       resolvedRecipientId,
+      resolvedRecipientName,
+      targetRecipientType,
       input.itemType,
       normPeriod,
       amountToDisburse,
       effectiveMethod,
       initialStatus,
       destinationBank,
+      destinationBank,
       destinationAccount,
+      accountHolderName,
       accountHolderName,
       input.proofAttachmentUrl || null,
       input.transferredBy,
@@ -2106,3 +2131,6 @@ export async function importProviderAccounts(
     invalidCount: 0,
   }
 }
+
+export * from './bri/cash-manual-distribution-types'
+export * from './bri/cash-manual-distribution-service'
