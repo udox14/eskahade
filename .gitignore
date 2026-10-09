@@ -46,7 +46,15 @@ yarn-error.log*
 *.db
 /backup-*.sql
 /*-backup-*.sql
+/backup_*.sql
+/*_backup_*.sql
+/backup*.sql
+/*backup*.sql
 /*snapshot*.sql
+uat_fixtures_*.sql
+temp_*.sql
+*audit_result*.json
+*rehearsal*.json
 
 # env files (can opt-in for committing if needed)
 .env*

@@ -105,15 +105,15 @@ export class AuditReportService {
     const payRows = await query<any>(
       `SELECT
          COUNT(*) as total_count,
-         COALESCE(SUM(amount), 0) as total_amount,
+         COALESCE(SUM(gross_amount), 0) as total_amount,
          COALESCE(SUM(CASE WHEN status IN ('PAID', 'SETTLED') THEN 1 ELSE 0 END), 0) as paid_count,
-         COALESCE(SUM(CASE WHEN status IN ('PAID', 'SETTLED') THEN amount ELSE 0 END), 0) as paid_amount,
+         COALESCE(SUM(CASE WHEN status IN ('PAID', 'SETTLED') THEN gross_amount ELSE 0 END), 0) as paid_amount,
          COALESCE(SUM(CASE WHEN status = 'SETTLED' THEN 1 ELSE 0 END), 0) as settled_count,
-         COALESCE(SUM(CASE WHEN status = 'SETTLED' THEN amount ELSE 0 END), 0) as settled_amount,
+         COALESCE(SUM(CASE WHEN status = 'SETTLED' THEN gross_amount ELSE 0 END), 0) as settled_amount,
          COALESCE(SUM(CASE WHEN status = 'PAID' THEN 1 ELSE 0 END), 0) as unsettled_count,
-         COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount ELSE 0 END), 0) as unsettled_amount,
+         COALESCE(SUM(CASE WHEN status = 'PAID' THEN gross_amount ELSE 0 END), 0) as unsettled_amount,
          COALESCE(SUM(CASE WHEN status IN ('PAID', 'SETTLED') THEN COALESCE(cooperative_admin_fee, 0) ELSE 0 END), 0) as coop_admin_fee,
-         COALESCE(SUM(CASE WHEN status IN ('PAID', 'SETTLED') THEN COALESCE(bri_bank_fee, 0) ELSE 0 END), 0) as bri_bank_fee
+         COALESCE(SUM(CASE WHEN status IN ('PAID', 'SETTLED') THEN COALESCE(bri_fee_amount, 0) ELSE 0 END), 0) as bri_bank_fee
        FROM finance_payments`
     )
     const payStats = payRows[0] || {}
@@ -137,9 +137,9 @@ export class AuditReportService {
         `SELECT
            COUNT(*) as total_santri,
            COALESCE(SUM(CASE WHEN ${nonBillableSantriSqlPredicate('asrama', true)} THEN 1 ELSE 0 END), 0) as al_baghory,
-           COALESCE(SUM(CASE WHEN UPPER(TRIM(COALESCE(kategori_santri, status_santri, 'REGULER'))) = 'SADESA' THEN 1 ELSE 0 END), 0) as sadesa
+           COALESCE(SUM(CASE WHEN UPPER(TRIM(COALESCE(kategori_santri, 'REGULER'))) = 'SADESA' THEN 1 ELSE 0 END), 0) as sadesa
          FROM santri
-         WHERE (status_global = 'aktif' OR status = 'AKTIF')`
+         WHERE status_global = 'aktif'`
       )
       if (santriRows.length > 0) {
         totalSantri = Number(santriRows[0].total_santri || 0)
@@ -256,12 +256,12 @@ export class AuditReportService {
   async getDistributionAuditSummary(): Promise<DistributionAuditSummary> {
     const distRows = await query<any>(
       `SELECT
-         disbursement_method,
+         method as disbursement_method,
          status,
          COUNT(*) as count,
          COALESCE(SUM(total_amount), 0) as total_amount
        FROM finance_distributions
-       GROUP BY disbursement_method, status`
+       GROUP BY method, status`
     )
 
     const byMethod: DistributionAuditSummary['byMethod'] = {
@@ -317,8 +317,14 @@ export class AuditReportService {
       const sessionRows = await query<any>(
         `SELECT
            COUNT(*) as open_sessions,
-           COALESCE(SUM(live_prepared_amount), 0) as live_prepared,
-           COALESCE(SUM(opening_balance + cash_in_amount - cash_out_amount), 0) as current_cash
+           COALESCE((
+             SELECT SUM(d.total_amount)
+             FROM finance_distributions d
+             WHERE d.method = 'CASH'
+               AND d.status = 'PROCESSING'
+               AND d.cash_session_id IN (SELECT id FROM finance_cash_sessions WHERE status = 'OPEN')
+           ), 0) as live_prepared,
+           COALESCE(SUM(expected_closing_balance), 0) as current_cash
          FROM finance_cash_sessions
          WHERE status = 'OPEN'`
       )
@@ -363,9 +369,9 @@ export class AuditReportService {
            COUNT(*) as total_count,
            COALESCE(SUM(CASE WHEN type_normalized = 'CREDIT' THEN amount ELSE 0 END), 0) as credit_amount,
            COALESCE(SUM(CASE WHEN type_normalized = 'DEBIT' THEN amount ELSE 0 END), 0) as debit_amount,
-           COALESCE(SUM(CASE WHEN settlement_status = 'SETTLED' THEN 1 ELSE 0 END), 0) as settled_count,
-           COALESCE(SUM(CASE WHEN settlement_status = 'UNALLOCATED' AND type_normalized = 'CREDIT' THEN 1 ELSE 0 END), 0) as unalloc_count,
-           COALESCE(SUM(CASE WHEN settlement_status = 'UNALLOCATED' AND type_normalized = 'CREDIT' THEN amount ELSE 0 END), 0) as unalloc_amount
+           COALESCE(SUM(CASE WHEN match_status IN ('MATCHED', 'SETTLED') THEN 1 ELSE 0 END), 0) as settled_count,
+           COALESCE(SUM(CASE WHEN match_status IN ('UNALLOCATED_RECORDED', 'UNALLOCATED') AND type_normalized = 'CREDIT' THEN 1 ELSE 0 END), 0) as unalloc_count,
+           COALESCE(SUM(CASE WHEN match_status IN ('UNALLOCATED_RECORDED', 'UNALLOCATED') AND type_normalized = 'CREDIT' THEN amount ELSE 0 END), 0) as unalloc_amount
          FROM finance_bri_statement_transactions`
       )
       if (stmtRows.length > 0) {
@@ -488,17 +494,17 @@ export class AuditReportService {
       // Query error
     }
 
-    // 2. HARD_INV_2_NO_DOUBLE_ALLOCATION: SUM(allocations) <= payment.amount
+    // 2. HARD_INV_2_NO_DOUBLE_ALLOCATION: SUM(allocations) <= payment.gross_amount
     try {
       const doubleAllocRows = await query<any>(
         `SELECT
            p.id as payment_id,
-           p.amount as payment_amount,
+           p.gross_amount as payment_amount,
            COALESCE(SUM(a.amount), 0) as total_allocated
          FROM finance_payments p
          JOIN finance_allocations a ON p.id = a.payment_id
-         GROUP BY p.id, p.amount
-         HAVING total_allocated > p.amount`
+         GROUP BY p.id, p.gross_amount
+         HAVING total_allocated > p.gross_amount`
       )
       if (doubleAllocRows.length > 0) {
         for (const row of doubleAllocRows) {
@@ -515,7 +521,7 @@ export class AuditReportService {
     // Setiap pembayaran SETTLED wajib memiliki rekam settlement item yang authoritative
     try {
       const unverifiedSettled = await query<any>(
-        `SELECT p.id, p.payment_number, p.amount
+        `SELECT p.id, p.payment_number, p.gross_amount as amount
          FROM finance_payments p
          WHERE p.status = 'SETTLED'
            AND NOT EXISTS (
@@ -578,17 +584,21 @@ export class AuditReportService {
     try {
       const cashSessions = await query<any>(
         `SELECT
-           id,
-           session_code,
-           opening_balance,
-           cash_in_amount,
-           cash_out_amount,
-           live_prepared_amount
-         FROM finance_cash_sessions
-         WHERE status = 'OPEN'`
+           cs.id,
+           cs.session_code,
+           cs.expected_closing_balance,
+           COALESCE((
+             SELECT SUM(d.total_amount)
+             FROM finance_distributions d
+             WHERE d.cash_session_id = cs.id
+               AND d.method = 'CASH'
+               AND d.status = 'PROCESSING'
+           ), 0) as live_prepared_amount
+         FROM finance_cash_sessions cs
+         WHERE cs.status = 'OPEN'`
       )
       for (const cs of cashSessions) {
-        const available = Number(cs.opening_balance || 0) + Number(cs.cash_in_amount || 0) - Number(cs.cash_out_amount || 0)
+        const available = Number(cs.expected_closing_balance || 0)
         const reserved = Number(cs.live_prepared_amount || 0)
         if (reserved > available) {
           violations.push({

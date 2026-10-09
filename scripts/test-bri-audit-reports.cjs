@@ -71,98 +71,124 @@ require.extensions['.ts'] = (mod, file) => {
 
 function initFullSchema() {
   sqliteDb.exec(`
-    CREATE TABLE users (id TEXT PRIMARY KEY, full_name TEXT, role TEXT, username TEXT);
+    CREATE TABLE users (
+        id TEXT PRIMARY KEY,
+        email TEXT,
+        password_hash TEXT,
+        full_name TEXT,
+        role TEXT
+    );
     CREATE TABLE santri (
         id TEXT PRIMARY KEY,
         nis TEXT,
-        nama TEXT,
         nama_lengkap TEXT,
         asrama TEXT,
-        status TEXT DEFAULT 'AKTIF',
         status_global TEXT DEFAULT 'aktif',
-        status_santri TEXT DEFAULT 'REGULER',
         kategori_santri TEXT DEFAULT 'REGULER',
         jenis_kelamin TEXT,
         created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE master_jasa (
         id TEXT PRIMARY KEY,
-        nama TEXT,
-        kategori TEXT,
-        status TEXT
+        nama_jasa TEXT,
+        jenis TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_distribution_recipients (
         id TEXT PRIMARY KEY,
         recipient_type TEXT NOT NULL,
+        name TEXT,
         provider_id TEXT,
-        display_name TEXT,
         is_active INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT (datetime('now'))
+        allowed_methods TEXT DEFAULT 'BRI_QLOLA,CASH,MANUAL_TRANSFER',
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_recipient_accounts (
         id TEXT PRIMARY KEY,
         recipient_id TEXT,
         bank_code TEXT,
         account_number TEXT,
-        account_holder_name TEXT,
+        account_holder TEXT,
         is_primary INTEGER DEFAULT 1,
         is_active INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT (datetime('now'))
+        notes TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_recipient_allowed_methods (
-        id TEXT PRIMARY KEY,
         recipient_id TEXT,
         method TEXT,
-        is_allowed INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (recipient_id, method)
     );
     CREATE TABLE finance_cooperative_admin_fee_rules (
         id TEXT PRIMARY KEY,
-        rule_name TEXT,
-        fee_amount INTEGER DEFAULT 2500,
-        is_active INTEGER DEFAULT 1,
+        code TEXT,
+        name TEXT,
+        is_enabled INTEGER DEFAULT 1,
+        amount INTEGER DEFAULT 2500,
+        applies_to_channel TEXT DEFAULT 'BRI',
+        effective_from TEXT,
         created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_student_va (
         id TEXT PRIMARY KEY,
         santri_id TEXT,
+        customer_no TEXT,
         va_number TEXT UNIQUE,
-        bank_code TEXT,
         status TEXT DEFAULT 'ACTIVE',
-        is_active INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT (datetime('now'))
+        activated_at TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_payment_orders (
         id TEXT PRIMARY KEY,
         order_number TEXT UNIQUE,
         santri_id TEXT,
-        va_number TEXT,
-        total_amount INTEGER,
+        payer_type TEXT DEFAULT 'PORTAL_ORTU',
+        gross_amount INTEGER,
+        cooperative_admin_fee INTEGER DEFAULT 0,
+        fee_payer TEXT DEFAULT 'CUSTOMER',
+        total_charged INTEGER,
+        payment_method TEXT DEFAULT 'BRI_VA',
+        fixed_va_number TEXT,
         status TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
+        expires_at TEXT,
+        cash_session_id TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_cooperative_income (
         id TEXT PRIMARY KEY,
-        source_type TEXT,
-        source_id TEXT,
+        income_number TEXT UNIQUE,
+        entry_type TEXT DEFAULT 'INCOME',
+        payment_id TEXT,
+        order_id TEXT,
         amount INTEGER,
-        recorded_at TEXT,
+        rule_id TEXT,
+        rule_snapshot TEXT,
+        reference_note TEXT,
+        created_by TEXT,
         created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_payments (
         id TEXT PRIMARY KEY,
         payment_number TEXT,
-        santri_id TEXT,
         order_id TEXT,
-        method TEXT,
+        santri_id TEXT,
         channel TEXT,
-        amount INTEGER,
-        admin_fee INTEGER DEFAULT 0,
-        total_amount INTEGER,
-        status TEXT,
-        allocation_status TEXT,
+        method TEXT,
+        gross_amount INTEGER,
         cooperative_admin_fee INTEGER DEFAULT 0,
-        bri_bank_fee INTEGER DEFAULT 0,
+        bri_fee_amount INTEGER DEFAULT 0,
+        net_amount INTEGER,
+        status TEXT,
+        correction_status TEXT DEFAULT 'NONE',
+        allocation_status TEXT,
+        paid_at TEXT,
+        bri_payment_request_id TEXT,
+        bri_trx_id TEXT,
         created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_allocations (
@@ -180,31 +206,40 @@ function initFullSchema() {
     CREATE TABLE finance_cash_sessions (
         id TEXT PRIMARY KEY,
         session_code TEXT UNIQUE,
-        opened_by TEXT,
-        status TEXT,
+        operator_id TEXT,
+        opened_at TEXT,
         opening_balance INTEGER DEFAULT 0,
-        cash_in_amount INTEGER DEFAULT 0,
-        cash_out_amount INTEGER DEFAULT 0,
-        live_prepared_amount INTEGER DEFAULT 0,
+        total_cash_in INTEGER DEFAULT 0,
+        total_cash_out INTEGER DEFAULT 0,
         expected_closing_balance INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
+        status TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_distributions (
         id TEXT PRIMARY KEY,
         distribution_number TEXT UNIQUE,
         recipient_type TEXT,
         recipient_id TEXT,
-        disbursement_method TEXT,
+        item_type TEXT,
+        period TEXT,
         total_amount INTEGER,
+        method TEXT,
         status TEXT,
         cash_session_id TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
+        destination_bank TEXT,
+        destination_account TEXT,
+        account_holder_name TEXT,
+        account_id TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_distribution_items (
         id TEXT PRIMARY KEY,
         distribution_id TEXT,
         allocation_id TEXT,
-        amount INTEGER
+        amount INTEGER,
+        created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_cash_manual_evidence (
         id TEXT PRIMARY KEY,
@@ -224,31 +259,54 @@ function initFullSchema() {
     );
     CREATE TABLE finance_bri_statement_fetches (
         id TEXT PRIMARY KEY,
+        fetch_reference_no TEXT,
         account_no TEXT,
-        start_date TEXT,
-        end_date TEXT,
-        total_records INTEGER,
+        from_date_time TEXT,
+        to_date_time TEXT,
+        total_items_fetched INTEGER DEFAULT 0,
+        total_credits_count INTEGER DEFAULT 0,
+        total_credits_amount INTEGER DEFAULT 0,
+        total_debits_count INTEGER DEFAULT 0,
+        total_debits_amount INTEGER DEFAULT 0,
         status TEXT,
+        body_hash TEXT,
         created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_bri_statement_transactions (
         id TEXT PRIMARY KEY,
         fetch_id TEXT,
-        bri_trx_id TEXT,
         account_no TEXT,
-        amount INTEGER,
+        transaction_id TEXT,
+        identity_strength TEXT DEFAULT 'STRONG',
+        dedup_key TEXT,
+        transaction_date_raw TEXT,
+        type_raw TEXT,
         type_normalized TEXT,
-        description TEXT,
-        settlement_status TEXT,
+        amount INTEGER,
+        amount_raw TEXT,
+        currency TEXT DEFAULT 'IDR',
+        remark TEXT,
+        bri_trx_id TEXT,
+        va_number TEXT,
+        observation_count INTEGER DEFAULT 1,
         raw_evidence_hash TEXT,
+        match_status TEXT,
+        matched_payment_id TEXT,
+        first_seen_at TEXT,
+        last_seen_at TEXT,
+        raw_json TEXT DEFAULT '{}',
         created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_bri_settlements (
         id TEXT PRIMARY KEY,
         settlement_number TEXT,
-        statement_fetch_id TEXT,
-        total_amount INTEGER,
-        total_count INTEGER,
+        account_no TEXT,
+        settlement_date TEXT,
+        total_payments_count INTEGER,
+        total_gross_amount INTEGER,
+        total_cooperative_admin_fee INTEGER,
+        total_net_amount INTEGER,
+        status TEXT,
         created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_bri_settlement_items (
@@ -256,9 +314,13 @@ function initFullSchema() {
         settlement_id TEXT,
         payment_id TEXT,
         statement_transaction_id TEXT,
-        matched_amount INTEGER,
-        match_rule TEXT,
+        gross_amount INTEGER,
+        cooperative_admin_fee INTEGER,
+        net_amount INTEGER,
         match_strength TEXT,
+        match_method TEXT,
+        currency TEXT DEFAULT 'IDR',
+        settled_at TEXT,
         created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE finance_reconciliation_items (
@@ -274,8 +336,15 @@ function initFullSchema() {
     CREATE TABLE finance_qlola_transfer_intents (
         id TEXT PRIMARY KEY,
         distribution_id TEXT,
-        intent_state TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
+        distribution_request_id TEXT,
+        intent_status TEXT,
+        external_id TEXT,
+        maker_user_id TEXT,
+        payload_hash TEXT,
+        provider_status TEXT,
+        error_details TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
     );
   `)
 }
@@ -425,8 +494,8 @@ async function runTests() {
   // TEST 9: Invariant Chaos Injection - Over-Distribution
   console.log('Test 9: Invariant Chaos Injection - Over-Distribution')
   sqliteDb.prepare(`
-    INSERT INTO finance_distributions (id, distribution_number, recipient_type, recipient_id, disbursement_method, total_amount, status)
-    VALUES ('DIST-CHAOS-OVER', 'DIS-CHAOS-01', 'PESANTREN', 'REC-PESANTREN', 'CASH', 9999999, 'PROCESSING')
+    INSERT INTO finance_distributions (id, distribution_number, recipient_type, recipient_id, method, total_amount, status)
+    VALUES ('DIST-CHAOS-OVER', 'DIS-CHAOS-01', 'PESANTREN', 'rec_pesantren', 'CASH', 9999999, 'PROCESSING')
   `).run()
   sqliteDb.prepare(`
     INSERT INTO finance_distribution_items (id, distribution_id, allocation_id, amount)
@@ -459,8 +528,8 @@ async function runTests() {
   // TEST 11: Invariant Chaos Injection - Unlinked SETTLED Payment
   console.log('Test 11: Invariant Chaos Injection - Unlinked SETTLED Payment')
   sqliteDb.prepare(`
-    INSERT INTO finance_payments (id, payment_number, santri_id, method, channel, amount, total_amount, status, allocation_status)
-    VALUES ('PAY-CHAOS-SETTLED', 'PAY-CHAOS-001', 'SAN-BILLABLE-001', 'BRIVA', 'BRIVA_ONLINE', 100000, 100000, 'SETTLED', 'UNALLOCATED')
+    INSERT INTO finance_payments (id, payment_number, santri_id, method, channel, gross_amount, net_amount, status, allocation_status, paid_at)
+    VALUES ('PAY-CHAOS-SETTLED', 'PAY-CHAOS-001', 'SAN-BILLABLE-001', 'BRIVA', 'BRI', 100000, 100000, 'SETTLED', 'UNALLOCATED', datetime('now'))
   `).run()
   const chaos3 = await auditReportService.verifyFinancialReportInvariants()
   assert.equal(chaos3.isConsistent, false)
@@ -473,8 +542,8 @@ async function runTests() {
   // TEST 12: Invariant Chaos Injection - Leaked Uang Jajan Distribution
   console.log('Test 12: Invariant Chaos Injection - Leaked Uang Jajan Distribution')
   sqliteDb.prepare(`
-    INSERT INTO finance_distributions (id, distribution_number, recipient_type, recipient_id, disbursement_method, total_amount, status)
-    VALUES ('DIST-CHAOS-JAJAN', 'DIS-CHAOS-02', 'PESANTREN', 'REC-PESANTREN', 'CASH', 50000, 'PROCESSING')
+    INSERT INTO finance_distributions (id, distribution_number, recipient_type, recipient_id, method, total_amount, status)
+    VALUES ('DIST-CHAOS-JAJAN', 'DIS-CHAOS-02', 'PESANTREN', 'rec_pesantren', 'CASH', 50000, 'PROCESSING')
   `).run()
   sqliteDb.prepare(`
     INSERT INTO finance_distribution_items (id, distribution_id, allocation_id, amount)
@@ -492,9 +561,8 @@ async function runTests() {
   // TEST 13: Invariant Chaos Injection - Cash Session Over-Reservation
   console.log('Test 13: Invariant Chaos Injection - Cash Session Over-Reservation')
   sqliteDb.prepare(`
-    UPDATE finance_cash_sessions
-    SET live_prepared_amount = 9999999
-    WHERE id = 'CS-SESSION-001'
+    INSERT INTO finance_distributions (id, distribution_number, recipient_type, recipient_id, method, total_amount, status, cash_session_id)
+    VALUES ('DIST-CHAOS-CASH', 'DIS-CHAOS-03', 'PESANTREN', 'rec_pesantren', 'CASH', 9999999, 'PROCESSING', 'CS-SESSION-001')
   `).run()
   const chaos5 = await auditReportService.verifyFinancialReportInvariants()
   assert.equal(chaos5.isConsistent, false)
@@ -502,17 +570,13 @@ async function runTests() {
   console.log('✓ Test 13 Passed: Cash session over-reservation accurately detected')
 
   // Revert Chaos 5
-  sqliteDb.prepare(`
-    UPDATE finance_cash_sessions
-    SET live_prepared_amount = 100000
-    WHERE id = 'CS-SESSION-001'
-  `).run()
+  sqliteDb.prepare(`DELETE FROM finance_distributions WHERE id = 'DIST-CHAOS-CASH'`).run()
 
   // TEST 14: Invariant Chaos Injection - Active Duitku Payment
   console.log('Test 14: Invariant Chaos Injection - Active Duitku Payment')
   sqliteDb.prepare(`
-    INSERT INTO finance_payments (id, payment_number, santri_id, method, channel, amount, total_amount, status, allocation_status)
-    VALUES ('PAY-CHAOS-DUITKU', 'PAY-DUITKU-001', 'SAN-BILLABLE-001', 'DUITKU_VA', 'DUITKU', 50000, 50000, 'PAID', 'UNALLOCATED')
+    INSERT INTO finance_payments (id, payment_number, santri_id, method, channel, gross_amount, net_amount, status, allocation_status, paid_at)
+    VALUES ('PAY-CHAOS-DUITKU', 'PAY-DUITKU-001', 'SAN-BILLABLE-001', 'DUITKU_VA', 'DUITKU', 50000, 50000, 'PAID', 'UNALLOCATED', datetime('now'))
   `).run()
   const chaos6 = await auditReportService.verifyFinancialReportInvariants()
   assert.equal(chaos6.isConsistent, false)
