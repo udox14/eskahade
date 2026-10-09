@@ -1,0 +1,49 @@
+name: Deploy Sandbox to Cloudflare Workers
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-sandbox:
+    name: Build & Deploy Sandbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Safety Guard - Validate Sandbox Configuration
+        run: node scripts/validate-sandbox-config.cjs
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npx next build --webpack && npx opennextjs-cloudflare build --skipNextBuild
+
+      - name: Prune unused @vercel/og dependencies to fix Cloudflare 3MB Limit
+        run: |
+          echo "Removing heavy unused WASM binaries from root node_modules..."
+          rm -rf node_modules/next/dist/compiled/@vercel/og/* || true
+          echo "export const ImageResponse = class {};" > node_modules/next/dist/compiled/@vercel/og/index.edge.js || true
+          echo "module.exports.ImageResponse = class {};" > node_modules/next/dist/compiled/@vercel/og/index.node.js || true
+          
+          echo "Removing from .open-next node_modules as backup..."
+          rm -rf .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/* || true
+          echo "export const ImageResponse = class {};" > .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/index.edge.js || true
+          echo "module.exports.ImageResponse = class {};" > .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/index.node.js || true
+
+      - name: Deploy Sandbox
+        run: npx opennextjs-cloudflare deploy --env sandbox
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

@@ -51,5 +51,55 @@
 			"bucket_name": "eskahade-foto",
 			"preview_bucket_name": "eskahade-foto-preview"
 		}
-	]
+	],
+	"env": {
+		"sandbox": {
+			"name": "eskahade-sandbox",
+			"services": [
+				{
+					"binding": "WORKER_SELF_REFERENCE",
+					"service": "eskahade-sandbox"
+				}
+			],
+			"vars": {
+				"CLOUDFLARE_ACCOUNT_ID": "a170ed4144c00927988a828aa9a41896",
+				"BRI_ENV": "sandbox",
+				"BRI_BASE_URL": "https://sandbox.partner.api.bri.co.id",
+				"BRI_OUTBOUND_ENABLED": "false",
+				"BRI_BRIVA_OUTBOUND_ENABLED": "false",
+				"BRI_BRIVA_INBOUND_ENABLED": "false",
+				"BRI_STATEMENT_SYNC_ENABLED": "false",
+				"BRI_DIST_CASH_ENABLED": "false",
+				"BRI_DIST_MANUAL_ENABLED": "false"
+			},
+			"kv_namespaces": [
+				{
+					"binding": "NEXT_INC_CACHE_KV",
+					"id": "4a7848f9ee424b61acb7b8b237bb6d71",
+					"remote": true
+				}
+			],
+			"d1_databases": [
+				{
+					// BRI sandbox inbound requests have no demo session; sandbox DB intentionally points directly to demo D1.
+					"binding": "DB",
+					"database_name": "eskahade-demo-db",
+					"database_id": "677f05ba-9b52-4534-9542-96cc785f25e4",
+					"remote": true
+				},
+				{
+					"binding": "DEMO_DB",
+					"database_name": "eskahade-demo-db",
+					"database_id": "677f05ba-9b52-4534-9542-96cc785f25e4",
+					"remote": true
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "R2_BUCKET",
+					"bucket_name": "eskahade-sandbox-foto"
+				}
+			]
+		}
+	}
 }
