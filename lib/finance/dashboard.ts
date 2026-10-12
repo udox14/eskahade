@@ -192,11 +192,11 @@ export async function getExecutiveFinanceKpi(periodInput?: string): Promise<Fina
     }>(
       `SELECT
          COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' THEN a.amount ELSE 0 END), 0) AS total_penerimaan,
-         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'DUITKU' THEN a.amount ELSE 0 END), 0) AS online_penerimaan,
+         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'BRI' THEN a.amount ELSE 0 END), 0) AS online_penerimaan,
          COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'CASH' THEN a.amount ELSE 0 END), 0) AS cash_penerimaan,
-         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'DUITKU' AND EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN a.amount ELSE 0 END), 0) AS settled_amount,
-         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'DUITKU' AND NOT EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN a.amount ELSE 0 END), 0) AS pending_settlement_amount,
-         COALESCE(COUNT(DISTINCT CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'DUITKU' AND NOT EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN p.id ELSE NULL END), 0) AS pending_settlement_count
+         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'BRI' AND EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN a.amount ELSE 0 END), 0) AS settled_amount,
+         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'BRI' AND NOT EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN a.amount ELSE 0 END), 0) AS pending_settlement_amount,
+         COALESCE(COUNT(DISTINCT CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'BRI' AND NOT EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN p.id ELSE NULL END), 0) AS pending_settlement_count
        FROM finance_allocations a
        JOIN finance_payments p ON a.payment_id = p.id
        WHERE a.target_type = 'OBLIGATION'
@@ -471,7 +471,7 @@ export async function getDashboardChartsData(periodInput?: string): Promise<{
     cash_sum: number
   }>(
     `SELECT
-       COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'DUITKU' THEN a.amount ELSE 0 END), 0) AS online_sum,
+       COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'BRI' THEN a.amount ELSE 0 END), 0) AS online_sum,
        COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'CASH' THEN a.amount ELSE 0 END), 0) AS cash_sum
      FROM finance_allocations a
      JOIN finance_payments p ON a.payment_id = p.id
@@ -570,7 +570,7 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
       p.channel,
       p.method,
       CASE
-        WHEN p.channel = 'DUITKU' AND EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN 'SETTLED'
+        WHEN p.channel = 'BRI' AND EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN 'SETTLED'
         ELSE p.status
       END AS status,
       (SELECT GROUP_CONCAT(DISTINCT a.item_type) FROM finance_allocations a WHERE a.payment_id = p.id) AS item_type,
@@ -597,8 +597,8 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
       'TITIPAN_SANTRI' AS fund_type,
       wl.direction,
       wl.amount,
-      CASE WHEN wl.movement_type = 'TOPUP_ONLINE' THEN 'DUITKU' ELSE 'CASH' END AS channel,
-      CASE WHEN wl.movement_type = 'TOPUP_ONLINE' THEN 'DUITKU' ELSE 'CASH' END AS method,
+      CASE WHEN wl.movement_type = 'TOPUP_ONLINE' THEN 'BRI' ELSE 'CASH' END AS channel,
+      CASE WHEN wl.movement_type = 'TOPUP_ONLINE' THEN 'BRI_VA' ELSE 'CASH' END AS method,
       CASE
         WHEN wl.movement_type = 'REVERSAL' THEN 'REVERSAL'
         ELSE 'COMPLETED'

@@ -471,7 +471,7 @@ export default function LaporanKeuanganContent({
             <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
               <p className="text-xs text-slate-500 font-medium">Fee Payment Gateway</p>
               <p className="text-xl font-bold text-slate-900 mt-1">{formatRupiah(receiptsData.kpi.totalFee)}</p>
-              <p className="text-[11px] text-slate-400 mt-1">Duitku VA & QRIS</p>
+              <p className="text-[11px] text-slate-400 mt-1">Online BRI</p>
             </div>
             <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
               <p className="text-xs text-slate-500 font-medium">Penerimaan Bersih (Neto)</p>
@@ -648,7 +648,7 @@ export default function LaporanKeuanganContent({
               <p className="text-[11px] text-slate-400 mt-1">Pencairan bank</p>
             </div>
             <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
-              <p className="text-xs text-slate-500 font-medium">Gross Pencairan Duitku</p>
+              <p className="text-xs text-slate-500 font-medium">Gross Pencairan BRI</p>
               <p className="text-xl font-bold text-slate-900 mt-1">{formatRupiah(settlementsData?.kpi.totalGrossSettled || 0)}</p>
               <p className="text-[11px] text-slate-400 mt-1">Nominal bruto transaksi</p>
             </div>
@@ -906,7 +906,7 @@ export default function LaporanKeuanganContent({
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          row.channel === 'DUITKU' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+                          row.channel === 'BRI' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
                         }`}>
                           {row.channel}
                         </span>
@@ -1768,7 +1768,7 @@ export default function LaporanKeuanganContent({
           isOpen={isPrintModalOpen}
           onClose={() => setIsPrintModalOpen(false)}
           title="LAPORAN SETTLEMENT PAYMENT GATEWAY"
-          subtitle="Pondok Pesantren Eskahade — Pencairan Dana Duitku ke Rekening Pesantren"
+          subtitle="Pondok Pesantren Eskahade — Pencairan Dana Online BRI ke Rekening Pesantren"
           filterSummary={`Periode: ${startDate || 'Awal'} s.d. ${endDate || 'Akhir'}`}
           kpis={[
             { label: 'Total Bruto', value: formatRupiah(settlementsData.kpi.totalGrossSettled) },

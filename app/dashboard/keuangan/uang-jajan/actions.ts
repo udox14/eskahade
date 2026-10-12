@@ -1,4 +1,4 @@
-﻿'use server'
+'use server'
 
 import { query, queryOne } from '@/lib/db'
 import {
@@ -101,7 +101,6 @@ const ALLOWED_VIEW_ROLES = [
   'admin_koperasi',
   'petugas_koperasi',
   'pimpinan',
-  'tester',
   'demo',
 ]
 
@@ -123,7 +122,7 @@ async function authorizeUser(): Promise<{
 
   // Role 'demo' hanya boleh menulis bila request benar-benar dilayani DEMO_DB.
   const demoRunsInSandbox = isDemoSandboxRequest(session)
-  const isViewOnly = roles.includes('pimpinan') || roles.includes('tester')
+  const isViewOnly = roles.includes('pimpinan')
   const canMutate = !isViewOnly && hasFinanceMutateRole(roles, demoRunsInSandbox)
 
   return {

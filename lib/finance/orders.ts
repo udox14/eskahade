@@ -30,11 +30,12 @@ function generateOrderNumber(): string {
  *    - Status bukan 'PAID' atau 'EXEMPTED'.
  *    - Nominal tidak boleh melebihi sisa tagihan (effective_expected - amount_paid).
  *    - Jika installment_rule = 'DISALLOWED' (misal SPP), nominal wajib lunas penuh sisa tagihan.
- * 4. Kalkulasi biaya gateway:
- *    - CUSTOMER: total_charged = gross_amount + gateway_fee
- *    - INSTITUTION: total_charged = gross_amount (disubsidi pesantren)
- * 5. Jika metode DUITKU_VA, menyematkan nomor Fixed VA santri jika sudah terdaftar.
- * 6. Eksekusi atomik header order + detail items via db.batch().
+ * 4. Kalkulasi biaya administrasi Koperasi:
+ *    - CUSTOMER: total_charged = gross_amount + cooperative_admin_fee
+ *    - INSTITUTION: total_charged = gross_amount
+ * 5. Jika metode BRI_VA, menyematkan nomor Fixed BRIVA santri jika sudah terdaftar.
+ * 6. Maksimum 1 active online order per santri (order lama PENDING diganti menjadi REPLACED).
+ * 7. Eksekusi atomik header order + detail items via db.batch().
  */
 export async function createPaymentOrder(
   input: CreatePaymentOrderInput
@@ -42,9 +43,9 @@ export async function createPaymentOrder(
   const santriId = input.santriId
   const payerType = input.payerType
   const feePayer = input.feePayer ?? 'CUSTOMER'
-  const gatewayFee = Math.max(0, Math.floor(input.gatewayFee ?? 0))
+  const cooperativeAdminFee = Math.max(0, Math.floor(input.cooperativeAdminFee ?? 0))
   const expiresInHours = input.expiresInHours ?? 24
-  const paymentMethod = input.paymentMethod ?? null
+  const paymentMethod = input.paymentMethod ?? 'BRI_VA'
   const cashSessionId = input.cashSessionId ?? null
 
   if (!input.items || input.items.length === 0) {
@@ -182,12 +183,12 @@ export async function createPaymentOrder(
     grossAmount += amount
   }
 
-  // 3. Kalkulasi Total Tagihan (Gross + Fee)
-  const totalCharged = feePayer === 'CUSTOMER' ? grossAmount + gatewayFee : grossAmount
+  // 3. Kalkulasi Total Tagihan (Gross + Biaya Operasional Koperasi)
+  const totalCharged = feePayer === 'CUSTOMER' ? grossAmount + cooperativeAdminFee : grossAmount
 
-  // 4. Fixed VA Lookup jika metode DUITKU_VA
+  // 4. Fixed BRIVA Lookup jika metode BRI_VA
   let fixedVaNumber: string | null = null
-  if (paymentMethod === 'DUITKU_VA') {
+  if (paymentMethod === 'BRI_VA') {
     const studentVa = await getStudentFixedVa(santriId)
     if (studentVa) {
       fixedVaNumber = studentVa.va_number
@@ -202,10 +203,23 @@ export async function createPaymentOrder(
   // 5. Batch Insert Atomik
   const statements: Array<{ sql: string; params: unknown[] }> = []
 
+  // Hard Rule: Maksimum 1 active online order per santri
+  // Jika membuat order online baru (BRI_VA), gantikan order PENDING lama menjadi REPLACED
+  if (paymentMethod === 'BRI_VA') {
+    statements.push({
+      sql: `
+        UPDATE finance_payment_orders
+        SET status = 'REPLACED', updated_at = ?
+        WHERE santri_id = ? AND status = 'PENDING' AND payment_method = 'BRI_VA'
+      `,
+      params: [timestamp, santriId],
+    })
+  }
+
   statements.push({
     sql: `
       INSERT INTO finance_payment_orders (
-        id, order_number, santri_id, payer_type, gross_amount, gateway_fee,
+        id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee,
         fee_payer, total_charged, payment_method, fixed_va_number, status,
         expires_at, cash_session_id, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?)
@@ -216,7 +230,7 @@ export async function createPaymentOrder(
       santriId,
       payerType,
       grossAmount,
-      gatewayFee,
+      cooperativeAdminFee,
       feePayer,
       totalCharged,
       paymentMethod,
@@ -255,7 +269,7 @@ export async function getPaymentOrderById(
   orderId: string
 ): Promise<PaymentOrderWithItems | null> {
   const order = await queryOne<FinancePaymentOrder>(
-    `SELECT id, order_number, santri_id, payer_type, gross_amount, gateway_fee,
+    `SELECT id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee,
             fee_payer, total_charged, payment_method, fixed_va_number, status,
             expires_at, cash_session_id, created_at, updated_at
      FROM finance_payment_orders
@@ -286,7 +300,7 @@ export async function getPaymentOrderByNumber(
   orderNumber: string
 ): Promise<PaymentOrderWithItems | null> {
   const order = await queryOne<FinancePaymentOrder>(
-    `SELECT id, order_number, santri_id, payer_type, gross_amount, gateway_fee,
+    `SELECT id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee,
             fee_payer, total_charged, payment_method, fixed_va_number, status,
             expires_at, cash_session_id, created_at, updated_at
      FROM finance_payment_orders
@@ -397,7 +411,7 @@ export async function listPaymentOrdersByStudent(
   }
 
   const orders = await query<FinancePaymentOrder>(
-    `SELECT id, order_number, santri_id, payer_type, gross_amount, gateway_fee,
+    `SELECT id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee,
             fee_payer, total_charged, payment_method, fixed_va_number, status,
             expires_at, cash_session_id, created_at, updated_at
      FROM finance_payment_orders

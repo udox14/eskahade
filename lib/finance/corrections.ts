@@ -62,11 +62,12 @@ export async function recordCorrection(
     santri_id: string
     channel: string
     gross_amount: number
+    cooperative_admin_fee: number
     status: string
     correction_status: string
     cash_session_id: string | null
   }>(
-    `SELECT id, payment_number, santri_id, channel, gross_amount, status, correction_status, cash_session_id
+    `SELECT id, payment_number, santri_id, channel, gross_amount, cooperative_admin_fee, status, correction_status, cash_session_id
      FROM finance_payments
      WHERE id = ?`,
     [input.paymentId]
@@ -143,11 +144,31 @@ export async function recordCorrection(
       [alloc.id]
     )
     const prevAllocAmount = prevAllocCorr?.total ?? 0
-    const remainingAlloc = alloc.amount - prevAllocAmount
 
-    if (amount > remainingAlloc) {
+    // 1. Periksa akumulasi live bank reservations aktif (PENDING_APPROVAL, PROCESSING, CANCEL_PENDING)
+    // Dana yang sudah DISTRIBUTED tetap boleh dikoreksi (menghasilkan recovery case di bawah).
+    const liveReservationRow = await queryOne<{ total: number }>(
+      `SELECT COALESCE(SUM(di.amount), 0) AS total
+       FROM finance_distribution_items di
+       JOIN finance_distributions d ON di.distribution_id = d.id
+       WHERE di.allocation_id = ?
+         AND d.status IN ('PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING')`,
+      [alloc.id]
+    )
+    const liveReserved = liveReservationRow?.total ?? 0
+
+    // Nominal koreksi tidak boleh membuat reservasi bank aktif menjadi undercollateralized
+    if ((amount + liveReserved) > (alloc.amount - prevAllocAmount)) {
       throw new Error(
-        `Nominal koreksi Rp ${amount.toLocaleString('id-ID')} melebihi sisa alokasi ${alloc.item_type} yang tersedia (Rp ${remainingAlloc.toLocaleString('id-ID')}).`
+        `Nominal koreksi Rp ${amount.toLocaleString('id-ID')} tidak dapat diproses karena reservasi penyaluran bank aktif sedang berjalan (Rp ${liveReserved.toLocaleString('id-ID')}). Selesaikan atau batalkan instruksi penyaluran aktif terlebih dahulu.`
+      )
+    }
+
+    // Nominal koreksi juga tidak boleh melebihi sisa alokasi bruto
+    const remainingGrossAlloc = alloc.amount - prevAllocAmount
+    if (amount > remainingGrossAlloc) {
+      throw new Error(
+        `Nominal koreksi Rp ${amount.toLocaleString('id-ID')} melebihi sisa alokasi ${alloc.item_type} yang tersedia (Rp ${remainingGrossAlloc.toLocaleString('id-ID')}).`
       )
     }
 
@@ -381,6 +402,41 @@ export async function recordCorrection(
         totalRecoveryAmount,
         totalRecoveryAmount,
         `Kasus Pemulihan Dana (Recovery Case) dari koreksi ${correctionNumber}: Alokasi sebesar Rp ${totalRecoveryAmount.toLocaleString('id-ID')} telah disalurkan ke vendor. Sistem memblokir auto-deduct; wajib investigasi manual dan klaim pemulihan kas pihak ketiga.`,
+        createdAt,
+      ],
+    })
+  }
+
+  // F. Append-Only Ledger: Catat pembalikan pendapatan Koperasi jika berlaku
+  if (payment.cooperative_admin_fee > 0 && newCorrectionStatus === 'FULLY_CORRECTED') {
+    const incEntryType = input.correctionType === 'REFUND' ? 'REFUND' : 'REVERSAL'
+    const incomeId = generateId()
+    const incomeNumber = `${incEntryType === 'REFUND' ? 'REF' : 'REV'}-KOP-${createdAt.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+    const origIncome = await queryOne<{ id: string; rule_id: string | null; rule_snapshot: string | null }>(
+      `SELECT id, rule_id, rule_snapshot FROM finance_cooperative_income WHERE payment_id = ? AND entry_type = 'INCOME' LIMIT 1`,
+      [payment.id]
+    ).catch(() => null)
+
+    statements.push({
+      sql: `
+        INSERT INTO finance_cooperative_income (
+          id, income_number, entry_type, reference_income_id, correction_id,
+          payment_id, order_id, amount, rule_id, rule_snapshot,
+          reference_note, created_by, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)
+      `,
+      params: [
+        incomeId,
+        incomeNumber,
+        incEntryType,
+        origIncome?.id || null,
+        correctionId,
+        payment.id,
+        payment.cooperative_admin_fee,
+        origIncome?.rule_id || null,
+        origIncome?.rule_snapshot || null,
+        `Pembalikan Biaya Operasional Koperasi atas koreksi ${correctionNumber} pada pembayaran ${payment.payment_number}`,
+        input.createdBy,
         createdAt,
       ],
     })

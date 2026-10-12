@@ -132,7 +132,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
       {/* 1. Header & Controls */}
       <DashboardPageHeader
         title="Rekonsiliasi & Koreksi"
-        description="Pencocokan tiga arah Duitku ↔ Bank, rekonsiliasi kas loket, resolusi transfer ambigu, dan histori koreksi non-destruktif."
+        description="Pencocokan tiga arah BRI ↔ Rekening Koran, rekonsiliasi kas loket, resolusi transfer ambigu, dan histori koreksi non-destruktif."
         action={
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium text-slate-500">Periode:</label>
@@ -156,7 +156,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
         {/* Card 1: Belum Settlement */}
         <div className="rounded-2xl border border-amber-100 bg-linear-to-b from-amber-50/50 to-white p-4 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-amber-800">Belum Settlement (Duitku)</span>
+            <span className="text-xs font-medium text-amber-800">Belum Settlement (BRI)</span>
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
               <Bank size={16} weight="bold" />
             </div>
@@ -250,7 +250,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
       <div className="border-b border-slate-200">
         <nav className="flex space-x-6 text-xs font-medium" aria-label="Tabs">
           {[
-            { id: 'SETTLEMENT' as const, label: 'Duitku & Settlement', icon: Bank },
+            { id: 'SETTLEMENT' as const, label: 'Settlement Bank (Legacy / Nonaktif)', icon: Bank },
             { id: 'KAS_LOKET' as const, label: 'Kas Loket & Fisik', icon: Wallet },
             {
               id: 'UNALLOCATED' as const,
@@ -296,28 +296,18 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
 
       {/* 4. Tab Content Panels */}
       <div className="space-y-4">
-        {/* ─── TAB 1: DUITKU & SETTLEMENT ─── */}
+        {/* ─── TAB 1: ONLINE BRI & SETTLEMENT ─── */}
         {activeTab === 'SETTLEMENT' && (
           <div className="space-y-6">
-            {/* Action Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            {/* Banner Isolasi Settlement Legacy */}
+            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+              <Info size={20} className="shrink-0 text-amber-700 mt-0.5" weight="bold" />
               <div>
-                <h3 className="text-sm font-semibold text-slate-800">Pencairan Dana Gateway ke Bank</h3>
-                <p className="text-xs text-slate-500">
-                  Pembayaran berstatus PAID belum otomatis di-settle sampai tercatat pada rekening koran bank pesantren.
+                <h4 className="text-xs font-bold text-amber-900">Pencatatan Settlement Online Dinonaktifkan Sementara</h4>
+                <p className="mt-0.5 text-xs text-amber-700 leading-relaxed">
+                  Pencatatan settlement online dinonaktifkan hingga integrasi Rekening Koran BRIAPI (BRI-4) aktif. Invariant: <code className="font-semibold text-amber-800">PAID != SETTLED</code> ditegakkan. Data riwayat batch di bawah merupakan arsip historis yang dapat ditinjau untuk audit.
                 </p>
               </div>
-              {userPermissions.canMutate && (
-                <button
-                  type="button"
-                  onClick={() => setIsSettlementModalOpen(true)}
-                  disabled={!data.settlementData?.candidates.length}
-                  className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  <PlusCircle size={16} />
-                  <span>Catat Batch Settlement ({data.settlementData?.candidates.length || 0})</span>
-                </button>
-              )}
             </div>
 
             {/* Riwayat Batch Settlement */}

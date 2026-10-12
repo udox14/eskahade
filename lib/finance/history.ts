@@ -205,12 +205,12 @@ export async function getGlobalTransactionHistory(
         'IN' AS direction,
         p.gross_amount AS amount,
         p.gross_amount,
-        p.gateway_fee,
+        p.cooperative_admin_fee AS gateway_fee,
         p.net_amount,
         p.channel,
         p.method,
         CASE
-          WHEN p.channel = 'DUITKU' AND EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN 'SETTLED'
+          WHEN p.channel = 'BRI' AND EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN 'SETTLED'
           ELSE p.status
         END AS status,
         (SELECT GROUP_CONCAT(DISTINCT a.item_type) FROM finance_allocations a WHERE a.payment_id = p.id) AS item_type,
@@ -221,7 +221,7 @@ export async function getGlobalTransactionHistory(
         s.kamar AS santri_kamar,
         NULL AS recipient_info,
         u.full_name AS operator_name,
-        p.external_reference,
+        COALESCE(p.bri_trx_id, p.bri_payment_request_id) AS external_reference,
         NULL AS notes,
         p.paid_at AS created_at,
         p.source AS payment_source,
@@ -249,8 +249,8 @@ export async function getGlobalTransactionHistory(
         wl.amount AS gross_amount,
         0 AS gateway_fee,
         wl.amount AS net_amount,
-        CASE WHEN wl.movement_type = 'TOPUP_ONLINE' THEN 'DUITKU' ELSE 'CASH' END AS channel,
-        CASE WHEN wl.movement_type = 'TOPUP_ONLINE' THEN 'DUITKU' ELSE 'CASH' END AS method,
+        CASE WHEN wl.movement_type = 'TOPUP_ONLINE' THEN 'BRI' ELSE 'CASH' END AS channel,
+        CASE WHEN wl.movement_type = 'TOPUP_ONLINE' THEN 'BRI_VA' ELSE 'CASH' END AS method,
         CASE
           WHEN wl.movement_type = 'REVERSAL' THEN 'REVERSAL'
           ELSE 'COMPLETED'
@@ -555,7 +555,7 @@ export async function getTransactionDetail(
       [id]
     )
     const paymentStatus =
-      p.channel === 'DUITKU' && (hasSettlement?.cnt ?? 0) > 0 ? 'SETTLED' : p.status
+      p.channel === 'BRI' && (hasSettlement?.cnt ?? 0) > 0 ? 'SETTLED' : p.status
 
     const allocations = await query<{
       id: string
@@ -606,7 +606,7 @@ export async function getTransactionDetail(
         direction: 'IN',
         amount: p.gross_amount,
         grossAmount: p.gross_amount,
-        gatewayFee: p.gateway_fee,
+        gatewayFee: (p as any).cooperative_admin_fee ?? p.gateway_fee ?? 0,
         netAmount: p.net_amount,
         channel: p.channel,
         method: p.method,
@@ -622,7 +622,7 @@ export async function getTransactionDetail(
         santriKamar: p.santri_kamar,
         recipientInfo: null,
         operatorName: p.operator_name,
-        externalReference: p.external_reference,
+        externalReference: (p as any).bri_trx_id || (p as any).bri_payment_request_id || p.external_reference || null,
         notes: null,
         createdAt: p.paid_at,
         source: (p as any).source,
@@ -696,7 +696,7 @@ export async function getTransactionDetail(
       category = 'TOPUP'
     }
 
-    const channel = wl.movement_type === 'TOPUP_ONLINE' ? 'DUITKU' : 'CASH'
+    const channel = wl.movement_type === 'TOPUP_ONLINE' ? 'BRI' : 'CASH'
     const itemLabel =
       wl.movement_type === 'REVERSAL'
         ? `Pembalikan Mutasi Dompet (Saldo: Rp${wl.balance_before.toLocaleString('id-ID')} -> Rp${wl.balance_after.toLocaleString('id-ID')})`
@@ -999,7 +999,7 @@ export async function getHistoryFilterOptions(): Promise<FilterOptionsData> {
     ],
     channelList: [
       { value: 'ALL', label: 'Semua Kanal & Metode' },
-      { value: 'DUITKU', label: 'Online Duitku' },
+      { value: 'BRI', label: 'Online BRI' },
       { value: 'CASH', label: 'Tunai Loket' },
       { value: 'TRANSFER', label: 'Transfer Bank' },
     ],

@@ -1,4 +1,4 @@
-﻿'use server'
+'use server'
 
 import { query, queryOne, execute, generateId, now } from '@/lib/db'
 import {
@@ -155,7 +155,6 @@ const ALLOWED_VIEW_ROLES = [
   'admin_koperasi',
   'petugas_koperasi',
   'pimpinan',
-  'tester',
   'demo',
 ]
 
@@ -177,9 +176,9 @@ async function authorizeUser(): Promise<{
 
   // Role 'demo' hanya boleh menulis bila request benar-benar dilayani DEMO_DB.
   // Bila database ini punya akun 'demo' tetapi tidak ada sandbox, akun tersebut
-  // tetap read-only â€” mencegah tulis ke data pesantren sebenarnya.
+  // tetap read-only — mencegah tulis ke data pesantren sebenarnya.
   const demoRunsInSandbox = isDemoSandboxRequest(session)
-  const isViewOnly = roles.includes('pimpinan') || roles.includes('tester')
+  const isViewOnly = roles.includes('pimpinan')
   const canMutate = !isViewOnly && hasFinanceMutateRole(roles, demoRunsInSandbox)
 
   return {

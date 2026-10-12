@@ -49,7 +49,7 @@ function formatDateDisplay(dateStr?: string | null): string {
 }
 
 const MOVEMENT_LABELS: Record<string, string> = {
-  TOPUP_ONLINE: 'Top-Up Online (Duitku)',
+  TOPUP_ONLINE: 'Top-Up Online (BRI)',
   TOPUP_CASH: 'Setor Tunai (Loket)',
   WITHDRAWAL_LOKET: 'Pencairan Loket',
   REVERSAL: 'Pembalikan / Reversal',

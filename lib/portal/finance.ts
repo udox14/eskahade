@@ -1,19 +1,14 @@
 // lib/portal/finance.ts
 // Modul Integrasi Finansial Portal Orang Tua ke Sistem Keuangan Baru
 // Menggabungkan pembacaan tagihan authoritative, kalkulasi cicilan,
-// pembuatan payment order Duitku (payer_type = 'PORTAL_ORTU'),
+// pembuatan payment order online BRI (payer_type = 'PORTAL_ORTU'),
 // top-up uang jajan, batas limit dompet, dan riwayat transaksi terpadu.
 
 import { cache } from 'react'
 import { query, queryOne } from '@/lib/db'
 import { createPaymentOrder, getPaymentOrderById } from '@/lib/finance/orders'
 import { getStudentFixedVa } from '@/lib/finance/va'
-import {
-  createDuitkuV2Transaction,
-  getDuitkuV2Config,
-  getGatewayFeeSettings,
-  getEnabledPaymentChannels,
-} from '@/lib/finance/gateway/duitku-v2'
+import { getEffectiveCooperativeAdminFee } from '@/lib/finance/cooperative-admin'
 import {
   getStudentWalletBalance,
   getParentWalletLimits,
@@ -78,15 +73,18 @@ export interface PortalStudentBillingData {
     id: string
     orderNumber: string
     grossAmount: number
-    gatewayFee: number
+    cooperativeAdminFee: number
     totalCharged: number
     paymentMethod: string | null
     expiresAt: string
     createdAt: string
     items: Array<{ itemType: string; amount: number }>
   }>
+  cooperativeFee: number
   gatewayInfo?: {
-    enabledChannels: Array<'DUITKU_VA' | 'DUITKU_QRIS'>
+    isOnlineAvailable?: boolean
+    unavailableReason?: string
+    enabledChannels: Array<'BRI_VA'>
     feePayer: 'CUSTOMER' | 'INSTITUTION'
     defaultVaFee: number
     defaultQrisFeePercent: number
@@ -95,8 +93,7 @@ export interface PortalStudentBillingData {
 
 export interface PortalCheckoutInput {
   santriId: string
-  paymentMethod?: 'DUITKU_VA' | 'DUITKU_QRIS'
-  vaBank?: string
+  paymentMethod?: 'BRI_VA'
   topUpAmount?: number
   items: Array<{
     obligationId?: string | null
@@ -112,7 +109,7 @@ export interface PortalCheckoutResponse {
     id: string
     orderNumber: string
     grossAmount: number
-    gatewayFee: number
+    cooperativeAdminFee: number
     totalCharged: number
     paymentMethod: string | null
     expiresAt: string
@@ -121,8 +118,7 @@ export interface PortalCheckoutResponse {
   checkout: {
     paymentUrl?: string | null
     vaNumber?: string | null
-    qrString?: string | null
-    qrUrl?: string | null
+    bankCode?: string
     instructions?: string[]
   }
 }
@@ -135,6 +131,7 @@ export interface PortalTransactionHistoryItem {
   referenceNumber: string
   amount: number
   grossAmount?: number
+  cooperativeAdminFee?: number
   gatewayFee?: number
   channel?: string | null
   method?: string | null
@@ -412,13 +409,13 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
     id: string
     order_number: string
     gross_amount: number
-    gateway_fee: number
+    cooperative_admin_fee: number
     total_charged: number
     payment_method: string | null
     expires_at: string
     created_at: string
   }>(
-    `SELECT id, order_number, gross_amount, gateway_fee, total_charged, payment_method, expires_at, created_at
+    `SELECT id, order_number, gross_amount, cooperative_admin_fee, total_charged, payment_method, expires_at, created_at
      FROM finance_payment_orders
      WHERE santri_id = ? AND status = 'PENDING' AND datetime(expires_at) > datetime('now')
      ORDER BY created_at DESC LIMIT 5`,
@@ -429,7 +426,7 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
     id: string
     orderNumber: string
     grossAmount: number
-    gatewayFee: number
+    cooperativeAdminFee: number
     totalCharged: number
     paymentMethod: string | null
     expiresAt: string
@@ -457,7 +454,7 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
       id: po.id,
       orderNumber: po.order_number,
       grossAmount: po.gross_amount,
-      gatewayFee: po.gateway_fee,
+      cooperativeAdminFee: po.cooperative_admin_fee,
       totalCharged: po.total_charged,
       paymentMethod: po.payment_method,
       expiresAt: po.expires_at,
@@ -466,63 +463,116 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
     }))
   }
 
-  return {
-    santri: {
-      id: santri.id,
-      nis: santri.nis,
-      nama: santri.nama_lengkap,
-      asrama: santri.asrama,
-      kamar: santri.kamar,
-      tempatMakan: santri.tempat_makan,
-      tempatMencuci: santri.tempat_mencuci,
-    },
-    wallet: {
-      balance: walletBal.balance,
-      globalDailyLimit,
-      parentDailyLimit: parentLimits?.parent_daily_limit ?? null,
-      parentWeeklyLimit: parentLimits?.parent_weekly_limit ?? null,
-      parentMonthlyLimit: parentLimits?.parent_monthly_limit ?? null,
-      effectiveDailyLimit,
-    },
-    fixedVa: fixedVa
-      ? {
-          vaNumber: fixedVa.va_number,
-          bankCode: fixedVa.bank_code,
-        }
-      : null,
-    obligations: {
-      past,
-      current,
-      upcoming,
-      monthly,
-      annual,
-      uspp,
-      totalRemaining,
-    },
-    pendingOrders: pendingWithItems,
-    gatewayInfo: {
-      enabledChannels: await getEnabledPaymentChannels().catch(() => ['DUITKU_VA' as const, 'DUITKU_QRIS' as const]),
-      feePayer: (await getGatewayFeeSettings().catch(() => ({ feePayer: 'CUSTOMER' as const }))).feePayer,
-      defaultVaFee: (await getGatewayFeeSettings().catch(() => ({ defaultVaFee: 4000 }))).defaultVaFee,
-      defaultQrisFeePercent: (await getGatewayFeeSettings().catch(() => ({ defaultQrisFeePercent: 0.7 }))).defaultQrisFeePercent,
-    },
+  const effectiveCoopFee = await getEffectiveCooperativeAdminFee().catch(() => 0)
+
+    const brivaGate = await isOnlineBrivaAvailable(santriId)
+
+    return {
+      santri: {
+        id: santri.id,
+        nis: santri.nis,
+        nama: santri.nama_lengkap,
+        asrama: santri.asrama,
+        kamar: santri.kamar,
+        tempatMakan: santri.tempat_makan,
+        tempatMencuci: santri.tempat_mencuci,
+      },
+      wallet: {
+        balance: walletBal.balance,
+        globalDailyLimit,
+        parentDailyLimit: parentLimits?.parent_daily_limit ?? null,
+        parentWeeklyLimit: parentLimits?.parent_weekly_limit ?? null,
+        parentMonthlyLimit: parentLimits?.parent_monthly_limit ?? null,
+        effectiveDailyLimit,
+      },
+      fixedVa: fixedVa && brivaGate.available
+        ? {
+            vaNumber: fixedVa.va_number,
+            bankCode: 'BRI',
+          }
+        : null,
+      obligations: {
+        past,
+        current,
+        upcoming,
+        monthly,
+        annual,
+        uspp,
+        totalRemaining,
+      },
+      pendingOrders: pendingWithItems,
+      cooperativeFee: effectiveCoopFee,
+      gatewayInfo: {
+        isOnlineAvailable: brivaGate.available,
+        unavailableReason: brivaGate.reason,
+        enabledChannels: brivaGate.available ? ['BRI_VA'] : [],
+        feePayer: 'CUSTOMER',
+        defaultVaFee: effectiveCoopFee,
+        defaultQrisFeePercent: 0,
+      },
+    }
   }
-})
+)
 
 /**
- * Membuat Payment Order Duitku dari Portal Orang Tua.
+ * Evaluasi ketersediaan kanal pembayaran online (BRIVA) - FAIL-CLOSED FEATURE GATE.
+ * Pada BRI-1, integrasi protokol bank belum aktif (dijadwalkan pada BRI-2/3).
+ * Kanal online hanya aktif jika flag FEATURE_FLAG_BRIVA_ONLINE diaktifkan dan santri telah memiliki Fixed BRIVA aktif.
+ */
+export async function isOnlineBrivaAvailable(santriId?: string): Promise<{
+  available: boolean
+  reason: string
+  vaNumber: string | null
+}> {
+  const isGateOpen = process.env.FEATURE_FLAG_BRIVA_ONLINE === 'true'
+  if (!isGateOpen) {
+    return {
+      available: false,
+      reason: 'Layanan pembayaran online (BRIVA) belum dibuka. Pembayaran tagihan dan titipan uang jajan saat ini dilayani secara tunai di loket pesantren.',
+      vaNumber: null,
+    }
+  }
+
+  if (!santriId) {
+    return { available: false, reason: 'ID Santri tidak valid.', vaNumber: null }
+  }
+
+  const fixedVa = await getStudentFixedVa(santriId).catch(() => null)
+  if (!fixedVa || fixedVa.status !== 'ACTIVE' || !fixedVa.va_number) {
+    return {
+      available: false,
+      reason: 'Nomor Virtual Account BRI (BRIVA) santri belum diterbitkan oleh bank. Silakan hubungi bagian keuangan pesantren.',
+      vaNumber: null,
+    }
+  }
+
+  return {
+    available: true,
+    reason: '',
+    vaNumber: fixedVa.va_number,
+  }
+}
+
+/**
+ * Membuat Payment Order online BRI dari Portal Orang Tua.
  * Penegakan aturan bisnis:
  * 1. Otorisasi server-side: hanya wali santri terkait yang dapat membuat pesanan.
- * 2. SPP tidak boleh dicicil (harus lunas penuh sisa periode tsb).
- * 3. USPP dapat dicicil parsial.
- * 4. Uang Jajan dapat ditambahkan sebagai top-up dana titipan.
- * 5. Membuat finance_payment_orders dengan payer_type = 'PORTAL_ORTU'.
- * 6. Mengintegrasikan pemanggilan Duitku V2 untuk menghasilkan payment URL / VA / QRIS.
+ * 2. Fail-closed feature gate: menolak pembuatan order jika kanal BRIVA belum aktif/terverifikasi.
+ * 3. SPP tidak boleh dicicil (harus lunas penuh sisa periode tsb).
+ * 4. USPP dapat dicicil parsial.
+ * 5. Uang Jajan dapat ditambahkan sebagai top-up dana titipan.
+ * 6. Membuat finance_payment_orders dengan payer_type = 'PORTAL_ORTU'.
+ * 7. Mengaitkan Fixed BRIVA santri dan Biaya Administrasi Koperasi.
  */
 export async function createPortalPaymentOrder(
   santriId: string,
   input: PortalCheckoutInput
 ): Promise<PortalCheckoutResponse> {
+  const gate = await isOnlineBrivaAvailable(santriId)
+  if (!gate.available) {
+    throw new Error(gate.reason)
+  }
+
   if (!input.items || input.items.length === 0) {
     throw new Error('Pilih minimal satu item tagihan atau masukkan nominal top-up uang jajan.')
   }
@@ -635,102 +685,32 @@ export async function createPortalPaymentOrder(
     }
   }
 
-  // 2. Tentukan metode pembayaran & validasi kanal pembayaran
-  const method = input.paymentMethod || 'DUITKU_VA'
-  const enabledChannels = await getEnabledPaymentChannels()
-  const feeSettings = await getGatewayFeeSettings()
+  // 2. Tentukan metode pembayaran & biaya administrasi koperasi
+  const method = 'BRI_VA'
+  const cooperativeAdminFee = await getEffectiveCooperativeAdminFee().catch(() => 0)
 
-  const validMethods = ['DUITKU_VA', 'DUITKU_QRIS']
-  if (!validMethods.includes(method)) {
-    throw new Error(`Metode pembayaran "${method}" tidak valid atau tidak didukung.`)
-  }
-  if (!enabledChannels.includes(method as 'DUITKU_VA' | 'DUITKU_QRIS')) {
-    throw new Error(`Kanal pembayaran "${method}" sedang dinonaktifkan oleh administrasi keuangan.`)
-  }
-
-  const grossAmount = orderItems.reduce((sum, it) => sum + it.amount, 0)
-  let gatewayFee = 0
-
-  if (method === 'DUITKU_VA') {
-    gatewayFee = feeSettings.defaultVaFee
-  } else if (method === 'DUITKU_QRIS') {
-    gatewayFee = Math.ceil(grossAmount * (feeSettings.defaultQrisFeePercent / 100))
-  }
-
-  // 3. Buat Payment Order via Engine Locked dengan live feePayer ('CUSTOMER' vs 'INSTITUTION')
+  // 3. Buat Payment Order via Engine Locked
   const orderWithItems = await createPaymentOrder({
     santriId,
     payerType: 'PORTAL_ORTU',
     items: orderItems,
     paymentMethod: method,
-    gatewayFee,
-    feePayer: feeSettings.feePayer,
+    cooperativeAdminFee,
     expiresInHours: 24,
   })
 
-  // 4. Hubungkan ke Gateway Duitku jika terkonfigurasi
-  let checkoutData: {
-    paymentUrl?: string | null
-    vaNumber?: string | null
-    qrString?: string | null
-    qrUrl?: string | null
-    instructions?: string[]
-  } = {}
+  // 4. Instruksi pembayaran Virtual Account BRI (BRIVA)
+  const fixedVa = orderWithItems.fixed_va_number || (await getStudentFixedVa(santriId).catch(() => null))?.va_number || null
 
-  try {
-    const duitkuConfig = await getDuitkuV2Config()
-    if (duitkuConfig.merchantCode && duitkuConfig.apiKey) {
-      const studentInfo = await queryOne<{ nama_lengkap: string; nis: string }>(
-        `SELECT nama_lengkap, nis FROM santri WHERE id = ?`,
-        [santriId]
-      )
-
-      const productDetails = orderItems
-        .map(it => `${FINANCE_ITEM_LABELS[it.itemType as keyof typeof FINANCE_ITEM_LABELS] || it.itemType}: Rp${it.amount.toLocaleString('id-ID')}`)
-        .join(', ')
-
-      const res = await createDuitkuV2Transaction({
-        paymentAmount: orderWithItems.total_charged,
-        paymentMethod: input.vaBank || (method === 'DUITKU_QRIS' ? 'SP' : 'VC'),
-        merchantOrderId: orderWithItems.order_number,
-        productDetails: productDetails.slice(0, 250),
-        customerVaName: studentInfo?.nama_lengkap.slice(0, 20) || 'Wali Santri',
-        email: 'portal@eskahade.sch.id',
-        phoneNumber: '08123456789',
-        callbackUrl: duitkuConfig.callbackUrl,
-        returnUrl: duitkuConfig.returnUrl,
-        expiryPeriod: 1440,
-      })
-
-      checkoutData = {
-        paymentUrl: res.paymentUrl || null,
-        vaNumber: res.vaNumber || orderWithItems.fixed_va_number || null,
-        qrString: res.qrString || null,
-        instructions: [
-          'Salin nomor Virtual Account / pindai kode QR yang tertera.',
-          'Lakukan transfer sebelum masa berlaku pesanan berakhir (24 jam).',
-          'Pembayaran akan diverifikasi secara otomatis oleh sistem dalam 1-2 menit.',
-        ],
-      }
-    } else {
-      // Fallback ke Fixed VA yang tersimpan jika belum ada kredensial API Duitku di env
-      checkoutData = {
-        vaNumber: orderWithItems.fixed_va_number || '8800' + santriId.replace(/\D/g, '').slice(0, 8),
-        instructions: [
-          'Gunakan nomor Virtual Account santri untuk melakukan pembayaran.',
-          'Pastikan nominal transfer sama persis dengan Total Tagihan.',
-          'Pembayaran akan terverifikasi otomatis setelah dana diterima.',
-        ],
-      }
-    }
-  } catch {
-    checkoutData = {
-      vaNumber: orderWithItems.fixed_va_number || null,
-      instructions: [
-        'Pesanan pembayaran berhasil dibuat.',
-        'Selesaikan pembayaran melalui kanal Virtual Account yang tersedia.',
-      ],
-    }
+  const checkoutData = {
+    vaNumber: fixedVa,
+    bankCode: 'BRI',
+    instructions: [
+      'Gunakan nomor Virtual Account BRI (BRIVA) santri di atas.',
+      'Dapat dibayar melalui aplikasi BRImo, ATM BRI, AgenBRILink, atau Transfer Antar-Bank (Kode Bank 002).',
+      'Pastikan nominal transfer sama persis dengan Total Tagihan.',
+      'Pembayaran akan diverifikasi secara otomatis oleh sistem setelah dana diterima.',
+    ],
   }
 
   return {
@@ -739,7 +719,7 @@ export async function createPortalPaymentOrder(
       id: orderWithItems.id,
       orderNumber: orderWithItems.order_number,
       grossAmount: orderWithItems.gross_amount,
-      gatewayFee: orderWithItems.gateway_fee,
+      cooperativeAdminFee: orderWithItems.cooperative_admin_fee,
       totalCharged: orderWithItems.total_charged,
       paymentMethod: orderWithItems.payment_method,
       expiresAt: orderWithItems.expires_at,
@@ -802,7 +782,7 @@ export async function getPortalFinancialHistory(
       id: string
       payment_number: string
       gross_amount: number
-      gateway_fee: number
+      cooperative_admin_fee: number
       net_amount: number
       channel: string
       method: string
@@ -810,7 +790,7 @@ export async function getPortalFinancialHistory(
       paid_at: string
       created_at: string
     }>(
-      `SELECT id, payment_number, gross_amount, gateway_fee, net_amount,
+      `SELECT id, payment_number, gross_amount, cooperative_admin_fee, net_amount,
               channel, method, status, paid_at, created_at
        FROM finance_payments
        WHERE santri_id = ?
@@ -863,7 +843,8 @@ export async function getPortalFinancialHistory(
         referenceNumber: p.payment_number,
         amount: p.gross_amount,
         grossAmount: p.gross_amount,
-        gatewayFee: p.gateway_fee,
+        cooperativeAdminFee: p.cooperative_admin_fee,
+        gatewayFee: p.cooperative_admin_fee,
         channel: p.channel,
         method: p.method,
         status: p.status === 'PAID' || p.status === 'SETTLED' ? 'PAID' : 'COMPLETED',
@@ -930,13 +911,13 @@ export async function getPortalFinancialHistory(
     id: string
     order_number: string
     gross_amount: number
-    gateway_fee: number
+    cooperative_admin_fee: number
     total_charged: number
     payment_method: string | null
     expires_at: string
     created_at: string
   }>(
-    `SELECT id, order_number, gross_amount, gateway_fee, total_charged, payment_method, expires_at, created_at
+    `SELECT id, order_number, gross_amount, cooperative_admin_fee, total_charged, payment_method, expires_at, created_at
      FROM finance_payment_orders
      WHERE santri_id = ? AND status = 'PENDING' AND datetime(expires_at) > datetime('now')
      ORDER BY created_at DESC LIMIT 5`,
@@ -952,7 +933,8 @@ export async function getPortalFinancialHistory(
       referenceNumber: po.order_number,
       amount: po.total_charged,
       grossAmount: po.gross_amount,
-      gatewayFee: po.gateway_fee,
+      cooperativeAdminFee: po.cooperative_admin_fee,
+      gatewayFee: po.cooperative_admin_fee,
       method: po.payment_method,
       status: 'PENDING',
       createdAt: po.created_at,

@@ -57,7 +57,7 @@ export default function PengaturanKeuanganContent({
     { key: 'tarif', label: 'Tarif & Cicilan', icon: Tag, badge: data.tariffs.length },
     { key: 'pembebasan', label: 'Pembebasan Biaya', icon: ShieldCheck, badge: data.exemptions.filter(e => e.status === 'ACTIVE').length },
     { key: 'limit', label: 'Limit Uang Jajan', icon: Wallet },
-    { key: 'gateway', label: 'Payment Gateway Duitku', icon: CreditCard },
+    { key: 'gateway', label: 'BRIVA & Koperasi', icon: CreditCard },
     { key: 'kop', label: 'Kop & Cetak', icon: Printer },
   ]
 

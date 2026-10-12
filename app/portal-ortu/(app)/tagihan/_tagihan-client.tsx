@@ -38,9 +38,8 @@ function formatExpiryShort(isoString: string): string {
 }
 
 function formatPaymentMethodLabel(method: string | null): string {
-  if (method === 'DUITKU_VA') return 'Virtual Account'
-  if (method === 'DUITKU_QRIS') return 'QRIS'
-  return method || 'Pembayaran Online'
+  if (method === 'BRI_VA') return 'Virtual Account BRI (BRIVA)'
+  return method || 'Virtual Account BRI'
 }
 
 function cleanPeriodLabel(periodLabel: string): string {
@@ -73,21 +72,9 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
   const [isTopUpSelected, setIsTopUpSelected] = useState<boolean>(false)
   const [topUpAmount, setTopUpAmount] = useState<number>(0)
 
-  // Payment Channels Whitelist from Settings
-  const enabledChannels = useMemo(() => {
-    return billingData.gatewayInfo?.enabledChannels || ['DUITKU_VA', 'DUITKU_QRIS']
-  }, [billingData.gatewayInfo?.enabledChannels])
-  const isVaEnabled = enabledChannels.includes('DUITKU_VA')
-  const isQrisEnabled = enabledChannels.includes('DUITKU_QRIS')
-
   // Checkout state
   const [isCheckingOut, setIsCheckingOut] = useState<boolean>(false)
-  const [paymentMethod, setPaymentMethod] = useState<'DUITKU_VA' | 'DUITKU_QRIS'>(() => {
-    if (isVaEnabled) return 'DUITKU_VA'
-    if (isQrisEnabled) return 'DUITKU_QRIS'
-    return 'DUITKU_VA'
-  })
-  const [vaBank, setVaBank] = useState<string>('BR') // default BRI
+  const paymentMethod = 'BRI_VA' as const
   const [checkoutResult, setCheckoutResult] = useState<PortalCheckoutResponse | null>(null)
   const [isReviewOpen, setIsReviewOpen] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
@@ -169,17 +156,14 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
     }
 
     const grossAmount = items.reduce((sum, it) => sum + it.amount, 0)
-    const configuredFee = paymentMethod === 'DUITKU_VA'
-      ? (billingData.gatewayInfo?.defaultVaFee ?? 4000)
-      : Math.ceil(grossAmount * ((billingData.gatewayInfo?.defaultQrisFeePercent ?? 0.7) / 100))
-    const gatewayFee = billingData.gatewayInfo?.feePayer === 'INSTITUTION' ? 0 : configuredFee
-    const totalCharged = grossAmount > 0 ? grossAmount + gatewayFee : 0
+    const cooperativeFee = billingData.cooperativeFee || 0
+    const totalCharged = grossAmount > 0 ? grossAmount + cooperativeFee : 0
 
     return {
       items,
       count: items.length,
       grossAmount,
-      gatewayFee,
+      cooperativeFee,
       totalCharged,
     }
   }, [
@@ -190,8 +174,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
     billingData.obligations.uspp,
     isTopUpSelected,
     topUpAmount,
-    paymentMethod,
-    billingData.gatewayInfo,
+    billingData.cooperativeFee,
   ])
 
   const handleCopyVa = (vaText: string) => {
@@ -218,8 +201,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
 
       const res = await createPortalCheckoutAction({
         santriId: billingData.santri.id,
-        paymentMethod,
-        vaBank,
+        paymentMethod: 'BRI_VA',
         items: payloadItems,
       })
 
@@ -391,7 +373,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
                       id: po.id,
                       orderNumber: po.orderNumber,
                       grossAmount: po.grossAmount,
-                      gatewayFee: po.gatewayFee,
+                      cooperativeAdminFee: po.cooperativeAdminFee,
                       totalCharged: po.totalCharged,
                       paymentMethod: po.paymentMethod,
                       expiresAt: po.expiresAt,
@@ -718,14 +700,32 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
         title="Tinjau pembayaran"
         subtitle="Periksa item dan total sebelum membuat pembayaran"
         footer={
-          <button
-            type="button"
-            disabled={isCheckingOut || (!isVaEnabled && !isQrisEnabled)}
-            onClick={handleProceedCheckout}
-            className="w-full min-h-12 rounded-xl bg-[#064e3b] px-4 py-3 text-sm font-bold text-[#bef264] disabled:opacity-50"
-          >
-            {isCheckingOut ? 'Membuat pembayaran…' : `Buat pembayaran ${formatRupiah(selectedItemsSummary.totalCharged)}`}
-          </button>
+          !billingData.gatewayInfo?.isOnlineAvailable ? (
+            <div className="w-full space-y-2">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/40 p-3 text-xs text-amber-800 dark:text-amber-200 text-left">
+                <p className="font-semibold">Pembayaran Online Belum Tersedia</p>
+                <p className="mt-1 text-[11px] leading-relaxed">
+                  {billingData.gatewayInfo?.unavailableReason || 'Kanal pembayaran online (BRIVA) belum diaktifkan. Silakan lakukan pembayaran tagihan secara tunai di loket pesantren.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled
+                className="w-full min-h-12 rounded-xl bg-slate-200 dark:bg-slate-800 px-4 py-3 text-sm font-bold text-slate-400 cursor-not-allowed"
+              >
+                Pembayaran Online Belum Dibuka
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={isCheckingOut}
+              onClick={handleProceedCheckout}
+              className="w-full min-h-12 rounded-xl bg-[#064e3b] px-4 py-3 text-sm font-bold text-[#bef264] disabled:opacity-50"
+            >
+              {isCheckingOut ? 'Membuat pembayaran…' : `Buat pembayaran ${formatRupiah(selectedItemsSummary.totalCharged)}`}
+            </button>
+          )
         }
       >
         <div className="space-y-5 text-sm">
@@ -743,72 +743,25 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
               ))}
             </div>
           </div>
-          <fieldset className="space-y-2">
-            <legend className="font-bold text-slate-900 dark:text-slate-100">Metode pembayaran</legend>
-            <div className="grid grid-cols-2 gap-2">
-              {isVaEnabled && (
-                <button
-                  type="button"
-                  aria-pressed={paymentMethod === 'DUITKU_VA'}
-                  onClick={() => setPaymentMethod('DUITKU_VA')}
-                  className={`min-h-11 rounded-xl border px-2 text-xs font-bold transition cursor-pointer ${
-                    paymentMethod === 'DUITKU_VA'
-                      ? 'border-emerald-700 bg-emerald-50 text-emerald-900 dark:border-emerald-500 dark:bg-emerald-950/60 dark:text-emerald-200'
-                      : 'border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                  }`}
-                >
-                  Virtual Account
-                </button>
-              )}
-              {isQrisEnabled && (
-                <button
-                  type="button"
-                  aria-pressed={paymentMethod === 'DUITKU_QRIS'}
-                  onClick={() => setPaymentMethod('DUITKU_QRIS')}
-                  className={`min-h-11 rounded-xl border px-2 text-xs font-bold transition cursor-pointer ${
-                    paymentMethod === 'DUITKU_QRIS'
-                      ? 'border-emerald-700 bg-emerald-50 text-emerald-900 dark:border-emerald-500 dark:bg-emerald-950/60 dark:text-emerald-200'
-                      : 'border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                  }`}
-                >
-                  QRIS
-                </button>
-              )}
-            </div>
-            {paymentMethod === 'DUITKU_VA' && isVaEnabled && (
-              <div className="grid grid-cols-3 gap-2 pt-1">
-                {[
-                  { code: 'BR', label: 'BRI' }, { code: 'NC', label: 'BNI' },
-                  { code: 'M2', label: 'Mandiri' }, { code: 'BT', label: 'Permata' },
-                  { code: 'BC', label: 'BCA' },
-                ].map(bank => (
-                  <button
-                    key={bank.code}
-                    type="button"
-                    aria-pressed={vaBank === bank.code}
-                    onClick={() => setVaBank(bank.code)}
-                    className={`min-h-11 rounded-xl border px-2 text-xs font-bold transition cursor-pointer ${
-                      vaBank === bank.code
-                        ? 'border-emerald-700 bg-emerald-800 text-white dark:border-emerald-500 dark:bg-emerald-600'
-                        : 'border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750'
-                    }`}
-                  >
-                    {bank.label}
-                  </button>
-                ))}
+          <div className="space-y-2">
+            <h4 className="font-bold text-slate-900 dark:text-slate-100">Metode Pembayaran</h4>
+            <div className="rounded-xl border border-emerald-700 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/60 p-3 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">Virtual Account BRI (BRIVA)</p>
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-0.5">Transfer via BRImo, ATM BRI, AgenBRILink, atau Bank Lain</p>
               </div>
-            )}
-          </fieldset>
+            </div>
+          </div>
           <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-3">
             <div className="flex justify-between text-slate-700 dark:text-slate-300"><span>Subtotal</span><span className="font-mono">{formatRupiah(selectedItemsSummary.grossAmount)}</span></div>
-            <div className="flex justify-between text-slate-700 dark:text-slate-300"><span>Biaya admin (perkiraan)</span><span className="font-mono">{formatRupiah(selectedItemsSummary.gatewayFee)}</span></div>
+            <div className="flex justify-between text-slate-700 dark:text-slate-300"><span>Biaya admin Koperasi</span><span className="font-mono">{formatRupiah(selectedItemsSummary.cooperativeFee)}</span></div>
             <div className="flex justify-between border-t border-slate-200 dark:border-slate-800 pt-2 font-bold text-slate-950 dark:text-slate-100"><span>Total dibayar</span><span className="font-mono">{formatRupiah(selectedItemsSummary.totalCharged)}</span></div>
             <p className="text-xs text-slate-600 dark:text-slate-400">Nominal final dikonfirmasi oleh server sebelum instruksi pembayaran diterbitkan.</p>
           </div>
         </div>
       </BottomSheet>
 
-      {/* 8. MODAL INSTRUKSI PEMBAYARAN DUITKU */}
+      {/* 8. MODAL INSTRUKSI PEMBAYARAN BRIVA */}
       <BottomSheet
         open={Boolean(isModalOpen && checkoutResult)}
         onClose={() => setIsModalOpen(false)}
@@ -848,14 +801,14 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
                 {formatRupiah(checkoutResult.order.totalCharged)}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Termasuk biaya admin {formatRupiah(checkoutResult.order.gatewayFee)}
+                Termasuk biaya admin Koperasi {formatRupiah(checkoutResult.order.cooperativeAdminFee)}
               </p>
             </div>
 
-            {/* Virtual Account / Payment Link */}
-            {checkoutResult.checkout.vaNumber ? (
+            {/* Virtual Account Number */}
+            {checkoutResult.checkout.vaNumber && (
               <div className="rounded-2xl border border-emerald-200/80 dark:border-emerald-800/60 bg-emerald-50/60 dark:bg-emerald-950/40 p-4 text-center space-y-2">
-                <span className="text-xs font-bold text-emerald-950 dark:text-emerald-200">Nomor Virtual Account</span>
+                <span className="text-xs font-bold text-emerald-950 dark:text-emerald-200">Nomor Virtual Account BRI (BRIVA)</span>
                 <div className="flex items-center justify-center gap-2">
                   <span className="font-mono text-xl sm:text-2xl font-black text-emerald-950 dark:text-emerald-100 tracking-wider whitespace-nowrap overflow-x-auto no-scrollbar py-0.5">
                     {checkoutResult.checkout.vaNumber}
@@ -876,28 +829,17 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
                   </span>
                 </div>
               </div>
-            ) : checkoutResult.checkout.paymentUrl ? (
-              <div className="text-center py-1">
-                <a
-                  href={checkoutResult.checkout.paymentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center w-full min-h-[44px] rounded-xl bg-[#064e3b] hover:bg-[#047857] py-3 text-xs font-bold text-[#bef264] shadow-xs active:scale-[0.98] transition"
-                >
-                  Buka Halaman Pembayaran Duitku
-                </a>
-              </div>
-            ) : null}
+            )}
 
-            {/* Petunjuk Pembayaran */}
+            {/* Petunjuk Pembayaran BRIVA */}
             <div className="text-xs text-slate-600 dark:text-slate-400 space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3.5">
-              <p className="font-bold text-slate-900 dark:text-slate-200">Langkah Pembayaran:</p>
+              <p className="font-bold text-slate-900 dark:text-slate-200">Cara Pembayaran BRIVA:</p>
               <ul className="list-disc pl-4 space-y-1.5 text-slate-600 dark:text-slate-400 leading-relaxed">
-                <li>Buka aplikasi m-Banking atau ATM bank Anda.</li>
-                <li>Pilih menu Transfer Virtual Account / Bayar Tagihan.</li>
-                <li>Masukkan nomor Virtual Account di atas.</li>
-                <li>Pastikan nominal transfer sama persis dengan total tagihan.</li>
-                <li>Status pembayaran akan terupdate otomatis dalam 1-2 menit.</li>
+                <li><strong>BRImo:</strong> Login &gt; Bayar/Beli &gt; Pembayaran &gt; BRIVA &gt; Masukkan nomor BRIVA di atas.</li>
+                <li><strong>ATM BRI:</strong> Transaksi Lain &gt; Pembayaran &gt; Lainnya &gt; BRIVA &gt; Masukkan nomor BRIVA.</li>
+                <li><strong>Transfer Bank Lain:</strong> Transfer Antar-Bank &gt; Pilih Bank BRI (kode 002) &gt; Masukkan nomor BRIVA sebagai rekening tujuan.</li>
+                <li>Pastikan nominal transfer tepat Rp{checkoutResult.order.totalCharged.toLocaleString('id-ID')}.</li>
+                <li>Pembayaran terverifikasi otomatis dalam sistem tanpa perlu konfirmasi manual.</li>
               </ul>
             </div>
           </div>

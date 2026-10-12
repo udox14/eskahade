@@ -614,7 +614,7 @@ export async function exportStudentDetailExcel(report: StudentDetailReportRespon
   const ws1 = XLSX.utils.aoa_to_sheet([])
   setCell(ws1 as Record<string, unknown>, 1, 0, `LEMBAR KEUANGAN SANTRI: ${report.student.nama}`, titleStyle)
   setCell(ws1 as Record<string, unknown>, 2, 0, `NIS: ${report.student.nis} | Asrama: ${report.student.asrama || '-'} (${report.student.kamar || '-'}) | Kelas: ${report.student.kelas || '-'}`, metaStyle)
-  setCell(ws1 as Record<string, unknown>, 3, 0, `No. Fixed VA Duitku: ${report.student.fixedVa || '-'} (${report.student.bankCode || '-'}) | No. WA Ortu: ${report.student.noWaOrtu || '-'}`, metaStyle)
+  setCell(ws1 as Record<string, unknown>, 3, 0, `No. Fixed BRIVA: ${report.student.fixedVa || '-'} | No. WA Ortu: ${report.student.noWaOrtu || '-'}`, metaStyle)
   setCell(ws1 as Record<string, unknown>, 4, 0, `Saldo Titipan Uang Jajan: Rp${report.student.walletBalance.toLocaleString('id-ID')}`, labelStyle)
 
   const obHeaders = ['No', 'Periode', 'Pos Tagihan', 'Total Tagihan', 'Potongan Bebas', 'Telah Terbayar', 'Sisa Tagihan', 'Status']
@@ -1020,7 +1020,7 @@ export async function exportSettlementsExcel(
     numFmt: CURRENCY_FORMAT,
   }
 
-  setCell(1, 0, 'LAPORAN SETTLEMENT PAYMENT GATEWAY DUITKU', titleStyle)
+  setCell(1, 0, 'LAPORAN SETTLEMENT (HISTORIS / LEGACY)', titleStyle)
   setCell(2, 0, 'Pondok Pesantren Eskahade — Pencairan Dana Gateway ke Rekening Bank', metaStyle)
   setCell(3, 0, `Filter: ${filterInfo} | Diunduh: ${getFormattedTimestamp()} WIB`, metaStyle)
 

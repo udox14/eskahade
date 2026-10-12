@@ -1,4 +1,4 @@
-﻿'use server'
+'use server'
 
 import { query, queryOne, execute } from '@/lib/db'
 import {
@@ -519,7 +519,7 @@ function normalizePaymentMethod(channel?: string | null, method?: string | null)
   if (ch === 'CASH' || m === 'CASH') return 'Tunai'
   if (m.includes('QRIS')) return 'QRIS'
   if (m.includes('VA') || m.includes('VIRTUAL_ACCOUNT')) return 'Virtual Account'
-  if (ch === 'DUITKU') return 'Transfer via Portal'
+  if (ch === 'BRI') return 'Online BRI'
   if (m === 'TRANSFER') return 'Transfer'
   return m || ch || '-'
 }
@@ -550,7 +550,7 @@ function calculateOverdueAge(period: string, currentPeriod: string): { overdueSi
 /**
  * Audit & Otorisasi Server Action:
  * - Memverifikasi session dan role/feature access di server sebelum query dijalankan.
- * - Memastikan role view-only (seperti pimpinan atau tester) TIDAK memperoleh izin mutasi (canRecordPayment = false).
+ * - Memastikan role view-only (seperti pimpinan) TIDAK memperoleh izin mutasi (canRecordPayment = false).
  */
 export async function authorizeUser(): Promise<{
   userId: string
@@ -574,7 +574,7 @@ export async function authorizeUser(): Promise<{
 
   // Role 'demo' hanya boleh menulis bila request benar-benar dilayani DEMO_DB.
   const demoRunsInSandbox = isDemoSandboxRequest(session)
-  const isViewOnly = roles.includes('pimpinan') || roles.includes('tester')
+  const isViewOnly = roles.includes('pimpinan')
   const canMutate = !isViewOnly && hasFinanceMutateRole(roles, demoRunsInSandbox)
 
   const permissions: UserFinancePermissions = {
@@ -3090,7 +3090,7 @@ export async function recordCashPayment(
           payerType: 'LOKET',
           items: orderItemsPayload,
           feePayer: 'CUSTOMER',
-          gatewayFee: 0,
+          cooperativeAdminFee: 0,
           paymentMethod: 'CASH',
           cashSessionId: cashSession.id,
         })
@@ -3112,7 +3112,7 @@ export async function recordCashPayment(
         channel: 'CASH',
         method: 'CASH',
         externalReference: externalRef,
-        gatewayFee: 0,
+        cooperativeAdminFee: 0,
         cashSessionId: cashSession.id,
         receivedBy: userId,
       })

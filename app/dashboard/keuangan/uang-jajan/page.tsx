@@ -15,7 +15,6 @@ export default async function UangJajanPage() {
       'admin_koperasi',
       'petugas_koperasi',
       'pimpinan',
-      'tester',
     ])
   }
 

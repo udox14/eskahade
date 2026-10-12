@@ -1,4 +1,4 @@
-﻿'use server'
+'use server'
 
 // app/dashboard/keuangan/tarif/actions.ts
 // Server Actions untuk Modul Pengaturan Keuangan SPA (Patch B: PRD Bab 31 & Implementation Plan)
@@ -7,7 +7,7 @@
 // 1. Tarif & Cicilan (Versioned Tariffs, Overlap Prevention, Immutability)
 // 2. Pembebasan Biaya (Non-retroactive, Lifecycle ACTIVE/REVOKED)
 // 3. Limit Uang Jajan (Global Limit, Read-only Wallet Balances)
-// 4. Payment Gateway Duitku & Fixed VA (Sensitive Data Masking, Fee Payer, Settlement)
+// 4. Integrasi BRI & Biaya Administrasi Koperasi (Setting Gateway, BRIVA, Settlement)
 // 5. Otorisasi Mutasi Server-side (Admin & Bendahara mutasi, Pimpinan view-only)
 
 import { query, queryOne, execute, now } from '@/lib/db'
@@ -49,11 +49,9 @@ import {
 import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
 import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import {
-  getDuitkuV2Config,
-} from '@/lib/finance/gateway/duitku-v2'
-import {
-  getDuitkuSnapConfig,
-} from '@/lib/finance/gateway/duitku-snap'
+  getEffectiveCooperativeAdminFee,
+  setCooperativeAdminFeeRule,
+} from '@/lib/finance/cooperative-admin'
 import type {
   FinanceTariff,
   FinanceTariffOverride,
@@ -146,27 +144,20 @@ export interface StudentWalletLimitsResponse {
 
 export interface MaskedGatewaySettings {
   environment: 'sandbox' | 'production'
-  merchantCode: string
-  callbackUrl: string
-  returnUrl: string
-  defaultExpiryMinutes: number
-  apiKeyConfigured: boolean
-  apiKeyMasked: string
-  feePayer: 'CUSTOMER' | 'INSTITUTION'
-  defaultVaFee: number
-  defaultQrisFeePercent: number
-  enabledChannels: Array<'DUITKU_VA' | 'DUITKU_QRIS'>
-  snapPartnerId: string
-  snapPartnerServiceId: string
-  snapDefaultTrxType: 'C' | 'O'
-  snapClientSecretConfigured: boolean
-  snapClientSecretMasked: string
-  snapPrivateKeyConfigured: boolean
-  snapPublicKeyConfigured: boolean
+  partnerServiceId: string
+  cooperativeAdminFee: number
   settlementDestinationBank: string
   settlementDestinationAccount: string
   settlementAccountHolder: string
   totalFixedVaRegistered: number
+}
+
+export interface GatewaySettingsUpdateInput {
+  partnerServiceId?: string
+  cooperativeAdminFee?: number
+  settlementDestinationBank?: string
+  settlementDestinationAccount?: string
+  settlementAccountHolder?: string
 }
 
 export interface PengaturanKeuanganData {
@@ -197,25 +188,6 @@ export interface PengaturanKeuanganData {
   }
   legacySppCount: number
   userPermissions: UserFinancePermissions
-}
-
-export interface GatewaySettingsUpdateInput {
-  environment?: 'sandbox' | 'production'
-  merchantCode?: string
-  callbackUrl?: string
-  returnUrl?: string
-  defaultExpiryMinutes?: number
-  newApiKey?: string
-  feePayer?: 'CUSTOMER' | 'INSTITUTION'
-  defaultVaFee?: number
-  defaultQrisFeePercent?: number
-  enabledChannels?: Array<'DUITKU_VA' | 'DUITKU_QRIS'>
-  snapPartnerServiceId?: string
-  snapDefaultTrxType?: 'C' | 'O'
-  newSnapClientSecret?: string
-  settlementDestinationBank?: string
-  settlementDestinationAccount?: string
-  settlementAccountHolder?: string
 }
 
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ HELPER OTORISASI SERVER-SIDE Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
@@ -258,9 +230,8 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
     exemptions,
     globalDailyLimit,
     initialLimitsRes,
-    duitkuV2,
-    snapConfig,
     settingsRows,
+    effectiveCooperativeFee,
     vaCountRow,
     letterheadProfiles,
     documentPrintConfigs,
@@ -305,35 +276,17 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
       asramaList: [],
       kelasList: [],
     })),
-    getDuitkuV2Config().catch(() => ({
-      merchantCode: '',
-      apiKey: '',
-      environment: 'sandbox' as const,
-      callbackUrl: undefined,
-      returnUrl: undefined,
-      defaultExpiryMinutes: 1440,
-    })),
-    getDuitkuSnapConfig().catch(() => ({
-      partnerId: '',
-      partnerServiceId: '',
-      clientSecret: '',
-      privateKey: '',
-      duitkuPublicKey: undefined,
-      environment: 'sandbox' as const,
-      defaultTrxType: 'C' as const,
-    })),
     query<{ key: string; value: string }>(
       `SELECT key, value FROM app_settings WHERE key IN (
-        'gateway_fee_payer',
-        'gateway_default_va_fee',
-        'gateway_default_qris_fee_percent',
-        'gateway_channels_enabled',
+        'bri_env',
+        'bri_partner_service_id',
         'settlement_destination_bank',
         'settlement_destination_account',
         'settlement_account_holder'
       )`
     ).catch(() => []),
-    queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM finance_student_va`).catch(() => ({ count: 0 })),
+    getEffectiveCooperativeAdminFee().catch(() => 2000),
+    queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM finance_student_va WHERE status = 'ACTIVE'`).catch(() => ({ count: 0 })),
     getLetterheadProfiles().catch(() => []),
     getDocumentPrintConfigs().catch(() => []),
     listTariffOverrides().catch(() => []),
@@ -345,53 +298,17 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
   const settingsMap = new Map<string, string>()
   settingsRows.forEach((r) => settingsMap.set(r.key, r.value))
 
-  const feePayer = (settingsMap.get('gateway_fee_payer') === 'INSTITUTION' ? 'INSTITUTION' : 'CUSTOMER') as
-    | 'CUSTOMER'
-    | 'INSTITUTION'
-  const defaultVaFee = parseInt(settingsMap.get('gateway_default_va_fee') || '4000', 10) || 4000
-  const defaultQrisFeePercent = parseFloat(settingsMap.get('gateway_default_qris_fee_percent') || '0.7') || 0.7
-  const settlementDestinationBank = settingsMap.get('settlement_destination_bank') || 'Bank Syariah Indonesia (BSI)'
+  // Invariant 10: Environment BRI dikontrol melalui deployment environment (process.env.BRI_ENV), fail-closed ke sandbox
+  const briEnv = (process.env.BRI_ENV === 'production' ? 'production' : 'sandbox') as 'sandbox' | 'production'
+  const partnerServiceId = settingsMap.get('bri_partner_service_id') || ''
+  const settlementDestinationBank = settingsMap.get('settlement_destination_bank') || 'Bank BRI'
   const settlementDestinationAccount = settingsMap.get('settlement_destination_account') || ''
-  const settlementAccountHolder = settingsMap.get('settlement_account_holder') || 'Pesantren SKH'
-
-  let enabledChannels: Array<'DUITKU_VA' | 'DUITKU_QRIS'> = ['DUITKU_VA', 'DUITKU_QRIS']
-  const channelsRaw = settingsMap.get('gateway_channels_enabled')
-  if (channelsRaw) {
-    try {
-      const parsed = JSON.parse(channelsRaw)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const valid = parsed.filter((c: unknown): c is 'DUITKU_VA' | 'DUITKU_QRIS' =>
-          c === 'DUITKU_VA' || c === 'DUITKU_QRIS'
-        )
-        if (valid.length > 0) enabledChannels = valid
-      }
-    } catch {}
-  }
-
-  const hasApiKey = Boolean(duitkuV2.apiKey && duitkuV2.apiKey.length > 0)
-  const hasSnapSecret = Boolean(snapConfig.clientSecret && snapConfig.clientSecret.length > 0)
-  const hasSnapPrivateKey = Boolean(snapConfig.privateKey && snapConfig.privateKey.length > 0)
-  const hasSnapPublicKey = Boolean(snapConfig.duitkuPublicKey && snapConfig.duitkuPublicKey.length > 0)
+  const settlementAccountHolder = settingsMap.get('settlement_account_holder') || 'Koperasi Eskahade'
 
   const gatewayConfig: MaskedGatewaySettings = {
-    environment: duitkuV2.environment,
-    merchantCode: duitkuV2.merchantCode,
-    callbackUrl: duitkuV2.callbackUrl || '/api/finance/gateway/duitku/callback',
-    returnUrl: duitkuV2.returnUrl || '/portal-ortu/tagihan',
-    defaultExpiryMinutes: duitkuV2.defaultExpiryMinutes,
-    apiKeyConfigured: hasApiKey,
-    apiKeyMasked: hasApiKey ? 'Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢' : '',
-    feePayer,
-    defaultVaFee,
-    defaultQrisFeePercent,
-    enabledChannels,
-    snapPartnerId: snapConfig.partnerId || duitkuV2.merchantCode,
-    snapPartnerServiceId: snapConfig.partnerServiceId,
-    snapDefaultTrxType: snapConfig.defaultTrxType,
-    snapClientSecretConfigured: hasSnapSecret,
-    snapClientSecretMasked: hasSnapSecret ? 'Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢' : '',
-    snapPrivateKeyConfigured: hasSnapPrivateKey,
-    snapPublicKeyConfigured: hasSnapPublicKey,
+    environment: briEnv,
+    partnerServiceId,
+    cooperativeAdminFee: effectiveCooperativeFee,
     settlementDestinationBank,
     settlementDestinationAccount,
     settlementAccountHolder,
@@ -716,52 +633,39 @@ export async function updateStudentParentLimitAction(
   }
 }
 
-// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ SERVER ACTIONS: PAYMENT GATEWAY DUITKU & SETTLEMENT Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// --- SERVER ACTIONS: PENGATURAN BRI & BIAYA KOPERASI ---Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export async function saveGatewaySettingsAction(
   input: GatewaySettingsUpdateInput
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await assertMutationPermission()
+    const session = await getSession()
+    if (!session) {
+      throw new Error('Sesi autentikasi telah berakhir. Silakan login kembali.')
+    }
+    const roles = getEffectiveRoles(session)
+    const canConfigureAdminFee = roles.some((r) => r === 'admin' || r === 'admin_koperasi')
+    if (!canConfigureAdminFee) {
+      throw new Error('Akses ditolak: Pengaturan biaya administrasi koperasi dan gateway hanya dapat diubah oleh Admin atau Admin Koperasi.')
+    }
+    const userId = session.id
 
     const currentNow = now()
     const updates: Array<{ key: string; value: string }> = []
 
-    if (input.environment) {
-      updates.push({ key: 'duitku_env', value: input.environment })
+    if (input.partnerServiceId !== undefined) {
+      updates.push({ key: 'bri_partner_service_id', value: input.partnerServiceId.trim() })
     }
-    if (input.merchantCode !== undefined) {
-      updates.push({ key: 'duitku_merchant_code', value: input.merchantCode.trim() })
-    }
-    if (input.callbackUrl !== undefined) {
-      updates.push({ key: 'duitku_callback_url', value: input.callbackUrl.trim() })
-    }
-    if (input.returnUrl !== undefined) {
-      updates.push({ key: 'duitku_return_url', value: input.returnUrl.trim() })
-    }
-    if (input.defaultExpiryMinutes !== undefined) {
-      updates.push({ key: 'duitku_expiry_minutes', value: String(Math.max(1, input.defaultExpiryMinutes)) })
-    }
-    if (input.feePayer) {
-      updates.push({ key: 'gateway_fee_payer', value: input.feePayer })
-    }
-    if (input.defaultVaFee !== undefined) {
-      updates.push({ key: 'gateway_default_va_fee', value: String(Math.max(0, input.defaultVaFee)) })
-    }
-    if (input.defaultQrisFeePercent !== undefined) {
-      updates.push({ key: 'gateway_default_qris_fee_percent', value: String(Math.max(0, input.defaultQrisFeePercent)) })
-    }
-    if (input.enabledChannels && Array.isArray(input.enabledChannels) && input.enabledChannels.length > 0) {
-      const sanitized = input.enabledChannels.filter(c => c === 'DUITKU_VA' || c === 'DUITKU_QRIS')
-      if (sanitized.length > 0) {
-        updates.push({ key: 'gateway_channels_enabled', value: JSON.stringify(sanitized) })
-      }
-    }
-    if (input.snapPartnerServiceId !== undefined) {
-      updates.push({ key: 'duitku_snap_partner_service_id', value: input.snapPartnerServiceId.trim() })
-    }
-    if (input.snapDefaultTrxType) {
-      updates.push({ key: 'duitku_snap_default_trx_type', value: input.snapDefaultTrxType })
+    if (input.cooperativeAdminFee !== undefined) {
+      const fee = Math.max(0, input.cooperativeAdminFee)
+      updates.push({ key: 'finance_cooperative_admin_fee', value: String(fee) })
+      await setCooperativeAdminFeeRule({
+        code: 'ONLINE_CHECKOUT_FEE',
+        name: 'Biaya Administrasi Transaksi Online (BRIVA)',
+        amount: fee,
+        isEnabled: fee > 0,
+        createdBy: userId,
+      }).catch(() => null)
     }
     if (input.settlementDestinationBank !== undefined) {
       updates.push({ key: 'settlement_destination_bank', value: input.settlementDestinationBank.trim() })
@@ -771,15 +675,6 @@ export async function saveGatewaySettingsAction(
     }
     if (input.settlementAccountHolder !== undefined) {
       updates.push({ key: 'settlement_account_holder', value: input.settlementAccountHolder.trim() })
-    }
-
-    // Jika user menginput API key baru
-    if (input.newApiKey && input.newApiKey.trim().length > 0) {
-      updates.push({ key: 'duitku_api_key', value: input.newApiKey.trim() })
-    }
-    // Jika user menginput SNAP Client Secret baru
-    if (input.newSnapClientSecret && input.newSnapClientSecret.trim().length > 0) {
-      updates.push({ key: 'duitku_snap_client_secret', value: input.newSnapClientSecret.trim() })
     }
 
     for (const item of updates) {

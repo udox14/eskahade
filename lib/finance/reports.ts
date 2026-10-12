@@ -49,7 +49,7 @@ export interface BaseReportFilter {
 
 // 1. Penerimaan Types
 export interface ReceiptsReportFilter extends BaseReportFilter {
-  channel?: 'ALL' | 'DUITKU' | 'CASH'
+  channel?: 'ALL' | 'BRI' | 'CASH'
   method?: string
   itemType?: string
   source?: 'ALL' | 'LEGACY' | 'NEW_FINANCE'
@@ -66,7 +66,7 @@ export interface ReceiptItemRow {
   santriNis: string
   santriAsrama: string | null
   santriKelas: string | null
-  channel: 'DUITKU' | 'CASH'
+  channel: 'BRI' | 'CASH'
   method: string
   grossAmount: number
   gatewayFee: number
@@ -625,9 +625,10 @@ export async function getReceiptsReport(
       fpo.order_number LIKE ? OR
       s.nama_lengkap LIKE ? OR
       s.nis LIKE ? OR
-      fp.external_reference LIKE ?
+      fp.bri_trx_id LIKE ? OR
+      fp.bri_payment_request_id LIKE ?
     )`)
-    params.push(term, term, term, term, term)
+    params.push(term, term, term, term, term, term)
   }
 
   const whereSql = conditions.join(' AND ')
@@ -645,10 +646,10 @@ export async function getReceiptsReport(
   }>(
     `SELECT
        COALESCE(SUM(fp.gross_amount), 0) AS total_gross,
-       COALESCE(SUM(fp.gateway_fee), 0) AS total_fee,
+       COALESCE(SUM(fp.cooperative_admin_fee), 0) AS total_fee,
        COALESCE(SUM(fp.net_amount), 0) AS total_net,
        COUNT(*) AS total_count,
-       COALESCE(SUM(CASE WHEN fp.channel = 'DUITKU' THEN fp.gross_amount ELSE 0 END), 0) AS online_gross,
+       COALESCE(SUM(CASE WHEN fp.channel = 'BRI' THEN fp.gross_amount ELSE 0 END), 0) AS online_gross,
        COALESCE(SUM(CASE WHEN fp.channel = 'CASH' THEN fp.gross_amount ELSE 0 END), 0) AS cash_gross,
        COALESCE(SUM(CASE WHEN fp.fund_management = 'PRE_KOPERASI' THEN fp.gross_amount ELSE 0 END), 0) AS pre_koperasi_gross,
        COALESCE(SUM(CASE WHEN fp.fund_management = 'KOPERASI' THEN fp.gross_amount ELSE 0 END), 0) AS koperasi_gross
@@ -671,7 +672,7 @@ export async function getReceiptsReport(
     santri_nis: string
     santri_asrama: string | null
     santri_kelas: string | null
-    channel: 'DUITKU' | 'CASH'
+    channel: 'BRI' | 'CASH'
     method: string
     gross_amount: number
     gateway_fee: number
@@ -696,7 +697,7 @@ export async function getReceiptsReport(
        fp.channel,
        fp.method,
        fp.gross_amount,
-       fp.gateway_fee,
+       COALESCE(fp.cooperative_admin_fee, 0) AS gateway_fee,
        fp.net_amount,
        fp.status,
        fp.correction_status,
@@ -2390,7 +2391,7 @@ export async function getSettlementsReport(
     bankReference: r.notes,
     createdByName: r.verifier_name,
     createdAt: r.created_at,
-    itemsPreview: `${r.total_payments_count} pembayaran Duitku`,
+    itemsPreview: `${r.total_payments_count} pembayaran online BRI`,
   }))
 
   const totalRecords = kpiRow?.total_batches || 0
