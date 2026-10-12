@@ -182,11 +182,15 @@ export default function VerifikasiAbsenPage() {
   }
 
   const handlePilihSemua = async (v: VonisType) => {
-    if (!selectedDate || loading || isSaving || totalDrafts || !filtered.length || !periodeData || periodeData.status === 'FINAL') return
+    if (loading || isSaving || totalDrafts || !filtered.length) return
+    if (selectedDate && (!periodeData || periodeData.status === 'FINAL')) return
     const label = { ALFA_MURNI: 'Alfa', SAKIT: 'Sakit', IZIN: 'Izin', BELUM: 'Mangkir', KESALAHAN: 'Salah' }[v]
     const targets = [...filtered]
     const totalSesi = targets.reduce((sum, item) => sum + item.items.length, 0)
-    if (!await confirm(`Vonis ${label} untuk ${targets.length} santri (${totalSesi} sesi) pada ${formatVerificationWeek({ start: periodeData.tanggalMulai, end: periodeData.tanggalSelesai })}? Berlaku untuk seluruh hasil filter di semua halaman.`)) return
+    const periodeLabel = periodeData
+      ? `pada ${formatVerificationWeek({ start: periodeData.tanggalMulai, end: periodeData.tanggalSelesai })}`
+      : 'pada seluruh antrean tiga bulan terakhir (periode final otomatis dilewati)'
+    if (!await confirm(`Vonis ${label} untuk ${targets.length} santri (${totalSesi} sesi) ${periodeLabel}? Berlaku untuk seluruh hasil filter di semua halaman.`)) return
     const next: Record<string, VonisType> = {}
     targets.forEach(i => { next[i.santri_id] = v })
     setDrafts(next)
@@ -454,8 +458,8 @@ export default function VerifikasiAbsenPage() {
               { v: 'BELUM'      as VonisType, label: 'MANGKIR', cls: 'bg-slate-700 text-white hover:bg-slate-800' },
               { v: 'KESALAHAN'  as VonisType, label: 'SALAH', cls: 'bg-violet-600 text-white hover:bg-violet-700' },
             ].map(({ v, label, cls }) => (
-              <button key={v} onClick={() => void handlePilihSemua(v)} disabled={!selectedDate || loading || loadingPeriode || isSaving || totalDrafts > 0 || !filtered.length || !periodeData || periodeData.status === 'FINAL'}
-                title={!selectedDate ? 'Pilih satu pekan untuk vonis massal' : 'Vonis seluruh hasil filter pada pekan ini'}
+              <button key={v} onClick={() => void handlePilihSemua(v)} disabled={loading || loadingPeriode || isSaving || totalDrafts > 0 || !filtered.length || (Boolean(selectedDate) && (!periodeData || periodeData.status === 'FINAL'))}
+                title={selectedDate ? 'Vonis seluruh hasil filter pada pekan ini' : 'Vonis seluruh hasil filter pada antrean tiga bulan terakhir'}
                 className={`px-5 py-2.5 rounded-lg text-[11px] font-black tracking-widest transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-wait ${cls}`}>
                 {label}
               </button>
@@ -469,7 +473,7 @@ export default function VerifikasiAbsenPage() {
           <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-bold">Mode gabungan tiga bulan</p>
-            <p className="text-xs mt-0.5">Daftar dapat memuat beberapa pekan. Pilih satu pekan untuk mencocokkan lembar pemanggilan dan menyelesaikan verifikasi periode.</p>
+            <p className="text-xs mt-0.5">Daftar memuat antrean tiga bulan terakhir. Vonis massal berlaku pada seluruh hasil filter; pilih satu pekan untuk menyelesaikan verifikasi periode.</p>
           </div>
         </div>
       ) : (

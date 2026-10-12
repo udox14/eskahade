@@ -152,10 +152,15 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[], tanggalRe
   if ('error' in session) return session
   if (!hasRole(session, 'admin') && !hasRole(session, 'sekpen') && !hasRole(session, 'demo')) return { error: 'Akses ditolak' }
   if (!Array.isArray(daftarVonis) || daftarVonis.length === 0) return { error: 'Tidak ada data untuk disimpan' }
-  if (daftarVonis.length > 1 && !tanggalRef) return { error: 'Pilih satu pekan untuk vonis massal' }
   let week: ReturnType<typeof getAbsensiWeek> | undefined
   try { if (tanggalRef) week = getAbsensiWeek(tanggalRef) }
   catch { return { error: 'Tanggal pekan tidak valid' } }
+  let minimumDate: string | undefined
+  if (!week) {
+    const batas = new Date()
+    batas.setMonth(batas.getMonth() - 3)
+    minimumDate = batas.toISOString().slice(0, 10)
+  }
   const seen = new Set<string>()
   const checks: { sql: string; params: unknown[] }[] = []
   for (const data of daftarVonis) {
@@ -166,6 +171,7 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[], tanggalRe
         || (item.status_verif !== null && item.status_verif !== 'BELUM')) return { error: 'Data sesi tidak valid' }
       try { getAbsensiWeek(item.tanggal) } catch { return { error: 'Tanggal absensi tidak valid' } }
       if (week && (item.tanggal < week.start || item.tanggal > week.end)) return { error: 'Absensi berada di luar pekan terpilih' }
+      if (minimumDate && item.tanggal < minimumDate) return { error: 'Absensi berada di luar antrean tiga bulan terakhir' }
       const key = `${item.absen_id}:${item.sesi}`
       if (seen.has(key)) return { error: 'Sesi absensi duplikat' }
       seen.add(key)
@@ -177,9 +183,11 @@ export async function simpanVerifikasiMassal(daftarVonis: VonisItem[], tanggalRe
           AND NOT EXISTS (SELECT 1 FROM absensi_verifikasi_periode p
             WHERE p.status = 'FINAL' AND ah.tanggal BETWEEN p.tanggal_mulai AND p.tanggal_selesai)`
       const params = [item.absen_id, data.santriId, item.tanggal, item.status_verif]
+      const boundedCondition = minimumDate ? `${condition} AND ah.tanggal >= ?` : condition
+      if (minimumDate) params.push(minimumDate)
       // The assertion runs within the same atomic batch as all writes. Invalid JSON
       // aborts the transaction if a concurrent verification changed the snapshot.
-      checks.push({ sql: `SELECT json(CASE WHEN EXISTS (${condition}) THEN 'true' ELSE 'absensi_stale' END)`, params })
+      checks.push({ sql: `SELECT json(CASE WHEN EXISTS (${boundedCondition}) THEN 'true' ELSE 'absensi_stale' END)`, params })
     }
   }
 

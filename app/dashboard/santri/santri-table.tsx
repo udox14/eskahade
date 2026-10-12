@@ -123,13 +123,16 @@ export async function SantriTable({
     }
   }
 
-  const joinClause =
-    "LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif' LEFT JOIN kelas k ON k.id = rp.kelas_id"
+  const activeEducationStatus = "lower(trim(COALESCE(rp.status_riwayat, 'aktif'))) IN ('aktif', 'active', '')"
   if (kelasPesantren) {
-    whereClauses.push('rp.kelas_id = ?')
+    whereClauses.push(
+      `EXISTS (SELECT 1 FROM riwayat_pendidikan rp WHERE rp.santri_id = s.id AND rp.kelas_id = ? AND ${activeEducationStatus})`
+    )
     params.push(kelasPesantren)
   } else if (marhalah) {
-    whereClauses.push('k.marhalah_id = ?')
+    whereClauses.push(
+      `EXISTS (SELECT 1 FROM riwayat_pendidikan rp JOIN kelas k ON k.id = rp.kelas_id WHERE rp.santri_id = s.id AND k.marhalah_id = ? AND ${activeEducationStatus})`
+    )
     params.push(marhalah)
   }
 
@@ -200,13 +203,15 @@ export async function SantriTable({
 
   const [countRow, santriList] = await Promise.all([
     queryOne<{ total: number }>(
-      `SELECT COUNT(*) AS total FROM santri s ${joinClause} ${whereStr}`,
+      `SELECT COUNT(*) AS total FROM santri s ${whereStr}`,
       params
     ),
     query<SantriRow>(
       `SELECT s.id, s.nama_lengkap, s.nis, s.asrama, s.kamar, s.sekolah, s.kelas_sekolah, s.kategori_santri, s.foto_url, ${kategoriEfektifSql} AS kategori_efektif, s.status_global,
-              k.nama_kelas AS kelas_pesantren
-       FROM santri s ${joinClause} ${whereStr}
+              (SELECT k.nama_kelas FROM riwayat_pendidikan rp JOIN kelas k ON k.id = rp.kelas_id
+               WHERE rp.santri_id = s.id AND ${activeEducationStatus}
+               ORDER BY rp.created_at DESC, rp.id DESC LIMIT 1) AS kelas_pesantren
+       FROM santri s ${whereStr}
        ORDER BY s.nama_lengkap ASC
        LIMIT ? OFFSET ?`,
       [...params, limit, offset]

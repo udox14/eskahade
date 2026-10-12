@@ -323,7 +323,7 @@ export default function InterviewForm({
     pageStyle: PRINT_CSS,
     pdfOptions: {
       format: 'A4',
-      margin: { top: '15mm', bottom: '15mm', left: '15mm', right: '15mm' },
+      margin: { top: '12mm', bottom: '14mm', left: '14mm', right: '14mm' },
       printBackground: true,
       preferCSSPageSize: true,
     },
@@ -1027,27 +1027,26 @@ export default function InterviewForm({
                     {s.items.map((it) => {
                       const ans = answers[it.id]
                       const filled = isAnswered(it, ans)
+                      const response = it.kind === 'text'
+                        ? ans?.text?.trim() || 'Belum diisi'
+                        : ans?.unknown
+                          ? `Tidak diketahui${ans?.note?.trim() ? `: ${ans?.note?.trim()}` : ''}`
+                          : ans?.score
+                            ? `Skor ${ans.score}`
+                            : 'Belum diisi'
                       return (
                         <div
                           key={it.id}
-                          className="p-2.5 rounded-xl bg-slate-50/70 text-xs flex items-start justify-between gap-3"
+                          className="p-3 rounded-xl bg-slate-50/70 text-xs space-y-1.5"
                         >
-                          <span className="text-slate-700 font-medium line-clamp-1">{it.label}</span>
-                          <span
-                            className={`font-semibold shrink-0 ${
+                          <p className="text-slate-700 font-semibold">{it.label}</p>
+                          <p
+                            className={`font-medium whitespace-pre-wrap break-words leading-relaxed ${
                               filled ? 'text-slate-900' : 'text-amber-700 italic'
                             }`}
                           >
-                            {it.kind === 'text'
-                              ? ans?.text
-                                ? 'Terisi'
-                                : 'Belum diisi'
-                              : ans?.unknown
-                                ? 'Tidak diketahui'
-                                : ans?.score
-                                  ? `Skor ${ans.score}`
-                                  : 'Belum diisi'}
-                          </span>
+                            {response}
+                          </p>
                         </div>
                       )
                     })}
@@ -1158,7 +1157,7 @@ export default function InterviewForm({
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-3 sm:p-6 overflow-hidden animate-in fade-in duration-150"
         >
-          <div className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden">
+          <div className="relative w-full max-w-6xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[96dvh] overflow-hidden">
             {/* Header Modal */}
             <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
               <div className="flex items-center gap-2.5">
@@ -1196,8 +1195,8 @@ export default function InterviewForm({
             </div>
 
             {/* Modal Body: Kertas Dokumen Scrollable */}
-            <div className="p-4 sm:p-8 overflow-y-auto bg-slate-100/90 flex justify-center flex-1">
-              <div className="bg-white shadow-md border border-slate-200/90 rounded-sm p-6 sm:p-10 max-w-3xl w-full">
+            <div className="min-h-0 p-4 sm:p-6 overflow-auto bg-slate-200/80 flex flex-1 items-start justify-center">
+              <div className="supervisi-preview-sheet mx-auto bg-white border border-slate-300 shadow-xl">
                 <PrintView
                   ref={printRef}
                   interview={printable}

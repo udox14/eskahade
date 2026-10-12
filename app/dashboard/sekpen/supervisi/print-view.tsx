@@ -59,7 +59,7 @@ export const PRINT_CSS = `
 .supervisi-print .doc-subtitle {
   text-align: center;
   font-size: 8.5pt;
-  color: #475569;
+  color: #444;
   margin-bottom: 10pt;
 }
 
@@ -67,9 +67,9 @@ export const PRINT_CSS = `
   text-align: center;
   font-size: 8pt;
   font-weight: 700;
-  color: #b45309;
-  background-color: #fef3c7;
-  border: 1px solid #fde68a;
+  color: #111;
+  background-color: #ededed;
+  border: 1px solid #777;
   padding: 2pt 8pt;
   display: inline-block;
   border-radius: 3pt;
@@ -87,14 +87,14 @@ export const PRINT_CSS = `
 .supervisi-print .meta-table td {
   padding: 3pt 6pt;
   vertical-align: top;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #888;
 }
 
 .supervisi-print .meta-table .meta-label {
   width: 22%;
   font-weight: 600;
-  background-color: #f8fafc;
-  color: #334155;
+  background-color: #f1f1f1;
+  color: #111;
 }
 
 .supervisi-print .meta-table .meta-val {
@@ -106,8 +106,8 @@ export const PRINT_CSS = `
   font-size: 9.5pt;
   font-weight: 700;
   color: #0f172a;
-  background-color: #f1f5f9;
-  border: 1px solid #cbd5e1;
+  background-color: #eaeaea;
+  border: 1px solid #666;
   padding: 4pt 7pt;
   margin-top: 10pt;
   margin-bottom: 4pt;
@@ -124,34 +124,34 @@ export const PRINT_CSS = `
 }
 
 .supervisi-print .data-table th {
-  background-color: #f8fafc;
-  border: 1px solid #cbd5e1;
+  background-color: #f1f1f1;
+  border: 1px solid #666;
   padding: 4pt 6pt;
   font-weight: 700;
   text-align: left;
-  color: #334155;
+  color: #111;
   font-size: 8pt;
 }
 
 .supervisi-print .data-table td {
-  border: 1px solid #e2e8f0;
+  border: 1px solid #888;
   padding: 4pt 6pt;
   vertical-align: top;
 }
 
 .supervisi-print .text-question-card {
-  border: 1px solid #e2e8f0;
-  border-left: 3px solid #64748b;
+  border: 1px solid #888;
+  border-left: 3px solid #555;
   padding: 5pt 7pt;
   margin-bottom: 6pt;
-  background-color: #fafaf9;
+  background-color: #fff;
   break-inside: avoid;
 }
 
 .supervisi-print .text-question-label {
   font-weight: 600;
   font-size: 8.5pt;
-  color: #334155;
+  color: #222;
   margin-bottom: 2pt;
 }
 
@@ -175,20 +175,69 @@ export const PRINT_CSS = `
 .supervisi-print .scale-guide {
   font-size: 7.5pt;
   color: #64748b;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed #777;
   padding: 4pt 8pt;
   margin-bottom: 10pt;
   border-radius: 2pt;
-  background-color: #fcfcfc;
+  background-color: #fff;
+}
+
+@media screen {
+  .supervisi-preview-sheet {
+    box-sizing: border-box;
+    width: 210mm;
+    max-width: 100%;
+    min-height: 297mm;
+    padding: 12mm 14mm 14mm;
+    flex: 0 0 auto;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .supervisi-preview-sheet {
+    padding: 8mm 6mm;
+  }
+}
+
+@media print {
+  .supervisi-print,
+  .supervisi-print * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .supervisi-print,
+  .supervisi-print * {
+    color: #111 !important;
+    border-color: #777 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  .supervisi-print .meta-table .meta-label,
+  .supervisi-print .section-title,
+  .supervisi-print .data-table th,
+  .supervisi-print .draft-badge {
+    background-color: #ededed !important;
+  }
+  .supervisi-print .text-question-card,
+  .supervisi-print .scale-guide {
+    background-color: #fff !important;
+  }
+  .supervisi-print .data-table thead {
+    display: table-header-group;
+  }
+  .supervisi-print .data-table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
 }
 `
 
 function getPredicate(avg: number | null): { label: string; textClass: string } {
-  if (avg === null) return { label: '-', textClass: 'text-slate-400' }
-  if (avg >= 3.5) return { label: 'Sangat Baik', textClass: 'text-emerald-700 font-bold' }
+  if (avg === null) return { label: '-', textClass: 'text-slate-600' }
+  if (avg >= 3.5) return { label: 'Sangat Baik', textClass: 'text-slate-900 font-bold' }
   if (avg >= 3.0) return { label: 'Baik', textClass: 'text-slate-800 font-semibold' }
-  if (avg >= 2.0) return { label: 'Cukup', textClass: 'text-amber-700 font-semibold' }
-  return { label: 'Perlu Pembinaan', textClass: 'text-rose-700 font-bold' }
+  if (avg >= 2.0) return { label: 'Cukup', textClass: 'text-slate-800 font-semibold' }
+  return { label: 'Perlu Pembinaan', textClass: 'text-slate-900 font-bold' }
 }
 
 export default forwardRef<
