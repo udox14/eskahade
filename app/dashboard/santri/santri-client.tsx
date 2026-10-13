@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   MagnifyingGlass,
@@ -28,27 +28,59 @@ function useDebounce<T>(value: T, delay: number): T {
  */
 function useModalHistory(isOpen: boolean, onClose: () => void) {
   const isPushedRef = useRef(false)
+  const onCloseRef = useRef(onClose)
+  const afterCloseRef = useRef<(() => void) | undefined>(undefined)
+  const isClosingRef = useRef(false)
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+
+  const close = useCallback((afterClose?: () => void) => {
+    if (isClosingRef.current) return
+    if (isPushedRef.current) {
+      isClosingRef.current = true
+      afterCloseRef.current = afterClose
+      // Tunggu popstate sebelum mengubah URL filter.
+      window.history.back()
+    } else {
+      onCloseRef.current()
+      afterClose?.()
+    }
+  }, [])
 
   useEffect(() => {
     if (isOpen) {
-      window.history.pushState({ modalOpen: true }, '')
+      // Pertahankan state router Next.js dan gunakan ulang entry saat effect replay.
+      const modalState = { ...window.history.state, santriFilterOpen: true }
+      if (isPushedRef.current) window.history.replaceState(modalState, '')
+      else window.history.pushState(modalState, '')
       isPushedRef.current = true
 
-      const handlePopState = () => {
+      const handlePopState = (event: PopStateEvent) => {
+        if (event.state?.santriFilterOpen) return
         isPushedRef.current = false
-        onClose()
+        isClosingRef.current = false
+        const afterClose = afterCloseRef.current
+        afterCloseRef.current = undefined
+        onCloseRef.current()
+        afterClose?.()
       }
 
       window.addEventListener('popstate', handlePopState)
       return () => {
         window.removeEventListener('popstate', handlePopState)
-        if (isPushedRef.current) {
-          isPushedRef.current = false
-          window.history.back()
+        // Cleanup tidak boleh membatalkan navigasi filter yang sedang berjalan.
+        if (window.history.state?.santriFilterOpen) {
+          const state = { ...window.history.state }
+          delete state.santriFilterOpen
+          window.history.replaceState(state, '')
         }
       }
     }
-  }, [isOpen, onClose])
+  }, [isOpen])
+
+  return close
 }
 
 export function SearchInput() {
@@ -314,14 +346,15 @@ function SantriFilterModalContent({
   filterOptions,
   userAsrama,
   onClose,
+  onApply,
 }: {
   marhalahList: MarhalahItem[]
   kelasList: KelasItem[]
   filterOptions: SantriFilterOptions
   userAsrama: string | null
   onClose: () => void
+  onApply: (url: string) => void
 }) {
-  const router = useRouter()
   const searchParams = useSearchParams()
 
   const [status, setStatus] = useState(searchParams.get('status') || '')
@@ -374,8 +407,7 @@ function SantriFilterModalContent({
     setParam('jemaah', jemaah)
     setParam('alamat', alamat.trim())
     params.set('page', '1')
-    router.replace(`?${params.toString()}`, { scroll: false })
-    onClose()
+    onApply(`?${params.toString()}`)
   }
 
   const handleReset = () => {
@@ -415,8 +447,7 @@ function SantriFilterModalContent({
       'alamat',
     ].forEach((k) => params.delete(k))
     params.set('page', '1')
-    router.replace(`?${params.toString()}`, { scroll: false })
-    onClose()
+    onApply(`?${params.toString()}`)
   }
 
   const currentActiveCount = [
@@ -691,21 +722,22 @@ export function SantriFilter({
   filterOptions: SantriFilterOptions
   userAsrama: string | null
 }) {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [isOpen, setIsOpen] = useState(false)
 
   // Tangani gestur/tombol back pada HP
-  useModalHistory(isOpen, () => setIsOpen(false))
+  const closeModal = useModalHistory(isOpen, () => setIsOpen(false))
 
   // Tangani tombol keyboard Escape
   useEffect(() => {
     if (!isOpen) return
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsOpen(false)
+      if (e.key === 'Escape') closeModal()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen])
+  }, [isOpen, closeModal])
 
   const statusParam = searchParams.get('status')
   const activeCount = [
@@ -754,7 +786,8 @@ export function SantriFilter({
           kelasList={kelasList}
           filterOptions={filterOptions}
           userAsrama={userAsrama}
-          onClose={() => setIsOpen(false)}
+          onClose={() => closeModal()}
+          onApply={(url) => closeModal(() => router.replace(url, { scroll: false }))}
         />
       )}
     </>
