@@ -71,7 +71,7 @@ async function main(){
    const inquiryRoute=h.load('app/snap/v2.0/transfer-va/inquiry/route.ts'),paymentRoute=h.load('app/snap/v2.0/transfer-va/payment/route.ts');
    assert.equal((await inquiryRoute.POST(http('inquiry',{...identity,inquiryRequestId:'request-1'},true))).status,401);
    assert.equal((await inquiryRoute.POST(http('inquiry',{...identity,inquiryRequestId:'request-1'}))).status,200);
-   const payload={...identity,virtualAccountName:'Santri',paymentRequestId:'request-1',trxId:'1234567890',paidAmount:{value:'12000.00',currency:'IDR'}};
+   const payload={...identity,virtualAccountName:'Santri',paymentRequestId:'request-1',trxId:'1234567890',paidAmount:{value:'12000.00',currency:'IDR'},trxDateTime:new Date().toISOString()};
    assert.equal((await paymentRoute.POST(http('payment',payload))).status,200);assert.equal((await paymentRoute.POST(http('payment',payload))).status,200);
    assert.equal(h.db.prepare('SELECT COUNT(*) n FROM finance_payments').get().n,1);
    delete process.env.BRI_CLIENT_SECRET;const failed=await paymentRoute.POST(http('payment',payload));assert.equal(failed.status,500);assert.deepEqual(await failed.json(),{responseCode:'5002500',responseMessage:'General Error'});

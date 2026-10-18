@@ -573,6 +573,7 @@ async function runTestSuite() {
     customerNo: '00001099',
     virtualAccountNo: '   1234500001099',
     paymentRequestId: 'PAY-REQ-NO-INQ-001',
+    trxDateTime: undefined,
     paidAmount: { value: '82000.00', currency: 'IDR' },
     referenceNo: 'REF-SEAM-001',
   })
@@ -592,24 +593,28 @@ async function runTestSuite() {
 
   // 2. When BRI_REQUIRE_PRIOR_INQUIRY_FOR_PAYMENT is false (contract permits direct payment):
   process.env.BRI_REQUIRE_PRIOR_INQUIRY_FOR_PAYMENT = 'false'
-  const resReqInqSuccess = await handleBrivaPayment({
+  const missingTimeReview = await handleBrivaPayment({
     rawBody: directPayBodyNoInq,
     headers: directPayHeaders,
     endpointPath: '/snap/v1.0/transfer-va/payment',
     method: 'POST',
     configOverride: testConfig,
   })
-  assert.strictEqual(resReqInqSuccess.status, 200, 'Direct payment without prior inquiry succeeds when allowed')
+  assert.strictEqual(missingTimeReview.status,404,'Optional bank time is required by allocation safety policy, not by protocol')
+  assert.strictEqual(sqliteDb.prepare("SELECT COUNT(*) n FROM finance_briva_reconciliation_metadata WHERE payment_request_id='PAY-REQ-NO-INQ-001'").get().n,0,'Missing bank time must not create fabricated metadata/payment')
+  const datedDirectBody=JSON.stringify({...JSON.parse(directPayBodyNoInq),trxDateTime:new Date().toISOString()})
+  const resReqInqSuccess=await handleBrivaPayment({rawBody:datedDirectBody,headers:createSignedHeaders('POST','/snap/v1.0/transfer-va/payment',datedDirectBody),endpointPath:'/snap/v1.0/transfer-va/payment',method:'POST',configOverride:testConfig})
+  assert.strictEqual(resReqInqSuccess.status, 200, 'Direct payment with reliable bank time succeeds when explicitly allowed')
   assert.strictEqual(resReqInqSuccess.body.responseCode, BRI_VA_PAYMENT_CODES.SUCCESS)
 
-  // Verify omitted trxDateTime was stored as NULL in database metadata
+  // Authenticated corrected evidence may resolve the same request exactly once.
   const recMetaDirect = sqliteDb.prepare("SELECT trx_date_time FROM finance_briva_reconciliation_metadata WHERE payment_request_id = 'PAY-REQ-NO-INQ-001'").get()
   assert.ok(recMetaDirect)
-  assert.strictEqual(recMetaDirect.trx_date_time, null, 'Omitted trxDateTime must be persisted as NULL, never fabricated')
+  assert.strictEqual(recMetaDirect.trx_date_time,JSON.parse(datedDirectBody).trxDateTime,'Store actual supplied bank time, never processing-time fallback')
 
   // Reset seam to default
   delete process.env.BRI_REQUIRE_PRIOR_INQUIRY_FOR_PAYMENT
-  console.log('✓ 8B. Prior inquiry seam verified: fail-closed when required, supported when false, omitted trxDateTime is NULL.')
+  console.log('✓ 8B. Prior inquiry seam verified; omitted bank time reviewed, reliable corrected evidence allocates safely.')
 
   // =========================================================================
   // SCENARIOS 11, 16, 17, 19: Concurrent Payment, passApp Hygiene, Rec Metadata, PAID != SETTLED
@@ -1180,6 +1185,7 @@ runTestSuite().catch((err) => {
 })
 
 function stringifyBrivaFixture(payload){
+ if(payload?.paymentRequestId && !Object.hasOwn(payload,'trxDateTime'))payload={...payload,trxDateTime:new Date().toISOString()}
  if(payload?.paymentRequestId && payload?.virtualAccountNo){payload={...payload,virtualAccountName:payload.virtualAccountName||'Ahmad Fauzi',trxId:payload.trxId||payload.additionalInfo?.trxId};if(payload.trxId && !/^\d+$/.test(payload.trxId))payload.trxId=BigInt('0x'+crypto.createHash('sha256').update(payload.trxId).digest('hex').slice(0,14)).toString()}
  return JSON.stringify(payload)
 }

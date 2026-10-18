@@ -332,6 +332,8 @@ async function runTestSuite() {
     responseMessage: 'Successful',
     partnerReferenceNo: 'BS-WEAK-TEST',
     accountNo: '001901000123301',
+    totalCreditEntries:{numberOfEntries:'1',amount:{value:'80000.00',currency:'IDR'}},
+    totalDebitEntries:{numberOfEntries:'0',amount:{value:'0.00',currency:'IDR'}},
     detailData: [
       {
         transactionDate: '2026-10-08T11:00:00+07:00',
@@ -417,6 +419,8 @@ async function runTestSuite() {
     responseCode: '2001400',
     responseMessage: 'Successful',
     accountNo: '001901000123301',
+    totalCreditEntries:{numberOfEntries:'2',amount:{value:'190000.00',currency:'IDR'}},
+    totalDebitEntries:{numberOfEntries:'0',amount:{value:'0.00',currency:'IDR'}},
     detailData: [
       {
         transactionDate: '2026-10-08T15:00:00+07:00',

@@ -50,6 +50,7 @@ export interface StatementIngestSummary {
   rawResponseHash: string
   cursorAdvanced: boolean
   hasDiscrepancy: boolean
+  completenessStatus: 'VERIFIED_TOTALS' | 'UNVERIFIED' | 'INVALID'
 }
 
 /**
@@ -430,8 +431,16 @@ export async function persistBankStatementTransactions(params: {
   // Response code 2001400 is strictly required for success and cursor advance.
   // 4041401 (Transaction Not Found) or errors are provider failures: status FAILED, cursor does NOT advance.
   const isSuccess200 = response.responseCode === '2001400'
-  const cursorAdvanced = !hasDiscrepancy && isSuccess200
-  const fetchStatus = hasDiscrepancy ? 'DISCREPANCY' : (isSuccess200 ? 'SUCCESS' : 'FAILED')
+  // Public v2.1 totals/counts/detailData are optional protocol fields. In the
+  // absence of an onboarded completeness/pagination contract, hold the window
+  // unless BOTH count+amount totals match an explicit detail array. Missing
+  // optional fields are unverified completeness, not malformed bank responses.
+  const completenessStatus: StatementIngestSummary['completenessStatus'] = hasDiscrepancy ? 'INVALID'
+    : isSuccess200 && Array.isArray(response.detailData)
+      && response.totalCreditEntries?.numberOfEntries!==undefined
+      && response.totalDebitEntries?.numberOfEntries!==undefined ? 'VERIFIED_TOTALS' : 'UNVERIFIED'
+  const cursorAdvanced = isSuccess200 && completenessStatus==='VERIFIED_TOTALS'
+  const fetchStatus = hasDiscrepancy ? 'DISCREPANCY' : (!isSuccess200 ? 'FAILED' : cursorAdvanced ? 'SUCCESS' : 'PENDING')
 
   // 2. Insert Fetch Audit Row
   const statements: Array<{ sql: string; params: unknown[] }> = [
@@ -466,7 +475,7 @@ export async function persistBankStatementTransactions(params: {
   ]
 
   // If fetch failed (e.g. 4041401 Transaction Not Found), abort processing lines: zero transactions, zero settlement
-  if (!isSuccess200 || hasDiscrepancy) {
+  if (!cursorAdvanced) {
     await batch(statements)
     return {
       fetchId,
@@ -482,6 +491,7 @@ export async function persistBankStatementTransactions(params: {
       rawResponseHash,
       cursorAdvanced: false,
       hasDiscrepancy,
+      completenessStatus,
     }
   }
 
@@ -662,5 +672,6 @@ export async function persistBankStatementTransactions(params: {
     rawResponseHash,
     cursorAdvanced,
     hasDiscrepancy,
+    completenessStatus,
   }
 }

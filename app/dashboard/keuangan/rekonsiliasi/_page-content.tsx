@@ -308,6 +308,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                 <h4 className="text-xs font-bold text-amber-900">Settlement berdasarkan bukti rekening koran</h4>
                 <p className="mt-0.5 text-xs text-amber-700 leading-relaxed">
                   Pencocokan dan pemeriksaan bukti tersedia di atas; sinkronisasi bank mengikuti kesiapan integrasi. Invariant: <code className="font-semibold text-amber-800">PAID != SETTLED</code> ditegakkan. Data riwayat batch di bawah merupakan arsip historis yang dapat ditinjau untuk audit.
+                  {' '}Penerimaan BRI termasuk admin Koperasi; dana titipan dan admin bukan hak penyaluran Pesantren/Katering/Laundry. Hak siap salur mengikuti alokasi dan reservasi.
                 </p>
               </div>
             </div>
@@ -332,8 +333,8 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                         <th className="px-5 py-3">Rekening Tujuan</th>
                         <th className="px-5 py-3 text-center">Jumlah Pembayaran</th>
                         <th className="px-5 py-3 text-right">Total Bruto</th>
-                        <th className="px-5 py-3 text-right">Total Fee</th>
-                        <th className="px-5 py-3 text-right">Net Dicairkan</th>
+                        <th className="px-5 py-3 text-right">Potongan Settlement</th>
+                        <th className="px-5 py-3 text-right">Net Diterima Rekening</th>
                         <th className="px-5 py-3 text-center">Status</th>
                         <th className="px-5 py-3">Diverifikasi</th>
                       </tr>

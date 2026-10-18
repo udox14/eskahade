@@ -648,19 +648,19 @@ export default function LaporanKeuanganContent({
               <p className="text-[11px] text-slate-400 mt-1">Pencairan bank</p>
             </div>
             <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
-              <p className="text-xs text-slate-500 font-medium">Gross Pencairan BRI</p>
+              <p className="text-xs text-slate-500 font-medium">Bruto Settlement</p>
               <p className="text-xl font-bold text-slate-900 mt-1">{formatRupiah(settlementsData?.kpi.totalGrossSettled || 0)}</p>
-              <p className="text-[11px] text-slate-400 mt-1">Nominal bruto transaksi</p>
+              <p className="text-[11px] text-slate-400 mt-1">BRI termasuk admin Koperasi</p>
             </div>
             <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
-              <p className="text-xs text-slate-500 font-medium">Fee Terpotong</p>
+              <p className="text-xs text-slate-500 font-medium">Potongan Settlement</p>
               <p className="text-xl font-bold text-slate-900 mt-1">{formatRupiah(settlementsData?.kpi.totalFeeDeducted || 0)}</p>
-              <p className="text-[11px] text-slate-400 mt-1">Biaya transaksi gateway</p>
+              <p className="text-[11px] text-slate-400 mt-1">Bukan fee BRI yang dibayar wali</p>
             </div>
             <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
               <p className="text-xs text-slate-500 font-medium">Net Masuk Rekening</p>
               <p className="text-xl font-bold text-emerald-700 mt-1">{formatRupiah(settlementsData?.kpi.totalNetReceived || 0)}</p>
-              <p className="text-[11px] text-slate-400 mt-1">Saldo efektif bank</p>
+              <p className="text-[11px] text-slate-400 mt-1">Penerimaan terverifikasi, bukan saldo atau dana siap salur</p>
             </div>
           </>
         )}
@@ -1354,7 +1354,7 @@ export default function LaporanKeuanganContent({
                   <th className="py-3 px-3">Rekening Bank</th>
                   <th className="py-3 px-3 text-center">Jml Transaksi</th>
                   <th className="py-3 px-3 text-right">Bruto</th>
-                  <th className="py-3 px-3 text-right">Total Fee</th>
+                  <th className="py-3 px-3 text-right">Potongan Settlement</th>
                   <th className="py-3 px-3 text-right font-bold text-emerald-700">Net Masuk Rekening</th>
                   <th className="py-3 px-3 text-center">Status</th>
                 </tr>
@@ -1768,11 +1768,11 @@ export default function LaporanKeuanganContent({
           isOpen={isPrintModalOpen}
           onClose={() => setIsPrintModalOpen(false)}
           title="LAPORAN SETTLEMENT PAYMENT GATEWAY"
-          subtitle="Pondok Pesantren Eskahade — Pencairan Dana Online BRI ke Rekening Pesantren"
+          subtitle="Rekonsiliasi penerimaan rekening — BRI termasuk admin Koperasi; hak penyaluran mengikuti alokasi, bukan total settlement"
           filterSummary={`Periode: ${startDate || 'Awal'} s.d. ${endDate || 'Akhir'}`}
           kpis={[
             { label: 'Total Bruto', value: formatRupiah(settlementsData.kpi.totalGrossSettled) },
-            { label: 'Total Fee', value: formatRupiah(settlementsData.kpi.totalFeeDeducted) },
+            { label: 'Potongan Settlement', value: formatRupiah(settlementsData.kpi.totalFeeDeducted) },
             { label: 'Net Diterima', value: formatRupiah(settlementsData.kpi.totalNetReceived) },
             { label: 'Jumlah Batch', value: `${settlementsData.kpi.totalSettlementBatches} batch` },
           ]}
@@ -1784,7 +1784,7 @@ export default function LaporanKeuanganContent({
             { header: 'Atas Nama', accessor: (r) => r.accountHolderName },
             { header: 'Jml Trx', accessor: (r) => r.itemCount, align: 'center' },
             { header: 'Bruto', accessor: (r) => formatRupiah(r.grossAmount), align: 'right' },
-            { header: 'Total Fee', accessor: (r) => formatRupiah(r.totalFee), align: 'right' },
+            { header: 'Potongan Settlement', accessor: (r) => formatRupiah(r.totalFee), align: 'right' },
             { header: 'Net Masuk', accessor: (r) => formatRupiah(r.netAmount), align: 'right' },
             { header: 'Status', accessor: (r) => r.status, align: 'center' },
           ]}

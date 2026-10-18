@@ -2,6 +2,8 @@
 
 Dokumen ini menggantikan instruksi rilis lama yang bertentangan dengan audit/remediation 18 Oktober. Pekerjaan pada branch remediation hanya lokal. Tidak ada izin push, deploy, migrasi remote, perubahan secret/flag/R2, atau transaksi bank.
 
+Follow-up review setelah `ac9e4fa9`: lihat [laporan follow-up](C:/DATA/eskahade/docs/BRI_INDEPENDENT_REVIEW_FOLLOWUP.md). `paid_at` memakai waktu bank yang terautentikasi, `created_at` waktu pemrosesan; waktu bank hilang/rusak atau mendahului order masuk review tanpa allocation. Callback tertunda dengan waktu bank valid di dalam window tidak ditolak hanya karena terlambat tiba, selama order/inquiry tetap authoritative. Guard 0188 tidak diubah. Statement dengan optional totals/counts/detail yang belum membuktikan kelengkapan ditahan `PENDING`/cursor=0, bukan dianggap field mandatory invalid. Penerimaan settlement BRI termasuk admin Koperasi dan titipan; hak penyaluran tetap dari alokasi, bukan total penerimaan. Seluruh gate eksternal tetap berlaku.
+
 ## Baseline dan schema
 
 - Baseline audit: `6ee5debfb39881aba7bd74b4c3f1058a97210308`.

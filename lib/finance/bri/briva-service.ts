@@ -940,12 +940,29 @@ export async function handleBrivaPayment(params: {
   const parsedPaidRupiah = moneyParse.rupiah
 
   // 5. Resolve Identifiers & Compute Canonical Payment Fingerprint
-  if((req.trxId!==undefined && (typeof req.trxId!=='string' || !/^\d{1,64}$/.test(req.trxId))) ||
-     (req.trxDateTime!==undefined && (!isValidIsoDateTimeWithOffset(req.trxDateTime) || !Number.isFinite(Date.parse(req.trxDateTime)) || Date.parse(req.trxDateTime)>Date.now()+300000))) {
-    return {status:400,body:{responseCode:BRI_VA_PAYMENT_CODES.INVALID_FIELD_FORMAT,responseMessage:'Invalid Field Format trxId/trxDateTime'}}
+  if(req.trxId!==undefined && (typeof req.trxId!=='string' || !/^\d{1,64}$/.test(req.trxId))) {
+    return {status:400,body:{responseCode:BRI_VA_PAYMENT_CODES.INVALID_FIELD_FORMAT,responseMessage:'Invalid Field Format trxId'}}
   }
   const rawTrxId = req.trxId || ''
   const eventKey = `briva_pay_${paymentRequestId}_${rawTrxId}`
+  // Auth has already verified the raw payload. Preserve uncertain outcomes before
+  // returning; missing optional bank time is not permission to invent paid_at.
+  const recordReview=async(reason:string,orderId?:string,responseCode:string=BRI_VA_PAYMENT_CODES.BILL_NOT_FOUND)=>{
+    const reviewId=crypto.createHash('sha256').update(eventKey).digest('hex')
+    const owner=await queryOne<{santri_id:string}>('SELECT santri_id FROM finance_student_va WHERE va_number=? AND customer_no=?',[vaNo,custNo])
+    const statements:Array<{sql:string;params:unknown[]}>=[{sql:`INSERT OR IGNORE INTO finance_gateway_events(id,gateway_name,event_key,event_type,signature_valid,payload_json,response_code,is_processed,processing_status,created_at) VALUES(?,'BRI',?,'PAYMENT_NOTIFICATION',1,?,?,0,'ERROR',?)`,params:[reviewId,eventKey+':REVIEW',JSON.stringify(sanitizePayload(req as unknown as Record<string,unknown>)),responseCode,now()]}]
+    if(owner)statements.push({sql:`INSERT OR IGNORE INTO finance_bri_recovery_queue(id,order_id,santri_id,virtual_account_no,payment_request_id,bri_trx_id,expected_amount,recovery_status,reason,created_at) VALUES(?,?,?,?,?,?,?,'DISCREPANCY',?,?)`,params:[reviewId,orderId||null,owner.santri_id,vaNo,paymentRequestId,rawTrxId||null,parsedPaidRupiah,reason,now()]})
+    await batch(statements)
+  }
+  if(req.trxDateTime===undefined){
+    await recordReview('BANK_TRANSACTION_TIME_MISSING_REQUIRES_REVIEW')
+    return {status:404,body:{responseCode:BRI_VA_PAYMENT_CODES.BILL_NOT_FOUND,responseMessage:'Invalid Bill'}}
+  }
+  if(!isValidIsoDateTimeWithOffset(req.trxDateTime) || Date.parse(req.trxDateTime)>Date.now()+300000){
+    await recordReview('BANK_TRANSACTION_TIME_INVALID_REQUIRES_REVIEW',undefined,BRI_VA_PAYMENT_CODES.INVALID_FIELD_FORMAT)
+    return {status:400,body:{responseCode:BRI_VA_PAYMENT_CODES.INVALID_FIELD_FORMAT,responseMessage:'Invalid Field Format trxDateTime'}}
+  }
+  const confirmedAt=new Date(req.trxDateTime).toISOString()
   const paymentFingerprint = computePaymentFingerprint({
     partnerServiceId,
     customerNo: custNo,
@@ -1124,14 +1141,6 @@ export async function handleBrivaPayment(params: {
     }
   }
 
-  const recordReview=async(reason:string,orderId?:string)=>{
-    const reviewId=crypto.createHash('sha256').update(eventKey).digest('hex')
-    await batch([
-      {sql:`INSERT OR IGNORE INTO finance_gateway_events(id,gateway_name,event_key,event_type,signature_valid,payload_json,response_code,is_processed,processing_status,created_at) VALUES(?,'BRI',?,'PAYMENT_NOTIFICATION',1,?,'4042512',0,'ERROR',?)`,params:[reviewId,eventKey+':REVIEW',JSON.stringify(sanitizePayload(req as unknown as Record<string,unknown>)),now()]},
-      {sql:`INSERT OR IGNORE INTO finance_bri_recovery_queue(id,order_id,santri_id,virtual_account_no,payment_request_id,bri_trx_id,expected_amount,recovery_status,reason,created_at) VALUES(?,?,?,?,?,?,?,'DISCREPANCY',?,?)`,params:[reviewId,orderId||null,student.id,vaNo,paymentRequestId,rawTrxId||null,parsedPaidRupiah,reason,now()]}
-    ])
-  }
-
   // 10. Correlate Relevant Payment Order
   const activeOrder = await queryOne<{
     id: string
@@ -1142,9 +1151,10 @@ export async function handleBrivaPayment(params: {
     cooperative_fee_snapshot:string|null
     total_charged: number
     status: string
+    created_at: string
     expires_at: string
   }>(
-    `SELECT id, order_number, gross_amount, cooperative_admin_fee, cooperative_fee_rule_id, cooperative_fee_snapshot, total_charged, status, expires_at
+    `SELECT id, order_number, gross_amount, cooperative_admin_fee, cooperative_fee_rule_id, cooperative_fee_snapshot, total_charged, status, created_at, expires_at
      FROM finance_payment_orders
      WHERE santri_id = ?
        AND payment_method = 'BRI_VA'
@@ -1184,7 +1194,10 @@ export async function handleBrivaPayment(params: {
     }
   }
 
-  const confirmedAt=req.trxDateTime ? new Date(req.trxDateTime).toISOString() : now()
+  if(!Number.isFinite(Date.parse(activeOrder.created_at)) || !Number.isFinite(Date.parse(activeOrder.expires_at)) || Date.parse(confirmedAt)<Date.parse(activeOrder.created_at)) {
+    await recordReview('BANK_TIME_BEFORE_ORDER_OR_INVALID_ORDER_WINDOW',activeOrder.id)
+    return {status:404,body:{responseCode:BRI_VA_PAYMENT_CODES.BILL_NOT_FOUND,responseMessage:'Invalid Bill'}}
+  }
   if(Date.parse(activeOrder.expires_at)<Date.parse(confirmedAt)) {
     await recordReview('LATE_PAYMENT_REQUIRES_BANK_EVIDENCE',activeOrder.id)
     return {status:404,body:{responseCode:BRI_VA_PAYMENT_CODES.BILL_NOT_FOUND,responseMessage:'Invalid Bill'}}
@@ -1335,6 +1348,8 @@ export async function handleBrivaPayment(params: {
     ],
   })
 
+  // paid_at is authenticated bank event time; created_at is application processing
+  // time. Keep the expiry trigger strict even when delivery occurs after expiry.
   // Step B: Insert Payment Record (PAID != SETTLED; status = 'PAID')
   // Protected by trigger `trg_finance_payments_briva_guard` (compare-and-set)!
   statements.push({
@@ -1513,6 +1528,7 @@ export async function handleBrivaPayment(params: {
 
     // Case 1: BRIVA_GUARD_ABORT triggered (Order cancelled by CASH loket or changed)
     if (errMsg.includes('BRIVA_GUARD_ABORT')) {
+      await recordReview('ORDER_STATE_CHANGED_DURING_PAYMENT_REQUIRES_REVIEW',activeOrder.id)
       briLog('warn', 'BRIVA_PAYMENT_GUARD_ABORT', {
         durationMs: Date.now() - startTime,
         details: { orderId: activeOrder.id, paymentRequestId, error: errMsg },

@@ -1,0 +1,450 @@
+{
+  "baseline": "ac9e4fa9772163b28c22090f2ae192d0f3163d81",
+  "branch": "fix/finance-bri-audit-20261018",
+  "followupCommit": "Commit containing this evidence; exact SHA in handoff",
+  "before": {
+    "suite": "BRI independent review follow-up",
+    "sourceRevision": "ac9e4fa9772163b28c22090f2ae192d0f3163d81",
+    "schema": "Actual finance migrations through 0189, FK ON, all triggers enabled",
+    "results": [
+      {
+        "name": "1 on-time bank payment/on-time callback preserves event vs processing timestamps",
+        "status": "PASS"
+      },
+      {
+        "name": "2 on-time bank payment/delayed callback passes all migration-derived triggers",
+        "status": "PASS"
+      },
+      {
+        "name": "3 after-expiry bank payment is evidence only",
+        "status": "PASS"
+      },
+      {
+        "name": "4 missing optional bank time never substitutes processing time",
+        "status": "FAIL",
+        "error": "Expected values to be strictly equal:\n\n200 !== 404\n"
+      },
+      {
+        "name": "4b malformed bank time retains authenticated evidence without allocating",
+        "status": "FAIL",
+        "error": "Expected values to be strictly equal:\n\n0 !== 1\n"
+      },
+      {
+        "name": "5 bank time before order creation is reviewed instead of failing SQL payment insertion",
+        "status": "FAIL",
+        "error": "Expected values to be strictly equal:\n\n0 !== 1\n"
+      },
+      {
+        "name": "6 duplicate delayed callback commits payment/allocation/fee/wallet once",
+        "status": "PASS"
+      },
+      {
+        "name": "7 replaced/expired/cancelled order retains evidence and never allocates",
+        "status": "PASS"
+      },
+      {
+        "name": "8 lost delayed-callback response safely replays through actual HTTP route",
+        "status": "PASS"
+      },
+      {
+        "name": "9 expiry trigger remains hard guard for direct SQL outside validity window",
+        "status": "PASS"
+      },
+      {
+        "name": "10 order changes at atomic insert retain evidence after guard abort",
+        "status": "FAIL",
+        "error": "Expected values to be strictly equal:\n\n0 !== 1\n"
+      },
+      {
+        "name": "statement optional missing-credit-total holds cursor without declaring protocol mandatory",
+        "status": "FAIL",
+        "error": "Expected values to be strictly equal:\n\ntrue !== false\n"
+      },
+      {
+        "name": "statement optional missing-debit-total holds cursor without declaring protocol mandatory",
+        "status": "FAIL",
+        "error": "Expected values to be strictly equal:\n\ntrue !== false\n"
+      },
+      {
+        "name": "statement optional missing-both-totals holds cursor without declaring protocol mandatory",
+        "status": "FAIL",
+        "error": "Expected values to be strictly equal:\n\ntrue !== false\n"
+      },
+      {
+        "name": "statement optional missing-credit-count holds cursor without declaring protocol mandatory",
+        "status": "FAIL",
+        "error": "Expected values to be strictly equal:\n\ntrue !== false\n"
+      },
+      {
+        "name": "statement optional missing-debit-count holds cursor without declaring protocol mandatory",
+        "status": "FAIL",
+        "error": "Expected values to be strictly equal:\n\ntrue !== false\n"
+      },
+      {
+        "name": "statement optional omitted-details holds cursor without declaring protocol mandatory",
+        "status": "FAIL",
+        "error": "Expected values to be strictly equal:\n\ntrue !== false\n"
+      },
+      {
+        "name": "statement explicit empty detail with two consistent zero totals is verified",
+        "status": "FAIL",
+        "error": "Expected values to be strictly equal:\n+ actual - expected\n\n+ undefined\n- 'VERIFIED_TOTALS'\n"
+      },
+      {
+        "name": "statement inconsistent totals/truncated row/truncated list never advance cursor",
+        "status": "PASS"
+      },
+      {
+        "name": "settlement conservation separates principal/admin/bank customer fee and distribution rights",
+        "status": "PASS"
+      }
+    ],
+    "passed": 9,
+    "failed": 11
+  },
+  "after": {
+    "suite": "BRI independent review follow-up",
+    "sourceRevision": "working tree",
+    "schema": "Actual finance migrations through 0189, FK ON, all triggers enabled",
+    "results": [
+      {
+        "name": "1 on-time bank payment/on-time callback preserves event vs processing timestamps",
+        "status": "PASS"
+      },
+      {
+        "name": "2 on-time bank payment/delayed callback passes all migration-derived triggers",
+        "status": "PASS"
+      },
+      {
+        "name": "3 after-expiry bank payment is evidence only",
+        "status": "PASS"
+      },
+      {
+        "name": "4 missing optional bank time never substitutes processing time",
+        "status": "PASS"
+      },
+      {
+        "name": "4b malformed bank time retains authenticated evidence without allocating",
+        "status": "PASS"
+      },
+      {
+        "name": "5 bank time before order creation is reviewed instead of failing SQL payment insertion",
+        "status": "PASS"
+      },
+      {
+        "name": "6 duplicate delayed callback commits payment/allocation/fee/wallet once",
+        "status": "PASS"
+      },
+      {
+        "name": "7 replaced/expired/cancelled order retains evidence and never allocates",
+        "status": "PASS"
+      },
+      {
+        "name": "8 lost delayed-callback response safely replays through actual HTTP route",
+        "status": "PASS"
+      },
+      {
+        "name": "9 expiry trigger remains hard guard for direct SQL outside validity window",
+        "status": "PASS"
+      },
+      {
+        "name": "10 order changes at atomic insert retain evidence after guard abort",
+        "status": "PASS"
+      },
+      {
+        "name": "statement optional missing-credit-total holds cursor without declaring protocol mandatory",
+        "status": "PASS"
+      },
+      {
+        "name": "statement optional missing-debit-total holds cursor without declaring protocol mandatory",
+        "status": "PASS"
+      },
+      {
+        "name": "statement optional missing-both-totals holds cursor without declaring protocol mandatory",
+        "status": "PASS"
+      },
+      {
+        "name": "statement optional missing-credit-count holds cursor without declaring protocol mandatory",
+        "status": "PASS"
+      },
+      {
+        "name": "statement optional missing-debit-count holds cursor without declaring protocol mandatory",
+        "status": "PASS"
+      },
+      {
+        "name": "statement optional omitted-details holds cursor without declaring protocol mandatory",
+        "status": "PASS"
+      },
+      {
+        "name": "statement explicit empty detail with two consistent zero totals is verified",
+        "status": "PASS"
+      },
+      {
+        "name": "statement inconsistent totals/truncated row/truncated list never advance cursor",
+        "status": "PASS"
+      },
+      {
+        "name": "settlement conservation separates principal/admin/bank customer fee and distribution rights",
+        "status": "PASS"
+      }
+    ],
+    "passed": 20,
+    "failed": 0
+  },
+  "regression": [
+    {
+      "file": "test-bri-audit-reports.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-bri-cash-manual-distribution.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-bri-collection.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-bri-core.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-bri-distribution.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-bri-settlement.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-bri-remediation.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-bri-review-followup.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-cutover-uang-jajan-zero.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-excel-export.mjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase10.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase2a.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase2b.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase2c.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase3a.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase3b-snap.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase3b.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase4a.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase4b.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase4c.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase5.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase6.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase7.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase8.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase9.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-legacy-payment-bridge.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-operations-remediation.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-patch-b.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-patch-c1.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-patch-c2.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-patch-c3.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-patch-c4.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-portal-ortu.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-remediation.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-runtime-blockers.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-state-migration.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-migration-0182.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-migration-0183.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-migration-0184.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-migration-0185.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-migration-0186.cjs",
+      "exitCode": 0
+    }
+  ],
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit",
+    "exitCode": 0,
+    "log": "output/review-followup-typecheck.log",
+    "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "build": {
+    "command": "npm run build:cf",
+    "exitCode": 0,
+    "log": "output/review-followup-build.log",
+    "logSha256": "40e9b778d4989a3240f70a0b3f2886b9475d3f88b788eb18a3fa0f672d940583",
+    "windowsFirstAttempt": "EPERM generated .next directory; retried with allowed local execution"
+  },
+  "migrations": [
+    {
+      "file": "0182_bri_foundation.sql",
+      "committedSha256": "e2664abd76a28dd8625ee15b6579678dde11239aef38c8d30e9de92c0c1fc257",
+      "sqlUnchanged": true,
+      "appliedRemotelyByThisTask": false
+    },
+    {
+      "file": "0183_briva_collection_metadata.sql",
+      "committedSha256": "0102dbd8150b9cce3a039f3b6230eb5f04c2c739a372bbd032d855e08a0cc03c",
+      "sqlUnchanged": true,
+      "appliedRemotelyByThisTask": false
+    },
+    {
+      "file": "0184_bri_settlement_and_recovery.sql",
+      "committedSha256": "688ce3e74e8c2491406fd6cd8c89f28534c93f32a7fbf2e864ce2cb71008b789",
+      "sqlUnchanged": true,
+      "appliedRemotelyByThisTask": false
+    },
+    {
+      "file": "0185_bri_qlola_distribution.sql",
+      "committedSha256": "e3f288f797b94486343f0ff5081fb2e281ce738e6147708f69189a6913284763",
+      "sqlUnchanged": true,
+      "appliedRemotelyByThisTask": false
+    },
+    {
+      "file": "0186_cash_manual_distribution_hardening.sql",
+      "committedSha256": "e3a8ac2198c1fcf9551b18da822d85b1337cbdbe6a043fca0b4be5913e452367",
+      "sqlUnchanged": true,
+      "appliedRemotelyByThisTask": false
+    },
+    {
+      "file": "0187_finance_controlled_remediation.sql",
+      "committedSha256": "d0426d1a9af3c0e991a71cae2414813016e4982365f2fd3999cc58c8ba849a56",
+      "sqlUnchanged": true,
+      "appliedRemotelyByThisTask": false
+    },
+    {
+      "file": "0188_bri_evidence_guards.sql",
+      "committedSha256": "506a5b2b2ed74eef55fc20ac1ec8d90d9820b7e906524124f76f16d339f657e6",
+      "sqlUnchanged": true,
+      "appliedRemotelyByThisTask": false
+    },
+    {
+      "file": "0189_finance_snapshot_and_reporting.sql",
+      "committedSha256": "f7e92975353ae2f49c1c719905c9b292cd21a9ee729e119a15eb52a372f68ee1",
+      "sqlUnchanged": true,
+      "appliedRemotelyByThisTask": false
+    }
+  ],
+  "originalReportedDelayedCallback": {
+    "baselineResult": "PASS",
+    "afterResult": "PASS",
+    "bankPayment": "2026-10-18T09:59:00+07:00",
+    "applicationProcessing": "2026-10-18T10:05:00+07:00",
+    "paidAt": "2026-10-18T02:59:00.000Z",
+    "createdAt": "2026-10-18T03:05:00.000Z"
+  },
+  "confirmedDefectsFixed": [
+    "Missing bank-time fallback to application time",
+    "Malformed/pre-creation time and atomic state-change evidence not retained",
+    "Cursor advanced without optional completeness evidence",
+    "Settlement collection owner/balance/deduction labels"
+  ],
+  "remainingGates": [
+    "Direct R2/custom-domain/legacy-cache financial-proof privacy",
+    "Partner BRIVA timestamp/token/version/onboarding and UAT",
+    "Statement entitlement/window/pagination/completeness contract",
+    "Beneficiary and Transaction Status Inquiry contracts",
+    "QLola non-STP/Signer contract and UAT",
+    "Real D1 distributed concurrency and browser/operator UAT"
+  ],
+  "migrationStatus": "UNAPPLIED REMOTELY (0187-0189)",
+  "deploymentStatus": "NOT DEPLOYED",
+  "remoteMutations": false,
+  "credentialsOrFeatureFlagsChanged": false,
+  "verdict": "READY_FOR_REVIEW"
+}

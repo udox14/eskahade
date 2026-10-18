@@ -2342,6 +2342,7 @@ export async function getSettlementsReport(
   const rows = await query<{
     id: string
     settlement_number: string
+    provider: string
     settlement_date: string
     destination_bank: string
     destination_account: string
@@ -2357,6 +2358,7 @@ export async function getSettlementsReport(
     `SELECT
        fs.id,
        fs.settlement_number,
+       fs.provider,
        fs.settlement_date,
        fs.destination_bank,
        fs.destination_account,
@@ -2382,7 +2384,7 @@ export async function getSettlementsReport(
     settlementDate: r.settlement_date,
     destinationBank: r.destination_bank,
     destinationAccount: r.destination_account,
-    accountHolderName: 'Pondok Pesantren Eskahade',
+    accountHolderName: r.provider==='BRI' ? 'Rekening collection Koperasi' : 'Rekening settlement historis',
     itemCount: r.total_payments_count,
     grossAmount: r.total_gross_amount,
     totalFee: r.total_fee_amount,
