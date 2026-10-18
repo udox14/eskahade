@@ -948,9 +948,12 @@ export async function handleBrivaPayment(params: {
   // Auth has already verified the raw payload. Preserve uncertain outcomes before
   // returning; missing optional bank time is not permission to invent paid_at.
   const recordReview=async(reason:string,orderId?:string,responseCode:string=BRI_VA_PAYMENT_CODES.BILL_NOT_FOUND)=>{
-    const reviewId=crypto.createHash('sha256').update(eventKey).digest('hex')
+    // One durable record per authenticated body variant; a fresh signature/header
+    // on the same JSON body must still replay the same evidence atomically.
+    const reviewKey = `${eventKey}:REVIEW:${hashBodySha256(JSON.stringify(req))}`
+    const reviewId=crypto.createHash('sha256').update(reviewKey).digest('hex')
     const owner=await queryOne<{santri_id:string}>('SELECT santri_id FROM finance_student_va WHERE va_number=? AND customer_no=?',[vaNo,custNo])
-    const statements:Array<{sql:string;params:unknown[]}>=[{sql:`INSERT OR IGNORE INTO finance_gateway_events(id,gateway_name,event_key,event_type,signature_valid,payload_json,response_code,is_processed,processing_status,created_at) VALUES(?,'BRI',?,'PAYMENT_NOTIFICATION',1,?,?,0,'ERROR',?)`,params:[reviewId,eventKey+':REVIEW',JSON.stringify(sanitizePayload(req as unknown as Record<string,unknown>)),responseCode,now()]}]
+    const statements:Array<{sql:string;params:unknown[]}>=[{sql:`INSERT OR IGNORE INTO finance_gateway_events(id,gateway_name,event_key,event_type,signature_valid,payload_json,response_code,is_processed,processing_status,created_at) VALUES(?,'BRI',?,'PAYMENT_NOTIFICATION',1,?,?,0,'ERROR',?)`,params:[reviewId,reviewKey,JSON.stringify(sanitizePayload(req as unknown as Record<string,unknown>)),responseCode,now()]}]
     if(owner)statements.push({sql:`INSERT OR IGNORE INTO finance_bri_recovery_queue(id,order_id,santri_id,virtual_account_no,payment_request_id,bri_trx_id,expected_amount,recovery_status,reason,created_at) VALUES(?,?,?,?,?,?,?,'DISCREPANCY',?,?)`,params:[reviewId,orderId||null,owner.santri_id,vaNo,paymentRequestId,rawTrxId||null,parsedPaidRupiah,reason,now()]})
     await batch(statements)
   }
@@ -1069,6 +1072,21 @@ export async function handleBrivaPayment(params: {
         ...(buildPaymentResponseAdditionalInfo(req.additionalInfo) ? {additionalInfo:buildPaymentResponseAdditionalInfo(req.additionalInfo)} : {}),
       },
     }
+  }
+
+  // Conflicting authenticated review evidence needs reconciliation, even when a
+  // later callback supplies bank time. Do not choose an amount/identity silently.
+  const reviewConflictSql = `SELECT rq.id FROM finance_bri_recovery_queue rq
+    JOIN finance_gateway_events ge ON ge.id=rq.id AND ge.gateway_name='BRI'
+      AND ge.event_type='PAYMENT_NOTIFICATION' AND ge.signature_valid=1
+    WHERE rq.recovery_status='DISCREPANCY'
+      AND (rq.payment_request_id=? OR (?<>'' AND rq.bri_trx_id=?))
+      AND (COALESCE(rq.payment_request_id,'')!=? OR COALESCE(rq.bri_trx_id,'')!=?
+        OR rq.expected_amount!=? OR rq.virtual_account_no!=?) LIMIT 1`
+  const reviewConflictParams = [paymentRequestId,rawTrxId,rawTrxId,paymentRequestId,rawTrxId,parsedPaidRupiah,vaNo]
+  if (await queryOne(reviewConflictSql, reviewConflictParams)) {
+    await recordReview('CALLBACK_IDENTIFIER_CONFLICT_REQUIRES_REVIEW',undefined,BRI_VA_PAYMENT_CODES.CONFLICT)
+    return {status:409,body:{responseCode:BRI_VA_PAYMENT_CODES.CONFLICT,responseMessage:'Conflict'}}
   }
 
   // 8. Resolve Fixed BRIVA from database & Validate Cross-Field Identity Trio
@@ -1360,13 +1378,13 @@ export async function handleBrivaPayment(params: {
         status, correction_status, allocation_status, paid_at,
         bri_payment_request_id, bri_trx_id, external_reference,
         source, fund_management, created_at
-      ) VALUES (
+      ) SELECT
         ?, ?, ?, ?, 'BRI', 'BRI_VA',
         ?, ?, NULL, ?,
         'PAID', 'NONE', 'ALLOCATED', ?,
         ?, ?, ?,
         'NEW_FINANCE', 'KOPERASI', ?
-      )
+      WHERE NOT EXISTS (${reviewConflictSql})
     `,
     params: [
       paymentId,
@@ -1381,6 +1399,7 @@ export async function handleBrivaPayment(params: {
       rawTrxId || null,
       params.headers.externalId,
       timestamp,
+      ...reviewConflictParams,
     ],
   })
 
@@ -1413,7 +1432,7 @@ export async function handleBrivaPayment(params: {
     ],
   })
 
-  statements.push({sql:`UPDATE finance_bri_recovery_queue SET recovery_status='RESOLVED',recovered_payment_id=?,resolved_at=? WHERE payment_request_id=? AND santri_id=? AND virtual_account_no=?`,params:[paymentId,timestamp,paymentRequestId,studentVa.santri_id,vaNo]})
+  statements.push({sql:`UPDATE finance_bri_recovery_queue SET recovery_status='RESOLVED',recovered_payment_id=?,resolved_at=? WHERE payment_request_id=? AND santri_id=? AND virtual_account_no=? AND expected_amount=? AND COALESCE(bri_trx_id,'')=?`,params:[paymentId,timestamp,paymentRequestId,studentVa.santri_id,vaNo,parsedPaidRupiah,rawTrxId]})
   // Step D: Mark Payment Order as PAID
   statements.push({
     sql: `
@@ -1525,6 +1544,14 @@ export async function handleBrivaPayment(params: {
     await batch(statements)
   } catch (batchErr) {
     const errMsg = batchErr instanceof Error ? batchErr.message : String(batchErr)
+
+    // The conditional payment insert rechecks the conflict inside the atomic
+    // batch. If it is suppressed, dependent metadata/allocation FKs roll back
+    // the entire batch, including its gateway event, before review is recorded.
+    if (await queryOne(reviewConflictSql, reviewConflictParams)) {
+      await recordReview('CALLBACK_IDENTIFIER_CONFLICT_REQUIRES_REVIEW',activeOrder.id,BRI_VA_PAYMENT_CODES.CONFLICT)
+      return {status:409,body:{responseCode:BRI_VA_PAYMENT_CODES.CONFLICT,responseMessage:'Conflict'}}
+    }
 
     // Case 1: BRIVA_GUARD_ABORT triggered (Order cancelled by CASH loket or changed)
     if (errMsg.includes('BRIVA_GUARD_ABORT')) {

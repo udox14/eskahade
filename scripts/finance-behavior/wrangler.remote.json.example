@@ -1,0 +1,16 @@
+{
+  "name": "eskahade-fin-behavior-20261018-66449217",
+  "account_id": "a170ed4144c00927988a828aa9a41896",
+  "main": "worker.mjs",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [],
+  "observability": {"enabled": false},
+  "d1_databases": [{
+    "binding": "TEST_DB",
+    "database_name": "eskahade-fin-behavior-20261018-66449217",
+    "database_id": "REPLACE_ONLY_AFTER_EXPLICIT_APPROVAL_WITH_NEW_DISPOSABLE_UUID"
+  }]
+}

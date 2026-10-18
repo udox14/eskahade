@@ -1,0 +1,15 @@
+{
+  "name": "eskahade-fin-behavior-20261018-66449217",
+  "main": "worker.mjs",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {"TEST_AUTH_TOKEN": "local-synthetic-only-not-a-real-secret"},
+  "d1_databases": [{
+    "binding": "TEST_DB",
+    "database_name": "eskahade-fin-behavior-20261018-66449217",
+    "database_id": "00000000-0000-0000-0000-000000000000",
+    "remote": false
+  }]
+}

@@ -1,0 +1,6 @@
+// Fast SQLite preflight for the exact fixed scenarios later executed by workerd/D1.
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {DatabaseSync}=require('node:sqlite');
+require('./finance-behavior/prepare.cjs');
+async function main(){const db=new DatabaseSync(':memory:');db.exec('PRAGMA foreign_keys=ON');db.exec(fs.readFileSync(path.resolve('output/final-behavioral-gate-66449217/isolated/schema.sql'),'utf8'));const {runSuite}=await import('./finance-behavior/suite.mjs');const adapter={prepare:sql=>({sql,first:async()=>db.prepare(sql).get()||null,all:async()=>({results:db.prepare(sql).all()})}),batch:async statements=>{db.exec('BEGIN');try{const results=statements.map(s=>db.prepare(s.sql).run());db.exec('COMMIT');return results}catch(e){db.exec('ROLLBACK');throw e}}};const result=await runSuite(adapter);result.engine='Node SQLite preflight of fixed Cloudflare D1 scenarios; NOT a remote D1 test';console.log(JSON.stringify(result,null,2));const arg=process.argv.find(x=>x.startsWith('--evidence='));if(arg){const p=path.resolve(arg.slice(11));assert(p.startsWith(path.resolve('output')+path.sep));fs.writeFileSync(p,JSON.stringify(result,null,2)+'\n')}db.close();assert.equal(result.failed,0);assert.equal(result.passed,result.plannedCases)}
+main().catch(e=>{console.error(e);process.exitCode=1});
