@@ -80,6 +80,9 @@ async function main(){
   const body=JSON.stringify({filename:'proof.png',base64:'data:image/png;base64,'+Buffer.from([137,80,78,71,13,10,26,10]).toString('base64')});
   h.state.bucket=null;const unavailable=await upload.POST(new Request('https://test',{method:'POST',body}));assert.notEqual(unavailable.status,200);
   h.state.bucket={put:async()=>{},get:async()=>({body:'private-proof',writeHttpMetadata:()=>{}})};
+  const previousNodeEnv=process.env.NODE_ENV;process.env.NODE_ENV='production';
+  assert.notEqual((await upload.POST(new Request('https://test',{method:'POST',body}))).status,200,'Production privacy gate must block unverified bucket');
+  if(previousNodeEnv===undefined)delete process.env.NODE_ENV;else process.env.NODE_ENV=previousNodeEnv;
   const stored=await upload.POST(new Request('https://test',{method:'POST',body}));assert.equal(stored.status,200);const {url}=await stored.json();const key=url.slice('/api/finance/proofs/'.length).split('/');
   const own=await get.GET(new Request('https://test'),{params:Promise.resolve({key})});assert.equal(own.status,200);assert.match(own.headers.get('cache-control'),/private.*no-store/);
   h.state.session={id:'cashier',role:'petugas_koperasi',roles:['petugas_koperasi']};assert.equal((await get.GET(new Request('https://test'),{params:Promise.resolve({key})})).status,404);

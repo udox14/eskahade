@@ -1,3 +1,5 @@
+> **SUPERSEDED — 18 Oktober 2026:** angka/klaim readiness dalam laporan 9 Oktober di bawah adalah riwayat, bukan evidence rilis sekarang. Audit menemukan fixture schema yang keliru. Hasil remediation terbaru dan batas local simulation ada di [laporan remediation](FINANCE_BRI_REMEDIATION_REPORT_2026-10-18.md) dan [runbook](FINANCE_BRI_REMEDIATION_RUNBOOK.md). 0182–0186 sudah applied manual; jangan diulang. Tidak ada remote UAT/deploy/aktivasi dalam remediation lokal ini. Klaim lama "auth blocked" tidak diperiksa ulang sebagai status terkini.
+
 # Laporan UAT (User Acceptance Testing) & Evaluasi Kesiapan Integrasi Keuangan BRI
 
 **Nomor Dokumen**: UAT-BRI-202610-001-REV2  
@@ -38,7 +40,7 @@ Untuk mencegah kesalahpahaman antara uji unit/domain dengan integrasi perbankan 
    - Menguji logika bisnis, atomisitas batch, idempotensi, race condition, dan pencegahan *double-disbursement*.
    - **REMOTE D1 BEHAVIOR: NOT YET VERIFIED**.
 2. **Real Demo D1 UAT (Belum Dijalankan — Tertunda Otentikasi CLI)**:
-   - Eksekusi `wrangler d1 migrations apply eskahade-demo-db --remote` dan `scripts/seed-uat-fixtures.cjs` terhadap cluster Cloudflare D1 fisik.
+   - Eksekusi remote historis yang pernah direncanakan **tidak berlaku** sebagai instruksi sekarang. Gunakan preflight dan rencana tiga migration baru pada runbook remediation; seeder hanya boleh digunakan pada target UAT yang disetujui.
    - Memerlukan variabel `CLOUDFLARE_API_TOKEN` yang sah dari administrator.
 3. **External BRI Sandbox (Belum Diuji Jaringan / External Gate)**:
    - Panggilan HTTP nyata ke endpoint sandbox BRI.

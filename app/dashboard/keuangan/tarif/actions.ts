@@ -290,13 +290,13 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
         'settlement_destination_account',
         'settlement_account_holder'
       )`
-    ).catch(() => []),
+    ),
     getEffectiveCooperativeAdminFee(),
-    queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM finance_student_va WHERE status = 'ACTIVE'`).catch(() => ({ count: 0 })),
+    queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM finance_student_va WHERE status = 'ACTIVE'`),
     getLetterheadProfiles().catch(() => []),
     getDocumentPrintConfigs().catch(() => []),
     listTariffOverrides().catch(() => []),
-    getKoperasiEffectiveTimestamp().catch(() => null),
+    getKoperasiEffectiveTimestamp(),
     queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM santri_pembebasan_biaya WHERE is_active = 1`).catch(() => ({ count: 0 })),
     queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM finance_payments WHERE fund_management = 'KOPERASI'`).catch(() => ({ count: 0 })),
   ])

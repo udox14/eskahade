@@ -194,6 +194,13 @@ export class ProofStorageService {
     }
 
     if (bucket && typeof bucket.put === 'function') {
+      if (process.env.NODE_ENV === 'production' && process.env.FINANCE_PROOFS_PRIVATE_STORAGE_CONFIRMED !== 'true') {
+        return {
+          success:false,proofId:validation.proofId,objectKey:validation.objectKey,hash:validation.hash,
+          mimeType:validation.mimeType||input.mimeType,sizeBytes:validation.sizeBytes??input.buffer.length,
+          storageMode:'R2',error:'PRIVATE_STORAGE_NOT_CONFIRMED: Privasi bucket bukti wajib diverifikasi sebelum unggahan produksi.',
+        }
+      }
       try {
         await bucket.put(validation.objectKey, input.buffer, {
           httpMetadata: {

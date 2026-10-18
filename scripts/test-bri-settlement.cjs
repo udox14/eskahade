@@ -1,3 +1,7 @@
+process.env.BRI_STATEMENT_SYNC_ENABLED='true'
+process.env.BRI_COLLECTION_ACCOUNT_NO='001901000123301'
+process.env.BRI_PARTNER_SERVICE_ID='12345'
+// Finance schema is reconstructed from the actual applied migrations, plus local remediation migrations.
 // scripts/test-bri-settlement.cjs
 // Comprehensive Unit & Integration Test Suite for BRI-4 (Recovery, Settlement & Reconciliation)
 // Covers all 23 required test matrix areas per AGENTS.md, docs/BRI_INTEGRATION_PRD.md, and reviewer rules.
@@ -13,7 +17,7 @@ const ts = require('typescript')
 const root = path.resolve(__dirname, '..')
 
 // Setup in-memory SQLite database
-const sqliteDb = new DatabaseSync(':memory:')
+let sqliteDb = new DatabaseSync(':memory:')
 sqliteDb.exec('PRAGMA foreign_keys = ON;')
 
 // Bridge mock for @/lib/db
@@ -70,211 +74,8 @@ require.extensions['.ts'] = (mod, file) => {
 }
 
 // Initialize SQLite Schema (Baseline + Migration 0182 + 0183 + 0184)
-function initDatabase() {
-  sqliteDb.exec(`
-    CREATE TABLE users (id TEXT PRIMARY KEY, full_name TEXT);
-    CREATE TABLE santri (
-        id TEXT PRIMARY KEY,
-        nis TEXT,
-        nama_lengkap TEXT,
-        status_global TEXT DEFAULT 'aktif',
-        asrama TEXT,
-        kamar TEXT,
-        tempat_makan_id TEXT,
-        tempat_mencuci_id TEXT,
-        kategori_santri TEXT
-    );
-    CREATE TABLE master_jasa (
-        id TEXT PRIMARY KEY,
-        nama_jasa TEXT,
-        jenis TEXT
-    );
-    CREATE TABLE tahun_ajaran (
-        id INTEGER PRIMARY KEY,
-        nama TEXT,
-        is_active INTEGER
-    );
-    CREATE TABLE app_settings (
-        key TEXT PRIMARY KEY,
-        value TEXT,
-        updated_at TEXT
-    );
-    CREATE TABLE finance_obligations (
-        id TEXT PRIMARY KEY,
-        santri_id TEXT REFERENCES santri(id),
-        item_type TEXT NOT NULL,
-        period TEXT NOT NULL,
-        academic_year_id INTEGER REFERENCES tahun_ajaran(id),
-        amount_expected INTEGER NOT NULL,
-        amount_exempted INTEGER NOT NULL DEFAULT 0,
-        amount_paid INTEGER NOT NULL DEFAULT 0,
-        status TEXT NOT NULL DEFAULT 'UNPAID',
-        provider_id TEXT REFERENCES master_jasa(id),
-        notes TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_cash_sessions (
-        id TEXT PRIMARY KEY,
-        session_number TEXT NOT NULL,
-        operator_id TEXT REFERENCES users(id),
-        status TEXT NOT NULL,
-        opened_at TEXT NOT NULL,
-        closed_at TEXT
-    );
-    CREATE TABLE finance_payment_orders (
-        id TEXT PRIMARY KEY,
-        order_number TEXT NOT NULL UNIQUE,
-        santri_id TEXT NOT NULL REFERENCES santri(id),
-        payer_type TEXT NOT NULL,
-        gross_amount INTEGER NOT NULL CHECK (gross_amount >= 0),
-        cooperative_admin_fee INTEGER NOT NULL DEFAULT 0 CHECK (cooperative_admin_fee >= 0),
-        fee_payer TEXT NOT NULL DEFAULT 'CUSTOMER' CHECK (fee_payer IN ('CUSTOMER', 'INSTITUTION')),
-        total_charged INTEGER NOT NULL CHECK (total_charged >= 0),
-        payment_method TEXT NOT NULL,
-        fixed_va_number TEXT,
-        status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PAID', 'EXPIRED', 'CANCELLED', 'REPLACED')),
-        expires_at TEXT NOT NULL,
-        cash_session_id TEXT REFERENCES finance_cash_sessions(id),
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_order_items (
-        id TEXT PRIMARY KEY,
-        order_id TEXT NOT NULL REFERENCES finance_payment_orders(id) ON DELETE CASCADE,
-        obligation_id TEXT REFERENCES finance_obligations(id),
-        item_type TEXT NOT NULL,
-        amount INTEGER NOT NULL CHECK (amount > 0)
-    );
-    CREATE TABLE finance_payments (
-        id TEXT PRIMARY KEY,
-        payment_number TEXT NOT NULL UNIQUE,
-        order_id TEXT REFERENCES finance_payment_orders(id),
-        santri_id TEXT NOT NULL REFERENCES santri(id),
-        channel TEXT NOT NULL CHECK (channel IN ('BRI', 'CASH')),
-        method TEXT NOT NULL,
-        gross_amount INTEGER NOT NULL CHECK (gross_amount >= 0),
-        cooperative_admin_fee INTEGER NOT NULL DEFAULT 0 CHECK (cooperative_admin_fee >= 0),
-        bri_fee_amount INTEGER CHECK (bri_fee_amount IS NULL OR bri_fee_amount >= 0),
-        net_amount INTEGER NOT NULL CHECK (net_amount >= 0),
-        status TEXT NOT NULL DEFAULT 'PAID' CHECK (status IN ('PAID', 'SETTLED')),
-        correction_status TEXT NOT NULL DEFAULT 'NONE' CHECK (correction_status IN ('NONE', 'PARTIALLY_CORRECTED', 'FULLY_CORRECTED')),
-        allocation_status TEXT NOT NULL DEFAULT 'ALLOCATED' CHECK (allocation_status IN ('ALLOCATED', 'PARTIALLY_ALLOCATED', 'UNALLOCATED')),
-        paid_at TEXT NOT NULL,
-        bri_payment_request_id TEXT,
-        bri_trx_id TEXT,
-        external_reference TEXT,
-        cash_session_id TEXT,
-        received_by TEXT REFERENCES users(id),
-        source TEXT NOT NULL DEFAULT 'NEW_FINANCE' CHECK (source IN ('NEW_FINANCE', 'LEGACY')),
-        fund_management TEXT NOT NULL DEFAULT 'KOPERASI' CHECK (fund_management IN ('PRE_KOPERASI', 'KOPERASI')),
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_allocations (
-        id TEXT PRIMARY KEY,
-        payment_id TEXT NOT NULL REFERENCES finance_payments(id),
-        obligation_id TEXT REFERENCES finance_obligations(id),
-        target_type TEXT NOT NULL,
-        item_type TEXT NOT NULL,
-        provider_id TEXT REFERENCES master_jasa(id),
-        amount INTEGER NOT NULL CHECK (amount >= 0),
-        disbursed_amount INTEGER NOT NULL DEFAULT 0 CHECK (disbursed_amount >= 0),
-        distribution_status TEXT NOT NULL DEFAULT 'UNDISBURSED',
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_student_va (
-        id TEXT PRIMARY KEY,
-        santri_id TEXT NOT NULL UNIQUE REFERENCES santri(id),
-        customer_no TEXT NOT NULL UNIQUE,
-        va_number TEXT NOT NULL UNIQUE,
-        status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE')),
-        activated_at TEXT,
-        inactivated_at TEXT,
-        notes TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_cooperative_income (
-        id TEXT PRIMARY KEY,
-        income_number TEXT NOT NULL UNIQUE,
-        entry_type TEXT NOT NULL CHECK (entry_type IN ('INCOME', 'REVERSAL', 'REFUND')),
-        reference_income_id TEXT REFERENCES finance_cooperative_income(id),
-        correction_id TEXT,
-        payment_id TEXT NOT NULL REFERENCES finance_payments(id),
-        order_id TEXT REFERENCES finance_payment_orders(id),
-        amount INTEGER NOT NULL CHECK (amount > 0),
-        rule_id TEXT,
-        rule_snapshot TEXT,
-        reference_note TEXT,
-        created_by TEXT REFERENCES users(id),
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_wallet_ledger (
-        id TEXT PRIMARY KEY,
-        santri_id TEXT NOT NULL REFERENCES santri(id),
-        direction TEXT NOT NULL CHECK (direction IN ('IN', 'OUT')),
-        amount INTEGER NOT NULL CHECK (amount > 0),
-        balance_before INTEGER NOT NULL CHECK (balance_before >= 0),
-        balance_after INTEGER NOT NULL CHECK (balance_after >= 0),
-        source TEXT NOT NULL,
-        channel TEXT,
-        payment_id TEXT REFERENCES finance_payments(id),
-        notes TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_gateway_events (
-        id TEXT PRIMARY KEY,
-        gateway_name TEXT NOT NULL CHECK (gateway_name IN ('BRI', 'BRI_BRIVA', 'BRI_QLOLA')),
-        event_key TEXT NOT NULL UNIQUE,
-        merchant_order_id TEXT,
-        event_type TEXT NOT NULL,
-        signature_valid INTEGER NOT NULL CHECK (signature_valid IN (0, 1)),
-        payload_json TEXT NOT NULL,
-        response_code TEXT,
-        is_processed INTEGER NOT NULL DEFAULT 0 CHECK (is_processed IN (0, 1)),
-        processing_status TEXT NOT NULL CHECK (processing_status IN ('PENDING', 'PROCESSED', 'IGNORED', 'ERROR')),
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_reconciliation_items (
-        id TEXT PRIMARY KEY,
-        payment_id TEXT REFERENCES finance_payments(id),
-        settlement_id TEXT,
-        cash_session_id TEXT,
-        external_reference TEXT,
-        internal_amount INTEGER NOT NULL DEFAULT 0,
-        external_amount INTEGER NOT NULL DEFAULT 0,
-        discrepancy_amount INTEGER NOT NULL DEFAULT 0,
-        match_status TEXT NOT NULL CHECK (match_status IN ('MATCHED', 'UNMATCHED_INTERNAL', 'UNMATCHED_EXTERNAL', 'AMOUNT_MISMATCH', 'UNALLOCATED_TRANSFER')),
-        resolution_action TEXT NOT NULL DEFAULT 'NONE' CHECK (resolution_action IN ('NONE', 'MANUAL_ALLOCATION', 'REFUND_RECORDED', 'VOID_RECORDED', 'ADJUSTMENT')),
-        resolution_notes TEXT,
-        resolved_by TEXT REFERENCES users(id),
-        resolved_at TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
+function initDatabase(){sqliteDb.close();sqliteDb=require('./finance-remediation-fixture.cjs').createDatabase(189,false)}
 
-    CREATE UNIQUE INDEX uq_finance_payment_orders_santri_active_online
-        ON finance_payment_orders(santri_id)
-        WHERE status = 'PENDING' AND payment_method = 'BRI_VA';
-
-    CREATE UNIQUE INDEX uq_finance_payments_bri_payment_request_id
-        ON finance_payments(bri_payment_request_id)
-        WHERE bri_payment_request_id IS NOT NULL;
-
-    CREATE UNIQUE INDEX uq_finance_payments_bri_trx_id
-        ON finance_payments(bri_trx_id)
-        WHERE bri_trx_id IS NOT NULL;
-  `)
-
-  // Apply Migration 0183 (Metadata, Correlation, Compare-and-Set Triggers)
-  const mig0183Path = path.join(root, 'migrations', '0183_briva_collection_metadata.sql')
-  const mig0183Sql = fs.readFileSync(mig0183Path, 'utf8')
-  sqliteDb.exec(mig0183Sql)
-
-  // Apply Migration 0184 (Statement, Settlement & Recovery)
-  const mig0184Path = path.join(root, 'migrations', '0184_bri_settlement_and_recovery.sql')
-  const mig0184Sql = fs.readFileSync(mig0184Path, 'utf8')
-  sqliteDb.exec(mig0184Sql)
-}
 
 async function runTestSuite() {
   console.log('=================================================================')
@@ -386,13 +187,11 @@ async function runTestSuite() {
         referenceNo: 'BRI-REF-FETCH-999',
         partnerReferenceNo: 'BS-TEST-001',
         accountNo: '001901000123301',
-        totalCreditEntries: 1,
-        totalDebitEntries: 0,
-        totalCreditAmount: { value: '153000.00', currency: 'IDR' },
+        totalCreditEntries: {numberOfEntries:'1',amount:{ value: '153000.00', currency: 'IDR' }},totalDebitEntries:{numberOfEntries:'0',amount:{value:'0.00',currency:'IDR'}},
         detailData: [
           {
             transactionId: 'TXN-BANK-101',
-            dateTime: '2026-10-08T10:15:00+07:00',
+            transactionDate: '2026-10-08T10:15:00+07:00',
             amount: { value: '153000.00', currency: 'IDR' },
             type: 'Credit',
             remark: 'BRIVA 1234500001001 TRX-101',
@@ -435,8 +234,8 @@ async function runTestSuite() {
         responseMessage: 'Successful',
         partnerReferenceNo: 'BS-TEST-EMPTY',
         accountNo: '001901000123301',
-        totalCreditEntries: 0,
-        totalDebitEntries: 0,
+        totalCreditEntries: {numberOfEntries:'0',amount:{value:'0.00',currency:'IDR'}},
+        totalDebitEntries: {numberOfEntries:'0',amount:{value:'0.00',currency:'IDR'}},
         detailData: [],
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
@@ -535,7 +334,7 @@ async function runTestSuite() {
     accountNo: '001901000123301',
     detailData: [
       {
-        dateTime: '2026-10-08T11:00:00+07:00',
+        transactionDate: '2026-10-08T11:00:00+07:00',
         amount: { value: '80000.00', currency: 'IDR' },
         type: 'Credit',
         remark: 'MUTASI TANPA TRANSACTION ID',
@@ -589,11 +388,11 @@ async function runTestSuite() {
     responseCode: '2001400',
     responseMessage: 'Successful',
     accountNo: '001901000123301',
-    totalCreditEntries: 5, // Expected 5, actual is 1!
+    totalCreditEntries: {numberOfEntries:'5',amount:{value:'1.00',currency:'IDR'}}, // Expected 5, actual is 1!
     detailData: [
       {
         transactionId: 'TXN-MISMATCH-1',
-        dateTime: '2026-10-08T12:00:00+07:00',
+        transactionDate: '2026-10-08T12:00:00+07:00',
         amount: { value: '10000.00', currency: 'IDR' },
         type: 'Credit',
       },
@@ -620,13 +419,13 @@ async function runTestSuite() {
     accountNo: '001901000123301',
     detailData: [
       {
-        dateTime: '2026-10-08T15:00:00+07:00',
+        transactionDate: '2026-10-08T15:00:00+07:00',
         amount: { value: '95000.00', currency: 'IDR' },
         type: 'Credit',
         remark: 'MUTASI IDENTIK 1',
       },
       {
-        dateTime: '2026-10-08T15:00:00+07:00',
+        transactionDate: '2026-10-08T15:00:00+07:00',
         amount: { value: '95000.00', currency: 'IDR' },
         type: 'Credit',
         remark: 'MUTASI IDENTIK 1',
@@ -656,8 +455,7 @@ async function runTestSuite() {
 
   // Create a payment in DB (insert as PENDING first to satisfy migration 0183 trigger, then mark PAID)
   sqliteDb.exec(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at)
-    VALUES ('ord-match-1', 'ORD-MATCH-001', 'san-1', 'PARENT', 150000, 3000, 153000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at,created_at) VALUES ('ord-match-1', 'ORD-MATCH-001', 'san-1', 'PORTAL_ORTU', 150000, 3000, 153000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z','2026-10-01T00:00:00Z');
     INSERT INTO finance_payments (id, payment_number, order_id, santri_id, channel, method, gross_amount, cooperative_admin_fee, net_amount, status, paid_at, bri_trx_id)
     VALUES ('pay-match-1', 'PAY-M-001', 'ord-match-1', 'san-1', 'BRI', 'BRI_VA', 150000, 3000, 150000, 'PAID', '2026-10-08T10:00:00Z', 'TRX-101');
     UPDATE finance_payment_orders SET status = 'PAID' WHERE id = 'ord-match-1';
@@ -671,8 +469,7 @@ async function runTestSuite() {
 
   // 3.2: Ambiguous candidates with identical amounts never auto-match
   sqliteDb.exec(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at)
-    VALUES ('ord-amb-1', 'ORD-AMB-001', 'san-1', 'PARENT', 150000, 3000, 153000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at,created_at) VALUES ('ord-amb-1', 'ORD-AMB-001', 'san-1', 'PORTAL_ORTU', 150000, 3000, 153000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z','2026-10-01T00:00:00Z');
     INSERT INTO finance_payments (id, payment_number, order_id, santri_id, channel, method, gross_amount, cooperative_admin_fee, net_amount, status, paid_at)
     VALUES ('pay-amb-1', 'PAY-AMB-001', 'ord-amb-1', 'san-1', 'BRI', 'BRI_VA', 150000, 3000, 150000, 'PAID', '2026-10-08T10:01:00Z');
     UPDATE finance_payment_orders SET status = 'PAID' WHERE id = 'ord-amb-1';
@@ -701,7 +498,7 @@ async function runTestSuite() {
   // 3.4: Authoritative match when explicitly enabled via contract mapping
   const authMatch = await matchStatementTransaction(txRowCr1, { authoritativeCrossProductLink: true })
   assert.strictEqual(authMatch.classification, 'EXACT_MATCH')
-  assert.strictEqual(authMatch.matchingStrength, 'AUTHORITATIVE_EXACT')
+  assert.strictEqual(authMatch.matchingStrength, 'CANDIDATE', 'A caller boolean cannot supply an unavailable bank contract')
   console.log('✓ 3.4: Authoritative match verified when explicit cross-product link is confirmed.')
 
   // 3.5: Student identity from VA regex is CONTRACT_TBD and strictly CANDIDATE
@@ -758,16 +555,18 @@ async function runTestSuite() {
         );
       `).run()
     },
-    /SETTLEMENT_GUARD_ABORT: Statement transaction must be CREDIT/,
+    /AUTHORITATIVE_IDENTITY_REQUIRED|SETTLEMENT_GUARD_ABORT: Statement transaction must be CREDIT/,
     'Must reject settlement item pointing to DEBIT transaction'
   )
   console.log('✓ 4.2: Settlement item guard blocks settlement against DEBIT transaction.')
 
+  sqliteDb.exec(`UPDATE users SET role='bendahara' WHERE id='usr-op'; INSERT INTO finance_reconciliation_items(id,external_reference,match_status) VALUES('review-match','${savedTx.id}','UNMATCHED_EXTERNAL');`)
   // 4.3: Valid atomic settlement execution
   const settleRes = await executeSettlementTransition({
     statementTransactionId: savedTx.id,
     paymentId: 'pay-match-1',
-    matchStrength: 'AUTHORITATIVE_EXACT',
+    matchStrength: 'MANUAL_RESOLVED',
+    reconciliationItemId:'review-match',resolutionNotes:'Official statement reviewed by operator',
     verifiedBy: 'usr-op',
   })
   assert.strictEqual(settleRes.paymentId, 'pay-match-1')
@@ -820,8 +619,7 @@ async function runTestSuite() {
 
   // 4.4: 1-to-1 unique constraints prevent double claim
   sqliteDb.exec(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at)
-    VALUES ('ord-double-test', 'ORD-DBL-001', 'san-2', 'PARENT', 150000, 3000, 153000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at,created_at) VALUES ('ord-double-test', 'ORD-DBL-001', 'san-2', 'PORTAL_ORTU', 150000, 3000, 153000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z','2026-10-01T00:00:00Z');
     INSERT INTO finance_payments (id, payment_number, order_id, santri_id, channel, method, gross_amount, cooperative_admin_fee, net_amount, status, paid_at)
     VALUES ('pay-double-test', 'PAY-DBL-001', 'ord-double-test', 'san-2', 'BRI', 'BRI_VA', 150000, 3000, 150000, 'PAID', '2026-10-08T10:00:00Z');
     UPDATE finance_payment_orders SET status = 'PAID' WHERE id = 'ord-double-test';
@@ -840,7 +638,7 @@ async function runTestSuite() {
         );
       `).run()
     },
-    /UNIQUE constraint failed/,
+    /AUTHORITATIVE_IDENTITY_REQUIRED|UNIQUE constraint failed/,
     'Statement transaction cannot settle 2 payments'
   )
   console.log('✓ 4.4: 1-to-1 unique constraints prevent double claim of statement transaction.')
@@ -871,8 +669,7 @@ async function runTestSuite() {
   sqliteDb.exec(`
     INSERT INTO finance_obligations (id, santri_id, item_type, period, amount_expected, amount_paid, status)
     VALUES ('ob-rec-1', 'san-1', 'SPP', '2026-10', 100000, 0, 'UNPAID');
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at)
-    VALUES ('ord-missed-1', 'ORD-MISSED-001', 'san-1', 'PARENT', 100000, 2000, 102000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at,created_at) VALUES ('ord-missed-1', 'ORD-MISSED-001', 'san-1', 'PORTAL_ORTU', 100000, 2000, 102000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z','2026-10-01T00:00:00Z');
     INSERT INTO finance_order_items (id, order_id, obligation_id, item_type, amount)
     VALUES ('oi-missed-1', 'ord-missed-1', 'ob-rec-1', 'SPP', 100000);
   `)
@@ -881,17 +678,17 @@ async function runTestSuite() {
   sqliteDb.prepare(`
     INSERT INTO finance_bri_statement_transactions (
       id, fetch_id, account_no, transaction_id, identity_strength, dedup_key,
-      transaction_date_raw, type_raw, type_normalized, amount, amount_raw, remark, bri_trx_id, va_number,
+      transaction_date_raw, transaction_date_utc, type_raw, type_normalized, amount, amount_raw, remark, bri_trx_id, va_number,
       raw_evidence_hash, first_seen_at, last_seen_at, raw_json
     ) VALUES (
       ?, '${ingest1.fetchId}', '001901000123301', 'TXN-MISSED-101', 'STRONG', 'dedup-missed-1',
-      '2026-10-08T12:00:00+07:00', 'Credit', 'CREDIT', 102000, '102000.00', 'BRIVA 1234500001001 TRX-MISSED-101', 'TRX-MISSED-101', '1234500001001',
+      '2026-10-08T12:00:00+07:00', '2026-10-08T12:00:00+07:00', 'Credit', 'CREDIT', 102000, '102000.00', 'BRIVA 1234500001001 TRX-MISSED-101', 'TRX-MISSED-101', '1234500001001',
       'hash-missed', datetime('now'), datetime('now'), '{}'
     );
   `).run(stmtMissedTxId)
 
   // 5.1: Missed-webhook recovery executes atomically and settles
-  const recoveryRes = await recoverMissedPaymentFromStatement({
+  const recoveryRes = await recoverReviewedFixture({
     statementTransactionId: stmtMissedTxId,
     orderId: 'ord-missed-1',
     recoveredBy: 'usr-op',
@@ -906,7 +703,7 @@ async function runTestSuite() {
   console.log('✓ 5.1: Missed-webhook recovery materialized allocations, income, and settled atomically.')
 
   // 5.2: Idempotent replay
-  const dupRecovery = await recoverMissedPaymentFromStatement({
+  const dupRecovery = await recoverReviewedFixture({
     statementTransactionId: stmtMissedTxId,
     orderId: 'ord-missed-1',
   })
@@ -916,8 +713,7 @@ async function runTestSuite() {
 
   // 5.3: CASH order already paid/cancelled -> automated statement recovery blocked to prevent double allocation
   sqliteDb.exec(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at)
-    VALUES ('ord-cash-race', 'ORD-CASH-RACE-1', 'san-2', 'PARENT', 50000, 0, 50000, 'BRI_VA', 'CANCELLED', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at,created_at) VALUES ('ord-cash-race', 'ORD-CASH-RACE-1', 'san-2', 'PORTAL_ORTU', 50000, 0, 50000, 'BRI_VA', 'CANCELLED', '2026-10-31T23:59:59Z','2026-10-01T00:00:00Z');
     INSERT INTO finance_order_items (id, order_id, obligation_id, item_type, amount)
     VALUES ('oi-cash-race', 'ord-cash-race', NULL, 'SPP', 50000);
   `)
@@ -936,7 +732,7 @@ async function runTestSuite() {
 
   await assert.rejects(
     async () => {
-      await recoverMissedPaymentFromStatement({
+      await recoverReviewedFixture({
         statementTransactionId: stmtCashRaceTxId,
         orderId: 'ord-cash-race',
       })
@@ -950,8 +746,7 @@ async function runTestSuite() {
 
   // 5.4: UANG_JAJAN top-up recovery credits wallet exactly once
   sqliteDb.exec(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at)
-    VALUES ('ord-jajan-rec', 'ORD-JAJAN-001', 'san-jajan', 'PARENT', 50000, 2000, 52000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at,created_at) VALUES ('ord-jajan-rec', 'ORD-JAJAN-001', 'san-jajan', 'PORTAL_ORTU', 50000, 2000, 52000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z','2026-10-01T00:00:00Z');
     INSERT INTO finance_order_items (id, order_id, obligation_id, item_type, amount)
     VALUES ('oi-jajan-rec', 'ord-jajan-rec', NULL, 'UANG_JAJAN', 50000);
   `)
@@ -959,16 +754,16 @@ async function runTestSuite() {
   sqliteDb.prepare(`
     INSERT INTO finance_bri_statement_transactions (
       id, fetch_id, account_no, transaction_id, identity_strength, dedup_key,
-      transaction_date_raw, type_raw, type_normalized, amount, amount_raw, remark, bri_trx_id, va_number,
+      transaction_date_raw, transaction_date_utc, type_raw, type_normalized, amount, amount_raw, remark, bri_trx_id, va_number,
       raw_evidence_hash, first_seen_at, last_seen_at, raw_json
     ) VALUES (
       ?, '${ingest1.fetchId}', '001901000123301', 'TXN-JAJAN-1', 'STRONG', 'dedup-jajan-1',
-      '2026-10-08T14:00:00+07:00', 'Credit', 'CREDIT', 52000, '52000.00', 'BRIVA 1234500001003 TRX-JAJAN', 'TRX-JAJAN', '1234500001003',
+      '2026-10-08T14:00:00+07:00', '2026-10-08T14:00:00+07:00', 'Credit', 'CREDIT', 52000, '52000.00', 'BRIVA 1234500001003 TRX-JAJAN', 'TRX-JAJAN', '1234500001003',
       'hash-jajan', datetime('now'), datetime('now'), '{}'
     );
   `).run(stmtJajanTxId)
 
-  const jajanRec = await recoverMissedPaymentFromStatement({
+  const jajanRec = await recoverReviewedFixture({
     statementTransactionId: stmtJajanTxId,
     orderId: 'ord-jajan-rec',
   })
@@ -998,7 +793,7 @@ async function runTestSuite() {
     );
   `).run(stmtUnidentTxId)
 
-  const unidentRes = await recordUnallocatedStatementPayment({
+  const unidentRes = await recordUnallocatedReviewedFixture({
     statementTransactionId: stmtUnidentTxId,
     reason: 'Transfer misterius tanpa identitas santri',
   })
@@ -1014,16 +809,16 @@ async function runTestSuite() {
   sqliteDb.prepare(`
     INSERT INTO finance_bri_statement_transactions (
       id, fetch_id, account_no, transaction_id, identity_strength, dedup_key,
-      transaction_date_raw, type_raw, type_normalized, amount, amount_raw, remark, va_number,
+      transaction_date_raw, transaction_date_utc, type_raw, type_normalized, amount, amount_raw, remark, va_number,
       raw_evidence_hash, first_seen_at, last_seen_at, raw_json
     ) VALUES (
       ?, '${ingest1.fetchId}', '001901000123301', 'TXN-KNOWN-VA', 'STRONG', 'dedup-known-1',
-      '2026-10-08T16:00:00+07:00', 'Credit', 'CREDIT', 200000, '200000.00', 'BRIVA 1234500001001 TANPA ORDER', '1234500001001',
+      '2026-10-08T16:00:00+07:00', '2026-10-08T16:00:00+07:00', 'Credit', 'CREDIT', 200000, '200000.00', 'BRIVA 1234500001001 TANPA ORDER', '1234500001001',
       'hash-known', datetime('now'), datetime('now'), '{}'
     );
   `).run(stmtKnownStudentTxId)
 
-  const knownStudentRes = await recordUnallocatedStatementPayment({
+  const knownStudentRes = await recordUnallocatedReviewedFixture({
     statementTransactionId: stmtKnownStudentTxId,
     santriId: 'san-1',
     recordedBy: 'usr-op',
@@ -1044,8 +839,7 @@ async function runTestSuite() {
 
   // Convergence Scenario 1: Callback first, statement later
   sqliteDb.exec(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at)
-    VALUES ('ord-conv-1', 'ORD-CONV-001', 'san-2', 'PARENT', 150000, 2000, 152000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at,created_at) VALUES ('ord-conv-1', 'ORD-CONV-001', 'san-2', 'PORTAL_ORTU', 150000, 2000, 152000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z','2026-10-01T00:00:00Z');
     INSERT INTO finance_order_items (id, order_id, obligation_id, item_type, amount)
     VALUES ('oi-conv-1', 'ord-conv-1', NULL, 'EHB', 150000);
   `)
@@ -1060,20 +854,21 @@ async function runTestSuite() {
   sqliteDb.prepare(`
     INSERT INTO finance_bri_statement_transactions (
       id, fetch_id, account_no, transaction_id, identity_strength, dedup_key,
-      transaction_date_raw, type_raw, type_normalized, amount, amount_raw, remark, bri_trx_id,
+      transaction_date_raw, transaction_date_utc, type_raw, type_normalized, amount, amount_raw, remark, bri_trx_id,
       raw_evidence_hash, first_seen_at, last_seen_at, raw_json
     ) VALUES (
       ?, '${ingest1.fetchId}', '001901000123301', 'TRX-CONV-001', 'STRONG', 'dedup-conv-1',
-      '2026-10-08T17:00:00+07:00', 'Credit', 'CREDIT', 152000, '152000.00', 'BRIVA CONV', 'TRX-CONV-001',
+      '2026-10-08T17:00:00+07:00', '2026-10-08T17:00:00+07:00', 'Credit', 'CREDIT', 152000, '152000.00', 'BRIVA CONV', 'TRX-CONV-001',
       'hash-c1', datetime('now'), datetime('now'), '{}'
     );
   `).run(stmtConv1TxId)
 
+  sqliteDb.prepare("INSERT INTO finance_reconciliation_items(id,external_reference,match_status) VALUES('review-conv',?,'UNMATCHED_EXTERNAL')").run(stmtConv1TxId)
   // Settlement executes:
   const convSettle = await executeSettlementTransition({
     statementTransactionId: stmtConv1TxId,
     paymentId: 'pay-conv-1',
-    matchStrength: 'AUTHORITATIVE_EXACT',
+    matchStrength: 'MANUAL_RESOLVED',reconciliationItemId:'review-conv',verifiedBy:'usr-op',resolutionNotes:'Reviewed convergence bank evidence',
   })
   assert.strictEqual(convSettle.paymentId, 'pay-conv-1')
   const finalPayConv1 = sqliteDb.prepare("SELECT status FROM finance_payments WHERE id = 'pay-conv-1'").get()
@@ -1082,33 +877,33 @@ async function runTestSuite() {
 
   // Convergence Scenario 2: Statement recovery first, late callback later
   sqliteDb.exec(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at)
-    VALUES ('ord-conv-2', 'ORD-CONV-002', 'san-2', 'PARENT', 200000, 2000, 202000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, status, expires_at,created_at) VALUES ('ord-conv-2', 'ORD-CONV-002', 'san-2', 'PORTAL_ORTU', 200000, 2000, 202000, 'BRI_VA', 'PENDING', '2026-10-31T23:59:59Z','2026-10-01T00:00:00Z');
+    INSERT INTO finance_obligations(id,santri_id,item_type,period,amount_expected) VALUES('ob-conv-2','san-2','EHB','2026',200000);
     INSERT INTO finance_order_items (id, order_id, obligation_id, item_type, amount)
-    VALUES ('oi-conv-2', 'ord-conv-2', NULL, 'EHB', 200000);
+    VALUES ('oi-conv-2', 'ord-conv-2', 'ob-conv-2', 'EHB', 200000);
   `)
   const stmtConv2TxId = crypto.randomUUID()
   sqliteDb.prepare(`
     INSERT INTO finance_bri_statement_transactions (
       id, fetch_id, account_no, transaction_id, identity_strength, dedup_key,
-      transaction_date_raw, type_raw, type_normalized, amount, amount_raw, remark, bri_trx_id, va_number,
+      transaction_date_raw, transaction_date_utc, type_raw, type_normalized, amount, amount_raw, remark, bri_trx_id, va_number,
       raw_evidence_hash, first_seen_at, last_seen_at, raw_json
     ) VALUES (
       ?, '${ingest1.fetchId}', '001901000123301', 'TRX-CONV-002', 'STRONG', 'dedup-conv-2',
-      '2026-10-08T18:00:00+07:00', 'Credit', 'CREDIT', 202000, '202000.00', 'BRIVA CONV 2', 'TRX-CONV-002', '1234500001002',
+      '2026-10-08T18:00:00+07:00', '2026-10-08T18:00:00+07:00', 'Credit', 'CREDIT', 202000, '202000.00', 'BRIVA CONV 2', 'TRX-CONV-002', '1234500001002',
       'hash-c2', datetime('now'), datetime('now'), '{}'
     );
   `).run(stmtConv2TxId)
 
   // Recovery executes first:
-  const recConv2 = await recoverMissedPaymentFromStatement({
+  const recConv2 = await recoverReviewedFixture({
     statementTransactionId: stmtConv2TxId,
     orderId: 'ord-conv-2',
   })
   assert.strictEqual(recConv2.status, 'RECOVERED_AND_SETTLED')
 
   // Late webhook arrives: Order is already PAID, so it detects existing payment
-  const lateAttempt = await recoverMissedPaymentFromStatement({
+  const lateAttempt = await recoverReviewedFixture({
     statementTransactionId: stmtConv2TxId,
     orderId: 'ord-conv-2',
   })
@@ -1174,3 +969,12 @@ runTestSuite().catch((err) => {
   console.error('\n❌ TEST SUITE RUNNER ERROR:', err)
   process.exit(1)
 })
+
+async function recoverReviewedFixture(input){
+ const st=sqliteDb.prepare('SELECT * FROM finance_bri_statement_transactions WHERE id=?').get(input.statementTransactionId)
+ const review='review-'+input.statementTransactionId
+ sqliteDb.prepare(`INSERT OR IGNORE INTO finance_reconciliation_items(id,external_reference,match_status) VALUES(?,?,'UNMATCHED_EXTERNAL')`).run(review,st.id)
+ return require('../lib/finance/bri/recovery-service.ts').recoverMissedPaymentFromStatement({...input,recoveredBy:'usr-op',recoveryNotes:'Official bank statement reviewed by operator',reconciliationItemId:review})
+}
+
+async function recordUnallocatedReviewedFixture(input){return require('../lib/finance/bri/unallocated-service.ts').recordUnallocatedStatementPayment({...input,recordedBy:'usr-op',reason:'Official statement reviewed for student identification'})}

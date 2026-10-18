@@ -764,21 +764,16 @@ def test_snap_fixed_va_live_config_and_route_consistency(conn: sqlite3.Connectio
     snap_payment_file = ROOT / "app" / "api" / "finance" / "gateway" / "duitku" / "snap" / "va" / "payment" / "route.ts"
     snap_inquiry_file = ROOT / "app" / "api" / "finance" / "gateway" / "duitku" / "snap" / "va" / "inquiry" / "route.ts"
 
-    assert callback_v2_file.exists(), "Duitku V2 callback route file must exist"
-    assert snap_payment_file.exists(), "SNAP payment route file must exist"
-    assert snap_inquiry_file.exists(), "SNAP inquiry route file must exist"
-
-    # Verify callback route contains idempotency handling
-    callback_src = callback_v2_file.read_text(encoding="utf-8")
-    assert "processDuitkuV2Callback" in callback_src or "processDuitkuCallback" in callback_src
-
-    snap_pay_src = snap_payment_file.read_text(encoding="utf-8")
-    assert "processSnapPaymentNotification" in snap_pay_src
-
-    snap_inq_src = snap_inquiry_file.read_text(encoding="utf-8")
-    assert "processSnapVaInquiry" in snap_inq_src or "inquireSnapVa" in snap_inq_src
-
-    print("[PASS] SNAP Fixed VA live configuration and runtime webhook routes verified consistent.")
+    assert not callback_v2_file.exists(), "Retired Duitku callback must be absent"
+    assert not snap_payment_file.exists(), "Retired Duitku payment route must be absent"
+    assert not snap_inquiry_file.exists(), "Retired Duitku inquiry route must be absent"
+    bri_payment = (ROOT / "app/snap/v1.0/transfer-va/payment/route.ts").read_text(encoding="utf-8")
+    bri_inquiry = (ROOT / "app/snap/v1.0/transfer-va/inquiry/route.ts").read_text(encoding="utf-8")
+    assert "handleBrivaPayment" in bri_payment
+    assert "handleBrivaInquiry" in bri_inquiry
+    bri_service = (ROOT / "lib/finance/bri/briva-service.ts").read_text(encoding="utf-8")
+    assert "checkPaymentDuplicateOrCollision" in bri_service
+    print("[PASS] Retired Duitku routes absent; current BRIVA routes use idempotent BRI service.")
 
 
 # ─── TEST 13: SENSITIVE CREDENTIAL NEVER EXPOSED IN CLIENT RESPONSES ─────────

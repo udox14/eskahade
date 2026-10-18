@@ -1,3 +1,5 @@
+process.env.NODE_ENV='test'
+// Finance schema is reconstructed from the actual applied migrations, plus local remediation migrations.
 // scripts/test-bri-distribution.cjs
 // Comprehensive Unit & Integration Test Suite for BRI-5 (Distribution BRI / QLola Non-STP)
 // Enforces All Rules from AGENTS.md, docs/BRI_INTEGRATION_PRD.md, and Reviewer Prompt:
@@ -23,7 +25,7 @@ const ts = require('typescript')
 const root = path.resolve(__dirname, '..')
 
 // Setup in-memory SQLite database
-const sqliteDb = new DatabaseSync(':memory:')
+let sqliteDb = new DatabaseSync(':memory:')
 sqliteDb.exec('PRAGMA foreign_keys = ON;')
 
 // Bridge mock for @/lib/db
@@ -80,339 +82,8 @@ require.extensions['.ts'] = (mod, file) => {
 }
 
 // Initialize SQLite Schema (Prerequisites + Migration 0182 + 0185)
-function initDatabase() {
-  sqliteDb.exec(`
-    CREATE TABLE users (id TEXT PRIMARY KEY, full_name TEXT, role TEXT, username TEXT);
-    CREATE TABLE santri (
-        id TEXT PRIMARY KEY,
-        nis TEXT,
-        nama_lengkap TEXT,
-        status_global TEXT DEFAULT 'aktif',
-        asrama TEXT,
-        kamar TEXT,
-        tempat_makan_id TEXT,
-        tempat_mencuci_id TEXT,
-        kategori_santri TEXT
-    );
-    CREATE TABLE master_jasa (
-        id TEXT PRIMARY KEY,
-        nama_jasa TEXT,
-        jenis TEXT
-    );
-    CREATE TABLE app_settings (
-        key TEXT PRIMARY KEY,
-        value TEXT,
-        updated_at TEXT
-    );
-    CREATE TABLE finance_tariffs (
-        id TEXT PRIMARY KEY,
-        item_type TEXT NOT NULL,
-        academic_year_id INTEGER,
-        nominal INTEGER NOT NULL,
-        installment_rule TEXT DEFAULT 'ALLOWED',
-        effective_from TEXT NOT NULL,
-        effective_until TEXT,
-        created_by TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_obligations (
-        id TEXT PRIMARY KEY,
-        santri_id TEXT NOT NULL REFERENCES santri(id),
-        item_type TEXT NOT NULL,
-        period TEXT NOT NULL,
-        amount_expected INTEGER NOT NULL,
-        amount_exempted INTEGER NOT NULL DEFAULT 0,
-        amount_paid INTEGER NOT NULL DEFAULT 0,
-        status TEXT NOT NULL DEFAULT 'UNPAID',
-        provider_id TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_payments (
-        id TEXT PRIMARY KEY,
-        payment_number TEXT NOT NULL UNIQUE,
-        order_id TEXT,
-        santri_id TEXT NOT NULL REFERENCES santri(id),
-        channel TEXT NOT NULL CHECK (channel IN ('BRI', 'CASH')),
-        method TEXT NOT NULL,
-        gross_amount INTEGER NOT NULL,
-        cooperative_admin_fee INTEGER NOT NULL DEFAULT 0,
-        bri_fee_amount INTEGER,
-        net_amount INTEGER NOT NULL,
-        status TEXT NOT NULL DEFAULT 'PAID' CHECK (status IN ('PAID', 'SETTLED')),
-        correction_status TEXT NOT NULL DEFAULT 'NONE',
-        allocation_status TEXT NOT NULL DEFAULT 'ALLOCATED',
-        paid_at TEXT NOT NULL,
-        fund_management TEXT NOT NULL DEFAULT 'KOPERASI',
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_allocations (
-        id TEXT PRIMARY KEY,
-        payment_id TEXT NOT NULL REFERENCES finance_payments(id),
-        obligation_id TEXT REFERENCES finance_obligations(id),
-        item_type TEXT NOT NULL,
-        amount INTEGER NOT NULL CHECK (amount > 0),
-        disbursed_amount INTEGER NOT NULL DEFAULT 0,
-        distribution_status TEXT NOT NULL DEFAULT 'UNDISBURSED',
-        provider_id TEXT,
-        target_type TEXT NOT NULL DEFAULT 'OBLIGATION',
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_correction_items (
-        id TEXT PRIMARY KEY,
-        target_allocation_id TEXT REFERENCES finance_allocations(id),
-        obligation_id TEXT,
-        amount INTEGER NOT NULL CHECK (amount > 0),
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_reconciliation_items (
-        id TEXT PRIMARY KEY,
-        payment_id TEXT,
-        settlement_id TEXT,
-        cash_session_id TEXT,
-        external_reference TEXT,
-        internal_amount INTEGER,
-        external_amount INTEGER,
-        discrepancy_amount INTEGER,
-        match_status TEXT,
-        resolution_action TEXT,
-        resolution_notes TEXT,
-        resolved_by TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
+function initDatabase(){sqliteDb.close();sqliteDb=require('./finance-remediation-fixture.cjs').createDatabase(189,false)}
 
-    CREATE TABLE finance_distribution_recipients (
-        id TEXT PRIMARY KEY,
-        recipient_type TEXT NOT NULL CHECK (recipient_type IN ('PESANTREN', 'KATERING', 'LAUNDRY')),
-        name TEXT NOT NULL,
-        provider_id TEXT REFERENCES master_jasa(id),
-        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
-        allowed_methods TEXT NOT NULL DEFAULT 'BRI_QLOLA,CASH,MANUAL_TRANSFER',
-        created_by TEXT REFERENCES users(id),
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE finance_recipient_accounts (
-        id TEXT PRIMARY KEY,
-        recipient_id TEXT NOT NULL REFERENCES finance_distribution_recipients(id),
-        bank_code TEXT NOT NULL,
-        account_number TEXT NOT NULL,
-        account_holder TEXT NOT NULL,
-        is_primary INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0, 1)),
-        is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
-        notes TEXT,
-        created_by TEXT REFERENCES users(id),
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE finance_recipient_allowed_methods (
-        recipient_id TEXT NOT NULL REFERENCES finance_distribution_recipients(id) ON DELETE CASCADE,
-        method TEXT NOT NULL CHECK (method IN ('BRI_QLOLA', 'CASH', 'MANUAL_TRANSFER')),
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        PRIMARY KEY (recipient_id, method)
-    );
-
-    CREATE TABLE finance_distributions (
-        id TEXT PRIMARY KEY,
-        distribution_number TEXT NOT NULL UNIQUE,
-        recipient_type TEXT NOT NULL CHECK (recipient_type IN ('PESANTREN', 'KATERING', 'LAUNDRY')),
-        recipient_id TEXT REFERENCES finance_distribution_recipients(id),
-        item_type TEXT NOT NULL,
-        period TEXT NOT NULL,
-        total_amount INTEGER NOT NULL CHECK (total_amount > 0),
-        method TEXT NOT NULL CHECK (method IN ('BRI_QLOLA', 'CASH', 'MANUAL_TRANSFER')),
-        status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN (
-            'DRAFT', 'PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING',
-            'DISTRIBUTED', 'FAILED', 'REJECTED', 'CANCELLED'
-        )),
-        destination_bank TEXT,
-        destination_account TEXT,
-        account_holder_name TEXT,
-        external_reference TEXT,
-        proof_attachment_url TEXT,
-        submitted_by TEXT REFERENCES users(id),
-        submitted_at TEXT,
-        transferred_by TEXT REFERENCES users(id),
-        transferred_at TEXT,
-        notes TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE finance_distribution_items (
-        id TEXT PRIMARY KEY,
-        distribution_id TEXT NOT NULL REFERENCES finance_distributions(id) ON DELETE CASCADE,
-        allocation_id TEXT NOT NULL REFERENCES finance_allocations(id),
-        amount INTEGER NOT NULL CHECK (amount > 0),
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    -- Triggers dari 0182
-    CREATE TRIGGER trg_finance_dist_items_prevent_overdraw
-    BEFORE INSERT ON finance_distribution_items
-    FOR EACH ROW
-    WHEN (
-        SELECT status FROM finance_distributions WHERE id = NEW.distribution_id
-    ) IN ('PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING', 'DISTRIBUTED')
-    BEGIN
-        SELECT
-            CASE
-                WHEN (
-                    COALESCE((
-                        SELECT SUM(di.amount)
-                        FROM finance_distribution_items di
-                        JOIN finance_distributions d ON di.distribution_id = d.id
-                        WHERE di.allocation_id = NEW.allocation_id
-                          AND d.status IN ('PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING', 'DISTRIBUTED')
-                    ), 0) + NEW.amount
-                ) > (
-                    SELECT fa.amount - COALESCE((
-                        SELECT SUM(fci.amount)
-                        FROM finance_correction_items fci
-                        WHERE fci.target_allocation_id = fa.id
-                    ), 0)
-                    FROM finance_allocations fa
-                    WHERE fa.id = NEW.allocation_id
-                )
-                THEN RAISE(ABORT, 'Total penyaluran dan reservasi melebihi dana alokasi efektif yang tersedia (setelah memperhitungkan koreksi).')
-            END;
-    END;
-
-    CREATE TRIGGER trg_finance_dist_status_prevent_over_reserve
-    BEFORE UPDATE OF status ON finance_distributions
-    FOR EACH ROW
-    WHEN (
-        OLD.status NOT IN ('PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING', 'DISTRIBUTED')
-        AND NEW.status IN ('PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING', 'DISTRIBUTED')
-    )
-    BEGIN
-        SELECT
-            CASE
-                WHEN EXISTS (
-                    SELECT 1
-                    FROM finance_distribution_items cur_di
-                    JOIN finance_allocations a ON cur_di.allocation_id = a.id
-                    WHERE cur_di.distribution_id = NEW.id
-                      AND (
-                          COALESCE((
-                              SELECT SUM(other_di.amount)
-                              FROM finance_distribution_items other_di
-                              JOIN finance_distributions other_d ON other_di.distribution_id = other_d.id
-                              WHERE other_di.allocation_id = cur_di.allocation_id
-                                AND other_d.id != NEW.id
-                                AND other_d.status IN ('PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING', 'DISTRIBUTED')
-                          ), 0) + cur_di.amount
-                      ) > (
-                          a.amount - COALESCE((
-                              SELECT SUM(fci.amount)
-                              FROM finance_correction_items fci
-                              WHERE fci.target_allocation_id = a.id
-                          ), 0)
-                      )
-                )
-                THEN RAISE(ABORT, 'Perubahan status gagal: Reservasi dana melebihi sisa alokasi efektif yang tersedia (setelah memperhitungkan koreksi).')
-            END;
-    END;
-
-    CREATE TRIGGER trg_finance_dist_items_immutable_on_update
-    BEFORE UPDATE ON finance_distribution_items
-    FOR EACH ROW
-    WHEN (SELECT status FROM finance_distributions WHERE id = OLD.distribution_id) != 'DRAFT'
-    BEGIN
-        SELECT RAISE(ABORT, 'Item penyaluran bersifat immutable dan tidak boleh diubah setelah pengajuan (hanya boleh diubah saat berstatus DRAFT).');
-    END;
-
-    CREATE TRIGGER trg_finance_dist_items_immutable_on_delete
-    BEFORE DELETE ON finance_distribution_items
-    FOR EACH ROW
-    WHEN (SELECT status FROM finance_distributions WHERE id = OLD.distribution_id) != 'DRAFT'
-    BEGIN
-        SELECT RAISE(ABORT, 'Item penyaluran bersifat immutable dan tidak boleh dihapus setelah pengajuan (hanya boleh dihapus saat berstatus DRAFT).');
-    END;
-
-    CREATE TRIGGER trg_finance_dist_enforce_qlola_insert
-    BEFORE INSERT ON finance_distributions
-    FOR EACH ROW
-    WHEN NEW.method = 'BRI_QLOLA' AND NEW.status NOT IN ('DRAFT', 'PENDING_APPROVAL')
-    BEGIN
-        SELECT RAISE(ABORT, 'Penyaluran BRI_QLOLA non-STP baru wajib berstatus DRAFT atau PENDING_APPROVAL.');
-    END;
-
-    CREATE TRIGGER trg_finance_dist_enforce_qlola_transitions
-    BEFORE UPDATE OF status ON finance_distributions
-    FOR EACH ROW
-    WHEN NEW.method = 'BRI_QLOLA'
-    BEGIN
-        SELECT CASE
-            WHEN OLD.status = 'DRAFT' AND NEW.status NOT IN ('DRAFT', 'PENDING_APPROVAL', 'CANCELLED')
-            THEN RAISE(ABORT, 'Penyaluran BRI_QLOLA non-STP dari DRAFT hanya boleh diajukan ke PENDING_APPROVAL atau dibatalkan ke CANCELLED.')
-        END;
-
-        SELECT CASE
-            WHEN OLD.status = 'PENDING_APPROVAL' AND NEW.status NOT IN ('PENDING_APPROVAL', 'PROCESSING', 'REJECTED', 'CANCEL_PENDING', 'CANCELLED')
-            THEN RAISE(ABORT, 'Penyaluran BRI_QLOLA non-STP dari PENDING_APPROVAL hanya boleh beralih ke PROCESSING, REJECTED, CANCEL_PENDING, atau CANCELLED.')
-        END;
-
-        SELECT CASE
-            WHEN OLD.status = 'PROCESSING' AND NEW.status NOT IN ('PROCESSING', 'DISTRIBUTED', 'FAILED', 'CANCEL_PENDING')
-            THEN RAISE(ABORT, 'Penyaluran BRI_QLOLA non-STP dari PROCESSING hanya boleh beralih ke DISTRIBUTED, FAILED, atau CANCEL_PENDING.')
-        END;
-
-        SELECT CASE
-            WHEN OLD.status = 'CANCEL_PENDING' AND NEW.status NOT IN ('CANCEL_PENDING', 'CANCELLED', 'DISTRIBUTED', 'FAILED', 'PROCESSING')
-            THEN RAISE(ABORT, 'Penyaluran BRI_QLOLA non-STP dari CANCEL_PENDING hanya boleh beralih ke CANCELLED, DISTRIBUTED, FAILED, atau PROCESSING.')
-        END;
-
-        SELECT CASE
-            WHEN OLD.status IN ('DISTRIBUTED', 'FAILED', 'REJECTED', 'CANCELLED') AND NEW.status != OLD.status
-            THEN RAISE(ABORT, 'Penyaluran dengan status terminal bersifat final dan tidak dapat diubah.')
-        END;
-    END;
-
-    CREATE TRIGGER trg_finance_correction_items_prevent_over_correct
-    BEFORE INSERT ON finance_correction_items
-    FOR EACH ROW
-    WHEN NEW.target_allocation_id IS NOT NULL
-    BEGIN
-        SELECT CASE
-            WHEN (
-                COALESCE((
-                    SELECT SUM(fci.amount)
-                    FROM finance_correction_items fci
-                    WHERE fci.target_allocation_id = NEW.target_allocation_id
-                ), 0) + NEW.amount
-            ) > (
-                SELECT fa.amount FROM finance_allocations fa WHERE fa.id = NEW.target_allocation_id
-            )
-            THEN RAISE(ABORT, 'Total nominal koreksi melebihi nominal alokasi.')
-        END;
-
-        SELECT CASE
-            WHEN (
-                COALESCE((
-                    SELECT SUM(fci.amount)
-                    FROM finance_correction_items fci
-                    WHERE fci.target_allocation_id = NEW.target_allocation_id
-                ), 0) + NEW.amount + COALESCE((
-                    SELECT SUM(fdi.amount)
-                    FROM finance_distribution_items fdi
-                    JOIN finance_distributions fd ON fd.id = fdi.distribution_id
-                    WHERE fdi.allocation_id = NEW.target_allocation_id
-                      AND fd.status IN ('PENDING_APPROVAL', 'PROCESSING', 'CANCEL_PENDING')
-                ), 0)
-            ) > (
-                SELECT fa.amount FROM finance_allocations fa WHERE fa.id = NEW.target_allocation_id
-            )
-            THEN RAISE(ABORT, 'Koreksi ditolak: Nominal koreksi membuat reservasi penyaluran bank aktif melebihi sisa alokasi.')
-        END;
-    END;
-  `)
-
-  // Terapkan Migration 0185
-  const migration0185Sql = fs.readFileSync(path.join(root, 'migrations', '0185_bri_qlola_distribution.sql'), 'utf8')
-  sqliteDb.exec(migration0185Sql)
-}
 
 initDatabase()
 
@@ -481,13 +152,13 @@ async function runTests() {
       ('kat-1', 'Katering Barokah', 'Makan'),
       ('lnd-1', 'Laundry Bersih', 'Cuci');
 
-    INSERT INTO finance_distribution_recipients (id, recipient_type, name, provider_id, is_active, allowed_methods) VALUES
+    INSERT OR IGNORE INTO finance_distribution_recipients (id, recipient_type, name, provider_id, is_active, allowed_methods) VALUES
       ('rec_pesantren', 'PESANTREN', 'Pesantren Sukahideng (Bendahara)', NULL, 1, 'BRI_QLOLA,CASH,MANUAL_TRANSFER'),
       ('rec_kat-1', 'KATERING', 'Katering Barokah', 'kat-1', 1, 'BRI_QLOLA,CASH,MANUAL_TRANSFER'),
       ('rec_lnd-1', 'LAUNDRY', 'Laundry Bersih', 'lnd-1', 1, 'BRI_QLOLA,CASH,MANUAL_TRANSFER'),
       ('rec_inactive', 'KATERING', 'Katering Bangkrut', NULL, 0, 'BRI_QLOLA,CASH');
 
-    INSERT INTO finance_recipient_allowed_methods (recipient_id, method) VALUES
+    INSERT OR IGNORE INTO finance_recipient_allowed_methods (recipient_id, method) VALUES
       ('rec_pesantren', 'BRI_QLOLA'), ('rec_pesantren', 'CASH'), ('rec_pesantren', 'MANUAL_TRANSFER'),
       ('rec_kat-1', 'BRI_QLOLA'), ('rec_kat-1', 'CASH'), ('rec_kat-1', 'MANUAL_TRANSFER'),
       ('rec_lnd-1', 'BRI_QLOLA'), ('rec_lnd-1', 'CASH'), ('rec_lnd-1', 'MANUAL_TRANSFER'),
@@ -542,12 +213,12 @@ async function runTests() {
   // 1.3 Account version snapshot captured immutably upon creation
   // Seed allocation for testing
   sqliteDb.exec(`
-    INSERT INTO finance_payments (id, payment_number, santri_id, channel, method, gross_amount, net_amount, status, paid_at)
-    VALUES ('pay-base-1', 'PAY-BASE-001', 'san-1', 'BRI', 'BRI_VA', 1000000, 1000000, 'SETTLED', '2026-10-01T10:00:00Z');
-    INSERT INTO finance_obligations (id, santri_id, item_type, period, amount_expected, amount_paid, status)
-    VALUES ('ob-base-1', 'san-1', 'SPP', '2026-10', 1000000, 1000000, 'PAID');
-    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status)
-    VALUES ('alloc-base-1', 'pay-base-1', 'ob-base-1', 'SPP', 1000000, 0, 'UNDISBURSED');
+    INSERT INTO finance_payments (id, payment_number, santri_id, channel, method, gross_amount, net_amount, status, paid_at) VALUES
+('pay-base-1', 'PAY-BASE-001', 'san-1', 'BRI', 'BRI_VA', 1000000, 1000000, 'PAID', '2026-10-01T10:00:00Z');
+    INSERT INTO finance_obligations (id, santri_id, item_type, period, amount_expected, amount_paid, status) VALUES
+('ob-base-1', 'san-1', 'SPP', '2026-10', 1000000, 1000000, 'PAID');
+    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status, target_type) VALUES
+('alloc-base-1', 'pay-base-1', 'ob-base-1', 'SPP', 1000000, 0, 'UNDISBURSED', 'OBLIGATION');
   `)
 
   const draftRes = await qlolaService.createDistributionDraft({
@@ -651,10 +322,10 @@ async function runTests() {
 
   // 2.5 Correction reduces availability for future distributions
   sqliteDb.exec(`
-    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status)
-    VALUES ('alloc-corr-test', 'pay-base-1', 'ob-base-1', 'SPP', 500000, 0, 'UNDISBURSED');
-    INSERT INTO finance_correction_items (id, target_allocation_id, obligation_id, amount)
-    VALUES ('fci-test-1', 'alloc-corr-test', 'ob-base-1', 200000);
+    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status, target_type) VALUES
+('alloc-corr-test', 'pay-base-1', 'ob-base-1', 'SPP', 500000, 0, 'UNDISBURSED', 'OBLIGATION');
+    INSERT INTO finance_corrections(id,correction_number,correction_type,target_payment_id,total_amount,reason,created_by) VALUES('corr-test','CORR-TEST','VOID','pay-base-1',200000,'Test correction','usr-admin');
+    INSERT INTO finance_correction_items(id,correction_id,target_type,target_allocation_id,obligation_id,amount) VALUES('fci-test-1','corr-test','OBLIGATION','alloc-corr-test','ob-base-1',200000);
   `)
   // Available should now be 500,000 - 200,000 = 300,000
   const draftCorrRes = await qlolaService.createDistributionDraft({
@@ -671,10 +342,10 @@ async function runTests() {
   // 2.6 Correction that would exceed remaining allocation rejected by DB trigger
   assert.throws(() => {
     sqliteDb.prepare(`
-      INSERT INTO finance_correction_items (id, target_allocation_id, obligation_id, amount)
-      VALUES ('fci-over', 'alloc-corr-test', 'ob-base-1', 400000);
+      INSERT INTO finance_correction_items (id,correction_id,target_type,target_allocation_id,obligation_id,amount)
+      VALUES ('fci-over','corr-test','OBLIGATION','alloc-corr-test','ob-base-1',400000);
     `).run()
-  }, /Total nominal koreksi melebihi nominal alokasi|Koreksi ditolak: Nominal koreksi membuat reservasi penyaluran bank aktif melebihi sisa alokasi/, 'Must reject over-correction')
+  }, /CORRECTION_LIVE_RESERVATION|Total nominal koreksi melebihi nominal alokasi|Koreksi ditolak: Nominal koreksi membuat reservasi penyaluran bank aktif melebihi sisa alokasi/, 'Must reject over-correction')
   console.log('✓ 2.6: Over-correction rejected by trigger trg_finance_correction_items_prevent_over_correct.')
 
   // =========================================================================
@@ -803,7 +474,7 @@ async function runTests() {
   console.log('✓ 5.1: Cancel while DRAFT transitions directly to CANCELLED and releases reservation.')
 
   // 5.2 Cancel while PENDING_APPROVAL before bank submission (confirmedByBank: true) releases reservation
-  sqliteDb.exec(`
+  await seedPendingDistributionFixture(`
     INSERT INTO finance_distributions (
       id, distribution_number, recipient_type, recipient_id, item_type, period, total_amount, method, status
     ) VALUES ('dist-cancel-pending', 'DIS-CP-001', 'PESANTREN', 'rec_pesantren', 'SPP', '2026-10', 50000, 'BRI_QLOLA', 'PENDING_APPROVAL');
@@ -819,7 +490,7 @@ async function runTests() {
   console.log('✓ 5.2: Cancel while PENDING_APPROVAL before submission releases reservation.')
 
   // 5.3 Cancel while PENDING_APPROVAL after submission without bank confirmation -> CANCEL_PENDING (reservation remains)
-  sqliteDb.exec(`
+  await seedPendingDistributionFixture(`
     INSERT INTO finance_distributions (
       id, distribution_number, recipient_type, recipient_id, item_type, period, total_amount, method, status,
       dispatch_attempted_at, submission_outcome
@@ -839,7 +510,7 @@ async function runTests() {
   // 5.4 Switch method away from BRI_QLOLA while in PENDING_APPROVAL or CANCEL_PENDING is blocked by DB trigger
   assert.throws(() => {
     sqliteDb.prepare("UPDATE finance_distributions SET method = 'CASH' WHERE id = 'dist-cp-wait'").run()
-  }, /Dilarang mengganti metode penyaluran saat dana berada dalam status reservasi aktif/, 'Must block switching to CASH while in CANCEL_PENDING')
+  }, /Field finansial instruksi penyaluran bersifat immutable|Dilarang mengganti metode penyaluran saat dana berada dalam status reservasi aktif/, 'Must block switching to CASH while in CANCEL_PENDING')
   console.log('✓ 5.4: Switching method to CASH/MANUAL while in CANCEL_PENDING strictly blocked.')
 
   // 5.5 Switching method only allowed after terminal CANCELLED or REJECTED
@@ -853,7 +524,7 @@ async function runTests() {
   assert.strictEqual(syncBankReject.isReservationReleased, true)
 
   // Direct rejection from PENDING_APPROVAL -> REJECTED
-  sqliteDb.exec(`
+  await seedPendingDistributionFixture(`
     INSERT INTO finance_distributions (
       id, distribution_number, recipient_type, recipient_id, item_type, period, total_amount, method, status
     ) VALUES ('dist-reject-test', 'DIS-REJ-001', 'PESANTREN', 'rec_pesantren', 'SPP', '2026-10', 50000, 'BRI_QLOLA', 'PENDING_APPROVAL');
@@ -884,7 +555,7 @@ async function runTests() {
   assert.ok(recoveryRes.recoveryItemId)
 
   const recItem = sqliteDb.prepare("SELECT * FROM finance_reconciliation_items WHERE id = ?").get(recoveryRes.recoveryItemId)
-  assert.strictEqual(recItem.match_status, 'PENDING_RECOVERY')
+  assert.strictEqual(recItem.match_status, 'AMOUNT_MISMATCH')
   assert.strictEqual(recItem.internal_amount, 50000)
 
   // Verify historical distribution remains intact
@@ -939,7 +610,7 @@ async function runTests() {
         createdBy: 'usr-admin',
       })
     },
-    /Nominal penyaluran harus berupa bilangan bulat positif/,
+    /Nominal harus berupa integer Rupiah positif yang aman|Nominal penyaluran harus berupa bilangan bulat positif/,
     'Must reject 0 amount'
   )
 
@@ -954,7 +625,7 @@ async function runTests() {
         createdBy: 'usr-admin',
       })
     },
-    /Nominal penyaluran harus berupa bilangan bulat positif/,
+    /Nominal harus berupa integer Rupiah positif yang aman|Nominal penyaluran harus berupa bilangan bulat positif/,
     'Must reject negative amount'
   )
   console.log('✓ 8.1: Zero and negative amounts rejected fail-closed.')
@@ -984,7 +655,8 @@ async function runTests() {
     accountNumber: '001901000123301',
     expectedAccountHolder: 'Yayasan Pesantren Sukahideng',
   })
-  assert.strictEqual(inqRes.isMatched, true)
+  assert.strictEqual(inqRes.isMatched, false)
+  assert.strictEqual(inqRes.status,'NOT_VERIFIED')
   assert.strictEqual(inqRes.bankCode, '002')
   console.log('✓ 9.1: Contract isolation declarations and account inquiry seam verified.')
 
@@ -995,14 +667,14 @@ async function runTests() {
 
   // Setup seed allocation for regression tests
   sqliteDb.exec(`
-    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status)
-    VALUES ('alloc-reg-1', 'pay-base-1', 'ob-base-1', 'SPP', 5000000, 0, 'UNDISBURSED');
+    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status, target_type) VALUES
+('alloc-reg-1', 'pay-base-1', 'ob-base-1', 'SPP', 5000000, 0, 'UNDISBURSED', 'OBLIGATION');
   `)
 
   // Test 1: SUBMISSION_PENDING reserves allocation
   sqliteDb.exec(`
-    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status)
-    VALUES ('alloc-res-1', 'pay-base-1', 'ob-base-1', 'SPP', 500000, 0, 'UNDISBURSED');
+    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status, target_type) VALUES
+('alloc-res-1', 'pay-base-1', 'ob-base-1', 'SPP', 500000, 0, 'UNDISBURSED', 'OBLIGATION');
     INSERT INTO finance_distributions (
       id, distribution_number, recipient_type, recipient_id, recipient_name, recipient_category,
       item_type, period, total_amount, method, status, currency
@@ -1049,8 +721,8 @@ async function runTests() {
 
   // Test 2: UNKNOWN reserves allocation
   sqliteDb.exec(`
-    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status)
-    VALUES ('alloc-res-2', 'pay-base-1', 'ob-base-1', 'SPP', 300000, 0, 'UNDISBURSED');
+    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status, target_type) VALUES
+('alloc-res-2', 'pay-base-1', 'ob-base-1', 'SPP', 300000, 0, 'UNDISBURSED', 'OBLIGATION');
     INSERT INTO finance_distributions (
       id, distribution_number, recipient_type, recipient_id, recipient_name, recipient_category,
       item_type, period, total_amount, method, status, currency, dispatch_attempted_at, submission_outcome
@@ -1146,7 +818,7 @@ async function runTests() {
   `)
   assert.throws(() => {
     sqliteDb.prepare("UPDATE finance_distributions SET method = 'CASH' WHERE id = 'dist-frozen'").run()
-  }, /Dilarang mengganti metode penyaluran saat dana berada dalam status reservasi aktif atau memiliki intent transfer aktif/, 'Test 5 Failed: Method switch must be blocked')
+  }, /Field finansial instruksi penyaluran bersifat immutable|Dilarang mengganti metode penyaluran saat dana berada dalam status reservasi aktif atau memiliki intent transfer aktif/, 'Test 5 Failed: Method switch must be blocked')
   assert.throws(() => {
     sqliteDb.prepare("UPDATE finance_distributions SET recipient_name = 'Penerima Lain' WHERE id = 'dist-frozen'").run()
   }, /Field finansial instruksi penyaluran.*bersifat immutable/, 'Test 5 Failed: Financial field edit must be blocked')
@@ -1163,8 +835,8 @@ async function runTests() {
   // (returns DRAFT, intent CANCEL_PENDING)
   // -------------------------------------------------------------------------
   sqliteDb.exec(`
-    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status)
-    VALUES ('alloc-u-canc', 'pay-base-1', 'ob-base-1', 'SPP', 400000, 0, 'UNDISBURSED');
+    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status, target_type) VALUES
+('alloc-u-canc', 'pay-base-1', 'ob-base-1', 'SPP', 400000, 0, 'UNDISBURSED', 'OBLIGATION');
     INSERT INTO finance_distributions (
       id, distribution_number, recipient_type, recipient_id, recipient_name, recipient_category,
       item_type, period, total_amount, method, status, currency, dispatch_attempted_at, submission_outcome
@@ -1266,8 +938,8 @@ async function runTests() {
   // distribution PENDING_APPROVAL, intent SUBMITTED, reservation preserved
   // -------------------------------------------------------------------------
   sqliteDb.exec(`
-    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status)
-    VALUES ('alloc-ack-later', 'pay-base-1', 'ob-base-1', 'SPP', 350000, 0, 'UNDISBURSED');
+    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status, target_type) VALUES
+('alloc-ack-later', 'pay-base-1', 'ob-base-1', 'SPP', 350000, 0, 'UNDISBURSED', 'OBLIGATION');
     INSERT INTO finance_distributions (
       id, distribution_number, recipient_type, recipient_id, recipient_name, recipient_category,
       item_type, period, total_amount, method, status, currency, dispatch_attempted_at, submission_outcome
@@ -1332,8 +1004,8 @@ async function runTests() {
   // (competing 500k against 700k reserved from 1M fails)
   // -------------------------------------------------------------------------
   sqliteDb.exec(`
-    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status)
-    VALUES ('alloc-1m-comp', 'pay-base-1', 'ob-base-1', 'SPP', 1000000, 0, 'UNDISBURSED');
+    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status, target_type) VALUES
+('alloc-1m-comp', 'pay-base-1', 'ob-base-1', 'SPP', 1000000, 0, 'UNDISBURSED', 'OBLIGATION');
     INSERT INTO finance_distributions (
       id, distribution_number, recipient_type, recipient_id, recipient_name, recipient_category,
       item_type, period, total_amount, method, status, currency
@@ -1371,8 +1043,8 @@ async function runTests() {
   // REVIEWER TEST 7: Injected failure during ACK handoff rolls back both states
   // -------------------------------------------------------------------------
   sqliteDb.exec(`
-    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status)
-    VALUES ('alloc-rb-test', 'pay-base-1', 'ob-base-1', 'SPP', 200000, 0, 'UNDISBURSED');
+    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status, target_type) VALUES
+('alloc-rb-test', 'pay-base-1', 'ob-base-1', 'SPP', 200000, 0, 'UNDISBURSED', 'OBLIGATION');
     INSERT INTO finance_distributions (
       id, distribution_number, recipient_type, recipient_id, recipient_name, recipient_category,
       item_type, period, total_amount, method, status, currency
@@ -1421,7 +1093,7 @@ async function runTests() {
   // -------------------------------------------------------------------------
   // REVIEWER TEST 9: PENDING_APPROVAL -> PROCESSING without eligible APPROVAL_PROGRESS blocked DB
   // -------------------------------------------------------------------------
-  sqliteDb.exec(`
+  await seedPendingDistributionFixture(`
     INSERT INTO finance_distributions (
       id, distribution_number, recipient_type, recipient_id, recipient_name, recipient_category,
       item_type, period, total_amount, method, status, currency
@@ -1462,7 +1134,7 @@ async function runTests() {
   // -------------------------------------------------------------------------
   // REVIEWER TEST 11: TEST_PROVIDER evidence cannot authorize DISTRIBUTED (DB trigger rejects)
   // -------------------------------------------------------------------------
-  sqliteDb.exec(`
+  await seedPendingDistributionFixture(`
     INSERT INTO finance_distributions (
       id, distribution_number, recipient_type, recipient_id, recipient_name, recipient_category,
       item_type, period, total_amount, method, status, currency
@@ -1497,7 +1169,7 @@ async function runTests() {
   // -------------------------------------------------------------------------
   // REVIEWER TEST 12: Authenticated manual proof resolution with verified DB operator and role snapshot
   // -------------------------------------------------------------------------
-  sqliteDb.exec(`
+  await seedPendingDistributionFixture(`
     INSERT INTO finance_distributions (
       id, distribution_number, recipient_type, recipient_id, recipient_name, recipient_category,
       item_type, period, total_amount, method, status, currency
@@ -1633,8 +1305,8 @@ async function runTests() {
   // -------------------------------------------------------------------------
   // Cancel before dispatch releases intent reservation
   sqliteDb.exec(`
-    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status)
-    VALUES ('alloc-c-pre', 'pay-base-1', 'ob-base-1', 'SPP', 250000, 0, 'UNDISBURSED');
+    INSERT INTO finance_allocations (id, payment_id, obligation_id, item_type, amount, disbursed_amount, distribution_status, target_type) VALUES
+('alloc-c-pre', 'pay-base-1', 'ob-base-1', 'SPP', 250000, 0, 'UNDISBURSED', 'OBLIGATION');
     INSERT INTO finance_distributions (
       id, distribution_number, recipient_type, recipient_id, recipient_name, recipient_category,
       item_type, period, total_amount, method, status, currency
@@ -1746,3 +1418,12 @@ runTests().catch((err) => {
   console.error('\n❌ TEST RUN FAILED:', err)
   process.exit(1)
 })
+
+async function seedPendingDistributionFixture(sql){
+ const before=new Set(sqliteDb.prepare('SELECT id FROM finance_distributions').all().map(r=>r.id))
+ sqliteDb.exec(sql.replaceAll("'PENDING_APPROVAL'","'DRAFT'"))
+ for(const row of sqliteDb.prepare('SELECT id FROM finance_distributions').all().filter(r=>!before.has(r.id))){
+  sqliteDb.prepare(`UPDATE finance_distributions SET account_id='acc-pes-1',destination_bank='002',destination_account='001901000123301',account_holder_name='Yayasan Pesantren Sukahideng',dispatch_attempted_at=NULL,submission_outcome=NULL WHERE id=?`).run(row.id)
+  await new BriQlolaDistributionService().submitDistributionToQlola({distributionId:row.id,submittedBy:'usr-petugas',distributionRequestId:'FIXTURE-'+row.id,testProviderAdapter:{dispatchTransfer:async()=>({outcome:'ACKNOWLEDGED',providerReference:'FIXTURE-'+row.id,providerState:'WAITING_APPROVAL'})}})
+ }
+}

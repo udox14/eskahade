@@ -29,3 +29,7 @@ Existing untracked audit report/output are preserved. No remote mutations, deplo
 A09: original audit suggestion that Payment must require totalAmount is **not accepted without contract confirmation**. Inquiry response and Payment request are distinct. Historical manual migrations 0182–0186 are already applied; `d1_migrations` is not their authoritative history.
 
 External gates: partner entitlement, inbound token/onboarding identity contract, BRI sandbox interoperability and QLola non-STP H2H remain required. No public bank API is presumed to provide QLola Signer approval.
+
+## Penutupan checkpoint 4
+
+Status akhir per temuan, reproduksi sebelum/sesudah, evidence pengujian dan batas eksternal dicatat pada [laporan remediation](C:/DATA/eskahade/docs/FINANCE_BRI_REMEDIATION_REPORT_2026-10-18.md). A04 dan A09 tetap PARTIALLY_FIXED; A12 CONTRACT_BLOCKED; A13 PARTIALLY_FIXED. Temuan lain FIXED_AND_VERIFIED dalam batas verifikasi lokal. Subklaim A09 bahwa Payment wajib totalAmount ditolak berdasarkan tabel request publik. Tidak ada klaim bank go-live.

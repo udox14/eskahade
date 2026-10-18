@@ -1,0 +1,194 @@
+{
+  "date": "2026-10-18",
+  "base": "6ee5debfb39881aba7bd74b4c3f1058a97210308",
+  "branch": "fix/finance-bri-audit-20261018",
+  "scope": "Local only; no push/deploy/remote mutation/live bank calls",
+  "financeBriSuites": [
+    {
+      "file": "test-bri-audit-reports.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-bri-cash-manual-distribution.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-bri-collection.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-bri-core.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-bri-distribution.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-bri-settlement.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-bri-remediation.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-cutover-uang-jajan-zero.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-excel-export.mjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase10.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase2a.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase2b.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase2c.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase3a.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase3b-snap.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase3b.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase4a.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase4b.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase4c.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase5.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase6.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase7.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase8.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-fase9.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-legacy-payment-bridge.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-operations-remediation.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-patch-b.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-patch-c1.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-patch-c2.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-patch-c3.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-patch-c4.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-portal-ortu.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-remediation.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-runtime-blockers.py",
+      "exitCode": 0
+    },
+    {
+      "file": "test-finance-state-migration.py",
+      "exitCode": 0
+    }
+  ],
+  "migrationSuites": [
+    {
+      "file": "test-migration-0182.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-migration-0183.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-migration-0184.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-migration-0185.cjs",
+      "exitCode": 0
+    },
+    {
+      "file": "test-migration-0186.cjs",
+      "exitCode": 0
+    }
+  ],
+  "newNamedScenarios": {
+    "core": 17,
+    "bri": 15,
+    "operations": 12,
+    "total": 44
+  },
+  "anonymousExportEntrypoints": 95,
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit",
+    "exitCode": 0,
+    "log": "output/remediation-typecheck-full.log"
+  },
+  "build": {
+    "command": "npm run build:cf",
+    "exitCode": 0,
+    "log": "output/remediation-build.log"
+  },
+  "remoteMigrationsApplied": false,
+  "limitations": [
+    "Local migration-derived SQLite simulation is not Cloudflare D1 distributed-runtime verification",
+    "Bank transport mocked; no bank sandbox interoperability evidence",
+    "Direct R2 public/custom-domain privacy and old caches not verified",
+    "No browser visual/operator UAT"
+  ]
+}

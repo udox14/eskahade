@@ -1,3 +1,4 @@
+// Finance schema is reconstructed from the actual applied migrations, plus local remediation migrations.
 // scripts/test-bri-collection.cjs
 // Comprehensive Unit & Integration Test Suite for BRI-3 BRIVA Collection Hardening
 // Covers all 20 required verification scenarios per AGENTS.md and reviewer audit.
@@ -13,7 +14,7 @@ const ts = require('typescript')
 const root = path.resolve(__dirname, '..')
 
 // Setup in-memory SQLite database
-const sqliteDb = new DatabaseSync(':memory:')
+let sqliteDb = new DatabaseSync(':memory:')
 sqliteDb.exec('PRAGMA foreign_keys = ON;')
 
 // Bridge mock for @/lib/db
@@ -70,222 +71,8 @@ require.extensions['.ts'] = (mod, file) => {
 }
 
 // Initialize SQLite Schema (Baseline + Migration 0182 + Migration 0183)
-function initDatabase() {
-  sqliteDb.exec(`
-    CREATE TABLE users (id TEXT PRIMARY KEY, full_name TEXT);
-    CREATE TABLE santri (
-        id TEXT PRIMARY KEY,
-        nis TEXT,
-        nama_lengkap TEXT,
-        status_global TEXT DEFAULT 'aktif',
-        asrama TEXT,
-        kamar TEXT,
-        tempat_makan_id TEXT,
-        tempat_mencuci_id TEXT,
-        kategori_santri TEXT
-    );
-    CREATE TABLE master_jasa (
-        id TEXT PRIMARY KEY,
-        nama_jasa TEXT,
-        jenis TEXT
-    );
-    CREATE TABLE tahun_ajaran (
-        id INTEGER PRIMARY KEY,
-        nama TEXT,
-        is_active INTEGER
-    );
-    CREATE TABLE app_settings (
-        key TEXT PRIMARY KEY,
-        value TEXT,
-        updated_at TEXT
-    );
-    CREATE TABLE finance_tariffs (
-        id TEXT PRIMARY KEY,
-        item_type TEXT,
-        academic_year_id INTEGER,
-        nominal INTEGER,
-        installment_rule TEXT,
-        effective_from TEXT,
-        effective_until TEXT,
-        created_by TEXT,
-        created_at TEXT
-    );
-    CREATE TABLE finance_obligations (
-        id TEXT PRIMARY KEY,
-        santri_id TEXT REFERENCES santri(id),
-        item_type TEXT NOT NULL,
-        period TEXT NOT NULL,
-        academic_year_id INTEGER REFERENCES tahun_ajaran(id),
-        tariff_id TEXT REFERENCES finance_tariffs(id),
-        provider_id TEXT REFERENCES master_jasa(id),
-        amount_expected INTEGER NOT NULL,
-        amount_exempted INTEGER NOT NULL DEFAULT 0,
-        amount_paid INTEGER NOT NULL DEFAULT 0,
-        status TEXT NOT NULL DEFAULT 'UNPAID',
-        notes TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_cash_sessions (
-        id TEXT PRIMARY KEY,
-        session_number TEXT NOT NULL,
-        operator_id TEXT REFERENCES users(id),
-        status TEXT NOT NULL,
-        opened_at TEXT NOT NULL,
-        closed_at TEXT
-    );
-    CREATE TABLE finance_payment_orders (
-        id TEXT PRIMARY KEY,
-        order_number TEXT NOT NULL UNIQUE,
-        santri_id TEXT NOT NULL REFERENCES santri(id),
-        payer_type TEXT NOT NULL,
-        gross_amount INTEGER NOT NULL CHECK (gross_amount >= 0),
-        cooperative_admin_fee INTEGER NOT NULL DEFAULT 0 CHECK (cooperative_admin_fee >= 0),
-        fee_payer TEXT NOT NULL DEFAULT 'CUSTOMER' CHECK (fee_payer IN ('CUSTOMER', 'INSTITUTION')),
-        total_charged INTEGER NOT NULL CHECK (total_charged >= 0),
-        payment_method TEXT NOT NULL,
-        fixed_va_number TEXT,
-        status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'PAID', 'EXPIRED', 'CANCELLED', 'REPLACED')),
-        expires_at TEXT NOT NULL,
-        cash_session_id TEXT REFERENCES finance_cash_sessions(id),
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_order_items (
-        id TEXT PRIMARY KEY,
-        order_id TEXT NOT NULL REFERENCES finance_payment_orders(id) ON DELETE CASCADE,
-        obligation_id TEXT REFERENCES finance_obligations(id),
-        item_type TEXT NOT NULL,
-        amount INTEGER NOT NULL CHECK (amount > 0)
-    );
-    CREATE TABLE finance_payments (
-        id TEXT PRIMARY KEY,
-        payment_number TEXT NOT NULL UNIQUE,
-        order_id TEXT REFERENCES finance_payment_orders(id),
-        santri_id TEXT NOT NULL REFERENCES santri(id),
-        channel TEXT NOT NULL CHECK (channel IN ('BRI', 'CASH')),
-        method TEXT NOT NULL,
-        gross_amount INTEGER NOT NULL CHECK (gross_amount >= 0),
-        cooperative_admin_fee INTEGER NOT NULL DEFAULT 0 CHECK (cooperative_admin_fee >= 0),
-        bri_fee_amount INTEGER CHECK (bri_fee_amount IS NULL OR bri_fee_amount >= 0),
-        net_amount INTEGER NOT NULL CHECK (net_amount >= 0),
-        status TEXT NOT NULL DEFAULT 'PAID' CHECK (status IN ('PAID', 'SETTLED')),
-        correction_status TEXT NOT NULL DEFAULT 'NONE' CHECK (correction_status IN ('NONE', 'PARTIALLY_CORRECTED', 'FULLY_CORRECTED')),
-        allocation_status TEXT NOT NULL DEFAULT 'ALLOCATED' CHECK (allocation_status IN ('ALLOCATED', 'PARTIALLY_ALLOCATED', 'UNALLOCATED')),
-        paid_at TEXT NOT NULL,
-        bri_payment_request_id TEXT,
-        bri_trx_id TEXT,
-        external_reference TEXT,
-        cash_session_id TEXT,
-        received_by TEXT REFERENCES users(id),
-        source TEXT NOT NULL DEFAULT 'NEW_FINANCE' CHECK (source IN ('NEW_FINANCE', 'LEGACY')),
-        fund_management TEXT NOT NULL DEFAULT 'KOPERASI' CHECK (fund_management IN ('PRE_KOPERASI', 'KOPERASI')),
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_allocations (
-        id TEXT PRIMARY KEY,
-        payment_id TEXT NOT NULL REFERENCES finance_payments(id),
-        obligation_id TEXT REFERENCES finance_obligations(id),
-        target_type TEXT NOT NULL,
-        item_type TEXT NOT NULL,
-        provider_id TEXT REFERENCES master_jasa(id),
-        amount INTEGER NOT NULL CHECK (amount >= 0),
-        disbursed_amount INTEGER NOT NULL DEFAULT 0 CHECK (disbursed_amount >= 0),
-        distribution_status TEXT NOT NULL DEFAULT 'UNDISBURSED',
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_student_va (
-        id TEXT PRIMARY KEY,
-        santri_id TEXT NOT NULL UNIQUE REFERENCES santri(id),
-        customer_no TEXT NOT NULL UNIQUE,
-        va_number TEXT NOT NULL UNIQUE,
-        status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE')),
-        activated_at TEXT,
-        inactivated_at TEXT,
-        notes TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_cooperative_income (
-        id TEXT PRIMARY KEY,
-        income_number TEXT NOT NULL UNIQUE,
-        entry_type TEXT NOT NULL CHECK (entry_type IN ('INCOME', 'REVERSAL', 'REFUND')),
-        reference_income_id TEXT REFERENCES finance_cooperative_income(id),
-        correction_id TEXT,
-        payment_id TEXT NOT NULL REFERENCES finance_payments(id),
-        order_id TEXT REFERENCES finance_payment_orders(id),
-        amount INTEGER NOT NULL CHECK (amount > 0),
-        rule_id TEXT,
-        rule_snapshot TEXT,
-        reference_note TEXT,
-        created_by TEXT REFERENCES users(id),
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_wallet_ledger (
-        id TEXT PRIMARY KEY,
-        santri_id TEXT NOT NULL REFERENCES santri(id),
-        direction TEXT NOT NULL CHECK (direction IN ('IN', 'OUT')),
-        amount INTEGER NOT NULL CHECK (amount > 0),
-        balance_before INTEGER NOT NULL CHECK (balance_before >= 0),
-        balance_after INTEGER NOT NULL CHECK (balance_after >= 0),
-        source TEXT NOT NULL,
-        channel TEXT,
-        payment_id TEXT REFERENCES finance_payments(id),
-        notes TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_gateway_events (
-        id TEXT PRIMARY KEY,
-        gateway_name TEXT NOT NULL CHECK (gateway_name IN ('BRI', 'BRI_BRIVA', 'BRI_QLOLA')),
-        event_key TEXT NOT NULL UNIQUE,
-        merchant_order_id TEXT,
-        event_type TEXT NOT NULL,
-        signature_valid INTEGER NOT NULL CHECK (signature_valid IN (0, 1)),
-        payload_json TEXT NOT NULL,
-        response_code TEXT,
-        is_processed INTEGER NOT NULL DEFAULT 0 CHECK (is_processed IN (0, 1)),
-        processing_status TEXT NOT NULL CHECK (processing_status IN ('PENDING', 'PROCESSED', 'IGNORED', 'ERROR')),
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
+function initDatabase(){sqliteDb.close();sqliteDb=require('./finance-remediation-fixture.cjs').createDatabase(189,false)}
 
-    -- Unique & Partial Indexes
-    CREATE UNIQUE INDEX uq_finance_payment_orders_santri_active_online
-        ON finance_payment_orders(santri_id)
-        WHERE status = 'PENDING' AND payment_method = 'BRI_VA';
-
-    CREATE UNIQUE INDEX uq_finance_payments_bri_payment_request_id
-        ON finance_payments(bri_payment_request_id)
-        WHERE bri_payment_request_id IS NOT NULL;
-
-    CREATE UNIQUE INDEX uq_finance_payments_bri_trx_id
-        ON finance_payments(bri_trx_id)
-        WHERE bri_trx_id IS NOT NULL;
-
-    -- Trigger Wallet Integrity
-    CREATE TRIGGER trg_finance_wallet_verify_balance
-    BEFORE INSERT ON finance_wallet_ledger
-    FOR EACH ROW
-    BEGIN
-        SELECT CASE
-            WHEN (
-                SELECT COALESCE(SUM(CASE WHEN direction = 'IN' THEN amount ELSE -amount END), 0)
-                FROM finance_wallet_ledger
-                WHERE santri_id = NEW.santri_id
-            ) != NEW.balance_before
-            THEN RAISE(ABORT, 'Integritas Buku Besar Terlanggar: balance_before tidak sesuai saldo riil.')
-            WHEN NEW.direction = 'IN' AND (NEW.balance_after != NEW.balance_before + NEW.amount)
-            THEN RAISE(ABORT, 'Integritas Buku Besar Terlanggar: kalkulasi balance_after kredit (IN) salah.')
-            WHEN NEW.direction = 'OUT' AND (NEW.balance_after != NEW.balance_before - NEW.amount)
-            THEN RAISE(ABORT, 'Integritas Buku Besar Terlanggar: kalkulasi balance_after debit (OUT) salah.')
-        END;
-    END;
-  `)
-
-  // Apply Migration 0183 (Metadata, Correlation, Compare-and-Set Triggers)
-  const mig0183Path = path.join(root, 'migrations', '0183_briva_collection_metadata.sql')
-  const mig0183Sql = fs.readFileSync(mig0183Path, 'utf8')
-  sqliteDb.exec(mig0183Sql)
-}
 
 async function runTestSuite() {
   console.log('=================================================================')
@@ -319,7 +106,7 @@ async function runTestSuite() {
     baseUrl: 'https://sandbox.partner.api.bri.co.id',
     clientKey: 'koperasi_client_key_123',
     clientId: 'koperasi_client_key_123',
-    partnerId: '   12345', // Configured partner ID (with 3 leading spaces)
+    partnerId: 'partner-12345', // Configured partner ID (with 3 leading spaces)
     clientSecret: 'super_secret_signing_key_456',
     privateKey: testPrivateKey,
     timestampOffsetHours: 7,
@@ -380,7 +167,7 @@ async function runTestSuite() {
       timestamp,
       signature,
       partnerId,
-      externalId: overrides.externalId || 'EXT_REQ_' + Date.now(),
+      externalId: overrides.externalId || '123456789' + Date.now(),
       channelId,
       contentType: overrides.contentType !== undefined ? overrides.contentType : 'application/json',
     }
@@ -403,9 +190,7 @@ async function runTestSuite() {
   `).run()
 
   sqliteDb.prepare(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at)
-    VALUES
-      ('ord-pending-1', 'ORD-202610-001', 'san-1', 'PORTAL_ORTU', 150000, 3000, 153000, 'BRI_VA', '1234500001001', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at,created_at) VALUES ('ord-pending-1', 'ORD-202610-001', 'san-1', 'PORTAL_ORTU', 150000, 3000, 153000, 'BRI_VA', '1234500001001', 'PENDING', '2026-10-31T23:59:59Z' ,'2026-10-01T00:00:00Z');
   `).run()
 
   sqliteDb.prepare(`
@@ -415,10 +200,10 @@ async function runTestSuite() {
       ('oi-2', 'ord-pending-1', 'ob-mkn-1', 'UANG_MAKAN', 50000);
   `).run()
 
-  const validInquiryBody = JSON.stringify({
+  const validInquiryBody = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001001',
-    virtualAccountNo: '1234500001001',
+    virtualAccountNo: '   1234500001001',
     inquiryRequestId: 'INQ-REQ-BRI-001',
     channelId: '00009',
   })
@@ -440,10 +225,10 @@ async function runTestSuite() {
   assert.strictEqual(resKillInq.body.responseCode, BRI_VA_INQUIRY_CODES.GENERAL_ERROR)
   assert.strictEqual(resKillInq.body.responseMessage, 'General Error')
 
-  const killSwitchPayBody = JSON.stringify({
+  const killSwitchPayBody = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001001',
-    virtualAccountNo: '1234500001001',
+    virtualAccountNo: '   1234500001001',
     paymentRequestId: 'PAY-KILL-SWITCH-001',
     paidAmount: { value: '153000.00', currency: 'IDR' },
   })
@@ -577,7 +362,7 @@ async function runTestSuite() {
   // SCENARIO 6C: Exact Raw-Body HMAC with Formatting & Whitespace
   // =========================================================================
   console.log('--- Testing Exact Raw-Body HMAC with Formatting & Whitespace ---')
-  const formattedRawBody = `{\n  "partnerServiceId": "   12345",\n  "customerNo": "00001001",\n  "virtualAccountNo": "1234500001001",\n  "inquiryRequestId": "INQ-REQ-RAW-001",\n  "channelId": "00009"\n}`
+  const formattedRawBody = `{\n  "partnerServiceId": "   12345",\n  "customerNo": "00001001",\n  "virtualAccountNo": "   1234500001001",\n  "inquiryRequestId": "INQ-REQ-RAW-001",\n  "channelId": "00009"\n}`
   const formattedHeaders = createSignedHeaders('POST', '/snap/v1.0/transfer-va/inquiry', formattedRawBody)
   const resFormatted = await handleBrivaInquiry({
     rawBody: formattedRawBody,
@@ -698,10 +483,10 @@ async function runTestSuite() {
   console.log('✓ 15. Leading spaces and leading zeros preserved and inquiry resolved successfully.')
 
   // Mismatch Trio: customerNo modified
-  const mismatchTrioBody = JSON.stringify({
+  const mismatchTrioBody = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00009999',
-    virtualAccountNo: '1234500001001',
+    virtualAccountNo: '   1234500001001',
     inquiryRequestId: 'INQ-REQ-TRIO-ERR',
   })
   const mismatchTrioHeaders = createSignedHeaders('POST', '/snap/v1.0/transfer-va/inquiry', mismatchTrioBody)
@@ -712,8 +497,8 @@ async function runTestSuite() {
     method: 'POST',
     configOverride: testConfig,
   })
-  assert.strictEqual(resMismatchTrio.status, 404)
-  assert.strictEqual(resMismatchTrio.body.responseCode, BRI_VA_INQUIRY_CODES.INVALID_VIRTUAL_ACCOUNT)
+  assert.strictEqual(resMismatchTrio.status, 400)
+  assert.strictEqual(resMismatchTrio.body.responseCode, BRI_VA_INQUIRY_CODES.INVALID_FIELD_FORMAT)
   console.log('✓ 14. PartnerServiceId / customerNo / VA mismatch rejected.')
 
   // =========================================================================
@@ -722,10 +507,10 @@ async function runTestSuite() {
   console.log('--- Testing Inquiry ↔ Payment Correlation ---')
   // Valid inquiry record was created for INQ-REQ-BRI-001 (Ord-pending-1, total 153000)
   const exactTrxDateTimeString = '2026-10-08T14:30:00.123+07:00'
-  const validPaymentBody = JSON.stringify({
+  const validPaymentBody = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001001',
-    virtualAccountNo: '1234500001001',
+    virtualAccountNo: '   1234500001001',
     paymentRequestId: 'INQ-REQ-BRI-001',
     inquiryRequestId: 'INQ-REQ-BRI-001',
     paidAmount: { value: '153000.00', currency: 'IDR' },
@@ -735,16 +520,16 @@ async function runTestSuite() {
       idApp: 'ID-APP-001',
       passApp: 'SECRET_PASS_KEY_DO_NOT_LEAK', // For Scenario 16
       info1: 'Pembayaran SPP dan Makan',
-      trxId: 'TRX-BRI-CORR-101',
+      trxId: '2132902068917559061',
       evilField: 'MALICIOUS_FIELD_DO_NOT_ECHO',
     },
   })
 
   // Mismatched payment with modified inquiryRequestId:
-  const mismatchedInqPayBody = JSON.stringify({
+  const mismatchedInqPayBody = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001001',
-    virtualAccountNo: '1234500001001',
+    virtualAccountNo: '   1234500001001',
     paymentRequestId: 'PAY-MISMATCH-999',
     inquiryRequestId: 'INQ-DOES-NOT-EXIST',
     paidAmount: { value: '153000.00', currency: 'IDR' },
@@ -775,18 +560,18 @@ async function runTestSuite() {
     VALUES ('va-seam', 'san-seam', '00001099', '1234500001099', 'ACTIVE', '2026-10-01T00:00:00Z');
   `).run()
   sqliteDb.prepare(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at)
-    VALUES ('ord-seam-1', 'ORD-SEAM-001', 'san-seam', 'PORTAL_ORTU', 80000, 2000, 82000, 'BRI_VA', '1234500001099', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at,created_at) VALUES ('ord-seam-1', 'ORD-SEAM-001', 'san-seam', 'PORTAL_ORTU', 80000, 2000, 82000, 'BRI_VA', '1234500001099', 'PENDING', '2026-10-31T23:59:59Z' ,'2026-10-01T00:00:00Z');
   `).run()
+  sqliteDb.exec(`INSERT INTO finance_obligations(id,santri_id,item_type,period,amount_expected) VALUES('ob-oi-seam-1','san-seam','SPP','2026-10',80000);`)
   sqliteDb.prepare(`
     INSERT INTO finance_order_items (id, order_id, obligation_id, item_type, amount)
-    VALUES ('oi-seam-1', 'ord-seam-1', NULL, 'SPP', 80000);
+    VALUES ('oi-seam-1', 'ord-seam-1', 'ob-oi-seam-1', 'SPP', 80000);
   `).run()
 
-  const directPayBodyNoInq = JSON.stringify({
+  const directPayBodyNoInq = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001099',
-    virtualAccountNo: '1234500001099',
+    virtualAccountNo: '   1234500001099',
     paymentRequestId: 'PAY-REQ-NO-INQ-001',
     paidAmount: { value: '82000.00', currency: 'IDR' },
     referenceNo: 'REF-SEAM-001',
@@ -830,8 +615,8 @@ async function runTestSuite() {
   // SCENARIOS 11, 16, 17, 19: Concurrent Payment, passApp Hygiene, Rec Metadata, PAID != SETTLED
   // =========================================================================
   console.log('--- Testing Concurrent Payment & Persistence ---')
-  const validPayHeaders1 = createSignedHeaders('POST', '/snap/v1.0/transfer-va/payment', validPaymentBody, { externalId: 'EXT-1' })
-  const validPayHeaders2 = createSignedHeaders('POST', '/snap/v1.0/transfer-va/payment', validPaymentBody, { externalId: 'EXT-2' })
+  const validPayHeaders1 = createSignedHeaders('POST', '/snap/v1.0/transfer-va/payment', validPaymentBody, { externalId: '100000335' })
+  const validPayHeaders2 = createSignedHeaders('POST', '/snap/v1.0/transfer-va/payment', validPaymentBody, { externalId: '100000336' })
 
   // Run two concurrent payment notifications simultaneously
   const [resConcurrent1, resConcurrent2] = await Promise.all([
@@ -871,32 +656,32 @@ async function runTestSuite() {
 
   // Scenario 16: passApp wire preservation vs DB/log hygiene, and Payment additionalInfo allowlist
   assert.strictEqual(
-    resConcurrent1.body.virtualAccountData.additionalInfo.passApp,
+    resConcurrent1.body.additionalInfo.passApp,
     'SECRET_PASS_KEY_DO_NOT_LEAK',
     'passApp must be returned on the wire response per contract'
   )
   assert.strictEqual(
-    resConcurrent1.body.virtualAccountData.additionalInfo.idApp,
+    resConcurrent1.body.additionalInfo.idApp,
     'ID-APP-001',
     'idApp must be reflected in additionalInfo'
   )
   assert.strictEqual(
-    resConcurrent1.body.virtualAccountData.additionalInfo.info1,
+    resConcurrent1.body.additionalInfo.info1,
     'Pembayaran SPP dan Makan',
     'info1 must be reflected in additionalInfo'
   )
   assert.strictEqual(
-    'trxId' in resConcurrent1.body.virtualAccountData.additionalInfo,
+    'trxId' in resConcurrent1.body.additionalInfo,
     false,
     'trxId must NEVER be reflected in response additionalInfo'
   )
   assert.strictEqual(
-    resConcurrent1.body.virtualAccountData.additionalInfo.trxId,
+    resConcurrent1.body.additionalInfo.trxId,
     undefined,
     'trxId must be undefined in response additionalInfo'
   )
   assert.strictEqual(
-    'evilField' in resConcurrent1.body.virtualAccountData.additionalInfo,
+    'evilField' in resConcurrent1.body.additionalInfo,
     false,
     'Arbitrary unallowlisted fields (evilField) must NOT be reflected'
   )
@@ -922,18 +707,18 @@ async function runTestSuite() {
     VALUES ('va-inq-test', 'san-inq-test', '00001097', '1234500001097', 'ACTIVE', '2026-10-01T00:00:00Z');
   `).run()
   sqliteDb.prepare(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at)
-    VALUES ('ord-inq-test', 'ORD-INQ-TEST-001', 'san-inq-test', 'PORTAL_ORTU', 100000, 0, 100000, 'BRI_VA', '1234500001097', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at,created_at) VALUES ('ord-inq-test', 'ORD-INQ-TEST-001', 'san-inq-test', 'PORTAL_ORTU', 100000, 0, 100000, 'BRI_VA', '1234500001097', 'PENDING', '2026-10-31T23:59:59Z' ,'2026-10-01T00:00:00Z');
   `).run()
+  sqliteDb.exec(`INSERT INTO finance_obligations(id,santri_id,item_type,period,amount_expected) VALUES('ob-oi-inq-test','san-inq-test','SPP','2026-10',100000);`)
   sqliteDb.prepare(`
     INSERT INTO finance_order_items (id, order_id, obligation_id, item_type, amount)
-    VALUES ('oi-inq-test', 'ord-inq-test', NULL, 'SPP', 100000);
+    VALUES ('oi-inq-test', 'ord-inq-test', 'ob-oi-inq-test', 'SPP', 100000);
   `).run()
 
-  const inqBodyFull = JSON.stringify({
+  const inqBodyFull = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001097',
-    virtualAccountNo: '1234500001097',
+    virtualAccountNo: '   1234500001097',
     inquiryRequestId: 'INQ-REQ-ADDINFO-INQ',
     channelId: '00009',
     additionalInfo: {
@@ -965,7 +750,7 @@ async function runTestSuite() {
 
   // 2. Payment response additionalInfo only contains documented fields ('idApp', 'passApp', 'info1').
   //    'trxId' and arbitrary fields are strictly stripped.
-  const payAddInfo = resConcurrent1.body.virtualAccountData.additionalInfo
+  const payAddInfo = resConcurrent1.body.additionalInfo
   assert.ok(payAddInfo, 'Payment additionalInfo must be present when idApp is provided')
   assert.strictEqual(payAddInfo.idApp, 'ID-APP-001')
   assert.strictEqual(payAddInfo.passApp, 'SECRET_PASS_KEY_DO_NOT_LEAK')
@@ -994,7 +779,7 @@ async function runTestSuite() {
   const testFingerprint = computePaymentFingerprint({
     partnerServiceId: '   12345',
     customerNo: '00001001',
-    virtualAccountNo: '1234500001001',
+    virtualAccountNo: '   1234500001001',
     paymentRequestId: 'PAY-REQ-TEST',
     trxId: 'TRX-TEST',
     paidAmountRupiah: 100000,
@@ -1046,7 +831,7 @@ async function runTestSuite() {
   // SCENARIO 12: Duplicate with new X-EXTERNAL-ID stays exactly-once
   // =========================================================================
   console.log('--- Testing Retry with Different X-EXTERNAL-ID ---')
-  const retryHeaders = createSignedHeaders('POST', '/snap/v1.0/transfer-va/payment', validPaymentBody, { externalId: 'NEW_RETRY_EXT_ID_9999' })
+  const retryHeaders = createSignedHeaders('POST', '/snap/v1.0/transfer-va/payment', validPaymentBody, { externalId: '100001630' })
   const resRetry = await handleBrivaPayment({
     rawBody: validPaymentBody,
     headers: retryHeaders,
@@ -1067,10 +852,10 @@ async function runTestSuite() {
   console.log('--- Testing Identifier Collision Detection (HTTP 409) ---')
 
   // Collision 1: Same paymentRequestId, conflicting paidAmount
-  const collisionBody1 = JSON.stringify({
+  const collisionBody1 = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001001',
-    virtualAccountNo: '1234500001001',
+    virtualAccountNo: '   1234500001001',
     paymentRequestId: 'INQ-REQ-BRI-001', // existing
     paidAmount: { value: '99999.00', currency: 'IDR' }, // conflict
     referenceNo: 'REF-COLLISION-1',
@@ -1088,10 +873,10 @@ async function runTestSuite() {
   assert.strictEqual(resCol1.body.responseMessage, 'Conflict')
 
   // Collision 2: Same paymentRequestId, conflicting virtualAccountNo
-  const collisionBody2 = JSON.stringify({
+  const collisionBody2 = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001002',
-    virtualAccountNo: '1234500001002', // conflict
+    virtualAccountNo: '   1234500001002', // conflict
     paymentRequestId: 'INQ-REQ-BRI-001', // existing
     paidAmount: { value: '153000.00', currency: 'IDR' },
     referenceNo: 'REF-COLLISION-2',
@@ -1108,13 +893,13 @@ async function runTestSuite() {
   assert.strictEqual(resCol2.body.responseCode, BRI_VA_PAYMENT_CODES.CONFLICT)
 
   // Collision 3: Same trxId, conflicting paymentRequestId
-  const collisionBody3 = JSON.stringify({
+  const collisionBody3 = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001001',
-    virtualAccountNo: '1234500001001',
+    virtualAccountNo: '   1234500001001',
     paymentRequestId: 'PAY-REQ-DIFF-COLLISION', // conflict
     paidAmount: { value: '153000.00', currency: 'IDR' },
-    additionalInfo: { trxId: 'TRX-BRI-CORR-101' }, // existing trxId
+    additionalInfo: { trxId: '2132902068917559061' }, // existing trxId
     referenceNo: 'REF-COLLISION-3',
   })
   const colHeaders3 = createSignedHeaders('POST', '/snap/v1.0/transfer-va/payment', collisionBody3)
@@ -1129,13 +914,13 @@ async function runTestSuite() {
   assert.strictEqual(resCol3.body.responseCode, BRI_VA_PAYMENT_CODES.CONFLICT)
 
   // Collision 4: Same trxId, conflicting amount
-  const collisionBody4 = JSON.stringify({
+  const collisionBody4 = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001001',
-    virtualAccountNo: '1234500001001',
+    virtualAccountNo: '   1234500001001',
     paymentRequestId: 'INQ-REQ-BRI-001',
     paidAmount: { value: '200000.00', currency: 'IDR' }, // conflict
-    additionalInfo: { trxId: 'TRX-BRI-CORR-101' }, // existing trxId
+    additionalInfo: { trxId: '2132902068917559061' }, // existing trxId
     referenceNo: 'REF-COLLISION-4',
   })
   const colHeaders4 = createSignedHeaders('POST', '/snap/v1.0/transfer-va/payment', collisionBody4)
@@ -1160,18 +945,18 @@ async function runTestSuite() {
   console.log('--- Testing CASH Race & Compare-and-Set Guard ---')
   // Seed a new pending order
   sqliteDb.prepare(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at)
-    VALUES ('ord-race-1', 'ORD-RACE-001', 'san-1', 'PORTAL_ORTU', 100000, 0, 100000, 'BRI_VA', '1234500001001', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at,created_at) VALUES ('ord-race-1', 'ORD-RACE-001', 'san-1', 'PORTAL_ORTU', 100000, 0, 100000, 'BRI_VA', '1234500001001', 'PENDING', '2026-10-31T23:59:59Z' ,'2026-10-01T00:00:00Z');
   `).run()
+  sqliteDb.exec(`INSERT INTO finance_obligations(id,santri_id,item_type,period,amount_expected) VALUES('ob-oi-race-1','san-1','SPP','2026-09',100000);`)
   sqliteDb.prepare(`
     INSERT INTO finance_order_items (id, order_id, obligation_id, item_type, amount)
-    VALUES ('oi-race-1', 'ord-race-1', NULL, 'SPP', 100000);
+    VALUES ('oi-race-1', 'ord-race-1', 'ob-oi-race-1', 'SPP', 100000);
   `).run()
 
-  const racePaymentBody = JSON.stringify({
+  const racePaymentBody = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001001',
-    virtualAccountNo: '1234500001001',
+    virtualAccountNo: '   1234500001001',
     paymentRequestId: 'PAY-REQ-RACE-001',
     paidAmount: { value: '100000.00', currency: 'IDR' },
     trxDateTime: new Date().toISOString(),
@@ -1203,26 +988,25 @@ async function runTestSuite() {
   // =========================================================================
   console.log('--- Testing Concurrent Uang Jajan Top-up ---')
   sqliteDb.prepare(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at)
-    VALUES ('ord-jajan-1', 'ORD-JAJAN-001', 'san-1', 'PORTAL_ORTU', 50000, 3000, 53000, 'BRI_VA', '1234500001001', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at,created_at) VALUES ('ord-jajan-1', 'ORD-JAJAN-001', 'san-1', 'PORTAL_ORTU', 50000, 3000, 53000, 'BRI_VA', '1234500001001', 'PENDING', '2026-10-31T23:59:59Z' ,'2026-10-01T00:00:00Z');
   `).run()
   sqliteDb.prepare(`
     INSERT INTO finance_order_items (id, order_id, obligation_id, item_type, amount)
     VALUES ('oi-jajan-1', 'ord-jajan-1', NULL, 'UANG_JAJAN', 50000);
   `).run()
 
-  const jajanPaymentBody = JSON.stringify({
+  const jajanPaymentBody = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001001',
-    virtualAccountNo: '1234500001001',
+    virtualAccountNo: '   1234500001001',
     paymentRequestId: 'PAY-REQ-JAJAN-CONC',
     paidAmount: { value: '53000.00', currency: 'IDR' },
     referenceNo: 'REF-JAJAN-CONC',
     additionalInfo: { trxId: 'TRX-JAJAN-CONC' },
   })
 
-  const jajanHeaders1 = createSignedHeaders('POST', '/snap/v1.0/transfer-va/payment', jajanPaymentBody, { externalId: 'JAJAN-EXT-1' })
-  const jajanHeaders2 = createSignedHeaders('POST', '/snap/v1.0/transfer-va/payment', jajanPaymentBody, { externalId: 'JAJAN-EXT-2' })
+  const jajanHeaders1 = createSignedHeaders('POST', '/snap/v1.0/transfer-va/payment', jajanPaymentBody, { externalId: '100000736' })
+  const jajanHeaders2 = createSignedHeaders('POST', '/snap/v1.0/transfer-va/payment', jajanPaymentBody, { externalId: '100000737' })
 
   const [resJajan1, resJajan2] = await Promise.all([
     handleBrivaPayment({
@@ -1259,8 +1043,7 @@ async function runTestSuite() {
     VALUES ('ob-atom-spp', 'san-1', 'SPP', '2026-11', 120000, 0, 0, 'UNPAID');
   `).run()
   sqliteDb.prepare(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at)
-    VALUES ('ord-fail-ob', 'ORD-FAIL-OB-001', 'san-1', 'PORTAL_ORTU', 120000, 3000, 123000, 'BRI_VA', '1234500001001', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at,created_at) VALUES ('ord-fail-ob', 'ORD-FAIL-OB-001', 'san-1', 'PORTAL_ORTU', 120000, 3000, 123000, 'BRI_VA', '1234500001001', 'PENDING', '2026-10-31T23:59:59Z' ,'2026-10-01T00:00:00Z');
   `).run()
   sqliteDb.prepare(`
     INSERT INTO finance_order_items (id, order_id, obligation_id, item_type, amount)
@@ -1277,10 +1060,10 @@ async function runTestSuite() {
     END;
   `)
 
-  const failObPaymentBody = JSON.stringify({
+  const failObPaymentBody = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001001',
-    virtualAccountNo: '1234500001001',
+    virtualAccountNo: '   1234500001001',
     paymentRequestId: 'PAY-REQ-FAIL-OB',
     paidAmount: { value: '123000.00', currency: 'IDR' },
   })
@@ -1331,8 +1114,7 @@ async function runTestSuite() {
     VALUES ('va-fail-jaj', 'san-fail-jaj', '00001098', '1234500001098', 'ACTIVE', '2026-10-01T00:00:00Z');
   `).run()
   sqliteDb.prepare(`
-    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at)
-    VALUES ('ord-fail-jaj', 'ORD-FAIL-JAJ-001', 'san-fail-jaj', 'PORTAL_ORTU', 60000, 3000, 63000, 'BRI_VA', '1234500001098', 'PENDING', '2026-10-31T23:59:59Z');
+    INSERT INTO finance_payment_orders (id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, total_charged, payment_method, fixed_va_number, status, expires_at,created_at) VALUES ('ord-fail-jaj', 'ORD-FAIL-JAJ-001', 'san-fail-jaj', 'PORTAL_ORTU', 60000, 3000, 63000, 'BRI_VA', '1234500001098', 'PENDING', '2026-10-31T23:59:59Z' ,'2026-10-01T00:00:00Z');
   `).run()
   sqliteDb.prepare(`
     INSERT INTO finance_order_items (id, order_id, obligation_id, item_type, amount)
@@ -1352,10 +1134,10 @@ async function runTestSuite() {
     END;
   `)
 
-  const failJajPaymentBody = JSON.stringify({
+  const failJajPaymentBody = stringifyBrivaFixture({
     partnerServiceId: '   12345',
     customerNo: '00001098',
-    virtualAccountNo: '1234500001098',
+    virtualAccountNo: '   1234500001098',
     paymentRequestId: 'PAY-REQ-FAIL-JAJ',
     paidAmount: { value: '63000.00', currency: 'IDR' },
   })
@@ -1396,3 +1178,8 @@ runTestSuite().catch((err) => {
   console.error('\nFATAL ERROR IN BRI-3 TEST SUITE:', err)
   process.exit(1)
 })
+
+function stringifyBrivaFixture(payload){
+ if(payload?.paymentRequestId && payload?.virtualAccountNo){payload={...payload,virtualAccountName:payload.virtualAccountName||'Ahmad Fauzi',trxId:payload.trxId||payload.additionalInfo?.trxId};if(payload.trxId && !/^\d+$/.test(payload.trxId))payload.trxId=BigInt('0x'+crypto.createHash('sha256').update(payload.trxId).digest('hex').slice(0,14)).toString()}
+ return JSON.stringify(payload)
+}

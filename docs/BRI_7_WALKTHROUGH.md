@@ -1,3 +1,5 @@
+> **Catatan review 18 Oktober 2026:** uraian completion/UAT historis ini tidak menggantikan [laporan remediation](FINANCE_BRI_REMEDIATION_REPORT_2026-10-18.md). Privasi R2, kontrak BRI/QLola, dan real D1/bank UAT tetap gate terpisah. Migration applied tidak boleh diulang.
+
 # Walkthrough Teknis Fase BRI-7: Reports, Cleanup, UAT & Go-Live
 
 ## Ringkasan Eksekutif

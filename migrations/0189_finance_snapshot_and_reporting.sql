@@ -22,6 +22,11 @@ WHEN NEW.santri_id IS NOT OLD.santri_id OR NEW.gross_amount IS NOT OLD.gross_amo
  OR NEW.fixed_va_number IS NOT OLD.fixed_va_number OR NEW.cooperative_fee_rule_id IS NOT OLD.cooperative_fee_rule_id
  OR NEW.cooperative_fee_snapshot IS NOT OLD.cooperative_fee_snapshot
 BEGIN SELECT RAISE(ABORT,'ORDER_SNAPSHOT_IMMUTABLE'); END;
+CREATE TRIGGER trg_finance_order_terms_immutable BEFORE UPDATE OF expires_at,payment_method,fee_payer,created_at
+ON finance_payment_orders
+WHEN NEW.expires_at IS NOT OLD.expires_at OR NEW.payment_method IS NOT OLD.payment_method
+ OR NEW.fee_payer IS NOT OLD.fee_payer OR NEW.created_at IS NOT OLD.created_at
+BEGIN SELECT RAISE(ABORT,'ORDER_SNAPSHOT_IMMUTABLE'); END;
 CREATE TRIGGER trg_finance_order_item_immutable BEFORE UPDATE ON finance_order_items
 BEGIN SELECT RAISE(ABORT,'ORDER_ITEM_IMMUTABLE'); END;
 CREATE TRIGGER trg_finance_order_item_preserve BEFORE DELETE ON finance_order_items

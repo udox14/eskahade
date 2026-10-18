@@ -20,6 +20,10 @@ CREATE TRIGGER trg_finance_settlement_evidence_guard BEFORE INSERT ON finance_br
  SELECT CASE WHEN NEW.match_strength='MANUAL_RESOLVED' AND NOT EXISTS(
   SELECT 1 FROM finance_reconciliation_items ri JOIN users u ON u.id=NEW.resolved_by
    WHERE ri.id=NEW.reconciliation_item_id AND ri.external_reference=NEW.statement_transaction_id
-   AND u.role IN ('admin','bendahara') AND length(trim(NEW.resolution_notes))>0)
+   AND (u.role IN ('admin','bendahara') OR EXISTS(SELECT 1
+    FROM json_each(CASE WHEN json_valid(u.roles) THEN u.roles ELSE '[]' END) WHERE value IN ('admin','bendahara')))
+   AND u.role!='pimpinan' AND NOT EXISTS(SELECT 1
+    FROM json_each(CASE WHEN json_valid(u.roles) THEN u.roles ELSE '[]' END) WHERE value='pimpinan')
+   AND length(trim(NEW.resolution_notes))>0)
   THEN RAISE(ABORT,'MANUAL_RESOLUTION_EVIDENCE_REQUIRED') END;
 END;

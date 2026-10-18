@@ -1,3 +1,4 @@
+// Finance schema is reconstructed from the actual applied migrations, plus local remediation migrations.
 // scripts/test-bri-audit-reports.cjs
 // Comprehensive Test Suite for BRI-7 (Reports, Cleanup, UAT & Go-Live)
 // Covers: Feature Flags, Proof Storage, UAT Seeder, Audit Reporting Engine, and Automated Invariant Asserter
@@ -13,8 +14,8 @@ const ts = require('typescript')
 const root = path.resolve(__dirname, '..')
 
 // Setup in-memory SQLite database
-const sqliteDb = new DatabaseSync(':memory:')
-sqliteDb.exec('PRAGMA foreign_keys = OFF;') // Relax during dynamic test table creations
+let sqliteDb = new DatabaseSync(':memory:')
+sqliteDb.exec('PRAGMA foreign_keys = ON;')
 
 // Bridge mock for @/lib/db
 const mockDb = {
@@ -69,285 +70,8 @@ require.extensions['.ts'] = (mod, file) => {
   return mod._compile(transpiled, file)
 }
 
-function initFullSchema() {
-  sqliteDb.exec(`
-    CREATE TABLE users (
-        id TEXT PRIMARY KEY,
-        email TEXT,
-        password_hash TEXT,
-        full_name TEXT,
-        role TEXT
-    );
-    CREATE TABLE santri (
-        id TEXT PRIMARY KEY,
-        nis TEXT,
-        nama_lengkap TEXT,
-        asrama TEXT,
-        status_global TEXT DEFAULT 'aktif',
-        kategori_santri TEXT DEFAULT 'REGULER',
-        jenis_kelamin TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE master_jasa (
-        id TEXT PRIMARY KEY,
-        nama_jasa TEXT,
-        jenis TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_distribution_recipients (
-        id TEXT PRIMARY KEY,
-        recipient_type TEXT NOT NULL,
-        name TEXT,
-        provider_id TEXT,
-        is_active INTEGER DEFAULT 1,
-        allowed_methods TEXT DEFAULT 'BRI_QLOLA,CASH,MANUAL_TRANSFER',
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_recipient_accounts (
-        id TEXT PRIMARY KEY,
-        recipient_id TEXT,
-        bank_code TEXT,
-        account_number TEXT,
-        account_holder TEXT,
-        is_primary INTEGER DEFAULT 1,
-        is_active INTEGER DEFAULT 1,
-        notes TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_recipient_allowed_methods (
-        recipient_id TEXT,
-        method TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        PRIMARY KEY (recipient_id, method)
-    );
-    CREATE TABLE finance_cooperative_admin_fee_rules (
-        id TEXT PRIMARY KEY,
-        code TEXT,
-        name TEXT,
-        is_enabled INTEGER DEFAULT 1,
-        amount INTEGER DEFAULT 2500,
-        applies_to_channel TEXT DEFAULT 'BRI',
-        effective_from TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_student_va (
-        id TEXT PRIMARY KEY,
-        santri_id TEXT,
-        customer_no TEXT,
-        va_number TEXT UNIQUE,
-        status TEXT DEFAULT 'ACTIVE',
-        activated_at TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_payment_orders (
-        id TEXT PRIMARY KEY,
-        order_number TEXT UNIQUE,
-        santri_id TEXT,
-        payer_type TEXT DEFAULT 'PORTAL_ORTU',
-        gross_amount INTEGER,
-        cooperative_admin_fee INTEGER DEFAULT 0,
-        fee_payer TEXT DEFAULT 'CUSTOMER',
-        total_charged INTEGER,
-        payment_method TEXT DEFAULT 'BRI_VA',
-        fixed_va_number TEXT,
-        status TEXT,
-        expires_at TEXT,
-        cash_session_id TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_cooperative_income (
-        id TEXT PRIMARY KEY,
-        income_number TEXT UNIQUE,
-        entry_type TEXT DEFAULT 'INCOME',
-        payment_id TEXT,
-        order_id TEXT,
-        amount INTEGER,
-        rule_id TEXT,
-        rule_snapshot TEXT,
-        reference_note TEXT,
-        created_by TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_payments (
-        id TEXT PRIMARY KEY,
-        payment_number TEXT,
-        order_id TEXT,
-        santri_id TEXT,
-        channel TEXT,
-        method TEXT,
-        gross_amount INTEGER,
-        cooperative_admin_fee INTEGER DEFAULT 0,
-        bri_fee_amount INTEGER DEFAULT 0,
-        net_amount INTEGER,
-        status TEXT,
-        correction_status TEXT DEFAULT 'NONE',
-        allocation_status TEXT,
-        paid_at TEXT,
-        bri_payment_request_id TEXT,
-        bri_trx_id TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_allocations (
-        id TEXT PRIMARY KEY,
-        payment_id TEXT,
-        obligation_id TEXT,
-        target_type TEXT,
-        item_type TEXT,
-        provider_id TEXT,
-        amount INTEGER,
-        disbursed_amount INTEGER DEFAULT 0,
-        distribution_status TEXT DEFAULT 'UNDISBURSED',
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_cash_sessions (
-        id TEXT PRIMARY KEY,
-        session_code TEXT UNIQUE,
-        operator_id TEXT,
-        opened_at TEXT,
-        opening_balance INTEGER DEFAULT 0,
-        total_cash_in INTEGER DEFAULT 0,
-        total_cash_out INTEGER DEFAULT 0,
-        expected_closing_balance INTEGER DEFAULT 0,
-        status TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_distributions (
-        id TEXT PRIMARY KEY,
-        distribution_number TEXT UNIQUE,
-        recipient_type TEXT,
-        recipient_id TEXT,
-        item_type TEXT,
-        period TEXT,
-        total_amount INTEGER,
-        method TEXT,
-        status TEXT,
-        cash_session_id TEXT,
-        destination_bank TEXT,
-        destination_account TEXT,
-        account_holder_name TEXT,
-        account_id TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_distribution_items (
-        id TEXT PRIMARY KEY,
-        distribution_id TEXT,
-        allocation_id TEXT,
-        amount INTEGER,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_cash_manual_evidence (
-        id TEXT PRIMARY KEY,
-        distribution_id TEXT,
-        evidence_type TEXT,
-        evidence_strength TEXT,
-        source TEXT,
-        reference_number TEXT,
-        raw_evidence_hash TEXT,
-        observed_at TEXT,
-        recorded_at TEXT,
-        operator_id TEXT,
-        operator_role_snapshot TEXT,
-        receiving_person_name TEXT,
-        notes TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_bri_statement_fetches (
-        id TEXT PRIMARY KEY,
-        fetch_reference_no TEXT,
-        account_no TEXT,
-        from_date_time TEXT,
-        to_date_time TEXT,
-        total_items_fetched INTEGER DEFAULT 0,
-        total_credits_count INTEGER DEFAULT 0,
-        total_credits_amount INTEGER DEFAULT 0,
-        total_debits_count INTEGER DEFAULT 0,
-        total_debits_amount INTEGER DEFAULT 0,
-        status TEXT,
-        body_hash TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_bri_statement_transactions (
-        id TEXT PRIMARY KEY,
-        fetch_id TEXT,
-        account_no TEXT,
-        transaction_id TEXT,
-        identity_strength TEXT DEFAULT 'STRONG',
-        dedup_key TEXT,
-        transaction_date_raw TEXT,
-        type_raw TEXT,
-        type_normalized TEXT,
-        amount INTEGER,
-        amount_raw TEXT,
-        currency TEXT DEFAULT 'IDR',
-        remark TEXT,
-        bri_trx_id TEXT,
-        va_number TEXT,
-        observation_count INTEGER DEFAULT 1,
-        raw_evidence_hash TEXT,
-        match_status TEXT,
-        matched_payment_id TEXT,
-        first_seen_at TEXT,
-        last_seen_at TEXT,
-        raw_json TEXT DEFAULT '{}',
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_bri_settlements (
-        id TEXT PRIMARY KEY,
-        settlement_number TEXT,
-        account_no TEXT,
-        settlement_date TEXT,
-        total_payments_count INTEGER,
-        total_gross_amount INTEGER,
-        total_cooperative_admin_fee INTEGER,
-        total_net_amount INTEGER,
-        status TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_bri_settlement_items (
-        id TEXT PRIMARY KEY,
-        settlement_id TEXT,
-        payment_id TEXT,
-        statement_transaction_id TEXT,
-        gross_amount INTEGER,
-        cooperative_admin_fee INTEGER,
-        net_amount INTEGER,
-        match_strength TEXT,
-        match_method TEXT,
-        currency TEXT DEFAULT 'IDR',
-        settled_at TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_reconciliation_items (
-        id TEXT PRIMARY KEY,
-        reconciliation_id TEXT,
-        external_reference TEXT,
-        internal_amount INTEGER DEFAULT 0,
-        external_amount INTEGER DEFAULT 0,
-        match_status TEXT,
-        resolution_action TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE finance_qlola_transfer_intents (
-        id TEXT PRIMARY KEY,
-        distribution_id TEXT,
-        distribution_request_id TEXT,
-        intent_status TEXT,
-        external_id TEXT,
-        maker_user_id TEXT,
-        payload_hash TEXT,
-        provider_status TEXT,
-        error_details TEXT,
-        created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
-    );
-  `)
-}
+function initFullSchema(){sqliteDb.close();sqliteDb=require('./finance-remediation-fixture.cjs').createDatabase(189,false)}
+
 
 async function runTests() {
   console.log('--- STARTING BRI-7 COMPREHENSIVE TEST SUITE ---')
@@ -428,7 +152,7 @@ async function runTests() {
 
   // TEST 3: Seed UAT Fixtures
   console.log('Test 3: Seeding UAT Fixtures')
-  seedUatFixtures(sqliteDb)
+  seedUatFixtures(sqliteDb,'local-uat')
   console.log('✓ Test 3 Passed: Fixtures populated deterministically')
 
   // TEST 4: Collection Audit Summary
@@ -491,100 +215,26 @@ async function runTests() {
   assert.equal(baselineInvariants.violations.length, 0)
   console.log('✓ Test 8 Passed: Zero violations on valid state')
 
-  // TEST 9: Invariant Chaos Injection - Over-Distribution
-  console.log('Test 9: Invariant Chaos Injection - Over-Distribution')
-  sqliteDb.prepare(`
-    INSERT INTO finance_distributions (id, distribution_number, recipient_type, recipient_id, method, total_amount, status)
-    VALUES ('DIST-CHAOS-OVER', 'DIS-CHAOS-01', 'PESANTREN', 'rec_pesantren', 'CASH', 9999999, 'PROCESSING')
-  `).run()
-  sqliteDb.prepare(`
-    INSERT INTO finance_distribution_items (id, distribution_id, allocation_id, amount)
-    VALUES ('ITEM-CHAOS-OVER', 'DIST-CHAOS-OVER', 'ALC-SPP-001', 9999999)
-  `).run()
-
-  const chaos1 = await auditReportService.verifyFinancialReportInvariants()
-  assert.equal(chaos1.isConsistent, false)
-  assert.ok(chaos1.violations.some(v => v.code === 'OVER_DISTRIBUTION_DETECTED'))
-  console.log('✓ Test 9 Passed: Over-distribution accurately detected')
-
-  // Revert Chaos 1
-  sqliteDb.prepare(`DELETE FROM finance_distribution_items WHERE id = 'ITEM-CHAOS-OVER'`).run()
-  sqliteDb.prepare(`DELETE FROM finance_distributions WHERE id = 'DIST-CHAOS-OVER'`).run()
-
-  // TEST 10: Invariant Chaos Injection - Double Allocation
-  console.log('Test 10: Invariant Chaos Injection - Over-Allocation')
-  sqliteDb.prepare(`
-    INSERT INTO finance_allocations (id, payment_id, target_type, item_type, amount, disbursed_amount, distribution_status)
-    VALUES ('ALC-CHAOS-OVER', 'PAY-003', 'UANG_JAJAN', 'UANG_JAJAN', 9999999, 0, 'UNDISBURSED')
-  `).run()
-  const chaos2 = await auditReportService.verifyFinancialReportInvariants()
-  assert.equal(chaos2.isConsistent, false)
-  assert.ok(chaos2.violations.some(v => v.code === 'OVER_ALLOCATION_DETECTED'))
-  console.log('✓ Test 10 Passed: Over-allocation accurately detected')
-
-  // Revert Chaos 2
-  sqliteDb.prepare(`DELETE FROM finance_allocations WHERE id = 'ALC-CHAOS-OVER'`).run()
-
-  // TEST 11: Invariant Chaos Injection - Unlinked SETTLED Payment
-  console.log('Test 11: Invariant Chaos Injection - Unlinked SETTLED Payment')
-  sqliteDb.prepare(`
-    INSERT INTO finance_payments (id, payment_number, santri_id, method, channel, gross_amount, net_amount, status, allocation_status, paid_at)
-    VALUES ('PAY-CHAOS-SETTLED', 'PAY-CHAOS-001', 'SAN-BILLABLE-001', 'BRIVA', 'BRI', 100000, 100000, 'SETTLED', 'UNALLOCATED', datetime('now'))
-  `).run()
-  const chaos3 = await auditReportService.verifyFinancialReportInvariants()
-  assert.equal(chaos3.isConsistent, false)
-  assert.ok(chaos3.violations.some(v => v.code === 'UNLINKED_SETTLED_PAYMENT'))
-  console.log('✓ Test 11 Passed: Unlinked SETTLED payment violation accurately detected')
-
-  // Revert Chaos 3
-  sqliteDb.prepare(`DELETE FROM finance_payments WHERE id = 'PAY-CHAOS-SETTLED'`).run()
-
-  // TEST 12: Invariant Chaos Injection - Leaked Uang Jajan Distribution
-  console.log('Test 12: Invariant Chaos Injection - Leaked Uang Jajan Distribution')
-  sqliteDb.prepare(`
-    INSERT INTO finance_distributions (id, distribution_number, recipient_type, recipient_id, method, total_amount, status)
-    VALUES ('DIST-CHAOS-JAJAN', 'DIS-CHAOS-02', 'PESANTREN', 'rec_pesantren', 'CASH', 50000, 'PROCESSING')
-  `).run()
-  sqliteDb.prepare(`
-    INSERT INTO finance_distribution_items (id, distribution_id, allocation_id, amount)
-    VALUES ('ITEM-CHAOS-JAJAN', 'DIST-CHAOS-JAJAN', 'ALC-JAJAN-003', 50000)
-  `).run()
-  const chaos4 = await auditReportService.verifyFinancialReportInvariants()
-  assert.equal(chaos4.isConsistent, false)
-  assert.ok(chaos4.violations.some(v => v.code === 'UANG_JAJAN_DISTRIBUTION_LEAK'))
-  console.log('✓ Test 12 Passed: Leaked Uang Jajan accurately detected')
-
-  // Revert Chaos 4
-  sqliteDb.prepare(`DELETE FROM finance_distribution_items WHERE id = 'ITEM-CHAOS-JAJAN'`).run()
-  sqliteDb.prepare(`DELETE FROM finance_distributions WHERE id = 'DIST-CHAOS-JAJAN'`).run()
-
-  // TEST 13: Invariant Chaos Injection - Cash Session Over-Reservation
-  console.log('Test 13: Invariant Chaos Injection - Cash Session Over-Reservation')
-  sqliteDb.prepare(`
-    INSERT INTO finance_distributions (id, distribution_number, recipient_type, recipient_id, method, total_amount, status, cash_session_id)
-    VALUES ('DIST-CHAOS-CASH', 'DIS-CHAOS-03', 'PESANTREN', 'rec_pesantren', 'CASH', 9999999, 'PROCESSING', 'CS-SESSION-001')
-  `).run()
-  const chaos5 = await auditReportService.verifyFinancialReportInvariants()
-  assert.equal(chaos5.isConsistent, false)
-  assert.ok(chaos5.violations.some(v => v.code === 'CASH_SESSION_OVER_RESERVED'))
-  console.log('✓ Test 13 Passed: Cash session over-reservation accurately detected')
-
-  // Revert Chaos 5
-  sqliteDb.prepare(`DELETE FROM finance_distributions WHERE id = 'DIST-CHAOS-CASH'`).run()
-
-  // TEST 14: Invariant Chaos Injection - Active Duitku Payment
-  console.log('Test 14: Invariant Chaos Injection - Active Duitku Payment')
-  sqliteDb.prepare(`
-    INSERT INTO finance_payments (id, payment_number, santri_id, method, channel, gross_amount, net_amount, status, allocation_status, paid_at)
-    VALUES ('PAY-CHAOS-DUITKU', 'PAY-DUITKU-001', 'SAN-BILLABLE-001', 'DUITKU_VA', 'DUITKU', 50000, 50000, 'PAID', 'UNALLOCATED', datetime('now'))
-  `).run()
-  const chaos6 = await auditReportService.verifyFinancialReportInvariants()
-  assert.equal(chaos6.isConsistent, false)
-  assert.ok(chaos6.violations.some(v => v.code === 'ACTIVE_DUITKU_PAYMENT_FOUND'))
-  console.log('✓ Test 14 Passed: Active Duitku payment accurately detected')
-
-  // Revert Chaos 6
-  sqliteDb.prepare(`DELETE FROM finance_payments WHERE id = 'PAY-CHAOS-DUITKU'`).run()
+  // Tests 9-14: guards remain enabled. Inject corrupt read results to exercise the
+  // monitor against pre-existing damaged data; do not disable constraints to create it.
+  assert.throws(()=>sqliteDb.exec(`INSERT INTO finance_distributions(id,distribution_number,recipient_type,recipient_id,item_type,period,method,total_amount,status) VALUES('unsafe','UNSAFE','PESANTREN','rec_pesantren','SPP','2026-10','CASH',9999999,'PROCESSING')`),/DISTRIBUTION_MUST_START_DRAFT/)
+  const readCases=[
+   ['OVER_DISTRIBUTION_DETECTED','HAVING total_distributed_or_reserved',[{allocation_id:'damaged',allocation_amount:1,total_distributed_or_reserved:2}]],
+   ['OVER_ALLOCATION_DETECTED','HAVING total_allocated',[{payment_id:'damaged',payment_amount:1,total_allocated:2}]],
+   ['UNLINKED_SETTLED_PAYMENT',"WHERE p.status = 'SETTLED'",[{id:'damaged',payment_number:'DAMAGED',amount:10000}]],
+   ['UANG_JAJAN_DISTRIBUTION_LEAK',"WHERE a.target_type = 'UANG_JAJAN'",[{id:'damaged',distribution_id:'damaged-dist',amount:10000}]],
+   ['CASH_SESSION_OVER_RESERVED',"cs.expected_closing_balance",[{id:'damaged',session_code:'DAMAGED',expected_closing_balance:1,live_prepared_amount:2}]],
+   ['ACTIVE_DUITKU_PAYMENT_FOUND',"WHERE method LIKE '%DUITKU%'",[{id:'damaged',payment_number:'DAMAGED',method:'DUITKU_VA'}]]
+  ]
+  for(const [code,predicate,rows] of readCases){
+    const originalQuery=mockDb.query
+    try {mockDb.query=async(sql,params)=>sql.includes(predicate)?rows:originalQuery(sql,params)
+      const result=await auditReportService.verifyFinancialReportInvariants()
+      assert.equal(result.isConsistent,false)
+      assert.ok(result.violations.some(v=>v.code===code),code+' must be detected')
+    } finally {mockDb.query=originalQuery}
+    console.log('PASS Corrupt read fixture detected: '+code)
+  }
 
   // TEST 15: Operational Entrypoint Feature Flag Enforcement
   console.log('Test 15: Operational Entrypoint Feature Flag Enforcement')
@@ -647,6 +297,7 @@ async function runTests() {
   assert.equal(superadminAccess.success, false)
   assert.match(superadminAccess.error, /UNAUTHORIZED_ACCESS/i)
 
+  sqliteDb.exec("INSERT INTO users(id,full_name,role) VALUES('usr-pimpinan-1','Pimpinan','pimpinan')")
   // 16.2 pimpinan is read-only and must be rejected from mutating/finalizing distribution
   await assert.rejects(
     async () => {

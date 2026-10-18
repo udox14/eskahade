@@ -163,8 +163,8 @@ def test_receipts_and_auditability():
 
     # Portal ortu receipts
     po_receipt = (ROOT / "app" / "portal-ortu" / "(app)" / "riwayat" / "_receipt-modal.tsx").read_text(encoding="utf-8")
-    check("<DocumentLetterhead" in po_receipt, "Portal Ortu receipt uses DocumentLetterhead")
-    check("item.type === 'TOPUP'" in po_receipt, "Portal Ortu receipt supports TOPUP")
+    check("letterheadProfile" in po_receipt and "resolveDocumentLetterhead" in (ROOT / "app/portal-ortu/(app)/riwayat/page.tsx").read_text(encoding="utf-8"), "Portal Ortu isolated print uses centrally resolved letterhead profile")
+    check("item.title" in po_receipt and "item.amount" in po_receipt, "Portal Ortu generic receipt renders transaction title and amount, including TOPUP")
 
     po_riwayat = (ROOT / "app" / "portal-ortu" / "(app)" / "riwayat" / "_riwayat-client.tsx").read_text(encoding="utf-8")
     check("item.type === 'TOPUP'" in po_riwayat, "Portal Ortu history shows Kuitansi button for TOPUP")
