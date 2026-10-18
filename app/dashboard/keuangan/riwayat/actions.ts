@@ -1,5 +1,7 @@
 'use server'
 
+import { authorizeFinanceFeature } from '@/lib/finance/authorization'
+
 // app/dashboard/keuangan/riwayat/actions.ts
 // Server Actions untuk Riwayat Transaksi Global (Fase 9: PRD Bab 30)
 
@@ -28,6 +30,8 @@ export interface HistoryActionResponse {
 export async function getGlobalHistoryData(
   params: GlobalTransactionQueryParams
 ): Promise<GlobalTransactionHistoryResponse> {
+  await authorizeFinanceFeature('/dashboard/keuangan/riwayat', false)
+
   const session = await getSession()
   if (!session) {
     throw new Error('Sesi autentikasi telah berakhir. Silakan login kembali.')
@@ -53,6 +57,8 @@ export async function getGlobalHistoryData(
 }
 
 export async function getInitialHistoryData(): Promise<HistoryActionResponse> {
+  await authorizeFinanceFeature('/dashboard/keuangan/riwayat', false)
+
   const session = await getSession()
   if (!session) {
     throw new Error('Sesi autentikasi telah berakhir. Silakan login kembali.')
@@ -93,6 +99,8 @@ export async function getTransactionDetail(
   id: string,
   sourceTable: 'PAYMENT' | 'WALLET' | 'DISTRIBUTION' | 'CORRECTION'
 ) {
+  await authorizeFinanceFeature('/dashboard/keuangan/riwayat', false)
+
   const session = await getSession()
   if (!session) {
     throw new Error('Sesi autentikasi telah berakhir. Silakan login kembali.')

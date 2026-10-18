@@ -58,18 +58,13 @@ function CatatPenyaluranForm({
   const [amountStr, setAmountStr] = useState<string>(() => String(target.availableAmount))
   const [method, setMethod] = useState<'TRANSFER' | 'CASH'>('TRANSFER')
   const [providerAccounts, setProviderAccounts] = useState<FinanceProviderAccount[]>([])
-  const [selectedAccountId, setSelectedAccountId] = useState<string>(() =>
-    target.recipientType === 'BENDAHARA' ? 'bendahara_default' : ''
-  )
-  const [destinationBank, setDestinationBank] = useState<string>(() =>
-    target.recipientType === 'BENDAHARA' ? 'BSI (Bank Syariah Indonesia)' : ''
-  )
-  const [destinationAccount, setDestinationAccount] = useState<string>(() =>
-    target.recipientType === 'BENDAHARA' ? '1002345678' : ''
-  )
-  const [accountHolderName, setAccountHolderName] = useState<string>(() =>
-    target.recipientType === 'BENDAHARA' ? 'Yayasan Pesantren Sukahideng' : ''
-  )
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('')
+  const [destinationBank, setDestinationBank] = useState<string>('')
+  const [destinationAccount, setDestinationAccount] = useState<string>('')
+  const [accountHolderName, setAccountHolderName] = useState<string>('')
+  const [receivingPersonName,setReceivingPersonName]=useState('')
+  const [referenceNumber,setReferenceNumber]=useState('')
+  const [idempotencyKey]=useState(()=>crypto.randomUUID())
   const [transferredAt, setTransferredAt] = useState<string>(() =>
     new Date().toISOString().slice(0, 16)
   )
@@ -82,12 +77,12 @@ function CatatPenyaluranForm({
     setUploadingProof(true)
     try {
       const base64 = await compressImageFile(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.75 })
-      const response = await fetch('/api/upload-foto', {
+      const response = await fetch('/api/finance/proofs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           base64,
-          folder: 'penyaluran-proofs',
+          filename: file.name,
           filenamePrefix: `dist_${target.recipientType.toLowerCase()}`,
         }),
       })
@@ -105,10 +100,11 @@ function CatatPenyaluranForm({
 
   // Load rekening provider bila penerima katering/laundry
   useEffect(() => {
-    if (!target.recipientId) return
+    const providerId=target.recipientType==='BENDAHARA'?'BENDAHARA':target.recipientId
+    if (!providerId) return
 
     let active = true
-    getProviderAccountsAction(target.recipientId)
+    getProviderAccountsAction(providerId)
       .then((accounts) => {
         if (!active) return
         setProviderAccounts(accounts)
@@ -155,6 +151,8 @@ function CatatPenyaluranForm({
       return
     }
 
+    if (method==='CASH'&&!receivingPersonName.trim()) { toast.error('Nama penerima kas wajib diisi.'); return }
+    if (method==='TRANSFER'&&(!referenceNumber.trim()||!proofAttachmentUrl)) { toast.error('Referensi dan bukti transfer wajib diisi.'); return }
     if (method === 'TRANSFER') {
       if (!destinationBank.trim() || !destinationAccount.trim() || !accountHolderName.trim()) {
         toast.error('Mohon lengkapi seluruh informasi rekening bank tujuan transfer.')
@@ -165,6 +163,7 @@ function CatatPenyaluranForm({
     startTransition(async () => {
       try {
         const res = await recordDistributionAction({
+          idempotencyKey, receivingPersonName, referenceNumber, accountId:selectedAccountId||undefined,
           recipientType: target.recipientType,
           recipientId: target.recipientId,
           itemType: target.itemType,
@@ -235,6 +234,10 @@ function CatatPenyaluranForm({
                 </button>
               </div>
 
+              <label className="block text-sm">{method==='CASH'?'Nama penerima kas':'Nomor referensi bank'}
+                <input required value={method==='CASH'?receivingPersonName:referenceNumber}
+                  onChange={e=>method==='CASH'?setReceivingPersonName(e.target.value):setReferenceNumber(e.target.value)} className="w-full border rounded-lg p-2" />
+              </label>
               {/* Input Nominal */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">

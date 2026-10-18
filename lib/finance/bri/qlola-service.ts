@@ -10,6 +10,8 @@
 // 7. Provider Evidence Append-Only & Provenance Guard
 
 import crypto from 'node:crypto'
+import { operationIdentity, operationReplay, operationStatement } from '../operation'
+import { rupiah } from '../money'
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
 import { briLog } from '@/lib/finance/bri/logging'
 import {
@@ -58,6 +60,7 @@ export class BriQlolaDistributionService {
       name: string
       recipient_type: 'PESANTREN' | 'KATERING' | 'LAUNDRY'
       is_active: number
+      provider_id: string | null
     }
     accountSnapshot: BriRecipientAccountSnapshot | null
   }> {
@@ -66,8 +69,9 @@ export class BriQlolaDistributionService {
       name: string
       recipient_type: 'PESANTREN' | 'KATERING' | 'LAUNDRY'
       is_active: number
+      provider_id: string | null
     }>(
-      `SELECT id, name, recipient_type, is_active FROM finance_distribution_recipients WHERE id = ? LIMIT 1`,
+      `SELECT id, name, recipient_type, is_active, provider_id FROM finance_distribution_recipients WHERE id = ? LIMIT 1`,
       [params.recipientId]
     )
 
@@ -93,6 +97,7 @@ export class BriQlolaDistributionService {
       account_holder: string
       is_primary: number
       is_active: number
+      provider_id: string | null
     } | null = null
 
     if (params.accountId) {
@@ -157,7 +162,11 @@ export class BriQlolaDistributionService {
     totalAmount: number
     itemsCount: number
   }> {
-    const amountToDisburse = Math.floor(input.amount)
+    const identity=operationIdentity('DISTRIBUTION_DRAFT',input.createdBy,input.idempotencyKey||generateId(),
+      [input.recipientId,input.accountId||null,input.itemType,input.period,input.amount,input.method,input.notes||null])
+    const replay=await operationReplay<{distributionId:string;distributionNumber:string;status:'DRAFT';totalAmount:number;itemsCount:number}>(identity)
+    if(replay)return replay
+    const amountToDisburse = rupiah(input.amount)
     if (amountToDisburse <= 0 || !Number.isFinite(amountToDisburse)) {
       throw new Error('Nominal penyaluran harus berupa bilangan bulat positif lebih besar dari 0.')
     }
@@ -186,7 +195,7 @@ export class BriQlolaDistributionService {
       recipientType: recipient.recipient_type,
       itemType: input.itemType,
       period: normPeriod,
-      providerId: recipient.recipient_type !== 'PESANTREN' ? recipient.id : null,
+      providerId: recipient.recipient_type !== 'PESANTREN' ? recipient.provider_id : null,
     })
 
     const totalAvailable = eligibleAllocations.reduce((sum, a) => sum + a.available_amount, 0)
@@ -268,7 +277,14 @@ export class BriQlolaDistributionService {
       itemsCount++
     }
 
-    await batch(statements)
+    const result={distributionId,distributionNumber,status:'DRAFT' as const,totalAmount:amountToDisburse,itemsCount}
+    statements.unshift(operationStatement(identity,result))
+    try { await batch(statements) } catch(error) {
+      const replay=await operationReplay<typeof result>(identity)
+      if(replay)return replay
+      throw error
+    }
+
 
     briLog('info', 'BRI_DISTRIBUTION_DRAFT_CREATED', {
       details: {

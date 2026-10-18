@@ -167,7 +167,9 @@ export class CashManualDistributionService {
    * Helper RBAC: Validasi bahwa operator memiliki hak akses mutasi keuangan.
    * Menolak peran viewer, tester (read-only), dan pimpinan.
    */
-  assertFinanceOperator(operatorId: string, operatorRole: string): void {
+  async assertFinanceOperator(operatorId: string, operatorRole: string): Promise<void> {
+    const user=await queryOne<{role:string}>('SELECT role FROM users WHERE id=?',[operatorId])
+    if(!user || user.role!==operatorRole)throw new Error('FORBIDDEN: Operator role mismatch')
     if (!operatorId || typeof operatorId !== 'string') {
       throw new Error('Identitas operator tidak valid (operatorId kosong).')
     }
@@ -187,8 +189,8 @@ export class CashManualDistributionService {
    * Helper RBAC: Validasi pengesahan bukti manual (MANUAL_OFFICIAL_PROOF).
    * Hanya role admin atau bendahara yang berwenang.
    */
-  assertManualProofAuthorizer(operatorId: string, operatorRole: string): void {
-    this.assertFinanceOperator(operatorId, operatorRole)
+  async assertManualProofAuthorizer(operatorId: string, operatorRole: string): Promise<void> {
+    await this.assertFinanceOperator(operatorId, operatorRole)
     const role = (operatorRole || '').toLowerCase().trim()
     if (role !== 'admin' && role !== 'bendahara') {
       throw new Error(`Hanya role "admin" atau "bendahara" yang berwenang mengesahkan bukti penyaluran manual (MANUAL_OFFICIAL_PROOF). Role saat ini: "${operatorRole}".`)
@@ -239,7 +241,7 @@ export class CashManualDistributionService {
     input: PrepareCashDistributionInput
   ): Promise<{ distributionId: string; status: 'PROCESSING'; cashSessionCode: string }> {
     assertDistributionMethodEnabled('CASH')
-    this.assertFinanceOperator(input.operatorId, input.operatorRole)
+    await this.assertFinanceOperator(input.operatorId, input.operatorRole)
 
     // Validasi keberadaan user di tabel users
     const user = await queryOne<{ id: string; role: string }>(
@@ -397,7 +399,7 @@ export class CashManualDistributionService {
     input: FinalizeCashDistributionInput
   ): Promise<{ distributionId: string; status: 'DISTRIBUTED'; receiptReference: string }> {
     assertDistributionMethodEnabled('CASH')
-    this.assertFinanceOperator(input.operatorId, input.operatorRole)
+    await this.assertFinanceOperator(input.operatorId, input.operatorRole)
 
     // Validasi keberadaan user di tabel users
     const user = await queryOne<{ id: string; role: string }>(
@@ -637,7 +639,7 @@ export class CashManualDistributionService {
   async cancelCashDistribution(
     input: CancelCashDistributionInput
   ): Promise<{ distributionId: string; status: 'CANCELLED' }> {
-    this.assertFinanceOperator(input.operatorId, input.operatorRole)
+    await this.assertFinanceOperator(input.operatorId, input.operatorRole)
 
     const dist = await queryOne<FinanceDistribution>(
       `SELECT * FROM finance_distributions WHERE id = ?`,
@@ -747,7 +749,7 @@ export class CashManualDistributionService {
     input: InitiateManualTransferInput
   ): Promise<{ distributionId: string; status: 'PROCESSING'; sourceAccountMasked: string }> {
     assertDistributionMethodEnabled('MANUAL_TRANSFER')
-    this.assertFinanceOperator(input.operatorId, input.operatorRole)
+    await this.assertFinanceOperator(input.operatorId, input.operatorRole)
 
     const dist = await queryOne<FinanceDistribution>(
       `SELECT * FROM finance_distributions WHERE id = ?`,
@@ -891,7 +893,7 @@ export class CashManualDistributionService {
     input: FinalizeManualTransferInput
   ): Promise<{ distributionId: string; status: 'DISTRIBUTED'; referenceNumber: string }> {
     assertDistributionMethodEnabled('MANUAL_TRANSFER')
-    this.assertFinanceOperator(input.operatorId, input.operatorRole)
+    await this.assertFinanceOperator(input.operatorId, input.operatorRole)
 
     if (!input.referenceNumber || input.referenceNumber.trim().length === 0) {
       throw new Error('Nomor referensi bukti transfer bank wajib disertakan.')
@@ -928,7 +930,7 @@ export class CashManualDistributionService {
     let source: CashManualEvidenceSource
 
     if (input.evidenceType === 'MANUAL_OFFICIAL_PROOF') {
-      this.assertManualProofAuthorizer(input.operatorId, input.operatorRole)
+      await this.assertManualProofAuthorizer(input.operatorId, input.operatorRole)
       derivedStrength = 'MANUAL_RESOLVED'
       source = 'MANUAL_OFFICIAL_PROOF'
     } else if (input.evidenceType === 'MANUAL_TRANSFER_SUCCESS') {
@@ -937,7 +939,7 @@ export class CashManualDistributionService {
       source = 'BANK_RECEIPT'
     } else if (input.evidenceType === 'BANK_STATEMENT_DEBIT') {
       // Otorisasi supervisi: Hanya role admin atau bendahara yang berwenang mengesahkan resolusi manual berbasis mutasi bank
-      this.assertManualProofAuthorizer(input.operatorId, input.operatorRole)
+      await this.assertManualProofAuthorizer(input.operatorId, input.operatorRole)
 
       if (!input.statementTransactionId) {
         throw new Error(
@@ -1200,7 +1202,7 @@ export class CashManualDistributionService {
   async recordManualTransferUnknownOutcome(
     input: RecordManualTransferUnknownOutcomeInput
   ): Promise<{ distributionId: string; status: 'PROCESSING'; note: string; reconciliationItemId: string }> {
-    this.assertFinanceOperator(input.operatorId, input.operatorRole)
+    await this.assertFinanceOperator(input.operatorId, input.operatorRole)
 
     const dist = await queryOne<FinanceDistribution>(
       `SELECT * FROM finance_distributions WHERE id = ?`,
@@ -1297,7 +1299,7 @@ export class CashManualDistributionService {
   async failManualTransfer(
     input: FailManualTransferInput
   ): Promise<{ distributionId: string; status: 'FAILED' }> {
-    this.assertFinanceOperator(input.operatorId, input.operatorRole)
+    await this.assertFinanceOperator(input.operatorId, input.operatorRole)
 
     const dist = await queryOne<FinanceDistribution>(
       `SELECT * FROM finance_distributions WHERE id = ?`,
@@ -1386,7 +1388,7 @@ export class CashManualDistributionService {
   async cancelManualTransfer(
     input: CancelManualTransferInput
   ): Promise<{ distributionId: string; status: 'CANCELLED' }> {
-    this.assertFinanceOperator(input.operatorId, input.operatorRole)
+    await this.assertFinanceOperator(input.operatorId, input.operatorRole)
 
     const dist = await queryOne<FinanceDistribution>(
       `SELECT * FROM finance_distributions WHERE id = ?`,

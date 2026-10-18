@@ -183,6 +183,10 @@ export interface BendaharaItemStudentsResult {
 }
 
 export interface CreateDistributionInput {
+  idempotencyKey?: string
+  receivingPersonName?: string
+  referenceNumber?: string
+  accountId?: string
   recipientType: FinanceDistributionRecipientType
   recipientId?: string | null
   itemType: string

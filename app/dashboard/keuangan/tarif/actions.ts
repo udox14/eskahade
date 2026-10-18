@@ -1,5 +1,7 @@
 'use server'
 
+import { authorizeFinanceFeature } from '@/lib/finance/authorization'
+
 // app/dashboard/keuangan/tarif/actions.ts
 // Server Actions untuk Modul Pengaturan Keuangan SPA (Patch B: PRD Bab 31 & Implementation Plan)
 //
@@ -216,6 +218,8 @@ async function assertMutationPermission(): Promise<{ userId: string; role: strin
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ QUERY DATA LENGKAP PENGATURAN KE UANGAN Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganData> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', false)
+
   const session = await getSession()
   const roles = session ? getEffectiveRoles(session) : []
   const demoRunsInSandbox = isDemoSandboxRequest(session)
@@ -355,6 +359,8 @@ export async function createTariffAction(input: {
   effective_from: string
   effective_until?: string | null
 }): Promise<{ success: boolean; tariff?: FinanceTariff; error?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', true)
+
   try {
     const { userId } = await assertMutationPermission()
 
@@ -395,6 +401,8 @@ export async function grantExemptionAction(input: {
   reason: string
   notes?: string | null
 }): Promise<{ success: boolean; error?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', true)
+
   try {
     const { userId } = await assertMutationPermission()
 
@@ -428,6 +436,8 @@ export async function revokeExemptionAction(
   exemptionId: string,
   reason: string
 ): Promise<{ success: boolean; error?: string; restoredCount?: number }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', true)
+
   try {
     const { userId } = await assertMutationPermission()
 
@@ -456,6 +466,8 @@ export async function revokeExemptionAction(
 export async function updateGlobalDailyLimitAction(
   limit: number
 ): Promise<{ success: boolean; error?: string; limit?: number }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', true)
+
   try {
     await assertMutationPermission()
 
@@ -481,6 +493,8 @@ export async function updateGlobalDailyLimitAction(
 export async function getStudentWalletLimitsAction(
   params?: StudentWalletLimitsParams
 ): Promise<StudentWalletLimitsResponse> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', false)
+
   const page = Math.max(1, params?.page || 1)
   const pageSize = Math.max(1, Math.min(100, params?.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
   const offset = (page - 1) * pageSize
@@ -616,6 +630,8 @@ export async function updateStudentParentLimitAction(
   santriId: string,
   dailyLimit: number | null
 ): Promise<{ success: boolean; error?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', true)
+
   try {
     const { userId } = await assertMutationPermission()
 
@@ -638,6 +654,8 @@ export async function updateStudentParentLimitAction(
 export async function saveGatewaySettingsAction(
   input: GatewaySettingsUpdateInput
 ): Promise<{ success: boolean; error?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', true)
+
   try {
     const session = await getSession()
     if (!session) {
@@ -699,6 +717,8 @@ export async function saveGatewaySettingsAction(
 export async function searchActiveStudents(
   searchTerm: string
 ): Promise<Array<{ id: string; nis: string; nama_lengkap: string; asrama: string | null; kamar: string | null }>> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', false)
+
   const term = `%${searchTerm.trim()}%`
   return query<{ id: string; nis: string; nama_lengkap: string; asrama: string | null; kamar: string | null }>(
     `SELECT id, nis, nama_lengkap, asrama, kamar
@@ -717,6 +737,8 @@ export async function searchActiveStudents(
 export async function saveLetterheadProfilesAction(
   profiles: LetterheadProfile[]
 ): Promise<{ success: boolean; error?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', true)
+
   try {
     await assertMutationPermission()
     await saveLetterheadProfiles(profiles)
@@ -730,6 +752,8 @@ export async function saveLetterheadProfilesAction(
 export async function saveDocumentPrintConfigsAction(
   configs: DocumentPrintConfig[]
 ): Promise<{ success: boolean; error?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', true)
+
   try {
     await assertMutationPermission()
     await saveDocumentPrintConfigs(configs)
@@ -747,6 +771,8 @@ export async function listTariffOverridesAction(): Promise<{
   overrides: FinanceTariffOverride[]
   error?: string
 }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', false)
+
   try {
     const overrides = await listTariffOverrides()
     return { success: true, overrides }
@@ -761,6 +787,8 @@ export async function saveTariffOverrideAction(input: {
   nominal: number
   notes?: string | null
 }): Promise<{ success: boolean; override?: FinanceTariffOverride; error?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', true)
+
   try {
     const { userId } = await assertMutationPermission()
     if (!input.item_type || !input.period) {
@@ -791,6 +819,8 @@ export async function deleteTariffOverrideAction(
   itemType: FinanceItemType,
   period: string
 ): Promise<{ success: boolean; error?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', true)
+
   try {
     await assertMutationPermission()
     await deleteTariffOverride(itemType, period.trim())
@@ -811,6 +841,8 @@ export async function previewExemptionRuleAction(input: {
   period_start?: string
   period_end?: string
 }): Promise<{ success: boolean; preview?: GroupExemptionPreview; error?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', false)
+
   try {
     const session = await getSession()
     if (!session) {
@@ -844,6 +876,8 @@ export async function applyGroupExemptionAction(input: {
   reason: string
   notes?: string | null
 }): Promise<{ success: boolean; result?: GroupExemptionApplyResult; error?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', true)
+
   try {
     const { userId } = await assertMutationPermission()
     if (!input.reason || input.reason.trim().length === 0) {
@@ -876,6 +910,8 @@ export async function migrateLegacySppExemptionsAction(): Promise<{
   result?: LegacySppExemptionMigrationResult
   error?: string
 }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', true)
+
   try {
     const { userId } = await assertMutationPermission()
     const result = await migrateLegacySppExemptions(userId)
@@ -894,6 +930,8 @@ export async function getKoperasiCutoverStatusAction(): Promise<{
   hasKoperasiPayments: boolean
   koperasiPaymentsCount: number
 }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', false)
+
   const [effectiveAt, kopPaymentRow] = await Promise.all([
     getKoperasiEffectiveTimestamp(),
     queryOne<{ count: number }>(
@@ -912,6 +950,8 @@ export async function getKoperasiCutoverStatusAction(): Promise<{
 export async function setKoperasiCutoverAction(
   effectiveAt: string | null
 ): Promise<{ success: boolean; error?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/tarif', true)
+
   try {
     const { userId } = await assertMutationPermission()
     const targetTimestamp = effectiveAt ? effectiveAt.trim() : null

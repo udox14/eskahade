@@ -124,6 +124,7 @@ export interface TargetAllocationCorrectionItemInput {
 }
 
 export interface RecordCorrectionInput {
+  idempotencyKey?: string
   paymentId: string
   correctionType: FinanceCorrectionType
   method?: FinanceCorrectionMethod | null

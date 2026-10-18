@@ -7,6 +7,7 @@ import { getPaymentOrderById } from '@/lib/finance/orders'
 import { resolveFundManagement } from '@/lib/finance/fund-management'
 import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
 import { getEffectiveCooperativeAdminFeeRule } from '@/lib/finance/cooperative-admin'
+import type { FinanceWritePlan } from './write-plan'
 import type {
   FinancePayment,
   FinanceAllocation,
@@ -32,9 +33,10 @@ function generatePaymentNumber(): string {
  * 5. Seluruh mutasi dieksekusi dalam satu batch statement D1 (db.batch).
  */
 export async function recordOrderPayment(
-  input: RecordOrderPaymentInput
+  input: RecordOrderPaymentInput,
+  plan?: FinanceWritePlan
 ): Promise<PaymentWithAllocations> {
-  const order = await getPaymentOrderById(input.orderId)
+  const order = plan?.orders.get(input.orderId) || await getPaymentOrderById(input.orderId)
   if (!order) {
     throw new Error(`Order pembayaran dengan ID "${input.orderId}" tidak ditemukan.`)
   }
@@ -473,6 +475,19 @@ export async function recordOrderPayment(
   }
 
   // 8. Eksekusi batch dengan penanganan race condition
+  if (plan) {
+    if (input.channel !== 'CASH' || order.status !== 'PENDING' || unallocatedExcess !== 0) throw new Error('Staged cash payment harus exact dan payable.')
+    plan.statements.push(...statements)
+    return {
+      id:paymentId,payment_number:paymentNumber,order_id:order.id,santri_id:order.santri_id,channel:input.channel,method:input.method,
+      gross_amount:grossAmount,cooperative_admin_fee:cooperativeAdminFee,bri_fee_amount:briFeeAmount,net_amount:netAmount,status:'PAID',
+      correction_status:'NONE',allocation_status:allocationStatus,paid_at:paidAt,bri_payment_request_id:briPaymentRequestId,bri_trx_id:briTrxId,
+      external_reference:externalRef,cash_session_id:cashSessionId,received_by:receivedBy,source:paymentSource,fund_management:fundManagement,created_at:paidAt,
+      allocations:allocatableItems.map(a=>({id:a.id,payment_id:paymentId,obligation_id:a.obligationId||null,
+        target_type:a.obligationId?'OBLIGATION':'UANG_JAJAN',item_type:a.itemType,provider_id:null,amount:a.amount,
+        disbursed_amount:0,distribution_status:'UNDISBURSED',created_at:paidAt})),
+    }
+  }
   try {
     await batch(statements)
   } catch (err: unknown) {

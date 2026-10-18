@@ -1,5 +1,7 @@
 'use server'
 
+import { authorizeFinanceFeature } from '@/lib/finance/authorization'
+
 import { query, queryOne, execute, generateId, now } from '@/lib/db'
 import {
   getSession,
@@ -194,6 +196,8 @@ async function authorizeUser(): Promise<{
 export async function getKredensialData(
   params: KredensialQueryParams
 ): Promise<KredensialResponse> {
+  await authorizeFinanceFeature('/dashboard/keuangan/kredensial', false)
+
   const auth = await authorizeUser()
 
   const search = (params.search || '').trim()
@@ -400,6 +404,8 @@ export async function issueCardAction(
   santriId: string,
   reason?: string
 ): Promise<{ success: boolean; card: FinanceCredential }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/kredensial', true)
+
   const auth = await authorizeUser()
   if (!auth.canMutate) {
     throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')
@@ -416,6 +422,8 @@ export async function revokeCardAction(
   cardId: string,
   reason: string
 ): Promise<{ success: boolean }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/kredensial', true)
+
   const auth = await authorizeUser()
   if (!auth.canMutate) {
     throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')
@@ -432,6 +440,8 @@ export async function reportLostCardAction(
   cardId: string,
   reason: string
 ): Promise<{ success: boolean }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/kredensial', false)
+
   const auth = await authorizeUser()
   if (!auth.canMutate) {
     throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')
@@ -448,6 +458,8 @@ export async function blockCardAction(
   cardId: string,
   reason: string
 ): Promise<{ success: boolean }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/kredensial', true)
+
   const auth = await authorizeUser()
   if (!auth.canMutate) {
     throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')
@@ -463,6 +475,8 @@ export async function blockCardAction(
 export async function unblockCardAction(
   cardId: string
 ): Promise<{ success: boolean }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/kredensial', true)
+
   const auth = await authorizeUser()
   if (!auth.canMutate) {
     throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')
@@ -480,6 +494,8 @@ export async function resetPinAction(
   newPin: string,
   reason?: string
 ): Promise<{ success: boolean }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/kredensial', true)
+
   const auth = await authorizeUser()
   if (!auth.canMutate) {
     throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')
@@ -498,6 +514,8 @@ export async function setPinAction(
   isReset?: boolean,
   reason?: string
 ): Promise<{ success: boolean }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/kredensial', true)
+
   const auth = await authorizeUser()
   if (!auth.canMutate) {
     throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')
@@ -518,6 +536,8 @@ export async function unlockPinAction(
   santriId: string,
   reason?: string
 ): Promise<{ success: boolean }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/kredensial', true)
+
   const auth = await authorizeUser()
   if (!auth.canMutate) {
     throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')
@@ -535,6 +555,8 @@ export async function getCardsForBatchPrint(
   santriIds?: string[],
   asrama?: string
 ): Promise<CardPrintItem[]> {
+  await authorizeFinanceFeature('/dashboard/keuangan/kredensial', false)
+
   await authorizeUser()
 
   const conditions: string[] = [
@@ -603,6 +625,8 @@ export async function getCardsForBatchPrint(
 export async function getBulkIssuanceCandidatesAction(
   scope: BulkCandidateScope
 ): Promise<BulkCandidatesSummary> {
+  await authorizeFinanceFeature('/dashboard/keuangan/kredensial', false)
+
   await authorizeUser()
 
   const conditions: string[] = [
@@ -679,6 +703,8 @@ export async function getBulkIssuanceCandidatesAction(
 export async function issueCardBatchChunkAction(
   santriIds: string[]
 ): Promise<BatchChunkResult> {
+  await authorizeFinanceFeature('/dashboard/keuangan/kredensial', true)
+
   const auth = await authorizeUser()
   if (!auth.canMutate) {
     throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')
@@ -891,6 +917,8 @@ export async function recoverStudentPinsBatchChunkAction(
   santriIds: string[],
   reason?: string
 ): Promise<RecoverPinChunkResult> {
+  await authorizeFinanceFeature('/dashboard/keuangan/kredensial', false)
+
   const auth = await authorizeUser()
   if (!auth.canMutate) {
     throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')

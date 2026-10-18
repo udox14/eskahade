@@ -1,4 +1,5 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { isFinancialProofKey } from '@/lib/finance/proofs'
 
 // Serve file R2 lewat worker (same-origin), lepas dari pub-*.r2.dev yang
 // rate-limited. Dipakai untuk foto santri, avatar, TTD rapor, bukti, dll.
@@ -9,6 +10,7 @@ export async function GET(
   const { key } = await params
   const objectKey = (Array.isArray(key) ? key.join('/') : String(key || ''))
   if (!objectKey) return new Response('Not found', { status: 404 })
+  if (isFinancialProofKey(objectKey)) return new Response('Not found', { status: 404, headers: { 'Cache-Control':'no-store' } })
   // Evidence must pass feature/santri scope and expiry checks on its dedicated route.
   if (objectKey === 'pengajian-evidence' || objectKey.startsWith('pengajian-evidence/')) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
 

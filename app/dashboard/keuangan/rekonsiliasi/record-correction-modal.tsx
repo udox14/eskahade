@@ -58,9 +58,11 @@ export default function RecordCorrectionModal({
   const [amounts, setAmounts] = useState<Record<string, number>>({})
   const [reason, setReason] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
 
   useEffect(() => {
     if (isOpen && payment?.id) {
+      setIdempotencyKey(crypto.randomUUID())
       setIsLoadingAllocations(true)
       getPaymentAllocationsForCorrection(payment.id)
         .then((data) => {
@@ -126,6 +128,7 @@ export default function RecordCorrectionModal({
     setIsSubmitting(true)
     try {
       const res = await recordCorrectionAction({
+        idempotencyKey,
         paymentId: payment.id,
         correctionType,
         method: correctionType === 'REFUND' ? method : null,

@@ -162,6 +162,7 @@ export interface BriQlolaProviderEvidence {
 // ─── INPUT / OUTPUT SERVICES ────────────────────────────────────────────────
 
 export interface CreateDistributionBatchInput {
+  idempotencyKey?: string
   recipientId: string
   itemType: FinanceItemType
   period: string

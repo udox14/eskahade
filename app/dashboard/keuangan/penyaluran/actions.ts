@@ -1,5 +1,7 @@
 'use server'
 
+import { authorizeFinanceFeature } from '@/lib/finance/authorization'
+
 import {
   getSession,
   getEffectiveRoles,
@@ -167,6 +169,8 @@ export async function getPenyaluranPageData(params?: {
   historyRecipientType?: string
   historyItemType?: string
 }): Promise<PenyaluranPageData> {
+  await authorizeFinanceFeature('/dashboard/keuangan/penyaluran', false)
+
   const { permissions } = await authorizeUser()
 
   const activeTab: FinanceDistributionRecipientType | 'RIWAYAT' =
@@ -259,6 +263,8 @@ export async function getPenyaluranPageData(params?: {
 export async function recordDistributionAction(
   input: Omit<CreateDistributionInput, 'transferredBy'>
 ): Promise<{ success: boolean; data: FinanceDistribution }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/penyaluran', true)
+
   const { userId, roles, permissions } = await authorizeUser()
 
   if (!permissions.canDisburse) {
@@ -303,6 +309,8 @@ export async function cancelDistributionAction(
   distributionId: string,
   reason: string
 ): Promise<{ success: boolean; error?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/penyaluran', true)
+
   const { userId, roles, permissions } = await authorizeUser()
 
   if (!permissions.canDisburse) {
@@ -324,6 +332,8 @@ export async function cancelDistributionAction(
 export async function getProviderAccountsAction(
   providerId: string
 ): Promise<FinanceProviderAccount[]> {
+  await authorizeFinanceFeature('/dashboard/keuangan/penyaluran', false)
+
   await authorizeUser()
   return getProviderAccounts(providerId)
 }
@@ -331,6 +341,8 @@ export async function getProviderAccountsAction(
 export async function saveProviderAccountAction(
   input: CreateProviderAccountInput
 ): Promise<{ success: boolean; data: FinanceProviderAccount }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/penyaluran', true)
+
   const { roles, permissions } = await authorizeUser()
 
   if (!permissions.canDisburse) {
@@ -352,6 +364,8 @@ export async function saveProviderAccountAction(
 export async function updateProviderAccountAction(
   input: UpdateProviderAccountInput
 ): Promise<{ success: boolean; data: FinanceProviderAccount }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/penyaluran', true)
+
   const { roles, permissions } = await authorizeUser()
 
   if (!permissions.canDisburse) {
@@ -373,6 +387,8 @@ export async function updateProviderAccountAction(
 export async function deleteProviderAccountAction(
   id: string
 ): Promise<{ success: boolean }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/penyaluran', true)
+
   const { roles, permissions } = await authorizeUser()
 
   if (!permissions.canDisburse) {
@@ -391,6 +407,8 @@ export async function deleteProviderAccountAction(
 export async function getDistributionReceiptAction(
   id: string
 ): Promise<DistributionDetailWithItems | null> {
+  await authorizeFinanceFeature('/dashboard/keuangan/penyaluran', false)
+
   await authorizeUser()
   return getDistributionById(id)
 }
@@ -398,6 +416,8 @@ export async function getDistributionReceiptAction(
 export async function getProviderOperationalDetailAction(
   params: ProviderOperationalDetailParams
 ): Promise<ProviderOperationalDetailResult> {
+  await authorizeFinanceFeature('/dashboard/keuangan/penyaluran', false)
+
   await authorizeUser()
   return getProviderOperationalDetail(params)
 }
@@ -414,11 +434,15 @@ export async function getBendaharaStudentsByItemAction(params: {
   page?: number
   pageSize?: number
 }): Promise<BendaharaItemStudentsResult> {
+  await authorizeFinanceFeature('/dashboard/keuangan/penyaluran', false)
+
   await authorizeUser()
   return getBendaharaStudentsByItem(params)
 }
 
 export async function getProviderAccountTemplateDataAction(): Promise<ProviderAccountTemplatePayload> {
+  await authorizeFinanceFeature('/dashboard/keuangan/penyaluran', false)
+
   await authorizeUser()
   return getProviderAccountTemplateData()
 }
@@ -426,6 +450,8 @@ export async function getProviderAccountTemplateDataAction(): Promise<ProviderAc
 export async function importProviderAccountsAction(
   rows: ValidatedImportAccountRow[]
 ): Promise<{ success: boolean; insertedCount: number; skippedCount: number; invalidCount: number }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/penyaluran', false)
+
   const { roles, permissions } = await authorizeUser()
 
   if (!permissions.canDisburse) {

@@ -1,5 +1,7 @@
 'use server'
 
+import { authorizeFinanceFeature } from '@/lib/finance/authorization'
+
 import { query, queryOne, execute } from '@/lib/db'
 import {
   getSession,
@@ -1936,6 +1938,8 @@ async function fetchTunggakanData(options: {
 export async function getStatusPembayaranData(
   params?: StatusPembayaranQueryParams
 ): Promise<StatusPembayaranResponse> {
+  await authorizeFinanceFeature('/dashboard/keuangan/status-pembayaran', false)
+
   const { permissions } = await authorizeUser()
 
   const currentPeriod = getCurrentPeriodJakarta(params?.currentDateOverride)
@@ -2133,6 +2137,8 @@ export async function getStatusPembayaranData(
  * Mengambil opsi filter dropdown (asrama, kelas, periode bulanan, dan tahun ajaran)
  */
 export async function getStatusPembayaranFilterOptions(): Promise<FilterOptionsResponse> {
+  await authorizeFinanceFeature('/dashboard/keuangan/status-pembayaran', false)
+
   const { permissions } = await authorizeUser()
 
   // Ambil daftar asrama, kelas, dan tahun ajaran secara paralel
@@ -2226,6 +2232,8 @@ interface RawObligationDetailRow {
 export async function getStudentPaymentDetail(
   santriId: string
 ): Promise<StudentPaymentDetailResponse> {
+  await authorizeFinanceFeature('/dashboard/keuangan/status-pembayaran', false)
+
   const { permissions } = await authorizeUser()
 
   if (!santriId || typeof santriId !== 'string') {
@@ -2572,6 +2580,8 @@ export async function getStudentPaymentDetail(
 export async function searchStudentsForPayment(
   queryStr: string
 ): Promise<StudentSearchResultItem[]> {
+  await authorizeFinanceFeature('/dashboard/keuangan/status-pembayaran', false)
+
   const { permissions } = await authorizeUser()
   if (!permissions.canRecordPayment) {
     throw new Error('Akses ditolak: Anda tidak memiliki wewenang untuk mencatat pembayaran tunai.')
@@ -2631,6 +2641,8 @@ export async function getUnpaidObligationsForCashPayment(
   santri: StudentIdentityDetail
   obligations: PayableObligationItem[]
 }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/status-pembayaran', false)
+
   const { permissions } = await authorizeUser()
   if (!permissions.canRecordPayment) {
     throw new Error('Akses ditolak: Anda tidak memiliki wewenang untuk mencatat pembayaran tunai.')
@@ -2842,6 +2854,8 @@ export async function getCurrentCashSessionInfo(): Promise<{
   totalCashIn: number
   expectedClosingBalance: number
 } | null> {
+  await authorizeFinanceFeature('/dashboard/keuangan/status-pembayaran', false)
+
   const { userId, permissions } = await authorizeUser()
   if (!permissions.canRecordPayment) {
     return null
@@ -2869,6 +2883,8 @@ export async function openCashSessionAction(
   openingBalance: number
   expectedClosingBalance: number
 }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/status-pembayaran', false)
+
   const { userId, permissions } = await authorizeUser()
   if (!permissions.canRecordPayment) {
     throw new Error('Akses ditolak: Hanya Bendahara dan Admin yang dapat membuka sesi kas.')
@@ -2892,6 +2908,8 @@ export async function openCashSessionAction(
 export async function recordCashPayment(
   input: RecordCashPaymentInput
 ): Promise<RecordCashPaymentResult> {
+  await authorizeFinanceFeature('/dashboard/keuangan/status-pembayaran', true)
+
   const { userId, permissions } = await authorizeUser()
   if (!permissions.canRecordPayment) {
     throw new Error('Akses ditolak: Hanya Bendahara dan Admin yang memiliki wewenang untuk mencatat pembayaran tunai.')

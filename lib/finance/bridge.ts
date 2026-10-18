@@ -758,7 +758,7 @@ export async function syncLegacyPayment(
       sql: `
         INSERT INTO finance_payments (
           id, payment_number, order_id, santri_id, channel, method,
-          gross_amount, gateway_fee, net_amount, status, correction_status,
+          gross_amount, cooperative_admin_fee, net_amount, status, correction_status,
           allocation_status, paid_at, external_reference, cash_session_id,
           received_by, source, fund_management, created_at
         ) VALUES (?, ?, NULL, ?, 'CASH', ?, ?, 0, ?, 'PAID', 'NONE', ?, ?, ?, NULL, ?, 'LEGACY', 'PRE_KOPERASI', ?)

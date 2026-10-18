@@ -1,5 +1,7 @@
 'use server'
 
+import { authorizeFinanceFeature } from '@/lib/finance/authorization'
+
 // app/dashboard/keuangan/laporan/actions.ts
 // Server Actions untuk Modul Laporan & Cetak Ekspor Keuangan (Fase 10: PRD Bab 34)
 
@@ -65,56 +67,78 @@ async function assertReportPermission(): Promise<void> {
 }
 
 export async function fetchReceiptsReport(filters: ReceiptsReportFilter) {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await getReceiptsReport(filters)
 }
 
 export async function fetchDistributionsReport(filters: DistributionsReportFilter) {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await getDistributionsReport(filters)
 }
 
 export async function fetchArrearsReport(filters: ArrearsReportFilter) {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await getArrearsReport(filters)
 }
 
 export async function fetchExemptionsReport(filters: ExemptionsReportFilter) {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await getExemptionsReport(filters)
 }
 
 export async function fetchStudentDetailReport(filters: StudentDetailReportFilter) {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await getStudentDetailReport(filters)
 }
 
 export async function fetchWalletReport(filters: WalletReportFilter) {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await getWalletReport(filters)
 }
 
 export async function fetchCashSessionsReport(filters: CashSessionsReportFilter) {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await getCashSessionsReport(filters)
 }
 
 export async function fetchSettlementsReport(filters: SettlementsReportFilter) {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await getSettlementsReport(filters)
 }
 
 export async function fetchReconciliationsReport(filters: ReconciliationsReportFilter) {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await getReconciliationsReport(filters)
 }
 
 export async function fetchCashSessionDetailReport(sessionId: string) {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await getCashSessionDetailReport(sessionId)
 }
 
 export async function fetchReportFilterOptions() {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await getReportFilterOptions()
 }
@@ -127,6 +151,8 @@ export async function fetchReportFilterOptions() {
 export async function fetchReceiptsForExport(
   filters: ReceiptsReportFilter
 ): Promise<ReportExportPayload<ReceiptItemRow>> {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await collectAllReportPages((page, pageSize) =>
     getReceiptsReport({ ...filters, page, pageSize })
@@ -136,6 +162,8 @@ export async function fetchReceiptsForExport(
 export async function fetchDistributionsForExport(
   filters: DistributionsReportFilter
 ): Promise<ReportExportPayload<DistributionItemRow>> {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await collectAllReportPages((page, pageSize) =>
     getDistributionsReport({ ...filters, page, pageSize })
@@ -145,6 +173,8 @@ export async function fetchDistributionsForExport(
 export async function fetchArrearsForExport(
   filters: ArrearsReportFilter
 ): Promise<ReportExportPayload<ArrearItemRow>> {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await collectAllReportPages((page, pageSize) =>
     getArrearsReport({ ...filters, page, pageSize })
@@ -154,6 +184,8 @@ export async function fetchArrearsForExport(
 export async function fetchExemptionsForExport(
   filters: ExemptionsReportFilter
 ): Promise<ReportExportPayload<ExemptionItemRow>> {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await collectAllReportPages((page, pageSize) =>
     getExemptionsReport({ ...filters, page, pageSize })
@@ -163,6 +195,8 @@ export async function fetchExemptionsForExport(
 export async function fetchWalletForExport(
   filters: WalletReportFilter
 ): Promise<ReportExportPayload<WalletSummaryRow | WalletMutationRow>> {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await collectAllReportPages<WalletSummaryRow | WalletMutationRow>(
     async (page, pageSize) => {
@@ -178,6 +212,8 @@ export async function fetchWalletForExport(
 export async function fetchCashSessionsForExport(
   filters: CashSessionsReportFilter
 ): Promise<ReportExportPayload<CashSessionItemRow>> {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await collectAllReportPages((page, pageSize) =>
     getCashSessionsReport({ ...filters, page, pageSize })
@@ -187,6 +223,8 @@ export async function fetchCashSessionsForExport(
 export async function fetchSettlementsForExport(
   filters: SettlementsReportFilter
 ): Promise<ReportExportPayload<SettlementItemRow>> {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await collectAllReportPages((page, pageSize) =>
     getSettlementsReport({ ...filters, page, pageSize })
@@ -196,6 +234,8 @@ export async function fetchSettlementsForExport(
 export async function fetchReconciliationsForExport(
   filters: ReconciliationsReportFilter
 ): Promise<ReportExportPayload<ReconciliationReportRow>> {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+
   await assertReportPermission()
   return await collectAllReportPages((page, pageSize) =>
     getReconciliationsReport({ ...filters, page, pageSize })

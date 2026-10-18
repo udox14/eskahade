@@ -1,5 +1,7 @@
 'use server'
 
+import { authorizeFinanceFeature } from '@/lib/finance/authorization'
+
 import { query, queryOne } from '@/lib/db'
 import {
   getSession,
@@ -140,6 +142,8 @@ async function authorizeUser(): Promise<{
 export async function getUangJajanData(
   params: UangJajanQueryParams
 ): Promise<UangJajanResponse> {
+  await authorizeFinanceFeature('/dashboard/keuangan/uang-jajan', false)
+
   const auth = await authorizeUser()
 
   const search = (params.search || '').trim()
@@ -339,6 +343,8 @@ export async function getStudentWalletDetail(
   santriId: string,
   page: number = 1
 ): Promise<StudentWalletDetailResponse> {
+  await authorizeFinanceFeature('/dashboard/keuangan/uang-jajan', false)
+
   await authorizeUser()
 
   const student = await queryOne<{
@@ -395,6 +401,8 @@ export async function getStudentWalletDetail(
 export async function recalculateStudentWalletAction(
   santriId: string
 ): Promise<{ success: boolean; newBalance: number }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/uang-jajan', false)
+
   const auth = await authorizeUser()
   if (!auth.canMutate) {
     throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')
@@ -415,6 +423,8 @@ export async function saveParentLimitsAction(
     monthly?: number | null
   }
 ): Promise<{ success: boolean }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/uang-jajan', true)
+
   const auth = await authorizeUser()
   if (!auth.canMutate) {
     throw new Error('Akses ditolak: Anda hanya memiliki izin lihat (view-only).')

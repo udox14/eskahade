@@ -1,5 +1,7 @@
 'use server'
 
+import { authorizeFinanceFeature } from '@/lib/finance/authorization'
+
 // app/dashboard/keuangan/rekonsiliasi/actions.ts
 // Server actions untuk antarmuka modul Rekonsiliasi & Koreksi (Fase 8)
 
@@ -205,6 +207,8 @@ export async function getReconciliationPageData(params?: {
   search?: string
   status?: string
 }): Promise<ReconciliationPageData> {
+  await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi', false)
+
   const { perms } = await checkUserPermissions()
   const activeTab = params?.tab || 'SETTLEMENT'
   const selectedPeriod = params?.period || getDefaultPeriod()
@@ -290,6 +294,8 @@ export async function getReconciliationPageData(params?: {
 export async function createSettlementBatchAction(
   _input: Omit<CreateSettlementBatchInput, 'verifiedBy'>
 ): Promise<{ success: boolean; message: string; settlementId?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi', true)
+
   return {
     success: false,
     message: 'Pencatatan settlement online dinonaktifkan hingga integrasi Rekening Koran BRIAPI (BRI-4) aktif.',
@@ -302,6 +308,8 @@ export async function createSettlementBatchAction(
 export async function resolveUnallocatedManualAction(
   input: Omit<ResolveManualAllocationInput, 'resolvedBy'>
 ): Promise<{ success: boolean; message: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi', true)
+
   const { session, perms } = await checkUserPermissions()
   if (!perms.canMutate || !session) {
     return {
@@ -333,6 +341,8 @@ export async function resolveUnallocatedManualAction(
 export async function recordCorrectionAction(
   input: Omit<RecordCorrectionInput, 'createdBy'>
 ): Promise<{ success: boolean; message: string; correctionNumber?: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi', true)
+
   const { session, perms } = await checkUserPermissions()
   if (!perms.canMutate || !session) {
     return {
@@ -367,6 +377,8 @@ export async function recordCorrectionAction(
 export async function resolveRecoveryCaseAction(
   input: Omit<ResolveRecoveryCaseInput, 'resolvedBy'>
 ): Promise<{ success: boolean; message: string }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi', true)
+
   const { session, perms } = await checkUserPermissions()
   if (!perms.canMutate || !session) {
     return {
@@ -406,6 +418,8 @@ export async function getStudentUnpaidObligations(santriId: string): Promise<
     remaining: number
   }>
 > {
+  await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi', false)
+
   const rows = await query<{
     id: string
     item_type: string
@@ -446,6 +460,8 @@ export async function getPaymentAllocationsForCorrection(paymentId: string): Pro
     remaining_correctable: number
   }>
 > {
+  await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi', false)
+
   const rows = await query<{
     id: string
     target_type: 'OBLIGATION' | 'UANG_JAJAN'
@@ -483,6 +499,8 @@ export async function getPaymentAllocationsForCorrection(paymentId: string): Pro
  * Mengambil detail settlement untuk view modal/drawer
  */
 export async function getSettlementDetailAction(settlementId: string) {
+  await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi', false)
+
   return await getSettlementDetail(settlementId)
 }
 
@@ -490,6 +508,8 @@ export async function getSettlementDetailAction(settlementId: string) {
  * Mengambil detail koreksi untuk view modal/drawer
  */
 export async function getCorrectionDetailAction(correctionId: string) {
+  await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi', false)
+
   return await getCorrectionDetail(correctionId)
 }
 
@@ -508,6 +528,8 @@ export async function findPaymentForCorrection(paymentNumber: string): Promise<{
     cash_session_id?: string | null
   }
 }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi', false)
+
   const rows = await query<{
     id: string
     payment_number: string
@@ -560,6 +582,8 @@ export async function getLegacySyncPreviewAction(): Promise<{
   preview?: LegacySyncPreviewSummary
   error?: string
 }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi', false)
+
   const { perms } = await checkUserPermissions()
   if (!perms.canView) {
     return { success: false, error: 'Akses ditolak.' }
@@ -583,6 +607,8 @@ export async function executeLegacyBackfillAction(options?: {
   report?: LegacyBackfillReport
   error?: string
 }> {
+  await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi', true)
+
   const { session, perms } = await checkUserPermissions()
   if (!perms.canMutate || !session) {
     return { success: false, error: 'Anda tidak memiliki izin untuk mengeksekusi sinkronisasi modul lama.' }

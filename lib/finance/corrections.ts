@@ -6,7 +6,10 @@
 
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
 import { computeObligationStatus } from '@/lib/finance/types'
-import { getStudentWalletBalance, recordWalletMutation } from '@/lib/finance/wallet'
+import { getStudentWalletBalance } from '@/lib/finance/wallet'
+import { walletMutationStatements } from './wallet-statements'
+import { rupiah } from './money'
+import { operationIdentity, operationReplay, operationStatement, requestFingerprint } from './operation'
 import { getCashSessionById } from '@/lib/finance/cash-session'
 import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import type { FinancePaymentChannel } from '@/lib/finance/payment-types'
@@ -46,6 +49,14 @@ function generateCorrectionNumber(type: string): string {
 export async function recordCorrection(
   input: RecordCorrectionInput
 ): Promise<CorrectionDetailWithItems> {
+  const identity = operationIdentity('CORRECTION', input.createdBy, input.idempotencyKey || requestFingerprint([input.paymentId,input.correctionType,input.items,input.reason]),
+    [input.paymentId,input.correctionType,input.method || null,input.items,input.reason,input.cashSessionId || null])
+  const replay = await operationReplay<{ correctionId: string }>(identity)
+  if (replay) {
+    const detail = await getCorrectionDetail(replay.correctionId)
+    if (!detail) throw new Error('Koreksi tersimpan tetapi detail tidak tersedia. Hubungi petugas rekonsiliasi.')
+    return detail
+  }
   if (!input.items || input.items.length === 0) {
     throw new Error('Koreksi finansial harus menentukan minimal satu target alokasi.')
   }
@@ -110,7 +121,7 @@ export async function recordCorrection(
   const preparedItems: PreparedCorrectionItem[] = []
 
   for (const itm of input.items) {
-    const amount = Math.floor(itm.amount)
+    const amount = rupiah(itm.amount)
     if (amount <= 0 || !Number.isFinite(amount)) {
       throw new Error('Nominal item koreksi harus bernilai lebih besar dari 0.')
     }
@@ -286,7 +297,7 @@ export async function recordCorrection(
   const recoveryStatus = isRecoveryCase === 1 ? 'PENDING_RECOVERY' : 'NONE'
   const newCorrectionStatus = grandTotalCorrected >= payment.gross_amount ? 'FULLY_CORRECTED' : 'PARTIALLY_CORRECTED'
 
-  const statements: Array<{ sql: string; params: unknown[] }> = []
+  const statements: Array<{ sql: string; params: unknown[] }> = [operationStatement(identity, { correctionId })]
 
   // A. Insert Header Koreksi
   statements.push({
@@ -415,7 +426,7 @@ export async function recordCorrection(
     const origIncome = await queryOne<{ id: string; rule_id: string | null; rule_snapshot: string | null }>(
       `SELECT id, rule_id, rule_snapshot FROM finance_cooperative_income WHERE payment_id = ? AND entry_type = 'INCOME' LIMIT 1`,
       [payment.id]
-    ).catch(() => null)
+    )
 
     statements.push({
       sql: `
@@ -442,14 +453,10 @@ export async function recordCorrection(
     })
   }
 
-  // Eksekusi batch mutasi D1
-  await batch(statements)
-
-  // 7. Jika ada item UANG_JAJAN, mutasikan buku besar uang jajan santri secara presisi
-  // Pembalikan top-up -> mutasi OUT dengan movement_type 'REVERSAL'
+  // Wallet reversal participates in exactly the same transaction as the correction.
   for (const item of preparedItems) {
     if (item.targetType === 'UANG_JAJAN') {
-      await recordWalletMutation({
+      statements.push(...walletMutationStatements({
         santriId: payment.santri_id,
         direction: 'OUT',
         movementType: 'REVERSAL',
@@ -458,8 +465,28 @@ export async function recordCorrection(
         cashSessionId,
         operatorId: input.createdBy,
         notes: `Pembalikan top-up uang jajan karena koreksi ${input.correctionType} (${correctionNumber}) pada pembayaran ${payment.payment_number}`,
-      })
+      }).statements)
     }
+  }
+
+  // Derive caches inside the batch, including concurrent corrections committed before us.
+  for (const obId of obligationUpdates.keys()) {
+    statements.push({ sql: `UPDATE finance_obligations SET amount_paid=MAX(0,
+      COALESCE((SELECT SUM(amount) FROM finance_allocations WHERE obligation_id=?),0)-
+      COALESCE((SELECT SUM(amount) FROM finance_correction_items WHERE obligation_id=?),0)) WHERE id=?`, params:[obId,obId,obId] })
+    statements.push({sql:`UPDATE finance_obligations SET status=CASE WHEN amount_paid=0 AND amount_expected=amount_exempted THEN 'EXEMPTED'
+      WHEN amount_paid>=amount_expected-amount_exempted THEN 'PAID' WHEN amount_paid>0 THEN 'PARTIALLY_PAID' ELSE 'UNPAID' END WHERE id=?`,params:[obId]})
+  }
+  statements.push({sql:`UPDATE finance_payments SET correction_status=CASE
+    WHEN (SELECT COALESCE(SUM(total_amount),0) FROM finance_corrections WHERE target_payment_id=?)>=gross_amount
+    THEN 'FULLY_CORRECTED' ELSE 'PARTIALLY_CORRECTED' END WHERE id=?`,params:[payment.id,payment.id]})
+  try { await batch(statements) } catch (error) {
+    const committed = await operationReplay<{correctionId:string}>(identity)
+    if (committed) {
+      const detail = await getCorrectionDetail(committed.correctionId)
+      if (detail) return detail
+    }
+    throw error
   }
 
   const detail = await getCorrectionDetail(correctionId)

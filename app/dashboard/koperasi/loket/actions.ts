@@ -1,6 +1,6 @@
 'use server'
 
-import { query, queryOne, generateId, now } from '@/lib/db'
+import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
 import {
   getSession,
   getEffectiveRoles,
@@ -40,6 +40,11 @@ import {
   recordWalletMutation,
   type WalletLimitEvaluation,
 } from '@/lib/finance/wallet'
+import { financeWritePlan } from '@/lib/finance/write-plan'
+import { walletMutationStatements } from '@/lib/finance/wallet-statements'
+import { operationIdentity, operationReplay, operationStatement, hashPinAuthorization } from '@/lib/finance/operation'
+import { rupiah, sumRupiah } from '@/lib/finance/money'
+import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
 import { createPaymentOrder } from '@/lib/finance/orders'
 import { recordOrderPayment } from '@/lib/finance/payments'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
@@ -158,8 +163,7 @@ export interface LoketSessionTransactionItem {
 }
 
 // In-flight concurrency maps
-const inFlightTransactions = new Map<string, Promise<unknown>>()
-const verifiedPinSessions = new Map<string, { santriId: string; expiresAt: number }>()
+// Financial operation identity and PIN authorization are durable in D1.
 
 // â”€â”€â”€ OTORISASI OPERATOR LOKET (SERVER-SIDE RBAC) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -383,16 +387,14 @@ export async function verifyStudentLoketPin(
   remainingLockSeconds?: number
   attemptsLeft: number
 }> {
-  await authorizeLoketOperator()
+  const {userId} = await authorizeLoketOperator(true)
   const result = await verifyStudentPin(santriId, pin)
 
   if (result.verified) {
     const token = generateId()
     // Masa berlaku 5 menit
-    verifiedPinSessions.set(token, {
-      santriId,
-      expiresAt: Date.now() + 5 * 60 * 1000,
-    })
+    await execute(`INSERT INTO finance_pin_authorizations(token_hash,santri_id,operator_id,expires_at,created_at) VALUES (?,?,?,?,?)`,
+      [hashPinAuthorization(token),santriId,userId,new Date(Date.now()+5*60*1000).toISOString(),now()])
 
     return {
       verified: true,
@@ -587,21 +589,12 @@ export async function executeLoketWithdrawal(
 ): Promise<LoketWithdrawalReceipt> {
   const { userId, operatorName } = await authorizeLoketOperator(true)
 
-  const amount = Math.floor(input.amount)
-  if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error('Nominal penarikan uang jajan harus bernilai lebih dari Rp0.')
-  }
-
-  const activeSession = await getActiveCashSession(userId)
-  if (!activeSession) {
-    throw new Error('Tidak ada sesi kas yang aktif. Buka sesi kas terlebih dahulu sebelum mencairkan uang.')
-  }
-
-  // 1. Validasi Token Verifikasi PIN
-  const pinSession = verifiedPinSessions.get(input.verificationToken)
-  if (!pinSession || pinSession.santriId !== input.santriId || Date.now() > pinSession.expiresAt) {
-    throw new Error('Verifikasi PIN santri tidak valid atau telah kedaluwarsa. Masukkan PIN kembali.')
-  }
+  const amount = rupiah(input.amount)
+  const identity=operationIdentity('LOKET_WITHDRAWAL',userId,input.idempotencyKey,[input.santriId,amount,input.verificationToken,input.notes||null])
+  const replay=await operationReplay<LoketWithdrawalReceipt>(identity)
+  if(replay) return replay
+  const activeSession=await getActiveCashSession(userId)
+  if(!activeSession) throw new Error('Buka sesi kas terlebih dahulu.')
 
   // 2. Validasi Santri & Kartu Aktif
   const student = await queryOne<{
@@ -635,34 +628,14 @@ export async function executeLoketWithdrawal(
     )
   }
 
-  // 4. In-flight Lock Idempotency
-  const extKey = input.idempotencyKey.trim() || generateId()
-  const existingInFlight = inFlightTransactions.get(extKey)
-  if (existingInFlight) {
-    return existingInFlight as Promise<LoketWithdrawalReceipt>
-  }
-
   const executionPromise = (async (): Promise<LoketWithdrawalReceipt> => {
-    // 5. Eksekusi Mutasi Buku Besar Uang Jajan
-    const ledgerEntry = await recordWalletMutation({
-      santriId: input.santriId,
-      direction: 'OUT',
-      movementType: 'WITHDRAWAL_LOKET',
-      amount,
-      cashSessionId: activeSession.id,
-      operatorId: userId,
-      notes: input.notes || 'Pencairan uang jajan di loket kasir',
-    })
-
-    // 6. Catat kas keluar pada Sesi Kas
-    await recordCashOutFromSession(activeSession.id, amount)
-
-    // 7. Konsumsi token verifikasi PIN agar tidak dapat digunakan berulang
-    verifiedPinSessions.delete(input.verificationToken)
-
+    const balance = await getStudentWalletBalance(input.santriId)
+    const wallet=walletMutationStatements({santriId:input.santriId,direction:'OUT',movementType:'WITHDRAWAL_LOKET',amount,
+      cashSessionId:activeSession.id,operatorId:userId,referenceId:identity.key,notes:input.notes||'Pencairan uang jajan di loket kasir'})
+    const ledgerEntry={id:wallet.id,created_at:wallet.timestamp,balance_before:balance.balance,balance_after:balance.balance-amount,notes:input.notes||null}
     const receiptNumber = `WD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${ledgerEntry.id.slice(-6).toUpperCase()}`
 
-    return {
+    const receipt: LoketWithdrawalReceipt = {
       receiptNumber,
       type: 'WITHDRAWAL',
       santri: {
@@ -681,15 +654,16 @@ export async function executeLoketWithdrawal(
       sessionCode: activeSession.session_code,
       notes: ledgerEntry.notes,
     }
+    try {
+      await batch([operationStatement(identity,receipt,{santriId:input.santriId,amount,cashSessionId:activeSession.id,pinTokenHash:hashPinAuthorization(input.verificationToken),expectedWalletBalance:balance.balance}),
+        ...wallet.statements,
+        {sql:`UPDATE finance_cash_sessions SET total_cash_out=total_cash_out+?,expected_closing_balance=expected_closing_balance-?,updated_at=? WHERE id=?`,params:[amount,amount,now(),activeSession.id]}])
+    } catch(error) { const committed=await operationReplay<LoketWithdrawalReceipt>(identity); if(committed)return committed; throw error }
+    return receipt
   })()
 
-  inFlightTransactions.set(extKey, executionPromise)
+  return executionPromise
 
-  try {
-    return await executionPromise
-  } finally {
-    inFlightTransactions.delete(extKey)
-  }
 }
 
 // â”€â”€â”€ EKSEKUSI PENYETORAN / PEMBAYARAN LOKET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -711,6 +685,10 @@ export async function executeLoketDepositOrPayment(
     throw new Error('Pilih minimal 1 pos yang akan disetor atau dibayar.')
   }
 
+  input.items.forEach(item=>rupiah(item.amount))
+  const identity=operationIdentity('LOKET_DEPOSIT',userId,input.idempotencyKey,[input.santriId,input.items,input.notes||null])
+  const replay=await operationReplay<LoketPaymentReceipt>(identity)
+  if(replay)return replay
   const activeSession = await getActiveCashSession(userId)
   if (!activeSession) {
     throw new Error('Tidak ada sesi kas yang aktif. Buka sesi kas terlebih dahulu sebelum menerima pembayaran.')
@@ -734,12 +712,9 @@ export async function executeLoketDepositOrPayment(
     throw new Error(`Santri tidak aktif (status: ${student.status_global}).`)
   }
 
-  const extKey = input.idempotencyKey.trim() || generateId()
-  const existingInFlight = inFlightTransactions.get(extKey)
-  if (existingInFlight) {
-    return existingInFlight as Promise<LoketPaymentReceipt>
-  }
-
+  assertSantriBillable(student.asrama,student.nama_lengkap)
+  const extKey=identity.key
+  const plan=financeWritePlan()
   const executionPromise = (async (): Promise<LoketPaymentReceipt> => {
     // 1. Validasi setiap item
     const obligationOrderItems: Array<{
@@ -751,7 +726,7 @@ export async function executeLoketDepositOrPayment(
     let topupCashAmount = 0
 
     for (const it of input.items) {
-      const amt = Math.floor(it.amount)
+      const amt = rupiah(it.amount)
       if (amt <= 0) {
         throw new Error(`Nominal item "${it.itemType}" harus lebih besar dari Rp0.`)
       }
@@ -836,7 +811,7 @@ export async function executeLoketDepositOrPayment(
         feePayer: 'CUSTOMER',
         cooperativeAdminFee: 0,
         cashSessionId: activeSession.id,
-      })
+      }, plan)
 
       // CATATAN AUDIT: Pembayaran tunai loket berstatus PAID (bukan SETTLED),
       // dicatat pada channel CASH, dan tidak pernah membuat gateway settlement items.
@@ -848,7 +823,7 @@ export async function executeLoketDepositOrPayment(
         cooperativeAdminFee: 0,
         cashSessionId: activeSession.id,
         receivedBy: userId,
-      })
+      }, plan)
 
       paymentId = payment.id
       paymentGross = payment.gross_amount
@@ -859,24 +834,18 @@ export async function executeLoketDepositOrPayment(
     let walletBalanceAfter: number | null = null
     let topupLedgerId: string | null = null
     if (topupCashAmount > 0) {
-      const ledgerEntry = await recordWalletMutation({
-        santriId: input.santriId,
-        direction: 'IN',
-        movementType: 'TOPUP_CASH',
-        amount: topupCashAmount,
-        referenceId: null,
-        cashSessionId: activeSession.id,
-        operatorId: userId,
-        notes: input.notes || 'Setoran tunai uang jajan di loket kasir',
-      })
-      walletBalanceAfter = ledgerEntry.balance_after
-      topupLedgerId = ledgerEntry.id
+      const before=await getStudentWalletBalance(input.santriId)
+      const wallet=walletMutationStatements({santriId:input.santriId,direction:'IN',movementType:'TOPUP_CASH',amount:topupCashAmount,
+        referenceId:identity.key,cashSessionId:activeSession.id,operatorId:userId,notes:input.notes||'Setoran tunai uang jajan di loket kasir'})
+      plan.statements.push(...wallet.statements)
+      walletBalanceAfter=before.balance+topupCashAmount
+      topupLedgerId=wallet.id
     }
 
-    const totalCashReceived = paymentGross + topupCashAmount
+    const totalCashReceived = sumRupiah([paymentGross,topupCashAmount])
 
     // 4. Update cash-in sesi kas (live derived cache)
-    await recordCashInToSession(activeSession.id, totalCashReceived)
+    plan.statements.push({sql:`UPDATE finance_cash_sessions SET total_cash_in=total_cash_in+?,expected_closing_balance=expected_closing_balance+?,updated_at=? WHERE id=?`,params:[totalCashReceived,totalCashReceived,now(),activeSession.id]})
 
     const datePrefix = new Date().toISOString().slice(0, 10).replace(/-/g, '')
     const receiptNumber = paymentId
@@ -905,7 +874,7 @@ export async function executeLoketDepositOrPayment(
       })
     }
 
-    return {
+    const receipt: LoketPaymentReceipt = {
       receiptNumber,
       type: 'PAYMENT_OR_DEPOSIT',
       santri: {
@@ -922,15 +891,13 @@ export async function executeLoketDepositOrPayment(
       items: receiptItems,
       walletBalanceAfter,
     }
+    try { await batch([operationStatement(identity,receipt,{santriId:input.santriId,amount:totalCashReceived,cashSessionId:activeSession.id,expectedWalletBalance:topupCashAmount>0 ? walletBalanceAfter!-topupCashAmount : undefined}),...plan.statements]) }
+    catch(error) { const committed=await operationReplay<LoketPaymentReceipt>(identity); if(committed)return committed; throw error }
+    return receipt
   })()
 
-  inFlightTransactions.set(extKey, executionPromise)
+  return executionPromise
 
-  try {
-    return await executionPromise
-  } finally {
-    inFlightTransactions.delete(extKey)
-  }
 }
 
 // â”€â”€â”€ RIWAYAT TRANSAKSI SESI INI & SESI SEBELUMNYA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

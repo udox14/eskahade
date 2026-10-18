@@ -5,6 +5,8 @@
 import { query, queryOne, batch, execute, generateId, now } from '@/lib/db'
 import { getStudentFixedVa } from '@/lib/finance/va'
 import { assertSantriBillable, assertSantriBillableUntukItem } from '@/lib/finance/non-billable-santri'
+import { rupiah, sumRupiah } from './money'
+import type { FinanceWritePlan } from './write-plan'
 import type {
   FinancePaymentOrder,
   FinanceOrderItem,
@@ -38,12 +40,13 @@ function generateOrderNumber(): string {
  * 7. Eksekusi atomik header order + detail items via db.batch().
  */
 export async function createPaymentOrder(
-  input: CreatePaymentOrderInput
+  input: CreatePaymentOrderInput,
+  plan?: FinanceWritePlan
 ): Promise<PaymentOrderWithItems> {
   const santriId = input.santriId
   const payerType = input.payerType
   const feePayer = input.feePayer ?? 'CUSTOMER'
-  const cooperativeAdminFee = Math.max(0, Math.floor(input.cooperativeAdminFee ?? 0))
+  const cooperativeAdminFee = rupiah(input.cooperativeAdminFee ?? 0, 'Biaya Koperasi', true)
   const expiresInHours = input.expiresInHours ?? 24
   const paymentMethod = input.paymentMethod ?? 'BRI_VA'
   const cashSessionId = input.cashSessionId ?? null
@@ -78,7 +81,7 @@ export async function createPaymentOrder(
   const seenObligationIds = new Set<string>()
 
   for (const item of input.items) {
-    const amount = Math.floor(item.amount)
+    const amount = rupiah(item.amount)
     if (amount <= 0) {
       throw new Error(`Nominal item "${item.itemType}" harus lebih besar dari 0.`)
     }
@@ -113,6 +116,7 @@ export async function createPaymentOrder(
           `Kewajiban "${obligation.item_type}" (${obligation.id}) bukan milik santri yang dituju.`
         )
       }
+      assertSantriBillableUntukItem({asrama:student.asrama,kategoriSantri:student.kategori_santri,namaSantri:student.nama_lengkap},obligation.item_type)
       if (obligation.status === 'PAID') {
         throw new Error(
           `Kewajiban "${obligation.item_type}" sudah berstatus LUNAS (PAID).`
@@ -184,7 +188,7 @@ export async function createPaymentOrder(
   }
 
   // 3. Kalkulasi Total Tagihan (Gross + Biaya Operasional Koperasi)
-  const totalCharged = feePayer === 'CUSTOMER' ? grossAmount + cooperativeAdminFee : grossAmount
+  const totalCharged = sumRupiah(feePayer === 'CUSTOMER' ? [grossAmount,cooperativeAdminFee] : [grossAmount])
 
   // 4. Fixed BRIVA Lookup jika metode BRI_VA
   let fixedVaNumber: string | null = null
@@ -252,6 +256,17 @@ export async function createPaymentOrder(
     })
   }
 
+  if (plan) {
+    const staged: PaymentOrderWithItems = {
+      id:orderId,order_number:orderNumber,santri_id:santriId,payer_type:payerType,gross_amount:grossAmount,
+      cooperative_admin_fee:cooperativeAdminFee,fee_payer:feePayer,total_charged:totalCharged,payment_method:paymentMethod,
+      fixed_va_number:fixedVaNumber,status:'PENDING',expires_at:expiresAt,cash_session_id:cashSessionId,created_at:timestamp,updated_at:timestamp,
+      items:preparedOrderItems.map(item=>({id:item.id,order_id:orderId,obligation_id:item.obligationId,item_type:item.itemType,amount:item.amount})),
+    }
+    plan.statements.push(...statements)
+    plan.orders.set(orderId,staged)
+    return staged
+  }
   await batch(statements)
 
   const createdOrder = await getPaymentOrderById(orderId)
@@ -354,7 +369,7 @@ export async function cancelPaymentOrder(
   )
 
   const updated = await queryOne<FinancePaymentOrder>(
-    `SELECT id, order_number, santri_id, payer_type, gross_amount, gateway_fee,
+    `SELECT id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee,
             fee_payer, total_charged, payment_method, fixed_va_number, status,
             expires_at, cash_session_id, created_at, updated_at
      FROM finance_payment_orders

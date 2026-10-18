@@ -94,6 +94,7 @@ export interface InvariantVerificationResult {
   violations: InvariantViolation[]
   timestamp: string
   checkedInvariants: string[]
+  checks: Array<{id:string;status:'PASS'|'FAIL'|'ERROR'|'NOT_CHECKED';error?:string}>
 }
 
 export class AuditReportService {
@@ -467,6 +468,9 @@ export class AuditReportService {
       'HARD_INV_8_DUITKU_RETIRED_FROM_ACTIVE_SYSTEM',
     ]
 
+    const checks: InvariantVerificationResult['checks'] = checkedInvariants.map(id=>({id,status:'NOT_CHECKED'}))
+    const before: number[] = []
+    before[0]=violations.length
     // 1. HARD_INV_1_NO_OVER_DISTRIBUTION: SUM(disbursed + live reserved) <= allocation.amount
     try {
       const overDistRows = await query<any>(
@@ -490,10 +494,11 @@ export class AuditReportService {
           })
         }
       }
-    } catch (err: any) {
-      // Query error
-    }
+    } catch { checks[0].status='ERROR'; checks[0].error='Database invariant check failed' }
 
+    if(checks[0].status!=='ERROR') checks[0].status=violations.length>before[0]?'FAIL':'PASS'
+
+    before[1]=violations.length
     // 2. HARD_INV_2_NO_DOUBLE_ALLOCATION: SUM(allocations) <= payment.gross_amount
     try {
       const doubleAllocRows = await query<any>(
@@ -515,8 +520,11 @@ export class AuditReportService {
           })
         }
       }
-    } catch {}
+    } catch { checks[1].status='ERROR'; checks[1].error='Database invariant check failed' }
 
+    if(checks[1].status!=='ERROR') checks[1].status=violations.length>before[1]?'FAIL':'PASS'
+
+    before[2]=violations.length
     // 3. HARD_INV_3_SETTLED_REQUIRE_STATEMENT_LINK: PAID != SETTLED
     // Setiap pembayaran SETTLED wajib memiliki rekam settlement item yang authoritative
     try {
@@ -537,8 +545,11 @@ export class AuditReportService {
           })
         }
       }
-    } catch {}
+    } catch { checks[2].status='ERROR'; checks[2].error='Database invariant check failed' }
 
+    if(checks[2].status!=='ERROR') checks[2].status=violations.length>before[2]?'FAIL':'PASS'
+
+    before[3]=violations.length
     // 4. HARD_INV_4_UANG_JAJAN_NEVER_DISTRIBUTED
     // Uang Jajan adalah dana titipan santri yang TIDAK BOLEH didistribusikan ke Pesantren/Katering/Laundry
     try {
@@ -557,8 +568,11 @@ export class AuditReportService {
           })
         }
       }
-    } catch {}
+    } catch { checks[3].status='ERROR'; checks[3].error='Database invariant check failed' }
 
+    if(checks[3].status!=='ERROR') checks[3].status=violations.length>before[3]?'FAIL':'PASS'
+
+    before[4]=violations.length
     // 5. HARD_INV_5_COOP_ADMIN_SEPARATED_AND_NOT_DISTRIBUTED
     // Biaya admin Koperasi adalah hak Koperasi dan tidak didistribusikan ke vendor
     try {
@@ -577,8 +591,11 @@ export class AuditReportService {
           })
         }
       }
-    } catch {}
+    } catch { checks[4].status='ERROR'; checks[4].error='Database invariant check failed' }
 
+    if(checks[4].status!=='ERROR') checks[4].status=violations.length>before[4]?'FAIL':'PASS'
+
+    before[5]=violations.length
     // 6. HARD_INV_6_CASH_SESSION_LIQUIDITY_GUARD
     // Sesi kas tidak boleh mengalami over-reservation
     try {
@@ -608,8 +625,11 @@ export class AuditReportService {
           })
         }
       }
-    } catch {}
+    } catch { checks[5].status='ERROR'; checks[5].error='Database invariant check failed' }
 
+    if(checks[5].status!=='ERROR') checks[5].status=violations.length>before[5]?'FAIL':'PASS'
+
+    before[6]=violations.length
     // 7. HARD_INV_7_QLOLA_REAL_SUBMISSION_DISABLED
     // QLola submission langsung wajib DISABLED sampai kontrak H2H resmi diverifikasi
     if (QLOLA_REAL_SUBMISSION_STATE !== 'DISABLED') {
@@ -625,6 +645,9 @@ export class AuditReportService {
       })
     }
 
+    if(checks[6].status!=='ERROR') checks[6].status=violations.length>before[6]?'FAIL':'PASS'
+
+    before[7]=violations.length
     // 8. HARD_INV_8_DUITKU_RETIRED_FROM_ACTIVE_SYSTEM
     try {
       const activeDuitku = await query<any>(
@@ -639,13 +662,16 @@ export class AuditReportService {
           details: activeDuitku,
         })
       }
-    } catch {}
+    } catch { checks[7].status='ERROR'; checks[7].error='Database invariant check failed' }
+
+    if(checks[7].status!=='ERROR') checks[7].status=violations.length>before[7]?'FAIL':'PASS'
 
     return {
-      isConsistent: violations.length === 0,
+      isConsistent: checks.every(check=>check.status==='PASS'),
       violations,
       timestamp: new Date().toISOString(),
-      checkedInvariants,
+      checkedInvariants:checks.filter(check=>check.status==='PASS'||check.status==='FAIL').map(check=>check.id),
+      checks,
     }
   }
 }

@@ -1,3 +1,4 @@
+import { rupiah } from './money'
 // lib/finance/wallet.ts
 // Modul Buku Besar & Saldo Uang Jajan Santri (Fase 5: PRD #15, #16 & Implementation Plan #2, #18, #19)
 // Menjamin mutasi buku besar sebagai SUMBER KEBENARAN MUTLAK (Authoritative Source of Truth),
@@ -131,7 +132,7 @@ export async function recalculateStudentWallet(santriId: string): Promise<number
 export async function recordWalletMutation(
   input: RecordWalletMutationInput
 ): Promise<FinanceWalletLedgerEntry> {
-  const amount = Math.floor(input.amount)
+  const amount = rupiah(input.amount)
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new Error('Nominal mutasi uang jajan harus bernilai positif lebih dari 0.')
   }
@@ -291,15 +292,15 @@ export async function getGlobalDailyLimit(): Promise<number> {
     `SELECT value FROM app_settings WHERE key = 'uang_jajan_global_daily_limit'`
   )
   if (!row?.value) return DEFAULT_GLOBAL_DAILY_LIMIT
-  const parsed = parseInt(row.value, 10)
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_GLOBAL_DAILY_LIMIT
+  if(!/^\d+$/.test(row.value))throw new Error('Konfigurasi limit tidak valid.')
+  return rupiah(Number(row.value),'Limit global',true)
 }
 
 /**
  * Mengatur Limit Global Pesantren di app_settings.
  */
 export async function setGlobalDailyLimit(limit: number): Promise<void> {
-  const valid = Math.floor(limit)
+  const valid = rupiah(limit,'Limit',true)
   if (valid < 0 || !Number.isFinite(valid)) {
     throw new Error('Limit global tidak boleh bernilai negatif.')
   }
@@ -336,9 +337,9 @@ export async function setParentWalletLimits(
   },
   updatedBy?: string | null
 ): Promise<void> {
-  const daily = limits.daily !== undefined && limits.daily !== null ? Math.floor(limits.daily) : null
-  const weekly = limits.weekly !== undefined && limits.weekly !== null ? Math.floor(limits.weekly) : null
-  const monthly = limits.monthly !== undefined && limits.monthly !== null ? Math.floor(limits.monthly) : null
+  const daily = limits.daily !== undefined && limits.daily !== null ? rupiah(limits.daily,'Limit harian',true) : null
+  const weekly = limits.weekly !== undefined && limits.weekly !== null ? rupiah(limits.weekly,'Limit mingguan',true) : null
+  const monthly = limits.monthly !== undefined && limits.monthly !== null ? rupiah(limits.monthly,'Limit bulanan',true) : null
 
   if (daily !== null && daily < 0) throw new Error('Limit harian orang tua tidak boleh bernilai negatif.')
   if (weekly !== null && weekly < 0) throw new Error('Limit mingguan orang tua tidak boleh bernilai negatif.')
@@ -387,7 +388,7 @@ export async function evaluateWalletLimit(
      WHERE santri_id = ?
        AND direction = 'OUT'
        AND movement_type = 'WITHDRAWAL_LOKET'
-       AND date(created_at, 'localtime') = date('now', 'localtime')`,
+       AND date(created_at, '+7 hours') = date('now', '+7 hours')`,
     [santriId]
   )
 
