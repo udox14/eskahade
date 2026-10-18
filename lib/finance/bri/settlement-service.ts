@@ -79,16 +79,12 @@ export async function executeSettlementTransition(
   }
 
   // Collection Account Binding Guard
-  let config: ReturnType<typeof loadBriConfig> | null = null
-  try {
-    config = loadBriConfig()
-  } catch {
-    // Config may fail in test harness if credentials not mocked; allow if not production
-  }
-  if (config?.collectionAccountNo && statementTx.account_no.trim() !== config.collectionAccountNo.trim()) {
-    throw new Error(
-      `Statement transaction account ${statementTx.account_no} does not match configured collection account (${config.collectionAccountNo}).`
-    )
+  const collectionAccount=process.env.BRI_COLLECTION_ACCOUNT_NO?.trim()
+  if(!collectionAccount || statementTx.account_no.trim()!==collectionAccount)throw new Error('STATEMENT_COLLECTION_ACCOUNT_MISMATCH')
+  if(matchStrength==='MANUAL_RESOLVED') {
+    const operator=await queryOne<{role:string}>('SELECT role FROM users WHERE id=?',[verifiedBy||''])
+    const review=await queryOne<{external_reference:string|null}>('SELECT external_reference FROM finance_reconciliation_items WHERE id=?',[input.reconciliationItemId])
+    if(!operator || !['admin','bendahara'].includes(operator.role) || !input.resolutionNotes?.trim() || review?.external_reference!==statementTx.id)throw new Error('MANUAL_RESOLUTION_EVIDENCE_REQUIRED')
   }
 
   // 2. Fetch target payment

@@ -1,3 +1,4 @@
+import { walletMutationStatements } from '../wallet-statements'
 // lib/finance/bri/recovery-service.ts
 // Recovery Service: Transaction Status Inquiry Seam & Missed-Webhook Recovery Engine
 
@@ -17,6 +18,7 @@ export interface RecoverMissedWebhookInput {
   orderId: string
   recoveredBy?: string
   recoveryNotes?: string
+  reconciliationItemId?:string
 }
 
 export interface RecoverMissedWebhookResult {
@@ -76,6 +78,10 @@ export async function recoverMissedPaymentFromStatement(
   const { statementTransactionId, orderId, recoveredBy, recoveryNotes } = input
   const timestamp = now()
 
+  const operator=await queryOne<{role:string}>('SELECT role FROM users WHERE id=?',[recoveredBy||''])
+  if(!operator || !['admin','bendahara'].includes(operator.role) || !recoveryNotes?.trim() || !input.reconciliationItemId)throw new Error('MANUAL_RESOLUTION_REQUIRED: Recovery membutuhkan operator, catatan dan kasus rekonsiliasi resmi.')
+  const collectionAccount=process.env.BRI_COLLECTION_ACCOUNT_NO?.trim()
+  if(!collectionAccount)throw new Error('COLLECTION_ACCOUNT_REQUIRED')
   // 1. Fetch statement transaction
   const statementTx = await queryOne<FinanceBriStatementTransaction>(
     `SELECT * FROM finance_bri_statement_transactions WHERE id = ? LIMIT 1`,
@@ -90,6 +96,9 @@ export async function recoverMissedPaymentFromStatement(
     throw new Error(`Cannot recover payment from a non-CREDIT statement transaction (${statementTransactionId}, type: ${statementTx.type_normalized}).`)
   }
 
+  if(statementTx.account_no!==collectionAccount || statementTx.currency!=='IDR')throw new Error('STATEMENT_ACCOUNT_CURRENCY_MISMATCH')
+  const review=await queryOne<{external_reference:string|null}>('SELECT external_reference FROM finance_reconciliation_items WHERE id=?',[input.reconciliationItemId])
+  if(!review || review.external_reference!==statementTx.id)throw new Error('RECONCILIATION_EVIDENCE_MISMATCH')
   // 2. Fetch target order
   const order = await queryOne<{
     id: string
@@ -100,8 +109,9 @@ export async function recoverMissedPaymentFromStatement(
     cooperative_admin_fee: number
     total_charged: number
     payment_method: string
+    expires_at:string
   }>(
-    `SELECT id, order_number, santri_id, status, gross_amount, cooperative_admin_fee, total_charged, payment_method
+    `SELECT id, order_number, santri_id, status, gross_amount, cooperative_admin_fee, total_charged, payment_method, expires_at
      FROM finance_payment_orders
      WHERE id = ?
      LIMIT 1`,
@@ -124,7 +134,7 @@ export async function recoverMissedPaymentFromStatement(
       })
       return {
         paymentId: existingPayment.id,
-        settlementId: 'EXISTING',
+        settlementId: (await queryOne<{settlement_id:string}>('SELECT settlement_id FROM finance_bri_settlement_items WHERE payment_id=? AND statement_transaction_id=?',[existingPayment.id,statementTx.id]))?.settlement_id || (()=>{throw new Error('RECOVERY_SETTLEMENT_IDENTITY_MISMATCH')})(),
         orderId: order.id,
         status: 'RECOVERED_AND_SETTLED',
         alreadyRecovered: true,
@@ -178,6 +188,9 @@ export async function recoverMissedPaymentFromStatement(
     )
   }
 
+  if(!statementTx.transaction_date_utc || Date.parse(statementTx.transaction_date_utc)>Date.parse(order.expires_at))throw new Error('RECOVERY_EXPIRED_ORDER_REQUIRES_UNALLOCATED_REVIEW')
+  const studentVa=await queryOne<{va_number:string;customer_no:string}>('SELECT va_number,customer_no FROM finance_student_va WHERE santri_id=?',[order.santri_id])
+  if(!studentVa || statementTx.va_number!==studentVa.va_number || !process.env.BRI_PARTNER_SERVICE_ID?.trim())throw new Error('RECOVERY_VA_IDENTITY_REQUIRED')
   // 3. Load order items
   const orderItems = await query<{
     id: string
@@ -207,7 +220,7 @@ export async function recoverMissedPaymentFromStatement(
   const dateStr = timestamp.slice(0, 10).replace(/-/g, '')
   const randPayment = crypto.randomBytes(3).toString('hex').toUpperCase()
   const paymentNumber = `PAY-BRI-${dateStr}-${randPayment}`
-  const briTrxId = statementTx.bri_trx_id || statementTx.transaction_id || `STMT-${statementTx.id}`
+  const briTrxId = null // Issuer statement ID is not a BRIVA trxId
   const briPaymentRequestId = `REC-${statementTx.id}`
   const recMetaId = generateId()
   const eventId = generateId()
@@ -267,7 +280,7 @@ export async function recoverMissedPaymentFromStatement(
       order.gross_amount,
       order.cooperative_admin_fee,
       order.gross_amount,
-      timestamp,
+      statementTx.transaction_date_utc,
       briPaymentRequestId,
       briTrxId,
       statementTx.transaction_id || statementTx.id,
@@ -289,9 +302,9 @@ export async function recoverMissedPaymentFromStatement(
       recMetaId,
       paymentId,
       order.id,
-      statementTx.va_number || 'UNKNOWN_VA',
-      '001901',
-      order.santri_id,
+      studentVa.va_number,
+      process.env.BRI_PARTNER_SERVICE_ID!.trim().padStart(8,' '),
+      studentVa.customer_no,
       statementTx.amount,
       statementTx.transaction_date_raw,
       briPaymentRequestId,
@@ -354,18 +367,8 @@ export async function recoverMissedPaymentFromStatement(
     }
 
     if (item.item_type === 'UANG_JAJAN') {
-      const ledgerId = generateId()
-      const newBal = currentWalletBalance + item.amount
-      statements.push({
-        sql: `
-          INSERT INTO finance_wallet_ledger (
-            id, santri_id, direction, amount, balance_before,
-            balance_after, source, channel, payment_id, notes, created_at
-          ) VALUES (?, ?, 'IN', ?, ?, ?, 'TOPUP_BRIVA', 'BRI', ?, 'Top-up saldo Uang Jajan (Recovered dari Rekening Koran)', ?)
-        `,
-        params: [ledgerId, order.santri_id, item.amount, currentWalletBalance, newBal, paymentId, timestamp],
-      })
-      currentWalletBalance = newBal
+      statements.push(...walletMutationStatements({santriId:order.santri_id,direction:'IN',movementType:'TOPUP_ONLINE',amount:item.amount,referenceId:paymentId,notes:'Top-up hasil rekonsiliasi bank'}).statements)
+
     }
   }
 
@@ -434,7 +437,7 @@ export async function recoverMissedPaymentFromStatement(
         match_strength, match_method, reconciliation_item_id, currency,
         resolved_by, resolution_notes, resolved_at,
         settled_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'AUTHORITATIVE_EXACT', 'RECOVERY_BANK_STATEMENT_MATCH', NULL, 'IDR', ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'MANUAL_RESOLVED', 'RECOVERY_OPERATOR_REVIEW', ?, 'IDR', ?, ?, ?, ?, ?)
     `,
     params: [
       settlementItemId,
@@ -444,6 +447,7 @@ export async function recoverMissedPaymentFromStatement(
       order.gross_amount,
       order.cooperative_admin_fee,
       order.gross_amount,
+      input.reconciliationItemId,
       recoveredBy || null,
       recoveryNotes || 'Recovered from authoritative Bank Statement match',
       timestamp,

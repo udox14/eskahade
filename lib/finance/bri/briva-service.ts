@@ -1,3 +1,5 @@
+import { walletMutationStatements } from '../wallet-statements'
+import { isValidIsoDateTimeWithOffset } from './statement-service'
 // lib/finance/bri/briva-service.ts
 // Core business service for SNAP BI Virtual Account (BRIVA Online) Inbound Inquiry & Payment Notification
 // Hardened with strict headers, exact money parsing, canonical path, DB compare-and-set guards, and correlation.
@@ -8,7 +10,7 @@ import { loadBriConfig } from './config'
 import { verifyBriInboundNotificationSignature, hashBodySha256 } from './crypto'
 import { briLog, sanitizePayload } from './logging'
 import { parseBrivaMoney } from './money'
-import { isAsramaBebasTagihan } from '@/lib/finance/non-billable-santri'
+import { isAsramaBebasTagihan, isSantriBebasItem } from '@/lib/finance/non-billable-santri'
 import {
   BRI_VA_INQUIRY_CODES,
   BRI_VA_PAYMENT_CODES,
@@ -384,14 +386,13 @@ export function verifyInboundAuth(params: {
     }
   }
 
-  const expectedChannelId = config.channelId || '00009'
-  if (headers.channelId !== expectedChannelId) {
-    return {
-      valid: false,
-      errorStatus: 400,
-      errorCode: errBadReq,
-      errorMessage: `Invalid CHANNEL-ID "${headers.channelId}". Expected "${expectedChannelId}".`,
-    }
+  // CHANNEL-ID denotes the originating bank channel, not a fixed application channel.
+  const allowedChannels=process.env.BRI_INBOUND_ALLOWED_CHANNELS?.split(',').map(v=>v.trim())
+  if(!/^0000[1-9]$/.test(headers.channelId) || (allowedChannels && !allowedChannels.includes(headers.channelId))) {
+    return {valid:false,errorStatus:400,errorCode:errFormat,errorMessage:'Invalid Field Format CHANNEL-ID'}
+  }
+  if(!/^\d{1,36}$/.test(headers.externalId) || !isValidIsoDateTimeWithOffset(headers.timestamp)) {
+    return {valid:false,errorStatus:400,errorCode:errFormat,errorMessage:'Invalid Field Format headers'}
   }
 
   // 5. Partner ID Match Validation (Mismatch with server config is Unauthorized request)
@@ -506,9 +507,9 @@ export function validateVaIdentityTrio(params: {
 }): { valid: boolean; error?: string } {
   const { reqPartnerServiceId, reqCustomerNo, reqVaNo, studentVa, configPartnerId } = params
 
-  const expectedPartnerServiceId = process.env.BRI_PARTNER_SERVICE_ID || configPartnerId
+  const expectedPartnerServiceId = process.env.BRI_PARTNER_SERVICE_ID?.trim() || ''
 
-  if (reqPartnerServiceId !== expectedPartnerServiceId) {
+  if (!expectedPartnerServiceId || reqPartnerServiceId !== expectedPartnerServiceId.padStart(8,' ')) {
     return {
       valid: false,
       error: `partnerServiceId mismatch. Expected "${expectedPartnerServiceId}", received "${reqPartnerServiceId}".`,
@@ -522,7 +523,7 @@ export function validateVaIdentityTrio(params: {
     }
   }
 
-  if (reqVaNo !== studentVa.va_number) {
+  if (reqVaNo.trimStart() !== studentVa.va_number) {
     return {
       valid: false,
       error: `virtualAccountNo mismatch. Expected "${studentVa.va_number}", received "${reqVaNo}".`,
@@ -530,7 +531,7 @@ export function validateVaIdentityTrio(params: {
   }
 
   const canonicalConcat = reqPartnerServiceId.trim() + reqCustomerNo
-  if (reqVaNo !== canonicalConcat) {
+  if (reqVaNo.trimStart() !== canonicalConcat) {
     return {
       valid: false,
       error: `virtualAccountNo "${reqVaNo}" does not match concatenation "${canonicalConcat}".`,
@@ -603,6 +604,7 @@ export async function handleBrivaInquiry(params: {
   let req: BriVaInquiryRequest
   try {
     req = JSON.parse(params.rawBody) as BriVaInquiryRequest
+    if(!req || typeof req!=='object' || Array.isArray(req))throw new Error('Invalid object')
   } catch {
     return {
       status: 400,
@@ -614,10 +616,11 @@ export async function handleBrivaInquiry(params: {
   }
 
   // 3. Validate Mandatory Inquiry Fields (Do NOT trim away leading spaces/zeros prematurely)
-  const vaNo = req.virtualAccountNo || ''
-  const custNo = req.customerNo || ''
-  const partnerServiceId = req.partnerServiceId || ''
-  const inquiryRequestId = (req.inquiryRequestId || '').trim()
+  const wireVaNo = typeof req.virtualAccountNo==='string' ? req.virtualAccountNo : ''
+  const vaNo = wireVaNo.trimStart()
+  const custNo = typeof req.customerNo==='string' ? req.customerNo : ''
+  const partnerServiceId = typeof req.partnerServiceId==='string' ? req.partnerServiceId : ''
+  const inquiryRequestId = typeof req.inquiryRequestId==='string' ? req.inquiryRequestId.trim() : ''
 
   if (!vaNo || !partnerServiceId || !custNo || !inquiryRequestId) {
     return {
@@ -629,6 +632,7 @@ export async function handleBrivaInquiry(params: {
     }
   }
 
+  if(!/^ *\d+$/.test(partnerServiceId) || partnerServiceId.length!==8 || !/^\d{1,20}$/.test(custNo) || wireVaNo!==partnerServiceId+custNo || inquiryRequestId.length>36)return {status:400,body:{responseCode:BRI_VA_INQUIRY_CODES.INVALID_FIELD_FORMAT,responseMessage:'Invalid Field Format identity'}}
   // 4. Resolve Fixed BRIVA from database
   const studentVa = await queryOne<{
     santri_id: string
@@ -657,7 +661,7 @@ export async function handleBrivaInquiry(params: {
   const trioCheck = validateVaIdentityTrio({
     reqPartnerServiceId: partnerServiceId,
     reqCustomerNo: custNo,
-    reqVaNo: vaNo,
+    reqVaNo: wireVaNo,
     studentVa,
     configPartnerId: config.partnerId,
   })
@@ -770,35 +774,19 @@ export async function handleBrivaInquiry(params: {
     }
   }
 
-  // 8. Persist Durable Inquiry Evidence for Payment Correlation
-  const inquiryRecordId = generateId()
-  try {
-    await query(
-      `INSERT INTO finance_briva_inquiries (
-         id, inquiry_request_id, partner_service_id, customer_no,
-         virtual_account_no, santri_id, order_id, total_amount, expires_at, created_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(inquiry_request_id) DO UPDATE SET
-         order_id = excluded.order_id,
-         total_amount = excluded.total_amount,
-         expires_at = excluded.expires_at`,
-      [
-        inquiryRecordId,
-        inquiryRequestId,
-        partnerServiceId,
-        custNo,
-        vaNo,
-        student.id,
-        activeOrder.id,
-        activeOrder.total_charged,
-        activeOrder.expires_at,
-        currentTime,
-      ]
-    )
-  } catch (inqErr) {
-    briLog('warn', 'BRIVA_INQUIRY_LOG_ERROR', {
-      details: { error: inqErr instanceof Error ? inqErr.message : String(inqErr) },
-    })
+  const inquiryItems=await query<{item_type:string}>('SELECT item_type FROM finance_order_items WHERE order_id=?',[activeOrder.id])
+  if(!inquiryItems.length || inquiryItems.some(item=>isSantriBebasItem({asrama:student.asrama,kategoriSantri:student.kategori_santri},item.item_type)))return {status:404,body:{responseCode:BRI_VA_INQUIRY_CODES.BILL_NOT_FOUND,responseMessage:'Invalid Bill'}}
+  // Inquiry identifiers and their financial snapshot are append-only.
+  const previous=await queryOne<{order_id:string;virtual_account_no:string;total_amount:number;customer_no:string;partner_service_id:string}>(
+    'SELECT order_id,virtual_account_no,total_amount,customer_no,partner_service_id FROM finance_briva_inquiries WHERE inquiry_request_id=?',[inquiryRequestId])
+  const same=(row:typeof previous)=>row && row.order_id===activeOrder.id && row.virtual_account_no===vaNo && row.total_amount===activeOrder.total_charged && row.customer_no===custNo && row.partner_service_id===partnerServiceId
+  if(previous && !same(previous))return {status:409,body:{responseCode:'4092400',responseMessage:'Conflict'}}
+  if(!previous)try {
+    await query('INSERT INTO finance_briva_inquiries(id,inquiry_request_id,partner_service_id,customer_no,virtual_account_no,santri_id,order_id,total_amount,expires_at,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
+      [generateId(),inquiryRequestId,partnerServiceId,custNo,vaNo,student.id,activeOrder.id,activeOrder.total_charged,activeOrder.expires_at,currentTime])
+  } catch {
+    const persisted=await queryOne<NonNullable<typeof previous>>('SELECT order_id,virtual_account_no,total_amount,customer_no,partner_service_id FROM finance_briva_inquiries WHERE inquiry_request_id=?',[inquiryRequestId])
+    if(!same(persisted))return {status:500,body:{responseCode:BRI_VA_INQUIRY_CODES.GENERAL_ERROR,responseMessage:'General Error'}}
   }
 
   // 9. Format Authoritative Response from Order Snapshot (Strict .00 format)
@@ -823,7 +811,7 @@ export async function handleBrivaInquiry(params: {
       virtualAccountData: {
         partnerServiceId,
         customerNo: custNo,
-        virtualAccountNo: vaNo,
+        virtualAccountNo: wireVaNo,
         virtualAccountName: student.nama_lengkap,
         totalAmount: {
           value: totalAmountDecimal,
@@ -906,6 +894,7 @@ export async function handleBrivaPayment(params: {
   let req: BriVaPaymentRequest
   try {
     req = JSON.parse(params.rawBody) as BriVaPaymentRequest
+    if(!req || typeof req!=='object' || Array.isArray(req))throw new Error('Invalid object')
   } catch {
     return {
       status: 400,
@@ -917,12 +906,13 @@ export async function handleBrivaPayment(params: {
   }
 
   // 3. Validate Mandatory Payment Fields
-  const vaNo = req.virtualAccountNo || ''
-  const custNo = req.customerNo || ''
-  const partnerServiceId = req.partnerServiceId || ''
-  const paymentRequestId = (req.paymentRequestId || '').trim()
+  const wireVaNo = typeof req.virtualAccountNo==='string' ? req.virtualAccountNo : ''
+  const vaNo = wireVaNo.trimStart()
+  const custNo = typeof req.customerNo==='string' ? req.customerNo : ''
+  const partnerServiceId = typeof req.partnerServiceId==='string' ? req.partnerServiceId : ''
+  const paymentRequestId = typeof req.paymentRequestId==='string' ? req.paymentRequestId.trim() : ''
 
-  if (!vaNo || !partnerServiceId || !custNo || !paymentRequestId || !req.paidAmount) {
+  if (!vaNo || !partnerServiceId || !custNo || !paymentRequestId || !req.paidAmount || typeof req.virtualAccountName!=='string' || !req.virtualAccountName.trim()) {
     return {
       status: 400,
       body: {
@@ -932,6 +922,7 @@ export async function handleBrivaPayment(params: {
     }
   }
 
+  if(!/^ *\d+$/.test(partnerServiceId) || partnerServiceId.length!==8 || !/^\d{1,20}$/.test(custNo) || wireVaNo!==partnerServiceId+custNo || paymentRequestId.length>36 || req.virtualAccountName.length>255)return {status:400,body:{responseCode:BRI_VA_PAYMENT_CODES.INVALID_FIELD_FORMAT,responseMessage:'Invalid Field Format identity'}}
   // 4. Strict Decimal Money Parsing (NO FLOATING POINT)
   const moneyParse = parseBrivaMoney(req.paidAmount)
   if (!moneyParse.valid) {
@@ -949,7 +940,11 @@ export async function handleBrivaPayment(params: {
   const parsedPaidRupiah = moneyParse.rupiah
 
   // 5. Resolve Identifiers & Compute Canonical Payment Fingerprint
-  const rawTrxId = (req.additionalInfo?.trxId || req.referenceNo || paymentRequestId).toString().trim()
+  if((req.trxId!==undefined && (typeof req.trxId!=='string' || !/^\d{1,64}$/.test(req.trxId))) ||
+     (req.trxDateTime!==undefined && (!isValidIsoDateTimeWithOffset(req.trxDateTime) || !Number.isFinite(Date.parse(req.trxDateTime)) || Date.parse(req.trxDateTime)>Date.now()+300000))) {
+    return {status:400,body:{responseCode:BRI_VA_PAYMENT_CODES.INVALID_FIELD_FORMAT,responseMessage:'Invalid Field Format trxId/trxDateTime'}}
+  }
+  const rawTrxId = req.trxId || ''
   const eventKey = `briva_pay_${paymentRequestId}_${rawTrxId}`
   const paymentFingerprint = computePaymentFingerprint({
     partnerServiceId,
@@ -1087,7 +1082,7 @@ export async function handleBrivaPayment(params: {
   const trioCheck = validateVaIdentityTrio({
     reqPartnerServiceId: partnerServiceId,
     reqCustomerNo: custNo,
-    reqVaNo: vaNo,
+    reqVaNo: wireVaNo,
     studentVa,
     configPartnerId: config.partnerId,
   })
@@ -1129,6 +1124,14 @@ export async function handleBrivaPayment(params: {
     }
   }
 
+  const recordReview=async(reason:string,orderId?:string)=>{
+    const reviewId=crypto.createHash('sha256').update(eventKey).digest('hex')
+    await batch([
+      {sql:`INSERT OR IGNORE INTO finance_gateway_events(id,gateway_name,event_key,event_type,signature_valid,payload_json,response_code,is_processed,processing_status,created_at) VALUES(?,'BRI',?,'PAYMENT_NOTIFICATION',1,?,'4042512',0,'ERROR',?)`,params:[reviewId,eventKey,JSON.stringify(sanitizePayload(req as unknown as Record<string,unknown>)),now()]},
+      {sql:`INSERT OR IGNORE INTO finance_bri_recovery_queue(id,order_id,santri_id,virtual_account_no,payment_request_id,bri_trx_id,expected_amount,recovery_status,reason,created_at) VALUES(?,?,?,?,?,?,?,'DISCREPANCY',?,?)`,params:[reviewId,orderId||null,student.id,vaNo,paymentRequestId,rawTrxId||null,parsedPaidRupiah,reason,now()]}
+    ])
+  }
+
   // 10. Correlate Relevant Payment Order
   const activeOrder = await queryOne<{
     id: string
@@ -1149,6 +1152,7 @@ export async function handleBrivaPayment(params: {
   )
 
   if (!activeOrder) {
+    await recordReview('NO_PAYABLE_ORDER_BANK_OUTCOME_REQUIRES_REVIEW')
     const latestOrder = await queryOne<{ status: string }>(
       `SELECT status
        FROM finance_payment_orders
@@ -1176,6 +1180,12 @@ export async function handleBrivaPayment(params: {
         responseMessage: 'Bill not found',
       },
     }
+  }
+
+  const confirmedAt=req.trxDateTime ? new Date(req.trxDateTime).toISOString() : now()
+  if(Date.parse(activeOrder.expires_at)<Date.parse(confirmedAt)) {
+    await recordReview('LATE_PAYMENT_REQUIRES_BANK_EVIDENCE',activeOrder.id)
+    return {status:404,body:{responseCode:BRI_VA_PAYMENT_CODES.BILL_NOT_FOUND,responseMessage:'Invalid Bill'}}
   }
 
   // 11. Inquiry ↔ Payment Correlation Check
@@ -1210,6 +1220,7 @@ export async function handleBrivaPayment(params: {
       (!req.inquiryRequestId || req.inquiryRequestId === req.paymentRequestId)
 
     if (!isCorrelated) {
+      await recordReview('INQUIRY_CORRELATION_MISMATCH',activeOrder.id)
       briLog('warn', 'BRIVA_INQUIRY_CORRELATION_MISMATCH', {
         details: {
           inquiryId: priorInquiry.inquiry_request_id,
@@ -1228,6 +1239,7 @@ export async function handleBrivaPayment(params: {
   } else {
     // Inquiry snapshot not found locally
     if (requirePriorInquiry || req.inquiryRequestId) {
+      await recordReview('PRIOR_INQUIRY_MISSING',activeOrder.id)
       briLog('warn', 'BRIVA_PRIOR_INQUIRY_REQUIRED_REJECTED', {
         details: { paymentRequestId, targetInquiryId, requirePriorInquiry },
       })
@@ -1244,6 +1256,7 @@ export async function handleBrivaPayment(params: {
 
   // 12. Exact Amount Validation
   if (parsedPaidRupiah !== activeOrder.total_charged) {
+    await recordReview('PAYMENT_AMOUNT_MISMATCH',activeOrder.id)
     briLog('warn', 'BRIVA_PAYMENT_AMOUNT_MISMATCH', {
       details: {
         expected: activeOrder.total_charged,
@@ -1274,6 +1287,7 @@ export async function handleBrivaPayment(params: {
   )
 
   // 14. Calculate Current Wallet Balance if UANG_JAJAN is present
+  if(!orderItems.length || orderItems.some(item=>isSantriBebasItem({asrama:student.asrama,kategoriSantri:student.kategori_santri},item.item_type)))return {status:404,body:{responseCode:BRI_VA_PAYMENT_CODES.BILL_NOT_FOUND,responseMessage:'Invalid Bill'}}
   const hasUangJajan = orderItems.some((item) => item.item_type === 'UANG_JAJAN')
   let currentWalletBalance = 0
   if (hasUangJajan) {
@@ -1344,9 +1358,9 @@ export async function handleBrivaPayment(params: {
       activeOrder.gross_amount,
       activeOrder.cooperative_admin_fee,
       activeOrder.gross_amount,
-      timestamp,
+      confirmedAt,
       paymentRequestId,
-      rawTrxId,
+      rawTrxId || null,
       params.headers.externalId,
       timestamp,
     ],
@@ -1372,10 +1386,10 @@ export async function handleBrivaPayment(params: {
       parsedPaidRupiah,
       req.trxDateTime || null,
       paymentRequestId,
-      rawTrxId,
+      rawTrxId || null,
       req.referenceNo || null,
-      (req.additionalInfo?.sourceBankCode as string) || null,
-      req.channelId || params.headers.channelId || null,
+      req.sourceBankCode || null,
+      req.channelCode!==undefined ? String(req.channelCode) : params.headers.channelId || null,
       bodyHash,
       timestamp,
     ],
@@ -1480,29 +1494,8 @@ export async function handleBrivaPayment(params: {
         ],
       })
 
-      const walletLedgerId = generateId()
-      const newWalletBalance = runningWalletBalance + item.amount
+      statements.push(...walletMutationStatements({santriId:studentVa.santri_id,direction:'IN',movementType:'TOPUP_ONLINE',amount:item.amount,referenceId:paymentId,notes:'Top-up Uang Jajan via BRIVA '+paymentNumber}).statements)
 
-      statements.push({
-        sql: `
-          INSERT INTO finance_wallet_ledger (
-            id, santri_id, direction, amount, balance_before, balance_after,
-            source, channel, payment_id, notes, created_at
-          ) VALUES (?, ?, 'IN', ?, ?, ?, 'TOPUP', 'BRI', ?, ?, ?)
-        `,
-        params: [
-          walletLedgerId,
-          studentVa.santri_id,
-          item.amount,
-          runningWalletBalance,
-          newWalletBalance,
-          paymentId,
-          `Top-up Uang Jajan via BRIVA ${paymentNumber}`,
-          timestamp,
-        ],
-      })
-
-      runningWalletBalance = newWalletBalance
     }
   }
 
@@ -1621,7 +1614,7 @@ export async function handleBrivaPayment(params: {
             virtualAccountData: {
               partnerServiceId,
               customerNo: custNo,
-              virtualAccountNo: vaNo,
+              virtualAccountNo: wireVaNo,
               virtualAccountName: req.virtualAccountName || student.nama_lengkap,
               paymentRequestId,
               paidAmount: req.paidAmount,
@@ -1676,7 +1669,7 @@ export async function handleBrivaPayment(params: {
       virtualAccountData: {
         partnerServiceId,
         customerNo: custNo,
-        virtualAccountNo: vaNo,
+        virtualAccountNo: wireVaNo,
         virtualAccountName: req.virtualAccountName || student.nama_lengkap,
         paymentRequestId,
         paidAmount: req.paidAmount,

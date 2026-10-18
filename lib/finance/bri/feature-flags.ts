@@ -63,7 +63,7 @@ export function getBriFeatureFlags(customEnv?: Record<string, string | undefined
 
   // Gate 3: BRIVA Inbound Callback
   const brivaInboundRaw = getEnvValue('BRI_BRIVA_INBOUND_ENABLED', customEnv)
-  const brivaInboundCallbackEnabled = parseBooleanFlag(brivaInboundRaw, true)
+  const brivaInboundCallbackEnabled = parseBooleanFlag(brivaInboundRaw, false)
 
   // Gate 4: Bank Statement Sync
   const stmtSyncRaw = getEnvValue('BRI_STATEMENT_SYNC_ENABLED', customEnv)

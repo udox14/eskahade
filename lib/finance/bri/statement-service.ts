@@ -1,3 +1,5 @@
+import { assertBankStatementSyncEnabled } from './feature-flags'
+import { sumRupiah } from '../money'
 // lib/finance/bri/statement-service.ts
 // SNAP BI v2.1 Bank Statement Ingestion, Persistence & Deduplication Service
 
@@ -57,7 +59,7 @@ export interface StatementIngestSummary {
 export function isValidIsoDateTimeWithOffset(dtStr: string): boolean {
   if (typeof dtStr !== 'string') return false
   const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/
-  return isoRegex.test(dtStr.trim())
+  return isoRegex.test(dtStr.trim()) && Number.isFinite(Date.parse(dtStr))
 }
 
 /**
@@ -170,6 +172,7 @@ export function extractVaAndReferenceFromRemark(remark?: string | null): {
 export async function fetchBankStatement(
   options: FetchBankStatementOptions
 ): Promise<BriClientResult<BriBankStatementResponse>> {
+  assertBankStatementSyncEnabled()
   const startTime = Date.now()
   const config = options.configOverride || loadBriConfig()
 
@@ -290,7 +293,25 @@ export async function persistBankStatementTransactions(params: {
     ? `${response.referenceNo || response.partnerReferenceNo}-${randHex}`
     : `BS-${dateStr}-${randHex}`
 
-  const items = response.detailData || []
+  let validationError=false
+  const items = Array.isArray(response.detailData) ? response.detailData : []
+  if(response.detailData!==undefined && !Array.isArray(response.detailData))validationError=true
+  if(response.accountNo && response.accountNo!==accountNo)validationError=true
+  if(!isValidIsoDateTimeWithOffset(fromDateTime) || !isValidIsoDateTimeWithOffset(toDateTime) || Date.parse(fromDateTime)>Date.parse(toDateTime))throw new Error('Invalid statement window')
+  const seenIds=new Set<string>()
+  for(const item of items) {
+    if(!item || typeof item!=='object' || !isValidIsoDateTimeWithOffset(item.transactionDate) || typeof item.remark!=='string' ||
+       Date.parse(item.transactionDate)<Date.parse(fromDateTime) || Date.parse(item.transactionDate)>Date.parse(toDateTime) ||
+       !parseBrivaMoney(item.amount).valid || (item.detailInfo!==undefined && typeof item.detailInfo?.remarkCustom!=='string'))validationError=true
+    try { normalizeStatementType(item?.type) } catch {validationError=true}
+    if(item?.transactionId) {
+      if(typeof item.transactionId!=='string' || seenIds.has(item.transactionId))validationError=true
+      seenIds.add(item.transactionId)
+      const old=await queryOne<{amount:number;currency:string;transaction_date_raw:string;type_normalized:string}>(`SELECT amount,currency,transaction_date_raw,type_normalized FROM finance_bri_statement_transactions WHERE account_no=? AND transaction_id=? AND identity_strength='STRONG'`,[accountNo,item.transactionId])
+      if(old && (old.amount!==parseBrivaMoney(item.amount).rupiah || old.currency!==item.amount.currency || Date.parse(old.transaction_date_raw)!==Date.parse(item.transactionDate) || old.type_normalized!==normalizeStatementType(item.type)))validationError=true
+    }
+    for(const balance of [item?.detailBalance?.startAmount,item?.detailBalance?.endAmount])if(balance!==undefined && (!Array.isArray(balance) || balance.some(v=>!parseBrivaMoney(v?.amount).valid)))validationError=true
+  }
   let creditsCount = 0
   let creditsTotalAmount = 0
   let debitsCount = 0
@@ -320,7 +341,7 @@ export async function persistBankStatementTransactions(params: {
     matchStatus: string
   }> = []
 
-  for (const item of items) {
+  for (const item of validationError ? [] : items) {
     const typeNormalized = normalizeStatementType(item.type)
     const moneyParsed = parseBrivaMoney(item.amount)
 
@@ -332,26 +353,26 @@ export async function persistBankStatementTransactions(params: {
           currency: item.amount?.currency,
         },
       })
-      continue
+      throw new Error('Malformed statement amount')
     }
 
     const amountRupiah = moneyParsed.rupiah
     if (typeNormalized === 'CREDIT') {
       creditsCount++
-      creditsTotalAmount += amountRupiah
+      creditsTotalAmount = sumRupiah([creditsTotalAmount,amountRupiah])
     } else {
       debitsCount++
-      debitsTotalAmount += amountRupiah
+      debitsTotalAmount = sumRupiah([debitsTotalAmount,amountRupiah])
     }
 
-    const startBalRaw = item.detailBalance?.startAmount?.value || null
-    const endBalRaw = item.detailBalance?.endAmount?.value || null
-    const remarkCustom = typeof item.additionalInfo?.remarkCustom === 'string' ? item.additionalInfo.remarkCustom : null
+    const startBalRaw = item.detailBalance?.startAmount?.[0]?.amount.value || null
+    const endBalRaw = item.detailBalance?.endAmount?.[0]?.amount.value || null
+    const remarkCustom = typeof item.detailInfo?.remarkCustom === 'string' ? item.detailInfo.remarkCustom : null
 
     const { dedupKey, identityStrength, weakFingerprint } = generateStatementTransactionDedupKey({
       accountNo,
       transactionId: item.transactionId,
-      trxDateTimeRaw: item.dateTime,
+      trxDateTimeRaw: item.transactionDate,
       amountRaw: item.amount.value,
       typeNormalized,
       currency: item.amount.currency,
@@ -362,7 +383,7 @@ export async function persistBankStatementTransactions(params: {
     })
 
     const extracted = extractVaAndReferenceFromRemark(item.remark)
-    const briTrxId = typeof item.additionalInfo?.trxId === 'string' ? item.additionalInfo.trxId : (extracted.briTrxId || null)
+    const briTrxId = null // Statement transactionId/remark reference is NOT the BRIVA trxId
     const vaNumber = extracted.vaNumber || null
 
     const rawJson = JSON.stringify(item)
@@ -374,8 +395,8 @@ export async function persistBankStatementTransactions(params: {
       identityStrength,
       dedupKey,
       weakFingerprint,
-      trxDateTimeRaw: item.dateTime,
-      trxDateTimeUtc: normalizeToUtc(item.dateTime),
+      trxDateTimeRaw: item.transactionDate,
+      trxDateTimeUtc: normalizeToUtc(item.transactionDate),
       typeRaw: item.type,
       typeNormalized,
       amount: amountRupiah,
@@ -394,36 +415,12 @@ export async function persistBankStatementTransactions(params: {
   }
 
   // 1. Cross-check Statement Totals Consistency (Finding #14)
-  let hasDiscrepancy = false
-  if (response.totalCreditEntries !== undefined) {
-    const expectedCr = Number(response.totalCreditEntries)
-    if (!isNaN(expectedCr) && expectedCr !== creditsCount) {
-      hasDiscrepancy = true
-      briLog('warn', 'BRI_STATEMENT_TOTALS_MISMATCH', {
-        details: { type: 'credit_entries', expected: expectedCr, actual: creditsCount },
-      })
-    }
-  }
-
-  if (response.totalDebitEntries !== undefined) {
-    const expectedDb = Number(response.totalDebitEntries)
-    if (!isNaN(expectedDb) && expectedDb !== debitsCount) {
-      hasDiscrepancy = true
-      briLog('warn', 'BRI_STATEMENT_TOTALS_MISMATCH', {
-        details: { type: 'debit_entries', expected: expectedDb, actual: debitsCount },
-      })
-    }
-  }
-
-  if (response.totalCreditAmount !== undefined) {
-    const crAmtParsed = typeof response.totalCreditAmount === 'object'
-      ? parseBrivaMoney(response.totalCreditAmount as { value: string; currency: string })
-      : { valid: true, rupiah: parseInt(String(response.totalCreditAmount), 10) }
-    if (crAmtParsed.valid && crAmtParsed.rupiah !== creditsTotalAmount) {
-      hasDiscrepancy = true
-      briLog('warn', 'BRI_STATEMENT_TOTALS_MISMATCH', {
-        details: { type: 'credit_amount', expected: crAmtParsed.rupiah, actual: creditsTotalAmount },
-      })
+  let hasDiscrepancy=validationError
+  for(const [totals,count,amount] of [[response.totalCreditEntries,creditsCount,creditsTotalAmount],[response.totalDebitEntries,debitsCount,debitsTotalAmount]] as const) {
+    if(totals!==undefined) {
+      const parsed=parseBrivaMoney(totals?.amount)
+      if(!totals || typeof totals!=='object' || !parsed.valid || parsed.rupiah!==amount)hasDiscrepancy=true
+      if(totals?.numberOfEntries!==undefined && (!/^\d+$/.test(String(totals.numberOfEntries)) || !Number.isSafeInteger(Number(totals.numberOfEntries)) || Number(totals.numberOfEntries)!==count))hasDiscrepancy=true
     }
   }
 
@@ -466,7 +463,7 @@ export async function persistBankStatementTransactions(params: {
   ]
 
   // If fetch failed (e.g. 4041401 Transaction Not Found), abort processing lines: zero transactions, zero settlement
-  if (!isSuccess200) {
+  if (!isSuccess200 || hasDiscrepancy) {
     await batch(statements)
     return {
       fetchId,
@@ -481,7 +478,7 @@ export async function persistBankStatementTransactions(params: {
       debitsTotalAmount: 0,
       rawResponseHash,
       cursorAdvanced: false,
-      hasDiscrepancy: false,
+      hasDiscrepancy,
     }
   }
 

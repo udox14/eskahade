@@ -68,7 +68,10 @@ export interface BriVaPaymentRequest {
   partnerServiceId: string
   customerNo: string
   virtualAccountNo: string
-  virtualAccountName?: string
+  virtualAccountName: string
+  trxId?: string
+  channelCode?: number
+  sourceBankCode?: string
   paymentRequestId: string
   inquiryRequestId?: string
   channelId?: string
@@ -111,9 +114,9 @@ export interface BriVaPaymentResponse {
  */
 export const BRI_VA_INQUIRY_CODES = {
   SUCCESS: '2002400',
-  BAD_REQUEST: '4002400',
-  INVALID_MANDATORY_FIELD: '4002401',
-  INVALID_FIELD_FORMAT: '4002402',
+  BAD_REQUEST: '4002401',
+  INVALID_MANDATORY_FIELD: '4002402',
+  INVALID_FIELD_FORMAT: '4002401',
   UNAUTHORIZED: '4012400',
   INVALID_VIRTUAL_ACCOUNT: '4042411',
   BILL_NOT_FOUND: '4042412',
@@ -130,9 +133,9 @@ export const BRI_VA_INQUIRY_CODES = {
  */
 export const BRI_VA_PAYMENT_CODES = {
   SUCCESS: '2002500',
-  BAD_REQUEST: '4002500',
-  INVALID_MANDATORY_FIELD: '4002501',
-  INVALID_FIELD_FORMAT: '4002502',
+  BAD_REQUEST: '4002501',
+  INVALID_MANDATORY_FIELD: '4002502',
+  INVALID_FIELD_FORMAT: '4002501',
   UNAUTHORIZED: '4012500',
   INVALID_VIRTUAL_ACCOUNT: '4042511',
   BILL_NOT_FOUND: '4042512',

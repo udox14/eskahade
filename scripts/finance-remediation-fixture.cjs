@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),Module=require('node:module'),crypto=require('node:crypto');
 const {DatabaseSync}=require('node:sqlite'); const ts=require('typescript');
 const root=path.resolve(__dirname,'..');
-function createDatabase(through=187){
+function createDatabase(through=188){
  const db=new DatabaseSync(':memory:');
  db.exec(`PRAGMA foreign_keys=ON;
  CREATE TABLE users(id TEXT PRIMARY KEY,full_name TEXT,username TEXT,role TEXT,roles TEXT,email TEXT,password_hash TEXT);
@@ -17,7 +17,7 @@ function createDatabase(through=187){
  INSERT INTO users(id,full_name,role,roles) VALUES('admin','Admin','admin','["admin"]'),('cashier','Kasir','petugas_koperasi','["petugas_koperasi"]'),('viewer','Pimpinan','pimpinan','["pimpinan"]');
  INSERT INTO master_jasa VALUES('provider-meal','Katering','Makan'),('provider-wash','Laundry','Cuci');
  INSERT INTO santri(id,nis,nama_lengkap,asrama,kategori_santri,tempat_makan_id,tempat_mencuci_id) VALUES('student','1001','Santri','ASRAMA A','REGULER','provider-meal','provider-wash'),('other','1002','Lain','ASRAMA B','REGULER',NULL,NULL);`);
- const numbers=[152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,171,172,173,182,183,184,185,186,187];
+ const numbers=[152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,171,172,173,182,183,184,185,186,187,188];
  for(const n of numbers.filter(n=>n<=through)) {
   const name=fs.readdirSync(path.join(root,'migrations')).find(f=>f.startsWith(String(n).padStart(4,'0')+'_'));
   try{db.exec(fs.readFileSync(path.join(root,'migrations',name),'utf8'))}catch(e){throw new Error(`Migration ${name}: ${e.message}`,{cause:e})}
@@ -31,7 +31,7 @@ function harness(){
  query:async(sql,p=[])=>{if(failQuery)throw new Error('INJECTED_QUERY_FAILURE');return db.prepare(sql).all(...p)},
  queryOne:async(sql,p=[])=>{if(failQuery)throw new Error('INJECTED_QUERY_FAILURE');return db.prepare(sql).get(...p)||null},
  execute:async(sql,p=[])=>{db.prepare(sql).run(...p);return{success:true}},
- batch:async ss=>{db.exec('BEGIN');try{for(let i=0;i<ss.length;i++){if(i===failAt)throw new Error('INJECTED_BATCH_FAILURE');db.prepare(ss[i].sql).run(...(ss[i].params||[]))}db.exec('COMMIT')}catch(e){db.exec('ROLLBACK');throw e}},
+ batch:async ss=>{state.lastBatchLength=ss.length;db.exec('BEGIN');try{for(let i=0;i<ss.length;i++){if(i===failAt)throw new Error('INJECTED_BATCH_FAILURE');db.prepare(ss[i].sql).run(...(ss[i].params||[]))}db.exec('COMMIT')}catch(e){db.exec('ROLLBACK');throw e}},
  generateId:()=>crypto.randomUUID(),now:()=>new Date().toISOString(),today:()=>new Date().toISOString().slice(0,10)};
  const original=Module._load;
  Module._load=function(request,parent,main){

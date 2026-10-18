@@ -12,14 +12,14 @@ export type BriIdentityStrength = 'STRONG' | 'WEAK'
 export interface BriBankStatementDetailData {
   transactionId?: string // Optional transaction-level identifier
   detailBalance?: {
-    startAmount?: BriAmount
-    endAmount?: BriAmount
+    startAmount?: Array<{amount:BriAmount}>
+    endAmount?: Array<{amount:BriAmount}>
   }
   amount: BriAmount
   type: string // "CR" | "DB" | "Credit" | "Debit" | "CREDIT" | "DEBIT"
-  dateTime: string // ISO-8601 with offset, e.g. "2026-10-08T10:15:30+07:00"
+  transactionDate: string // ISO-8601 with offset, e.g. "2026-10-08T10:15:30+07:00"
   remark?: string
-  additionalInfo?: {
+  detailInfo?: {
     remarkCustom?: string
     bankCardToken?: string
     trxId?: string
@@ -50,10 +50,8 @@ export interface BriBankStatementResponse {
   partnerReferenceNo?: string
   accountNo?: string
   name?: string
-  totalCreditEntries?: number | string
-  totalDebitEntries?: number | string
-  totalCreditAmount?: BriAmount | string
-  totalDebitAmount?: BriAmount | string
+  totalCreditEntries?: {numberOfEntries?:number|string;amount:BriAmount}
+  totalDebitEntries?: {numberOfEntries?:number|string;amount:BriAmount}
   detailData?: BriBankStatementDetailData[]
   additionalInfo?: Record<string, unknown>
 }
