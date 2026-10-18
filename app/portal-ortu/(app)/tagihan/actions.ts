@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { execute, generateId, queryOne } from '@/lib/db'
 import { logActivity } from '@/lib/activity-log'
-import { uploadToR2 } from '@/lib/r2/upload'
+import { uploadPrivateImage } from '@/lib/r2/private-proofs'
 import { requirePortalSessionAction } from '@/lib/portal/session'
 import { getTunggakanSppSantri } from '@/lib/spp/tunggakan'
 import { getNonSppOutstandingSantri, NON_SPP_JENIS_ALL, type NonSppJenis } from '@/lib/keuangan/non-spp-outstanding'
@@ -160,6 +160,7 @@ export async function uploadBukti(formData: FormData): Promise<{ success: true }
   try {
     const session = await requirePortalSessionAction()
 
+    if (session.must_change_password) return { error: 'Ganti password sebelum mengunggah bukti.' }
     const submissionId = String(formData.get('submissionId') || '')
     const file = formData.get('bukti')
     if (!submissionId) return { error: 'Pengajuan tidak valid.' }
@@ -176,10 +177,7 @@ export async function uploadBukti(formData: FormData): Promise<{ success: true }
       return { error: 'Pengajuan ini sudah diproses dan tidak bisa diubah lagi.' }
     }
 
-    // Key: bukti-portal/<submissionId>_<timestamp>.<ext> — tidak bisa ditebak.
-    // /api/file/[...key] memang publik; risiko diterima (lihat rencana portal ortu).
-    const uploaded = await uploadToR2(file, submissionId, 'bukti-portal')
-    if ('error' in uploaded) return { error: uploaded.error }
+    const objectKey = await uploadPrivateImage(file, 'bukti-portal', {ownerId:session.santri_id, submissionId})
 
     // Upload ulang setelah ditolak memakai row yang sama: reset ke menunggu
     await execute(`
@@ -188,7 +186,7 @@ export async function uploadBukti(formData: FormData): Promise<{ success: true }
           rejected_by = NULL, rejected_at = NULL, reject_reason = NULL,
           updated_at = datetime('now')
       WHERE id = ?
-    `, [uploaded.url, submissionId])
+    `, [objectKey, submissionId])
 
     await logActivity({
       actor: { name: `Ortu ${session.nama}` },

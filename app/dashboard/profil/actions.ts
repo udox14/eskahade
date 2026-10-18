@@ -1,5 +1,7 @@
 'use server'
 
+import { publicMediaUrl } from '@/lib/r2/references'
+
 import { query, execute } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
 import { hashPassword, verifyPassword } from '@/lib/auth/password'
@@ -26,7 +28,7 @@ export async function getProfilData() {
     'SELECT id, email, full_name, role, asrama_binaan, avatar_url, phone, show_bottomnav FROM users WHERE id = ?',
     [session.id]
   )
-  return user[0] || null
+  return user[0] ? {...user[0], avatar_url:publicMediaUrl(user[0].avatar_url) || null} : null
 }
 
 export async function updateProfil(data: { full_name: string; phone: string }) {

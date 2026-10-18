@@ -1,5 +1,7 @@
 'use server'
 
+import { portalProofUrl } from '@/lib/r2/references'
+
 import { revalidatePath } from 'next/cache'
 import { batch, execute, generateId, now, query, queryOne } from '@/lib/db'
 import { getSession, hasAnyRole, type SessionUser } from '@/lib/auth/session'
@@ -50,7 +52,7 @@ export async function getSubmissionsNonSpp(statusFilter: string) {
       LIMIT 200
     `, params)
 
-    return { rows: rows as any[] }
+    return { rows: (rows as {id:string;bukti_url:string|null}[]).map(row => ({...row, bukti_url:row.bukti_url ? portalProofUrl(row.id) : null})) as any[] }
   } catch (error: any) {
     return { error: error?.message || 'Gagal memuat pengajuan.' }
   }

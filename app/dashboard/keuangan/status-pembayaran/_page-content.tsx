@@ -1,5 +1,7 @@
 'use client'
 
+import { publicMediaUrl } from '@/lib/r2/references'
+
 import React, { useState, useTransition, useId } from 'react'
 import {
   Search,
@@ -1219,7 +1221,7 @@ export default function StatusPembayaranContent({
                       <td className="py-3.5 pl-5 pr-3">
                         <div className="flex items-center gap-3">
                           <SantriPhotoAvatar
-                            src={item.fotoUrl}
+                            src={publicMediaUrl(item.fotoUrl)}
                             alt={item.namaLengkap}
                             name={item.namaLengkap}
                             size="sm"
@@ -1292,7 +1294,7 @@ export default function StatusPembayaranContent({
                       <td className="py-3.5 pl-5 pr-3">
                         <div className="flex items-center gap-3">
                           <SantriPhotoAvatar
-                            src={item.fotoUrl}
+                            src={publicMediaUrl(item.fotoUrl)}
                             alt={item.namaLengkap}
                             name={item.namaLengkap}
                             size="sm"
@@ -1373,7 +1375,7 @@ export default function StatusPembayaranContent({
                       <td className="py-3.5 pl-5 pr-3">
                         <div className="flex items-center gap-3">
                           <SantriPhotoAvatar
-                            src={item.fotoUrl}
+                            src={publicMediaUrl(item.fotoUrl)}
                             alt={item.namaLengkap}
                             name={item.namaLengkap}
                             size="sm"
@@ -1449,7 +1451,7 @@ export default function StatusPembayaranContent({
                       <td className="py-3.5 pl-5 pr-3">
                         <div className="flex items-center gap-3">
                           <SantriPhotoAvatar
-                            src={item.fotoUrl}
+                            src={publicMediaUrl(item.fotoUrl)}
                             alt={item.namaLengkap}
                             name={item.namaLengkap}
                             size="sm"
@@ -1530,7 +1532,7 @@ export default function StatusPembayaranContent({
                       <td className="py-3.5 pl-5 pr-3">
                         <div className="flex items-center gap-3">
                           <SantriPhotoAvatar
-                            src={item.fotoUrl}
+                            src={publicMediaUrl(item.fotoUrl)}
                             alt={item.namaLengkap}
                             name={item.namaLengkap}
                             size="sm"

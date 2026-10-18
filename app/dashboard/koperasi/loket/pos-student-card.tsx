@@ -1,5 +1,7 @@
 'use client'
 
+import { publicMediaUrl } from '@/lib/r2/references'
+
 import {
   User,
   Home,
@@ -66,7 +68,7 @@ export default function PosStudentCard({
             {student.fotoUrl ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img
-                src={student.fotoUrl}
+                src={publicMediaUrl(student.fotoUrl)}
                 alt={student.namaLengkap}
                 className="w-full h-full object-cover"
                 loading="eager"

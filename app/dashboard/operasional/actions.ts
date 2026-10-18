@@ -1,5 +1,8 @@
 'use server'
 
+import { transactionReceiptUrl } from '@/lib/r2/references'
+import { receiptReferenceForSave } from '@/lib/r2/private-proofs'
+
 import { revalidatePath } from 'next/cache'
 import { assertFeature } from '@/lib/auth/feature'
 import {
@@ -52,7 +55,7 @@ export async function getRecipientPageData(tahun: number, bulan: number, unitId?
     scope,
     activeUnitId,
     dashboard,
-    ledger,
+    ledger: {...ledger, transactions:ledger.transactions.map(row=>({...row, receipt_url:row.receipt_url ? transactionReceiptUrl(row.id) : null}))},
     printPreferences,
   }
 }
@@ -70,7 +73,8 @@ export async function getRecipientPrintData(tahun: number, bulan: number, unitId
 
 export async function saveRecipientTransaksi(payload: SaveOperasionalTransaksiPayload) {
   await assertRecipientWrite()
-  const result = await saveOperasionalTransaksi(payload)
+  const receiptUrl = await receiptReferenceForSave(payload.receiptUrl, payload.unitId, payload.id)
+  const result = await saveOperasionalTransaksi({...payload, receiptUrl})
   if ('success' in result) {
     revalidatePath(RECIPIENT_PATH)
     revalidatePath(PRINT_PATH)

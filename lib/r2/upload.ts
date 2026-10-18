@@ -1,6 +1,7 @@
 /// <reference types="node" />
 // lib/r2/upload.ts
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { canonicalObjectKey, isPrivateObjectKey } from './references'
 
 async function getR2() {
   const { env } = await getCloudflareContext({ async: true })
@@ -29,6 +30,7 @@ export async function uploadBufferToR2(params: {
   contentType: string
 }): Promise<{ url: string } | { error: string }> {
   try {
+    if (isPrivateObjectKey(canonicalObjectKey(params.folder || 'uploads'))) throw new Error('Gunakan unggahan bukti privat.')
     const r2 = await getR2()
     const ext = extensionFromMime(params.contentType || 'image/jpeg')
     const folder = sanitizePathSegment(params.folder || 'uploads') || 'uploads'

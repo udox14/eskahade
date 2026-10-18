@@ -1,3 +1,4 @@
+import { portalProofUrl } from '@/lib/r2/references'
 import { requirePortalSessionStrict } from '@/lib/portal/session'
 import { getPortalFinancialHistory, getPortalStudentBilling } from '@/lib/portal/finance'
 import { getRiwayatSubmissions } from '@/lib/portal/data'
@@ -57,7 +58,7 @@ export default async function RiwayatPage() {
         return null
       }
     })(),
-    buktiUrl: row.bukti_url,
+    buktiUrl: row.bukti_url ? portalProofUrl(row.id) : null,
     status: row.status,
     rejectReason: row.reject_reason,
     createdAt: row.created_at,

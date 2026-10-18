@@ -1,5 +1,7 @@
 'use client'
 
+import { publicMediaUrl } from '@/lib/r2/references'
+
 import React from 'react'
 
 import { useState, useRef } from 'react'
@@ -215,7 +217,7 @@ export default function ManajemenFotoPage() {
                          <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 border-2 border-white shadow-sm bg-slate-100 relative">
                              {s.foto_url ? (
                                  <img 
-                                    src={s.foto_url} 
+                                    src={publicMediaUrl(s.foto_url)}
                                     alt="Foto" 
                                     className="w-full h-full object-cover"
                                  />

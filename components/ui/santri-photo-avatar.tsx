@@ -1,5 +1,7 @@
 'use client'
 
+import { publicMediaUrl } from '@/lib/r2/references'
+
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -88,7 +90,8 @@ export function SantriPhotoAvatar({
   className,
 }: SantriPhotoAvatarProps) {
   const [open, setOpen] = useState(false)
-  const hasPhoto = Boolean(src)
+  const photoSrc = publicMediaUrl(src)
+  const hasPhoto = Boolean(photoSrc)
   const canOpen = hasPhoto && clickable
 
   const frame = (
@@ -100,7 +103,7 @@ export function SantriPhotoAvatar({
       )}
     >
       {hasPhoto ? (
-        <img src={src!} alt={alt || name} className="h-full w-full object-cover" />
+        <img src={photoSrc!} alt={alt || name} className="h-full w-full object-cover" />
       ) : (
         <div
           className={cn(
@@ -129,7 +132,7 @@ export function SantriPhotoAvatar({
       >
         {frame}
       </button>
-      <SantriPhotoLightbox src={src!} alt={alt || name} open={open} onClose={() => setOpen(false)} />
+      <SantriPhotoLightbox src={photoSrc!} alt={alt || name} open={open} onClose={() => setOpen(false)} />
     </>
   )
 }

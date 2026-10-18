@@ -1,5 +1,7 @@
 'use server'
 
+import { portalProofUrl } from '@/lib/r2/references'
+
 import { revalidatePath } from 'next/cache'
 import { batch, execute, generateId, query, queryOne } from '@/lib/db'
 import { getSession, type SessionUser } from '@/lib/auth/session'
@@ -110,7 +112,7 @@ export async function getSubmissionsSpp(statusFilter: string) {
     LIMIT 200
   `, params)
 
-  return { rows }
+  return { rows: rows.map(row => ({...row, bukti_url: row.bukti_url ? portalProofUrl(row.id) : null})) }
 }
 
 function parseDetail(detailJson: string): SppDetailItem[] {

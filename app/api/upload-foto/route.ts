@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { uploadBase64ImageToR2 } from '@/lib/r2/upload'
-import { isFinancialProofKey } from '@/lib/finance/proofs'
+import { canonicalObjectKey, isPrivateObjectKey } from '@/lib/r2/references'
 
 export async function POST(request: Request) {
   const session = await getSession()
@@ -12,8 +12,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const base64 = String(body?.base64 || '')
-    const folder = String(body?.folder || 'uploads').trim()
-    if (isFinancialProofKey(folder)) return NextResponse.json({error:'Gunakan unggahan bukti finansial privat.'},{status:403})
+    const folder = canonicalObjectKey(String(body?.folder || 'uploads'))
+    if (isPrivateObjectKey(folder)) return NextResponse.json({error:'Gunakan unggahan bukti privat.'},{status:403})
     const filenamePrefix = String(body?.filenamePrefix || session.id || 'file').trim()
 
     if (!base64.startsWith('data:image/')) {

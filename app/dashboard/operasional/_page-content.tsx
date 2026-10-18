@@ -1,5 +1,7 @@
 'use client'
 
+import { draftReceiptUrl } from '@/lib/r2/references'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useReactToPrint } from '@/lib/pdf/client'
 import {
@@ -189,18 +191,17 @@ export default function PageContent({ initialTab = 'ledger' }: { initialTab?: 'l
     setUploadingReceipt(true)
     try {
       const base64 = await compressImageFile(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.74 })
-      const response = await fetch('/api/upload-foto', {
+      const response = await fetch('/api/operasional/receipts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           base64,
-          folder: 'operasional-receipts',
-          filenamePrefix: activeUnitId || 'receipt',
+          unitId: activeUnitId,
         }),
       })
       const result = await response.json()
       if (!response.ok || !result.url) throw new Error(result.error || 'Upload kuitansi gagal.')
-      setForm(prev => ({ ...prev, receiptUrl: result.url }))
+      setForm(prev => ({ ...prev, receiptUrl: result.reference }))
       toast.success('Kuitansi berhasil diupload.')
     } catch (error: any) {
       toast.error(error?.message || 'Gagal upload kuitansi.')
@@ -586,7 +587,7 @@ export default function PageContent({ initialTab = 'ledger' }: { initialTab?: 'l
               <input type="file" accept="image/*" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) void uploadReceipt(file) }} />
             </label>
             {form.receiptUrl ? (
-              <a href={form.receiptUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700">
+              <a href={form.receiptUrl.startsWith('operasional-receipts/') ? draftReceiptUrl(form.receiptUrl) : form.receiptUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700">
                 <ImageIcon className="h-3.5 w-3.5" />
                 Lihat kuitansi
               </a>

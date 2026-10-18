@@ -1,5 +1,7 @@
 'use client'
 
+import { publicMediaUrl } from '@/lib/r2/references'
+
 import { useState, useEffect, type FormEvent, type SetStateAction } from 'react'
 import {
   getStatsTabungan,
@@ -538,7 +540,7 @@ export default function UangJajanPage() {
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-3">
                       <SantriPhotoAvatar
-                        src={s.foto_url}
+                        src={publicMediaUrl(s.foto_url)}
                         name={s.nama_lengkap}
                         alt={`Foto ${s.nama_lengkap}`}
                         size="sm"
@@ -737,7 +739,7 @@ export default function UangJajanPage() {
             <div className="border-b bg-slate-50 p-5">
               <div className="flex items-start gap-3">
                 <SantriPhotoAvatar
-                  src={selectedSantri.foto_url}
+                  src={publicMediaUrl(selectedSantri.foto_url)}
                   name={selectedSantri.nama_lengkap}
                   alt={`Foto ${selectedSantri.nama_lengkap}`}
                   size="md"

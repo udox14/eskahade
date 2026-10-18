@@ -1,5 +1,7 @@
 'use client'
 
+import { publicMediaUrl } from '@/lib/r2/references'
+
 import { SantriPhotoAvatar } from '@/components/ui/santri-photo-avatar'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -655,7 +657,7 @@ export default function MonitoringUangJajanPage() {
                         <td className="px-4 py-3">
                           <div className="flex items-start gap-3">
                             <SantriPhotoAvatar
-                              src={r.foto_url}
+                              src={publicMediaUrl(r.foto_url)}
                               name={r.nama_lengkap}
                               alt={`Foto ${r.nama_lengkap}`}
                               size="sm"
@@ -726,7 +728,7 @@ export default function MonitoringUangJajanPage() {
                 <div key={r.id} className="rounded-2xl border border-slate-200 bg-white p-4 transition-all hover:shadow-sm">
                   <div className="mb-3 flex items-center gap-3">
                     <SantriPhotoAvatar
-                      src={r.foto_url}
+                      src={publicMediaUrl(r.foto_url)}
                       name={r.nama_lengkap}
                       alt={`Foto ${r.nama_lengkap}`}
                       size="sm"

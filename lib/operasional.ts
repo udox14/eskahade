@@ -1,5 +1,6 @@
 import { batch, execute, generateId, now, query, queryOne } from '@/lib/db'
 import { getSession, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
+import { operationalUnitIds, asramaUnitId } from '@/lib/operasional/scope'
 import { deleteFromR2 } from '@/lib/r2/upload'
 import { revalidateTag } from 'next/cache'
 
@@ -144,7 +145,7 @@ export type SaveOperasionalTransaksiPayload = {
 let operasionalSchemaReady: Promise<void> | null = null
 
 function sanitizeAsramaUnitId(asrama: string) {
-  return `ASRAMA:${asrama.trim().toUpperCase()}`
+  return asramaUnitId(asrama)
 }
 
 function parseNumber(value: unknown) {
@@ -349,22 +350,11 @@ export async function getOperasionalScope(sessionArg?: SessionUser | null): Prom
   if (!session) return null
 
   const units = await getOperasionalUnits()
-  const accessibleIds = new Set<string>()
-
-  if (isAdmin(session) || hasRole(session, 'bendahara') || hasRole(session, 'tester')) {
-    units.forEach(unit => accessibleIds.add(unit.id))
-  } else {
-    if (hasRole(session, 'sekpen')) accessibleIds.add('SEKPEN')
-    if (hasRole(session, 'keamanan')) accessibleIds.add('KEAMANAN')
-    if (hasRole(session, 'pengurus_asrama') && session.asrama_binaan) {
-      accessibleIds.add(sanitizeAsramaUnitId(session.asrama_binaan))
-    }
-  }
-
-  const unitOptions = units.filter(unit => accessibleIds.has(unit.id))
+  const allowedIds = operationalUnitIds(session)
+  const unitOptions = units.filter(unit => allowedIds === null || allowedIds.includes(unit.id))
   if (unitOptions.length === 0) return null
 
-  const canManageAll = isAdmin(session) || hasRole(session, 'bendahara') || hasRole(session, 'tester')
+  const canManageAll = allowedIds === null
   return {
     canManageAll,
     lockedUnitId: canManageAll || unitOptions.length !== 1 ? null : unitOptions[0].id,

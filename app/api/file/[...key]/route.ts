@@ -1,5 +1,5 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { isFinancialProofKey } from '@/lib/finance/proofs'
+import { canonicalObjectKey, isPrivateObjectKey } from '@/lib/r2/references'
 
 // Serve file R2 lewat worker (same-origin), lepas dari pub-*.r2.dev yang
 // rate-limited. Dipakai untuk foto santri, avatar, TTD rapor, bukti, dll.
@@ -8,11 +8,10 @@ export async function GET(
   { params }: { params: Promise<{ key: string[] }> }
 ) {
   const { key } = await params
-  const objectKey = (Array.isArray(key) ? key.join('/') : String(key || ''))
-  if (!objectKey) return new Response('Not found', { status: 404 })
-  if (isFinancialProofKey(objectKey)) return new Response('Not found', { status: 404, headers: { 'Cache-Control':'no-store' } })
-  // Evidence must pass feature/santri scope and expiry checks on its dedicated route.
-  if (objectKey === 'pengajian-evidence' || objectKey.startsWith('pengajian-evidence/')) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } })
+  let objectKey: string
+  try { objectKey = canonicalObjectKey(Array.isArray(key) ? key.join('/') : String(key || '')) }
+  catch { return new Response('Not found', { status:404, headers:{'Cache-Control':'no-store'} }) }
+  if (isPrivateObjectKey(objectKey)) return new Response('Not found', { status:404, headers:{'Cache-Control':'no-store'} })
 
   const { env } = await getCloudflareContext({ async: true })
   // R2Bucket di-typing manual (Promise<unknown>); cast ke bentuk R2ObjectBody.

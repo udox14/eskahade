@@ -1,5 +1,7 @@
 'use client'
 
+import { publicMediaUrl } from '@/lib/r2/references'
+
 import React, { useState, useEffect, useMemo } from 'react'
 import { getNominalSPP, getStatusSPP, bayarSPP, getDashboardSPPAll, getClientRestriction, batalkanPembayaranSPP, getSppBillingStart, getTunggakanHistorisSPP, simpanTunggakanHistorisSPP, bayarTunggakanHistorisSPP, getTagihanDitiadakanSPP, simpanTagihanDitiadakanSPP, simpanTagihanDitiadakanKelasSPP, cabutTagihanDitiadakanSPP, getRekapStatistikSPP, getStatusSetoranUnit, getFilterOptions, bayarSPPBulanBerjalan, bayarSemuaSantriAsrama, getSetoranInfoBulanIni, getSetoranSppJuliInfo, submitSetoranAsrama, submitSetoranSppJuliSantriBaru } from './actions'
 import { Search, CreditCard, CheckCircle, Loader2, ArrowLeft, Home, Lock, ChevronLeft, ChevronRight, Filter, Save, PlusCircle, RotateCcw, X, Wallet, Ban, CalendarX, BarChart, AlertCircle, Users, Send, Clock } from 'lucide-react'
@@ -951,7 +953,7 @@ export default function SPPPage() {
                   {/* Avatar & Name */}
                   <div className="w-full md:col-span-4 flex items-center gap-3">
                     {s.foto_url ? (
-                      <img src={s.foto_url} alt={s.nama_lengkap} className="w-10 h-10 rounded-full object-cover border border-slate-200 bg-slate-100 flex-shrink-0" />
+                      <img src={publicMediaUrl(s.foto_url)} alt={s.nama_lengkap} className="w-10 h-10 rounded-full object-cover border border-slate-200 bg-slate-100 flex-shrink-0" />
                     ) : (
                       <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-xs text-slate-500 border flex-shrink-0">
                         {String(s.nama_lengkap || '?').split(' ').slice(0, 2).map((p: string) => p[0]).join('')}

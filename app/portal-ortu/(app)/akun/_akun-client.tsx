@@ -1,5 +1,7 @@
 'use client'
 
+import { publicMediaUrl } from '@/lib/r2/references'
+
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -140,10 +142,10 @@ export function AkunClient({
           aria-label="Foto santri, klik untuk perbesar layar penuh"
           title="Klik foto untuk melihat ukuran penuh"
         >
-          {session?.foto_url ? (
+          {publicMediaUrl(session?.foto_url) ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={session.foto_url}
+              src={publicMediaUrl(session?.foto_url)}
               alt={namaSantri}
               className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
             />
@@ -414,10 +416,10 @@ export function AkunClient({
             onClick={e => e.stopPropagation()}
           >
             <div className="relative w-full aspect-3/4 max-h-[62vh] rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/20 bg-slate-900">
-              {session?.foto_url ? (
+              {publicMediaUrl(session?.foto_url) ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={session.foto_url}
+                  src={publicMediaUrl(session?.foto_url)}
                   alt={namaSantri}
                   className="w-full h-full object-cover"
                 />

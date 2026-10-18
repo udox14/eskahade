@@ -1,3 +1,4 @@
+import { publicMediaUrl } from '@/lib/r2/references'
 import React from 'react'
 import Link from 'next/link'
 import {
@@ -87,9 +88,9 @@ export default async function PortalBerandaPage() {
           </p>
         </div>
         <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 flex items-center justify-center shadow-xs">
-          {session.foto_url ? (
+          {publicMediaUrl(session.foto_url) ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={session.foto_url} alt={session.nama} className="w-full h-full object-cover" />
+            <img src={publicMediaUrl(session.foto_url)} alt={session.nama} className="w-full h-full object-cover" />
           ) : (
             <span className="font-bold text-sm">
               {session.nama.charAt(0)}

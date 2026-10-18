@@ -1,5 +1,7 @@
 'use client'
 
+import { publicMediaUrl } from '@/lib/r2/references'
+
 import React from 'react'
 import { Printer } from 'lucide-react'
 import type { CardPrintItem } from './actions'
@@ -151,7 +153,7 @@ export function CardPrintSheet({ cards, onClose }: CardPrintSheetProps) {
                         {card.fotoUrl ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img
-                            src={card.fotoUrl}
+                            src={publicMediaUrl(card.fotoUrl)}
                             alt={card.namaLengkap}
                             className="h-full w-full object-cover"
                           />

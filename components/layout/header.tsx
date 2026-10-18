@@ -1,5 +1,7 @@
 'use client'
 
+import { publicMediaUrl } from '@/lib/r2/references'
+
 import { useState, useRef, useEffect } from 'react'
 import { signOut } from './actions'
 import { SignOut as LogOut, Bell, List as Menu, Gear as Settings, CaretDown as ChevronDown } from '@phosphor-icons/react'
@@ -191,8 +193,8 @@ export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick, 
 
             {/* Avatar */}
             <div className="w-7 h-7 md:w-8 md:h-8 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-white shadow-sm">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={userName} className="w-full h-full object-cover" />
+              {publicMediaUrl(avatarUrl) ? (
+                <img src={publicMediaUrl(avatarUrl)} alt={userName} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center">
                   <span className="text-white font-bold text-[10px]">{initials}</span>
@@ -213,8 +215,8 @@ export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick, 
               <div className="px-4 py-3 border-b border-slate-100">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-slate-100">
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt={userName} className="w-full h-full object-cover" />
+                    {publicMediaUrl(avatarUrl) ? (
+                      <img src={publicMediaUrl(avatarUrl)} alt={userName} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center">
                         <span className="text-white font-bold text-[10px]">{initials}</span>
