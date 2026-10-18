@@ -2334,7 +2334,7 @@ export async function getSettlementsReport(
        COALESCE(SUM(fs.total_fee_amount), 0) AS total_fee,
        COALESCE(SUM(fs.total_net_amount), 0) AS total_net,
        COUNT(*) AS total_batches
-     FROM finance_settlements fs
+     FROM finance_settlement_report fs
      WHERE ${whereSql}`,
     params
   )
@@ -2368,7 +2368,7 @@ export async function getSettlementsReport(
        fs.notes,
        u.full_name AS verifier_name,
        fs.created_at
-     FROM finance_settlements fs
+     FROM finance_settlement_report fs
      LEFT JOIN users u ON u.id = fs.verified_by
      WHERE ${whereSql}
      ORDER BY fs.settlement_date DESC

@@ -1,3 +1,4 @@
+import { configuredBrivaPartnerServiceId } from './briva-config'
 import { walletMutationStatements } from '../wallet-statements'
 import { isValidIsoDateTimeWithOffset } from './statement-service'
 // lib/finance/bri/briva-service.ts
@@ -406,8 +407,9 @@ export function verifyInboundAuth(params: {
   }
 
   // 6. Canonical Path Enforcement in Production
-  const canonicalInquiryPath = process.env.BRI_CANONICAL_INQUIRY_PATH || '/snap/v1.0/transfer-va/inquiry'
-  const canonicalPaymentPath = process.env.BRI_CANONICAL_PAYMENT_PATH || '/snap/v1.0/transfer-va/payment'
+  if(config.env==='production' && (!process.env.BRI_CANONICAL_INQUIRY_PATH || !process.env.BRI_CANONICAL_PAYMENT_PATH))return {valid:false,errorStatus:500,errorCode:errGeneral,errorMessage:'General Error'}
+  const canonicalInquiryPath = process.env.BRI_CANONICAL_INQUIRY_PATH || '/snap/v2.0/transfer-va/inquiry'
+  const canonicalPaymentPath = process.env.BRI_CANONICAL_PAYMENT_PATH || '/snap/v2.0/transfer-va/payment'
   const expectedPath = isService24 ? canonicalInquiryPath : canonicalPaymentPath
 
   if (config.env === 'production' && endpointPath !== expectedPath) {
@@ -504,10 +506,11 @@ export function validateVaIdentityTrio(params: {
   reqVaNo: string
   studentVa: { va_number: string; customer_no: string }
   configPartnerId: string
+  configuredPartnerServiceId?:string
 }): { valid: boolean; error?: string } {
   const { reqPartnerServiceId, reqCustomerNo, reqVaNo, studentVa, configPartnerId } = params
 
-  const expectedPartnerServiceId = process.env.BRI_PARTNER_SERVICE_ID?.trim() || ''
+  const expectedPartnerServiceId = params.configuredPartnerServiceId || process.env.BRI_PARTNER_SERVICE_ID?.trim() || ''
 
   if (!expectedPartnerServiceId || reqPartnerServiceId !== expectedPartnerServiceId.padStart(8,' ')) {
     return {
@@ -664,6 +667,7 @@ export async function handleBrivaInquiry(params: {
     reqVaNo: wireVaNo,
     studentVa,
     configPartnerId: config.partnerId,
+    configuredPartnerServiceId:await configuredBrivaPartnerServiceId(),
   })
 
   if (!trioCheck.valid) {
@@ -720,11 +724,13 @@ export async function handleBrivaInquiry(params: {
     order_number: string
     gross_amount: number
     cooperative_admin_fee: number
+    cooperative_fee_rule_id:string|null
+    cooperative_fee_snapshot:string|null
     total_charged: number
     status: string
     expires_at: string
   }>(
-    `SELECT id, order_number, gross_amount, cooperative_admin_fee, total_charged, status, expires_at
+    `SELECT id, order_number, gross_amount, cooperative_admin_fee, cooperative_fee_rule_id, cooperative_fee_snapshot, total_charged, status, expires_at
      FROM finance_payment_orders
      WHERE santri_id = ?
        AND payment_method = 'BRI_VA'
@@ -791,7 +797,6 @@ export async function handleBrivaInquiry(params: {
 
   // 9. Format Authoritative Response from Order Snapshot (Strict .00 format)
   const totalAmountDecimal = `${activeOrder.total_charged}.00`
-  const feeAmountDecimal = '0.00'
 
   briLog('info', 'BRIVA_INQUIRY_RESOLVED', {
     durationMs: Date.now() - startTime,
@@ -815,11 +820,6 @@ export async function handleBrivaInquiry(params: {
         virtualAccountName: student.nama_lengkap,
         totalAmount: {
           value: totalAmountDecimal,
-          currency: 'IDR',
-        },
-        virtualAccountTrxType: '1', // Closed / Fixed Amount bill
-        feeAmount: {
-          value: feeAmountDecimal,
           currency: 'IDR',
         },
         inquiryRequestId,
@@ -1047,10 +1047,9 @@ export async function handleBrivaPayment(params: {
           virtualAccountName: studentName,
           paymentRequestId,
           paidAmount: req.paidAmount,
-          ...(buildPaymentResponseAdditionalInfo(req.additionalInfo)
-            ? { additionalInfo: buildPaymentResponseAdditionalInfo(req.additionalInfo) }
-            : {}),
         },
+
+        ...(buildPaymentResponseAdditionalInfo(req.additionalInfo) ? {additionalInfo:buildPaymentResponseAdditionalInfo(req.additionalInfo)} : {}),
       },
     }
   }
@@ -1085,6 +1084,7 @@ export async function handleBrivaPayment(params: {
     reqVaNo: wireVaNo,
     studentVa,
     configPartnerId: config.partnerId,
+    configuredPartnerServiceId:await configuredBrivaPartnerServiceId(),
   })
 
   if (!trioCheck.valid) {
@@ -1127,7 +1127,7 @@ export async function handleBrivaPayment(params: {
   const recordReview=async(reason:string,orderId?:string)=>{
     const reviewId=crypto.createHash('sha256').update(eventKey).digest('hex')
     await batch([
-      {sql:`INSERT OR IGNORE INTO finance_gateway_events(id,gateway_name,event_key,event_type,signature_valid,payload_json,response_code,is_processed,processing_status,created_at) VALUES(?,'BRI',?,'PAYMENT_NOTIFICATION',1,?,'4042512',0,'ERROR',?)`,params:[reviewId,eventKey,JSON.stringify(sanitizePayload(req as unknown as Record<string,unknown>)),now()]},
+      {sql:`INSERT OR IGNORE INTO finance_gateway_events(id,gateway_name,event_key,event_type,signature_valid,payload_json,response_code,is_processed,processing_status,created_at) VALUES(?,'BRI',?,'PAYMENT_NOTIFICATION',1,?,'4042512',0,'ERROR',?)`,params:[reviewId,eventKey+':REVIEW',JSON.stringify(sanitizePayload(req as unknown as Record<string,unknown>)),now()]},
       {sql:`INSERT OR IGNORE INTO finance_bri_recovery_queue(id,order_id,santri_id,virtual_account_no,payment_request_id,bri_trx_id,expected_amount,recovery_status,reason,created_at) VALUES(?,?,?,?,?,?,?,'DISCREPANCY',?,?)`,params:[reviewId,orderId||null,student.id,vaNo,paymentRequestId,rawTrxId||null,parsedPaidRupiah,reason,now()]}
     ])
   }
@@ -1138,11 +1138,13 @@ export async function handleBrivaPayment(params: {
     order_number: string
     gross_amount: number
     cooperative_admin_fee: number
+    cooperative_fee_rule_id:string|null
+    cooperative_fee_snapshot:string|null
     total_charged: number
     status: string
     expires_at: string
   }>(
-    `SELECT id, order_number, gross_amount, cooperative_admin_fee, total_charged, status, expires_at
+    `SELECT id, order_number, gross_amount, cooperative_admin_fee, cooperative_fee_rule_id, cooperative_fee_snapshot, total_charged, status, expires_at
      FROM finance_payment_orders
      WHERE santri_id = ?
        AND payment_method = 'BRI_VA'
@@ -1288,6 +1290,7 @@ export async function handleBrivaPayment(params: {
 
   // 14. Calculate Current Wallet Balance if UANG_JAJAN is present
   if(!orderItems.length || orderItems.some(item=>isSantriBebasItem({asrama:student.asrama,kategoriSantri:student.kategori_santri},item.item_type)))return {status:404,body:{responseCode:BRI_VA_PAYMENT_CODES.BILL_NOT_FOUND,responseMessage:'Invalid Bill'}}
+  if(orderItems.some(item=>!Number.isSafeInteger(item.amount)||item.amount<=0||(!item.obligation_id && item.item_type!=='UANG_JAJAN')) || orderItems.reduce((sum,item)=>sum+item.amount,0)!==activeOrder.gross_amount)return {status:500,body:{responseCode:BRI_VA_PAYMENT_CODES.GENERAL_ERROR,responseMessage:'General Error'}}
   const hasUangJajan = orderItems.some((item) => item.item_type === 'UANG_JAJAN')
   let currentWalletBalance = 0
   if (hasUangJajan) {
@@ -1395,6 +1398,7 @@ export async function handleBrivaPayment(params: {
     ],
   })
 
+  statements.push({sql:`UPDATE finance_bri_recovery_queue SET recovery_status='RESOLVED',recovered_payment_id=?,resolved_at=? WHERE payment_request_id=? AND santri_id=? AND virtual_account_no=?`,params:[paymentId,timestamp,paymentRequestId,studentVa.santri_id,vaNo]})
   // Step D: Mark Payment Order as PAID
   statements.push({
     sql: `
@@ -1415,7 +1419,7 @@ export async function handleBrivaPayment(params: {
           id, income_number, entry_type, reference_income_id, correction_id,
           payment_id, order_id, amount, rule_id, rule_snapshot,
           reference_note, created_by, created_at
-        ) VALUES (?, ?, 'INCOME', NULL, NULL, ?, ?, ?, NULL, NULL, ?, NULL, ?)
+        ) VALUES (?, ?, 'INCOME', NULL, NULL, ?, ?, ?, ?, ?, ?, NULL, ?)
       `,
       params: [
         incomeId,
@@ -1423,6 +1427,8 @@ export async function handleBrivaPayment(params: {
         paymentId,
         activeOrder.id,
         activeOrder.cooperative_admin_fee,
+        activeOrder.cooperative_fee_rule_id||null,
+        activeOrder.cooperative_fee_snapshot||null,
         `Pendapatan Biaya Operasional Koperasi atas pembayaran BRIVA ${paymentNumber}`,
         timestamp,
       ],
@@ -1618,11 +1624,10 @@ export async function handleBrivaPayment(params: {
               virtualAccountName: req.virtualAccountName || student.nama_lengkap,
               paymentRequestId,
               paidAmount: req.paidAmount,
-              ...(buildPaymentResponseAdditionalInfo(req.additionalInfo)
-                ? { additionalInfo: buildPaymentResponseAdditionalInfo(req.additionalInfo) }
-                : {}),
             },
-          },
+
+        ...(buildPaymentResponseAdditionalInfo(req.additionalInfo) ? {additionalInfo:buildPaymentResponseAdditionalInfo(req.additionalInfo)} : {}),
+      },
         }
       }
     }
@@ -1673,10 +1678,9 @@ export async function handleBrivaPayment(params: {
         virtualAccountName: req.virtualAccountName || student.nama_lengkap,
         paymentRequestId,
         paidAmount: req.paidAmount,
-        ...(buildPaymentResponseAdditionalInfo(req.additionalInfo)
-          ? { additionalInfo: buildPaymentResponseAdditionalInfo(req.additionalInfo) }
-          : {}),
       },
-    },
+
+        ...(buildPaymentResponseAdditionalInfo(req.additionalInfo) ? {additionalInfo:buildPaymentResponseAdditionalInfo(req.additionalInfo)} : {}),
+      },
   }
 }

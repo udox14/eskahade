@@ -57,6 +57,8 @@ export interface FinanceStudentVa {
 }
 
 export interface FinancePaymentOrder {
+  cooperative_fee_rule_id?:string|null
+  cooperative_fee_snapshot?:string|null
   id: string
   order_number: string
   santri_id: string

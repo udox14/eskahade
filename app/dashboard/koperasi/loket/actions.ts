@@ -425,7 +425,7 @@ export async function changeStudentPinAtLoketAction(
   newPin: string,
   confirmPin: string
 ): Promise<{ success: boolean; message: string }> {
-  const { userId } = await authorizeLoketOperator(false)
+  const { userId } = await authorizeLoketOperator(true)
 
   const cleanOld = String(oldPin ?? '').trim()
   const cleanNew = String(newPin ?? '').trim()
@@ -908,7 +908,9 @@ export async function executeLoketDepositOrPayment(
 export async function getLoketCurrentSessionTransactions(
   sessionId: string
 ): Promise<LoketSessionTransactionItem[]> {
-  await authorizeLoketOperator()
+  const {userId,roles}=await authorizeLoketOperator()
+  const owner=await queryOne<{operator_id:string}>('SELECT operator_id FROM finance_cash_sessions WHERE id=?',[sessionId])
+  if(!owner || (owner.operator_id!==userId && !roles.some(r=>['admin','bendahara','pimpinan'].includes(r))))throw new Error('FORBIDDEN')
 
   // 1. Ambil penarikan dari finance_wallet_ledger
   const withdrawals = await query<{
@@ -995,6 +997,6 @@ export async function getPastCashSessions(options?: {
   page?: number
   pageSize?: number
 }): Promise<{ items: FinanceCashSession[]; total: number }> {
-  await authorizeLoketOperator()
-  return getCashSessionHistory(options)
+  const {userId,roles}=await authorizeLoketOperator()
+  return getCashSessionHistory({...options,operatorId:roles.some(r=>['admin','bendahara','pimpinan'].includes(r))?undefined:userId})
 }

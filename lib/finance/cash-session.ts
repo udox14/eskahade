@@ -1,3 +1,4 @@
+import { rupiah } from './money'
 // lib/finance/cash-session.ts
 // Modul Fondasi & Lifecycle Sesi Kas (Fase 4C & Fase 6: PRD #23, Implementation Plan #2.1 #4 & #20)
 // Menjamin:
@@ -97,7 +98,7 @@ export async function openCashSession(
     throw new Error(`Operator sudah memiliki sesi kas aktif dengan kode "${active.session_code}".`)
   }
 
-  const validBalance = Math.floor(openingBalance)
+  const validBalance = rupiah(openingBalance,'Saldo awal',true)
   if (validBalance < 0 || !Number.isFinite(validBalance)) {
     throw new Error('Saldo kas fisik awal (opening balance) tidak boleh bernilai negatif.')
   }
@@ -322,7 +323,7 @@ export async function closeCashSession(
     throw new Error(`Sesi kas dengan kode "${session.session_code}" sudah ditutup sebelumnya.`)
   }
 
-  const validActual = Math.floor(actualClosingBalance)
+  const validActual = rupiah(actualClosingBalance,'Saldo akhir',true)
   if (validActual < 0 || !Number.isFinite(validActual)) {
     throw new Error('Saldo fisik penutupan kas (actual closing balance) tidak boleh bernilai negatif.')
   }

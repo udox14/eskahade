@@ -45,8 +45,6 @@ export interface BriVaInquiryVirtualAccountData {
   virtualAccountNo: string
   virtualAccountName: string
   totalAmount: BriVaAmount
-  virtualAccountTrxType?: string // "1" = Closed/Fixed Bill
-  feeAmount?: BriVaAmount
   inquiryRequestId: string
   additionalInfo?: Record<string, unknown>
 }
@@ -96,13 +94,14 @@ export interface BriVaPaymentVirtualAccountData {
   virtualAccountName: string
   paymentRequestId: string
   paidAmount: BriVaAmount
-  additionalInfo?: Record<string, unknown>
+
 }
 
 /**
  * SNAP BI Virtual Account Payment Notification Response (Service Code 25)
  */
 export interface BriVaPaymentResponse {
+  additionalInfo?:Record<string,unknown>
   responseCode: string
   responseMessage: string
   virtualAccountData?: BriVaPaymentVirtualAccountData
@@ -133,7 +132,7 @@ export const BRI_VA_INQUIRY_CODES = {
  */
 export const BRI_VA_PAYMENT_CODES = {
   SUCCESS: '2002500',
-  BAD_REQUEST: '4002501',
+  BAD_REQUEST: '4002500',
   INVALID_MANDATORY_FIELD: '4002502',
   INVALID_FIELD_FORMAT: '4002501',
   UNAUTHORIZED: '4012500',

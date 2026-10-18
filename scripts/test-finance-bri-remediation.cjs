@@ -40,6 +40,21 @@ async function main(){
   assert.equal(h.db.prepare('SELECT movement_type n FROM finance_wallet_ledger').get().n,'TOPUP_ONLINE');
   assert.equal((await recovery.recoverMissedPaymentFromStatement(req)).settlementId,a.settlementId);
  });
+ await test('A09 actual v2.0 HTTP routes verify raw signature, post once, and sanitize configuration failures',async()=>{
+  seed();const keys=['BRI_ENV','BRI_CLIENT_KEY','BRI_CLIENT_ID','BRI_CLIENT_SECRET','BRI_PRIVATE_KEY','BRI_PARTNER_ID','BRI_OUTBOUND_ENABLED'],saved=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
+  Object.assign(process.env,{BRI_ENV:'sandbox',BRI_CLIENT_KEY:'local-test-client',BRI_CLIENT_ID:'local-test-client',BRI_CLIENT_SECRET:config.clientSecret,BRI_PARTNER_ID:config.partnerId,BRI_OUTBOUND_ENABLED:'false',BRI_PRIVATE_KEY:crypto.generateKeyPairSync('rsa',{modulusLength:2048,privateKeyEncoding:{type:'pkcs8',format:'pem'},publicKeyEncoding:{type:'spki',format:'pem'}}).privateKey});
+  try{
+   const {NextRequest}=require('next/server');
+   function http(kind,payload,bad=false){const path='/snap/v2.0/transfer-va/'+kind,body=JSON.stringify(payload),timestamp=new Date().toISOString();return new NextRequest('https://local.test'+path,{method:'POST',body,headers:{'Content-Type':'application/json','Authorization':'Bearer test-token','X-PARTNER-ID':config.partnerId,'CHANNEL-ID':'00009','X-EXTERNAL-ID':'999999999','X-TIMESTAMP':timestamp,'X-SIGNATURE':bad?'invalid':sign({method:'POST',endpointPath:path,accessToken:'test-token',body,timestamp,clientSecret:config.clientSecret})}})}
+   const inquiryRoute=h.load('app/snap/v2.0/transfer-va/inquiry/route.ts'),paymentRoute=h.load('app/snap/v2.0/transfer-va/payment/route.ts');
+   assert.equal((await inquiryRoute.POST(http('inquiry',{...identity,inquiryRequestId:'request-1'},true))).status,401);
+   assert.equal((await inquiryRoute.POST(http('inquiry',{...identity,inquiryRequestId:'request-1'}))).status,200);
+   const payload={...identity,virtualAccountName:'Santri',paymentRequestId:'request-1',trxId:'1234567890',paidAmount:{value:'12000.00',currency:'IDR'}};
+   assert.equal((await paymentRoute.POST(http('payment',payload))).status,200);assert.equal((await paymentRoute.POST(http('payment',payload))).status,200);
+   assert.equal(h.db.prepare('SELECT COUNT(*) n FROM finance_payments').get().n,1);
+   delete process.env.BRI_CLIENT_SECRET;const failed=await paymentRoute.POST(http('payment',payload));assert.equal(failed.status,500);assert.deepEqual(await failed.json(),{responseCode:'5002500',responseMessage:'General Error'});
+  }finally{for(const key of keys)if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key]}
+ });
  console.log(`ALL ${count} BRI REMEDIATION TESTS PASSED`)
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

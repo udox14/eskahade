@@ -1,4 +1,5 @@
 'use server'
+import { rupiah } from '@/lib/finance/money'
 
 import { authorizeFinanceFeature } from '@/lib/finance/authorization'
 
@@ -3038,7 +3039,7 @@ export async function recordCashPayment(
         const orderItemsPayload: Array<{ obligationId: string; itemType: FinanceItemType; amount: number }> = []
 
         for (const it of input.items) {
-          const amt = Math.floor(it.amount)
+          const amt = rupiah(it.amount)
           if (amt <= 0) {
             throw new Error(`Nominal pembayaran harus lebih besar dari Rp0.`)
           }

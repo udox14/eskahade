@@ -1,3 +1,6 @@
+import { storedFinanceRoles } from '../authorization'
+import { validateFinancialProof } from '../proofs'
+import { rupiah } from '../money'
 // lib/finance/bri/cash-manual-distribution-service.ts
 // Domain Service Penyaluran Kas (CASH) & Transfer Bank Manual (MANUAL_TRANSFER)
 // Memenuhi seluruh aturan integritas finansial, bukti append-only, sesi kas, dan RBAC Fase BRI-6
@@ -168,8 +171,9 @@ export class CashManualDistributionService {
    * Menolak peran viewer, tester (read-only), dan pimpinan.
    */
   async assertFinanceOperator(operatorId: string, operatorRole: string): Promise<void> {
-    const user=await queryOne<{role:string}>('SELECT role FROM users WHERE id=?',[operatorId])
-    if(!user || user.role!==operatorRole)throw new Error('FORBIDDEN: Operator role mismatch')
+    const roles=await storedFinanceRoles(operatorId)
+    if(!roles.includes(operatorRole))throw new Error('FORBIDDEN: Operator role mismatch')
+    if(roles.includes('pimpinan'))throw new Error('Role \"pimpinan\" bersifat read-only untuk eksekusi operasional penyaluran.')
     if (!operatorId || typeof operatorId !== 'string') {
       throw new Error('Identitas operator tidak valid (operatorId kosong).')
     }
@@ -1054,12 +1058,17 @@ export class CashManualDistributionService {
     // Validasi fee bank jika ada
     let validFee: number | null = null
     if (input.bankFee !== undefined && input.bankFee !== null) {
-      validFee = Math.floor(input.bankFee)
+      validFee = rupiah(input.bankFee,'Fee bank',true)
       if (validFee < 0 || !Number.isFinite(validFee)) {
         throw new Error('Fee bank tidak boleh bernilai negatif.')
       }
     }
 
+    if(input.evidenceType!=='BANK_STATEMENT_DEBIT') {
+      if(!proofRef)throw new Error('MANUAL_PROOF_REQUIRED: Bukti transfer privat wajib diunggah.')
+      const owned=await validateFinancialProof(proofRef,input.operatorId)
+      if(input.proofAttachmentHash && input.proofAttachmentHash!==owned.content_hash)throw new Error('PROOF_HASH_MISMATCH')
+    }
     const evidenceId = generateId()
     const timestamp = now()
 

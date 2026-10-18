@@ -1,5 +1,7 @@
 'use server'
 
+import { financeWritePlan } from '@/lib/finance/write-plan'
+import { rupiah } from '@/lib/finance/money'
 import { authorizeFinanceFeature } from '@/lib/finance/authorization'
 
 // app/dashboard/keuangan/tarif/actions.ts
@@ -12,7 +14,7 @@ import { authorizeFinanceFeature } from '@/lib/finance/authorization'
 // 4. Integrasi BRI & Biaya Administrasi Koperasi (Setting Gateway, BRIVA, Settlement)
 // 5. Otorisasi Mutasi Server-side (Admin & Bendahara mutasi, Pimpinan view-only)
 
-import { query, queryOne, execute, now } from '@/lib/db'
+import { query, queryOne, execute, batch, now } from '@/lib/db'
 import {
   getSession,
   getEffectiveRoles,
@@ -289,7 +291,7 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
         'settlement_account_holder'
       )`
     ).catch(() => []),
-    getEffectiveCooperativeAdminFee().catch(() => 2000),
+    getEffectiveCooperativeAdminFee(),
     queryOne<{ count: number }>(`SELECT COUNT(*) AS count FROM finance_student_va WHERE status = 'ACTIVE'`).catch(() => ({ count: 0 })),
     getLetterheadProfiles().catch(() => []),
     getDocumentPrintConfigs().catch(() => []),
@@ -304,7 +306,7 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
 
   // Invariant 10: Environment BRI dikontrol melalui deployment environment (process.env.BRI_ENV), fail-closed ke sandbox
   const briEnv = (process.env.BRI_ENV === 'production' ? 'production' : 'sandbox') as 'sandbox' | 'production'
-  const partnerServiceId = settingsMap.get('bri_partner_service_id') || ''
+  const partnerServiceId = process.env.BRI_PARTNER_SERVICE_ID?.trim() || settingsMap.get('bri_partner_service_id') || ''
   const settlementDestinationBank = settingsMap.get('settlement_destination_bank') || 'Bank BRI'
   const settlementDestinationAccount = settingsMap.get('settlement_destination_account') || ''
   const settlementAccountHolder = settingsMap.get('settlement_account_holder') || 'Koperasi Eskahade'
@@ -669,13 +671,19 @@ export async function saveGatewaySettingsAction(
     const userId = session.id
 
     const currentNow = now()
+    const plan=financeWritePlan()
     const updates: Array<{ key: string; value: string }> = []
 
     if (input.partnerServiceId !== undefined) {
+      const partner=input.partnerServiceId.trim()
+      if(!/^\d{1,8}$/.test(partner))throw new Error('Partner Service ID BRIVA tidak valid.')
+      if(process.env.BRI_PARTNER_SERVICE_ID?.trim() && process.env.BRI_PARTNER_SERVICE_ID.trim()!==partner)throw new Error('Partner Service ID berbeda dari konfigurasi deployment.')
+      const incompatible=await queryOne<{id:string}>(`SELECT santri_id id FROM finance_student_va WHERE va_number!=?||customer_no LIMIT 1`,[partner])
+      if(incompatible)throw new Error('Partner Service ID tidak sesuai dengan Fixed BRIVA permanen yang sudah tercatat.')
       updates.push({ key: 'bri_partner_service_id', value: input.partnerServiceId.trim() })
     }
     if (input.cooperativeAdminFee !== undefined) {
-      const fee = Math.max(0, input.cooperativeAdminFee)
+      const fee = rupiah(input.cooperativeAdminFee,'Biaya Koperasi',true)
       updates.push({ key: 'finance_cooperative_admin_fee', value: String(fee) })
       await setCooperativeAdminFeeRule({
         code: 'ONLINE_CHECKOUT_FEE',
@@ -683,7 +691,7 @@ export async function saveGatewaySettingsAction(
         amount: fee,
         isEnabled: fee > 0,
         createdBy: userId,
-      }).catch(() => null)
+      },plan)
     }
     if (input.settlementDestinationBank !== undefined) {
       updates.push({ key: 'settlement_destination_bank', value: input.settlementDestinationBank.trim() })
@@ -696,13 +704,14 @@ export async function saveGatewaySettingsAction(
     }
 
     for (const item of updates) {
-      await execute(
+      plan.statements.push({sql:
         `INSERT INTO app_settings (key, value, updated_at)
          VALUES (?, ?, ?)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-        [item.key, item.value, currentNow]
-      )
+        params:[item.key, item.value, currentNow]
+      })
     }
+    await batch(plan.statements)
 
     revalidatePath('/dashboard/keuangan/tarif')
     return { success: true }

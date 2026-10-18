@@ -59,7 +59,10 @@ export interface StatementIngestSummary {
 export function isValidIsoDateTimeWithOffset(dtStr: string): boolean {
   if (typeof dtStr !== 'string') return false
   const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/
-  return isoRegex.test(dtStr.trim()) && Number.isFinite(Date.parse(dtStr))
+  if(!isoRegex.test(dtStr.trim()) || !Number.isFinite(Date.parse(dtStr)))return false
+  const [year,month,day,hour,minute,second]=dtStr.trim().slice(0,19).split(/[-T:]/).map(Number)
+  const days=[31,year%4===0&&(year%100!==0||year%400===0)?29:28,31,30,31,30,31,31,30,31,30,31]
+  return month>=1&&month<=12&&day>=1&&day<=days[month-1]&&hour<24&&minute<60&&second<60
 }
 
 /**

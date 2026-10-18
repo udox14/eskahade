@@ -19,6 +19,7 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import BriWorkbench from './bri-workbench'
 import InputSettlementModal from './input-settlement-modal'
 import ManualAllocationModal from './manual-allocation-modal'
 import RecordCorrectionModal from './record-correction-modal'
@@ -250,7 +251,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
       <div className="border-b border-slate-200">
         <nav className="flex space-x-6 text-xs font-medium" aria-label="Tabs">
           {[
-            { id: 'SETTLEMENT' as const, label: 'Settlement Bank (Legacy / Nonaktif)', icon: Bank },
+            { id: 'SETTLEMENT' as const, label: 'Rekonsiliasi Bank', icon: Bank },
             { id: 'KAS_LOKET' as const, label: 'Kas Loket & Fisik', icon: Wallet },
             {
               id: 'UNALLOCATED' as const,
@@ -299,13 +300,14 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
         {/* ─── TAB 1: ONLINE BRI & SETTLEMENT ─── */}
         {activeTab === 'SETTLEMENT' && (
           <div className="space-y-6">
-            {/* Banner Isolasi Settlement Legacy */}
+            <BriWorkbench canMutate={data.userPermissions.canMutate} />
+            {/* Arsip settlement */}
             <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
               <Info size={20} className="shrink-0 text-amber-700 mt-0.5" weight="bold" />
               <div>
-                <h4 className="text-xs font-bold text-amber-900">Pencatatan Settlement Online Dinonaktifkan Sementara</h4>
+                <h4 className="text-xs font-bold text-amber-900">Settlement berdasarkan bukti rekening koran</h4>
                 <p className="mt-0.5 text-xs text-amber-700 leading-relaxed">
-                  Pencatatan settlement online dinonaktifkan hingga integrasi Rekening Koran BRIAPI (BRI-4) aktif. Invariant: <code className="font-semibold text-amber-800">PAID != SETTLED</code> ditegakkan. Data riwayat batch di bawah merupakan arsip historis yang dapat ditinjau untuk audit.
+                  Pencocokan dan pemeriksaan bukti tersedia di atas; sinkronisasi bank mengikuti kesiapan integrasi. Invariant: <code className="font-semibold text-amber-800">PAID != SETTLED</code> ditegakkan. Data riwayat batch di bawah merupakan arsip historis yang dapat ditinjau untuk audit.
                 </p>
               </div>
             </div>

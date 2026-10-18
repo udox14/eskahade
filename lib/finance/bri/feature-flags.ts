@@ -138,6 +138,7 @@ export function assertDistributionMethodEnabled(
   method: FinanceDistributionMethod,
   customEnv?: Record<string, string | undefined>
 ): void {
+  if(!['CASH','MANUAL_TRANSFER','BRI_QLOLA'].includes(method))throw new Error('Metode penyaluran tidak didukung.')
   const flags = getBriFeatureFlags(customEnv)
 
   if (method === 'CASH' && !flags.distributionCashEnabled) {

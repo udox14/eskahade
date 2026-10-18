@@ -360,19 +360,6 @@ export async function recordCorrection(
     }
   }
 
-  for (const [obId, u] of obligationUpdates.entries()) {
-    statements.push({
-      sql: `
-        UPDATE finance_obligations
-        SET amount_paid = ?,
-            status = ?,
-            updated_at = ?
-        WHERE id = ?
-      `,
-      params: [u.paid, u.status, createdAt, obId],
-    })
-  }
-
   // C. Update Derived Cache pada Payment (Histori asli tidak di-drop/di-update status historisnya)
   statements.push({
     sql: `UPDATE finance_payments SET correction_status = ? WHERE id = ?`,
@@ -419,7 +406,7 @@ export async function recordCorrection(
   }
 
   // F. Append-Only Ledger: Catat pembalikan pendapatan Koperasi jika berlaku
-  if (payment.cooperative_admin_fee > 0 && newCorrectionStatus === 'FULLY_CORRECTED') {
+  if (payment.cooperative_admin_fee > 0) {
     const incEntryType = input.correctionType === 'REFUND' ? 'REFUND' : 'REVERSAL'
     const incomeId = generateId()
     const incomeNumber = `${incEntryType === 'REFUND' ? 'REF' : 'REV'}-KOP-${createdAt.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
@@ -428,13 +415,16 @@ export async function recordCorrection(
       [payment.id]
     )
 
+    if(!origIncome)throw new Error('COOPERATIVE_INCOME_EVIDENCE_MISSING')
     statements.push({
       sql: `
         INSERT INTO finance_cooperative_income (
           id, income_number, entry_type, reference_income_id, correction_id,
           payment_id, order_id, amount, rule_id, rule_snapshot,
           reference_note, created_by, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)
+        ) SELECT ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?
+        WHERE (SELECT COALESCE(SUM(total_amount),0) FROM finance_corrections WHERE target_payment_id=?) >= ?
+        AND NOT EXISTS(SELECT 1 FROM finance_cooperative_income WHERE payment_id=? AND entry_type IN ('REVERSAL','REFUND'))
       `,
       params: [
         incomeId,
@@ -449,6 +439,7 @@ export async function recordCorrection(
         `Pembalikan Biaya Operasional Koperasi atas koreksi ${correctionNumber} pada pembayaran ${payment.payment_number}`,
         input.createdBy,
         createdAt,
+        payment.id,payment.gross_amount,payment.id,
       ],
     })
   }
@@ -471,9 +462,8 @@ export async function recordCorrection(
 
   // Derive caches inside the batch, including concurrent corrections committed before us.
   for (const obId of obligationUpdates.keys()) {
-    statements.push({ sql: `UPDATE finance_obligations SET amount_paid=MAX(0,
-      COALESCE((SELECT SUM(amount) FROM finance_allocations WHERE obligation_id=?),0)-
-      COALESCE((SELECT SUM(amount) FROM finance_correction_items WHERE obligation_id=?),0)) WHERE id=?`, params:[obId,obId,obId] })
+    const delta=preparedItems.filter(item=>item.obligationId===obId).reduce((sum,item)=>sum+item.amount,0)
+    statements.push({sql:`UPDATE finance_obligations SET amount_paid=amount_paid-?,updated_at=? WHERE id=?`,params:[delta,createdAt,obId]})
     statements.push({sql:`UPDATE finance_obligations SET status=CASE WHEN amount_paid=0 AND amount_expected=amount_exempted THEN 'EXEMPTED'
       WHEN amount_paid>=amount_expected-amount_exempted THEN 'PAID' WHEN amount_paid>0 THEN 'PARTIALLY_PAID' ELSE 'UNPAID' END WHERE id=?`,params:[obId]})
   }

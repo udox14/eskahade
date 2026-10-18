@@ -1,3 +1,4 @@
+import { rupiah } from '@/lib/finance/money'
 // lib/portal/finance.ts
 // Modul Integrasi Finansial Portal Orang Tua ke Sistem Keuangan Baru
 // Menggabungkan pembacaan tagihan authoritative, kalkulasi cicilan,
@@ -463,7 +464,7 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
     }))
   }
 
-  const effectiveCoopFee = await getEffectiveCooperativeAdminFee().catch(() => 0)
+  const effectiveCoopFee = await getEffectiveCooperativeAdminFee()
 
     const brivaGate = await isOnlineBrivaAvailable(santriId)
 
@@ -585,7 +586,7 @@ export async function createPortalPaymentOrder(
   }> = []
 
   for (const item of input.items) {
-    const amount = Math.floor(item.amount)
+    const amount = rupiah(item.amount)
     if (amount <= 0) {
       throw new Error(`Nominal item "${item.itemType}" harus lebih besar dari Rp0.`)
     }
@@ -687,7 +688,7 @@ export async function createPortalPaymentOrder(
 
   // 2. Tentukan metode pembayaran & biaya administrasi koperasi
   const method = 'BRI_VA'
-  const cooperativeAdminFee = await getEffectiveCooperativeAdminFee().catch(() => 0)
+  const cooperativeAdminFee = await getEffectiveCooperativeAdminFee()
 
   // 3. Buat Payment Order via Engine Locked
   const orderWithItems = await createPaymentOrder({

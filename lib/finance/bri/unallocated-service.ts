@@ -1,3 +1,4 @@
+import { assertStoredFinanceRole } from '../authorization'
 // lib/finance/bri/unallocated-service.ts
 // Service for handling Unmatched / Ambiguous Bank Payments (UNALLOCATED Flow)
 
@@ -70,7 +71,7 @@ export async function recordUnallocatedStatementPayment(
       return {
         paymentId: existingPayment.id,
         reconciliationItemId: existingRecItem?.id || '',
-        settlementId: 'EXISTING',
+        settlementId: (await queryOne<{settlement_id:string}>('SELECT settlement_id FROM finance_bri_settlement_items WHERE payment_id=? AND statement_transaction_id=?',[existingPayment.id,statementTx.id]))?.settlement_id || null,
         amount: statementTx.amount,
         alreadyRecorded: true,
         isIdentifiedStudent: true,
@@ -82,7 +83,11 @@ export async function recordUnallocatedStatementPayment(
   // Per BRI-4 contract invariant: BANK_STATEMENT -> STUDENT AUTO IDENTITY = CONTRACT_TBD.
   // Student identity cannot be inferred from statement remark regex; strictly requires operator input.
   let resolvedSantriId: string | null = null
-  if (input.santriId) {
+  if(input.santriId){
+    await assertStoredFinanceRole(recordedBy||'',['admin','bendahara'])
+    if(!reason?.trim())throw new Error('MANUAL_IDENTIFICATION_REQUIRED')
+    if(!process.env.BRI_COLLECTION_ACCOUNT_NO || statementTx.account_no!==process.env.BRI_COLLECTION_ACCOUNT_NO.trim())throw new Error('COLLECTION_ACCOUNT_MISMATCH')
+
     const student = await queryOne<{ id: string }>(
       `SELECT id FROM santri WHERE id = ? LIMIT 1`,
       [input.santriId]
@@ -99,7 +104,7 @@ export async function recordUnallocatedStatementPayment(
     const existingUnmatchedRec = await queryOne<{ id: string }>(
       `SELECT id FROM finance_reconciliation_items
        WHERE external_reference = ? AND match_status = 'UNMATCHED_EXTERNAL' LIMIT 1`,
-      [statementTx.transaction_id || statementTx.id]
+      [statementTx.id]
     )
 
     if (existingUnmatchedRec) {
@@ -128,7 +133,7 @@ export async function recordUnallocatedStatementPayment(
       `,
       params: [
         reconciliationItemId,
-        statementTx.transaction_id || statementTx.id,
+        statementTx.id,
         statementTx.amount,
         statementTx.amount,
         reason || 'Unidentified bank statement credit line awaiting authorized manual identification',
@@ -167,7 +172,7 @@ export async function recordUnallocatedStatementPayment(
   const dateStr = timestamp.slice(0, 10).replace(/-/g, '')
   const randSuffix = crypto.randomBytes(3).toString('hex').toUpperCase()
   const paymentNumber = `PAY-BRI-UNALLOC-${dateStr}-${randSuffix}`
-  const briTrxId = statementTx.bri_trx_id || statementTx.transaction_id || `UNALLOC-${statementTx.id}`
+  const briTrxId = null
   const settlementId = generateId()
   const settlementItemId = generateId()
   const settlementNumber = `STL-BRI-${dateStr}-${randSuffix}`
@@ -198,7 +203,7 @@ export async function recordUnallocatedStatementPayment(
       timestamp,
       `UNALLOC-${statementTx.id}`,
       briTrxId,
-      statementTx.transaction_id || statementTx.id,
+      statementTx.id,
       timestamp,
     ],
   })
@@ -242,7 +247,7 @@ export async function recordUnallocatedStatementPayment(
       reconciliationItemId,
       paymentId,
       settlementId,
-      statementTx.transaction_id || statementTx.id,
+      statementTx.id,
       statementTx.amount,
       statementTx.amount,
       statementTx.amount,

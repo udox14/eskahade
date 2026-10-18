@@ -1,3 +1,4 @@
+import { assertStoredFinanceRole } from '../authorization'
 import crypto from 'node:crypto'
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
 import { loadBriConfig } from './config'
@@ -82,9 +83,9 @@ export async function executeSettlementTransition(
   const collectionAccount=process.env.BRI_COLLECTION_ACCOUNT_NO?.trim()
   if(!collectionAccount || statementTx.account_no.trim()!==collectionAccount)throw new Error('STATEMENT_COLLECTION_ACCOUNT_MISMATCH')
   if(matchStrength==='MANUAL_RESOLVED') {
-    const operator=await queryOne<{role:string}>('SELECT role FROM users WHERE id=?',[verifiedBy||''])
+    await assertStoredFinanceRole(verifiedBy||'',['admin','bendahara'])
     const review=await queryOne<{external_reference:string|null}>('SELECT external_reference FROM finance_reconciliation_items WHERE id=?',[input.reconciliationItemId])
-    if(!operator || !['admin','bendahara'].includes(operator.role) || !input.resolutionNotes?.trim() || review?.external_reference!==statementTx.id)throw new Error('MANUAL_RESOLUTION_EVIDENCE_REQUIRED')
+    if(!input.resolutionNotes?.trim() || review?.external_reference!==statementTx.id)throw new Error('MANUAL_RESOLUTION_EVIDENCE_REQUIRED')
   }
 
   // 2. Fetch target payment
@@ -160,6 +161,7 @@ export async function executeSettlementTransition(
     throw new Error(`Statement transaction ${statementTransactionId} is already matched to payment ${statementTx.matched_payment_id}.`)
   }
 
+  if(matchStrength==='AUTHORITATIVE_EXACT')throw new Error('AUTHORITATIVE_IDENTITY_REQUIRED: Bank contract mapping is not verified; use authorized manual review.')
   // 4. Resolve or create settlement batch header
   let settlementId = input.settlementBatchId
   let settlementNumber = ''
@@ -245,7 +247,7 @@ export async function executeSettlementTransition(
       payment.cooperative_admin_fee,
       payment.gross_amount,
       matchStrength,
-      input.matchMethod || (matchStrength === 'AUTHORITATIVE_EXACT' ? 'CROSS_PRODUCT_EXACT' : 'MANUAL_OPERATOR'),
+      input.matchMethod || 'MANUAL_OPERATOR',
       input.reconciliationItemId || null,
       'IDR',
       verifiedBy || null,
@@ -278,6 +280,7 @@ export async function executeSettlementTransition(
   })
 
   // Execute in atomic database batch
+  if(input.reconciliationItemId)statements.push({sql:`UPDATE finance_reconciliation_items SET resolution_action='MANUAL_ALLOCATION',resolution_notes=?,resolved_by=?,resolved_at=? WHERE id=?`,params:[input.resolutionNotes||null,verifiedBy||null,timestamp,input.reconciliationItemId]})
   await batch(statements)
 
   briLog('info', 'BRI_PAYMENT_SETTLED_SUCCESSFULLY', {

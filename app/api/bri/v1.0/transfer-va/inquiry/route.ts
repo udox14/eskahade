@@ -8,6 +8,7 @@ import { loadBriConfig, BRI_VA_INQUIRY_CODES, extractBrivaHeaders, handleBrivaIn
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
+  try {
   const config = loadBriConfig()
 
   if (config.env === 'production') {
@@ -33,4 +34,8 @@ export async function POST(req: NextRequest) {
   })
 
   return NextResponse.json(result.body, { status: result.status })
+
+  } catch {
+    return NextResponse.json({responseCode:BRI_VA_INQUIRY_CODES.GENERAL_ERROR,responseMessage:'General Error'},{status:500,headers:{'Cache-Control':'no-store'}})
+  }
 }

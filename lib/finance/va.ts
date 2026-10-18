@@ -60,7 +60,7 @@ export async function assignStudentFixedVa(
 ): Promise<FinanceStudentVa> {
   const cleanVa = vaNumber.trim()
 
-  if (!cleanVa) {
+  if (!/^\d{1,28}$/.test(cleanVa)) {
     throw new Error('Nomor Virtual Account tidak boleh kosong.')
   }
 
@@ -81,8 +81,8 @@ export async function assignStudentFixedVa(
   }
   assertSantriBillable(student.asrama, student.nama_lengkap, student.kategori_santri)
 
-  const cleanCustomerNo = (customerNo || student.nis || santriId.replace(/\D/g, '')).trim()
-  if (!cleanCustomerNo) {
+  const cleanCustomerNo = (customerNo || '').trim()
+  if (!/^\d{1,20}$/.test(cleanCustomerNo)) {
     throw new Error('Customer number tidak boleh kosong.')
   }
 
@@ -98,6 +98,9 @@ export async function assignStudentFixedVa(
     throw new Error(`Customer number "${cleanCustomerNo}" sudah terdaftar untuk santri lain.`)
   }
 
+  const owned=await getStudentFixedVa(santriId)
+  if(owned && (owned.va_number!==cleanVa || owned.customer_no!==cleanCustomerNo))throw new Error('FIXED_VA_OWNERSHIP_IMMUTABLE')
+  if(student.status_global!=='aktif')throw new Error('Santri tidak aktif.')
   const timestamp = now()
 
   await execute(

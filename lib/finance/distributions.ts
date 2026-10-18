@@ -1,3 +1,5 @@
+import { storedFinanceRoles, assertStoredFinanceRole } from './authorization'
+import { requestFingerprint } from './operation'
 import { privateProofUrl } from './proofs'
 // lib/finance/distributions.ts
 // Modul Fondasi & Engine Penyaluran Dana (Fase 7: PRD Bab 24 s.d. 29, Implementation Plan #3.4 & #8)
@@ -948,9 +950,14 @@ export async function executeDistribution(
   if(method==='MANUAL_TRANSFER'&&(!input.referenceNumber?.trim()||!input.proofAttachmentUrl)) throw new Error('Referensi bank dan bukti transfer wajib diisi.')
   const proof=input.proofAttachmentUrl?await validateFinancialProof(input.proofAttachmentUrl,input.transferredBy):null
   const recipientId=['BENDAHARA','PESANTREN'].includes(input.recipientType)?'rec_pesantren':(input.recipientId?.startsWith('rec_')?input.recipientId:'rec_'+input.recipientId)
+  if(method==='MANUAL_TRANSFER' && input.destinationAccount){
+    if(!input.accountId)throw new Error('Pilih rekening penerima aktif dari master rekening.')
+    const snapshot=await briQlolaDistributionService.resolveRecipientAndAccountSnapshot({recipientId,accountId:input.accountId,method})
+    if(snapshot.accountSnapshot?.accountNumber!==input.destinationAccount.trim())throw new Error('Rekening tujuan berbeda dari master yang dipilih.')
+  }
   const draft=await briQlolaDistributionService.createDistributionDraft({recipientId,accountId:input.accountId,
     itemType:input.itemType as FinanceItemType,period:input.period,amount:input.amount,method,createdBy:input.transferredBy,
-    idempotencyKey:input.idempotencyKey,notes:input.notes})
+    idempotencyKey:input.idempotencyKey,requestFingerprint:requestFingerprint([input.receivingPersonName||null,input.referenceNumber||null,proof?.key||null]),notes:input.notes})
   const current=await queryOne<{status:string}>('SELECT status FROM finance_distributions WHERE id=?',[draft.distributionId])
   const common={distributionId:draft.distributionId,operatorId:input.transferredBy,operatorRole:operator.role,notes:input.notes||undefined}
   if(current?.status!=='DISTRIBUTED') {
@@ -1006,8 +1013,7 @@ export async function cancelDistribution(
 ): Promise<{ success: boolean; error?: string }> {
   const dist=await queryOne<{method:string;status:string}>('SELECT method,status FROM finance_distributions WHERE id=?',[distributionId])
   if(!dist)return {success:false,error:'Penyaluran tidak ditemukan.'}
-  const operator=await queryOne<{role:string}>('SELECT role FROM users WHERE id=?',[cancelledBy])
-  if(!operator)throw new Error('FORBIDDEN')
+  const operator={role:await assertStoredFinanceRole(cancelledBy,['admin','bendahara','petugas_koperasi'])}
   const {cashManualDistributionService}=await import('./bri/cash-manual-distribution-service')
   const input={distributionId,operatorId:cancelledBy,operatorRole:operator.role,reason}
   if(dist.method==='CASH')await cashManualDistributionService.cancelCashDistribution(input)
@@ -1096,7 +1102,7 @@ export async function getProviderAccounts(
 export async function createProviderAccount(
   input: CreateProviderAccountInput
 ): Promise<FinanceProviderAccount> {
-  const provider = await queryOne<{ id: string; nama_jasa: string; jenis: string }>(
+  const provider = input.providerId==='BENDAHARA' ? {id:'BENDAHARA',nama_jasa:'Pesantren',jenis:'PESANTREN'} : await queryOne<{ id: string; nama_jasa: string; jenis: string }>(
     `SELECT id, nama_jasa, jenis FROM master_jasa WHERE id = ?`,
     [input.providerId]
   )
@@ -1297,6 +1303,7 @@ export async function getDistributionHistory(filter: DistributionHistoryFilter =
     SELECT COUNT(*) AS total
     FROM finance_distributions d
     LEFT JOIN master_jasa j ON d.recipient_id = j.id
+    LEFT JOIN finance_distribution_recipients r ON d.recipient_id = r.id
     LEFT JOIN users u ON d.transferred_by = u.id
     WHERE ${whereClause}
     `,
@@ -1327,12 +1334,13 @@ export async function getDistributionHistory(filter: DistributionHistoryFilter =
       d.notes,
       d.created_at,
       CASE
-        WHEN d.recipient_type = 'BENDAHARA' THEN 'Bendahara Pesantren'
-        ELSE COALESCE(j.nama_jasa, d.recipient_type)
+        WHEN d.recipient_type IN ('BENDAHARA','PESANTREN') THEN 'Bendahara Pesantren'
+        ELSE COALESCE(r.name,j.nama_jasa, d.recipient_type)
       END AS recipient_name,
       COALESCE(u.full_name, d.transferred_by) AS operator_name
     FROM finance_distributions d
     LEFT JOIN master_jasa j ON d.recipient_id = j.id
+    LEFT JOIN finance_distribution_recipients r ON d.recipient_id = r.id
     LEFT JOIN users u ON d.transferred_by = u.id
     WHERE ${whereClause}
     ORDER BY d.transferred_at DESC, d.created_at DESC
@@ -1342,7 +1350,7 @@ export async function getDistributionHistory(filter: DistributionHistoryFilter =
   )
 
   return {
-    items: rows,
+    items: rows.map(row=>({...row,proof_attachment_url:row.proof_attachment_url?privateProofUrl(row.proof_attachment_url):null})),
     totalItems,
     totalPages,
     page,
@@ -1378,12 +1386,13 @@ export async function getDistributionById(
       d.notes,
       d.created_at,
       CASE
-        WHEN d.recipient_type = 'BENDAHARA' THEN 'Bendahara Pesantren'
-        ELSE COALESCE(j.nama_jasa, d.recipient_type)
+        WHEN d.recipient_type IN ('BENDAHARA','PESANTREN') THEN 'Bendahara Pesantren'
+        ELSE COALESCE(r.name,j.nama_jasa, d.recipient_type)
       END AS recipient_name,
       COALESCE(u.full_name, d.transferred_by) AS operator_name
     FROM finance_distributions d
     LEFT JOIN master_jasa j ON d.recipient_id = j.id
+    LEFT JOIN finance_distribution_recipients r ON d.recipient_id = r.id
     LEFT JOIN users u ON d.transferred_by = u.id
     WHERE d.id = ?
     `,

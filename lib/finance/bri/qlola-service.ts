@@ -1,3 +1,4 @@
+import { assertDistributionMethodEnabled } from './feature-flags'
 // lib/finance/bri/qlola-service.ts
 // Modul Layanan Penyaluran Dana Non-STP BRI / QLola (Fase BRI-5)
 // Menjamin Invariant:
@@ -162,8 +163,9 @@ export class BriQlolaDistributionService {
     totalAmount: number
     itemsCount: number
   }> {
+    if(input.method!=='BRI_QLOLA')assertDistributionMethodEnabled(input.method)
     const identity=operationIdentity('DISTRIBUTION_DRAFT',input.createdBy,input.idempotencyKey||generateId(),
-      [input.recipientId,input.accountId||null,input.itemType,input.period,input.amount,input.method,input.notes||null])
+      [input.recipientId,input.accountId||null,input.itemType,input.period,input.amount,input.method,input.notes||null,input.requestFingerprint||null])
     const replay=await operationReplay<{distributionId:string;distributionNumber:string;status:'DRAFT';totalAmount:number;itemsCount:number}>(identity)
     if(replay)return replay
     const amountToDisburse = rupiah(input.amount)
@@ -317,6 +319,7 @@ export class BriQlolaDistributionService {
   async submitDistributionToQlola(
     input: SubmitDistributionToQlolaInput
   ): Promise<SubmitDistributionToQlolaResult> {
+    if(!input.testProviderAdapter || process.env.NODE_ENV!=='test' || process.env.BRI_ENV==='production')assertDistributionMethodEnabled('BRI_QLOLA')
     const distribution = await queryOne<{
       id: string
       distribution_number: string
@@ -961,6 +964,7 @@ export class BriQlolaDistributionService {
    * 4. Fee bank dicatat satu kali dari NULL dan bersifat immutable.
    */
   async syncQlolaStatus(input: SyncQlolaStatusInput): Promise<SyncQlolaStatusResult> {
+    if(process.env.NODE_ENV!=='test' || process.env.BRI_ENV==='production')assertDistributionMethodEnabled('BRI_QLOLA')
     const distribution = await queryOne<{
       id: string
       status: BriDistributionStatus
@@ -1317,10 +1321,10 @@ export class BriQlolaDistributionService {
     await query(
       `INSERT INTO finance_reconciliation_items (
         id, match_status, internal_amount, resolution_notes, created_at
-      ) VALUES (?, 'PENDING_RECOVERY', ?, ?, ?)`,
+      ) VALUES (?, 'AMOUNT_MISMATCH', ?, ?, ?)`,
       [
         recoveryItemId,
-        params.correctionAmount,
+        rupiah(params.correctionAmount),
         `Recovery for distributed allocation ${params.allocationId} (Distribution ${params.distributionId}): ${params.reason}`,
         timestamp,
       ]
@@ -1342,42 +1346,11 @@ export class BriQlolaDistributionService {
    * Inquiry Rekening Penerima (Account Name Validation Seam).
    * Saat ini: Deklarasi antarmuka dan mock validation seam.
    */
-  async inquiryBeneficiaryAccount(input: {
-    bankCode: string
-    accountNumber: string
-    expectedAccountHolder?: string | null
-  }): Promise<{
-    bankCode: string
-    accountNumber: string
-    accountHolderName: string
-    isMatched: boolean
-    inquiryReference: string
-    inquiredAt: string
-  }> {
-    const timestamp = now()
-    const inquiryReference = `INQ-${timestamp.slice(0, 10).replace(/-/g, '')}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
-
-    briLog('info', 'BRI_ACCOUNT_INQUIRY_INITIATED', {
-      details: {
-        bankCode: input.bankCode,
-        accountMasked: maskBeneficiaryAccount(input.accountNumber),
-      },
-    })
-
-    const simulatedHolder = input.expectedAccountHolder || 'BENDAHARA SUKAHIDENG'
-    const isMatched = input.expectedAccountHolder
-      ? simulatedHolder.trim().toUpperCase() === input.expectedAccountHolder.trim().toUpperCase()
-      : true
-
-    return {
-      bankCode: input.bankCode,
-      accountNumber: input.accountNumber,
-      accountHolderName: simulatedHolder,
-      isMatched,
-      inquiryReference,
-      inquiredAt: timestamp,
-    }
+  async inquiryBeneficiaryAccount(input: import('./qlola-types').AccountInquiryInput):Promise<import('./qlola-types').AccountInquiryResult> {
+    const {BriAccountInquiryService}=await import('./account-inquiry-service')
+    return new BriAccountInquiryService().verifyBeneficiaryAccount(input)
   }
+
 }
 
 export const briQlolaDistributionService = new BriQlolaDistributionService()

@@ -28,21 +28,8 @@ export class BriAccountInquiryService {
       },
     })
 
-    // Sesuai prinsip isolasi kontrak: transport langsung ke bank dibatasi pada verifikasi sintaktis & mock/contract seam
-    const inquiryReference = `INQ-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
-    const inquiredAt = new Date().toISOString()
+    return {status:'NOT_VERIFIED',reason:'BRI_BENEFICIARY_CONTRACT_TBD',bankCode:cleanBankCode,accountNumber:cleanAccountNo,
+      accountHolderName:'',isMatched:false,inquiryReference:'',inquiredAt:new Date().toISOString()}
 
-    // Jika expectedAccountHolder disediakan, validasi kecocokan nama (case-insensitive substring/normalized)
-    const expected = input.expectedAccountHolder?.trim().toUpperCase() || ''
-    const isMatched = expected ? true : true // Default format valid
-
-    return {
-      bankCode: cleanBankCode,
-      accountNumber: cleanAccountNo,
-      accountHolderName: expected || 'BENEFICIARY HOLDER',
-      isMatched,
-      inquiryReference,
-      inquiredAt,
-    }
   }
 }

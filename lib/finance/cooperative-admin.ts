@@ -1,3 +1,5 @@
+import type { FinanceWritePlan } from './write-plan'
+import { rupiah } from './money'
 // lib/finance/cooperative-admin.ts
 // Modul Pengelolaan Biaya Administrasi Koperasi & Buku Besar Pendapatan Koperasi (Append-Only)
 // Sistem Keuangan Baru Pesantren (Fase BRI-1)
@@ -49,7 +51,7 @@ export async function getEffectiveCooperativeAdminFee(
   atDate = new Date().toISOString()
 ): Promise<number> {
   const rule = await getEffectiveCooperativeAdminFeeRule(code, atDate)
-  return rule ? rule.amount : 0
+  return rule ? rupiah(rule.amount,'Biaya Koperasi',true) : 0
 }
 
 /**
@@ -74,16 +76,16 @@ export async function setCooperativeAdminFeeRule(input: {
   amount: number
   isEnabled?: boolean
   createdBy?: string | null
-}): Promise<FinanceCooperativeAdminFeeRule> {
+},plan?:FinanceWritePlan): Promise<FinanceCooperativeAdminFeeRule> {
   const cleanCode = (input.code || 'ONLINE_CHECKOUT_FEE').trim().toUpperCase()
   const cleanName = (input.name || 'Biaya Operasional Koperasi Transaksi Online').trim()
-  const amount = Math.max(0, Math.floor(input.amount))
+  const amount = rupiah(input.amount,'Biaya Koperasi',true)
   const isEnabled = input.isEnabled !== false ? 1 : 0
   const timestamp = now()
   const id = generateId()
 
   // Eksekusi atomik dalam 1 batch: tutup rule lama & insert rule baru
-  await batch([
+  const statements=[
     {
       sql: `UPDATE finance_cooperative_admin_fee_rules
             SET effective_until = ?, closed_by = ?, closed_at = ?
@@ -99,7 +101,9 @@ export async function setCooperativeAdminFeeRule(input: {
             ) VALUES (?, ?, ?, ?, ?, 'BRI', ?, NULL, NULL, NULL, ?, ?)`,
       params: [id, cleanCode, cleanName, isEnabled, amount, timestamp, input.createdBy || null, timestamp],
     },
-  ])
+  ]
+  if(plan){plan.statements.push(...statements);return {id,code:cleanCode,name:cleanName,is_enabled:isEnabled,amount,applies_to_channel:'BRI',effective_from:timestamp,effective_until:null,created_by:input.createdBy||null,created_at:timestamp}}
+  await batch(statements)
 
   const created = await queryOne<FinanceCooperativeAdminFeeRule>(
     `SELECT id, code, name, is_enabled, amount, applies_to_channel,
@@ -128,7 +132,7 @@ export async function recordCooperativeIncome(input: {
   referenceNote?: string | null
   createdBy?: string | null
 }): Promise<FinanceCooperativeIncome> {
-  const amount = Math.floor(input.amount)
+  const amount = rupiah(input.amount,'Pendapatan Koperasi',true)
   if (amount < 0 || !Number.isFinite(amount)) {
     throw new Error('Nominal pendapatan/koreksi Koperasi tidak boleh negatif.')
   }

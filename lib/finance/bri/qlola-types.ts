@@ -163,6 +163,7 @@ export interface BriQlolaProviderEvidence {
 
 export interface CreateDistributionBatchInput {
   idempotencyKey?: string
+  requestFingerprint?:string
   recipientId: string
   itemType: FinanceItemType
   period: string
@@ -261,6 +262,8 @@ export interface AccountInquiryInput {
 }
 
 export interface AccountInquiryResult {
+  status: 'NOT_VERIFIED' | 'VERIFIED'
+  reason?:string
   bankCode: string
   accountNumber: string
   accountHolderName: string

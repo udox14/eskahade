@@ -67,7 +67,7 @@ export async function matchStatementTransaction(
     }
   }
 
-  const isCrossProductAuthoritative = options?.authoritativeCrossProductLink === true
+  const isCrossProductAuthoritative: boolean = false // Public cross-product identity contract remains TBD; caller cannot enable it.
 
   // 1. Authoritative Cross-Product Match (Only permitted if authoritative contract link is enabled)
   if (isCrossProductAuthoritative && (statementTx.transaction_id || statementTx.bri_trx_id)) {

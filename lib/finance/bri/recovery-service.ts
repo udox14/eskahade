@@ -1,3 +1,6 @@
+import { assertSantriBillable, assertSantriBillableUntukItem } from '../non-billable-santri'
+import { configuredBrivaPartnerServiceId } from './briva-config'
+import { assertStoredFinanceRole } from '../authorization'
 import { walletMutationStatements } from '../wallet-statements'
 // lib/finance/bri/recovery-service.ts
 // Recovery Service: Transaction Status Inquiry Seam & Missed-Webhook Recovery Engine
@@ -78,8 +81,8 @@ export async function recoverMissedPaymentFromStatement(
   const { statementTransactionId, orderId, recoveredBy, recoveryNotes } = input
   const timestamp = now()
 
-  const operator=await queryOne<{role:string}>('SELECT role FROM users WHERE id=?',[recoveredBy||''])
-  if(!operator || !['admin','bendahara'].includes(operator.role) || !recoveryNotes?.trim() || !input.reconciliationItemId)throw new Error('MANUAL_RESOLUTION_REQUIRED: Recovery membutuhkan operator, catatan dan kasus rekonsiliasi resmi.')
+  if(recoveredBy)await assertStoredFinanceRole(recoveredBy,['admin','bendahara'])
+  if(!recoveredBy || !recoveryNotes?.trim() || !input.reconciliationItemId)throw new Error('MANUAL_RESOLUTION_REQUIRED: Recovery membutuhkan operator, catatan dan kasus rekonsiliasi resmi.')
   const collectionAccount=process.env.BRI_COLLECTION_ACCOUNT_NO?.trim()
   if(!collectionAccount)throw new Error('COLLECTION_ACCOUNT_REQUIRED')
   // 1. Fetch statement transaction
@@ -107,11 +110,13 @@ export async function recoverMissedPaymentFromStatement(
     status: string
     gross_amount: number
     cooperative_admin_fee: number
+    cooperative_fee_rule_id:string|null
+    cooperative_fee_snapshot:string|null
     total_charged: number
     payment_method: string
     expires_at:string
   }>(
-    `SELECT id, order_number, santri_id, status, gross_amount, cooperative_admin_fee, total_charged, payment_method, expires_at
+    `SELECT id, order_number, santri_id, status, gross_amount, cooperative_admin_fee, cooperative_fee_rule_id, cooperative_fee_snapshot, total_charged, payment_method, expires_at
      FROM finance_payment_orders
      WHERE id = ?
      LIMIT 1`,
@@ -190,7 +195,10 @@ export async function recoverMissedPaymentFromStatement(
 
   if(!statementTx.transaction_date_utc || Date.parse(statementTx.transaction_date_utc)>Date.parse(order.expires_at))throw new Error('RECOVERY_EXPIRED_ORDER_REQUIRES_UNALLOCATED_REVIEW')
   const studentVa=await queryOne<{va_number:string;customer_no:string}>('SELECT va_number,customer_no FROM finance_student_va WHERE santri_id=?',[order.santri_id])
-  if(!studentVa || statementTx.va_number!==studentVa.va_number || !process.env.BRI_PARTNER_SERVICE_ID?.trim())throw new Error('RECOVERY_VA_IDENTITY_REQUIRED')
+  if(!studentVa || statementTx.va_number!==studentVa.va_number)throw new Error('RECOVERY_VA_IDENTITY_REQUIRED')
+  const student=await queryOne<{asrama:string|null;kategori_santri:string|null;status_global:string}>('SELECT asrama,kategori_santri,status_global FROM santri WHERE id=?',[order.santri_id])
+  if(!student || student.status_global!=='aktif')throw new Error('STUDENT_NOT_ACTIVE')
+  assertSantriBillable(student.asrama,undefined,student.kategori_santri)
   // 3. Load order items
   const orderItems = await query<{
     id: string
@@ -202,6 +210,8 @@ export async function recoverMissedPaymentFromStatement(
     [order.id]
   )
 
+  for(const item of orderItems)assertSantriBillableUntukItem({asrama:student.asrama,kategoriSantri:student.kategori_santri},item.item_type)
+  if(orderItems.some(item=>!Number.isSafeInteger(item.amount)||item.amount<=0||(!item.obligation_id && item.item_type!=='UANG_JAJAN')) || orderItems.reduce((sum,item)=>sum+item.amount,0)!==order.gross_amount)throw new Error('INVALID_ORDER_FINANCIAL_SNAPSHOT')
   // 4. Check UANG_JAJAN presence and current balance
   const hasUangJajan = orderItems.some((item) => item.item_type === 'UANG_JAJAN')
   let currentWalletBalance = 0
@@ -303,7 +313,7 @@ export async function recoverMissedPaymentFromStatement(
       paymentId,
       order.id,
       studentVa.va_number,
-      process.env.BRI_PARTNER_SERVICE_ID!.trim().padStart(8,' '),
+      (await configuredBrivaPartnerServiceId()).padStart(8,' '),
       studentVa.customer_no,
       statementTx.amount,
       statementTx.transaction_date_raw,
@@ -382,7 +392,7 @@ export async function recoverMissedPaymentFromStatement(
           id, income_number, entry_type, reference_income_id, correction_id,
           payment_id, order_id, amount, rule_id, rule_snapshot,
           reference_note, created_by, created_at
-        ) VALUES (?, ?, 'INCOME', NULL, NULL, ?, ?, ?, NULL, NULL, ?, NULL, ?)
+        ) VALUES (?, ?, 'INCOME', NULL, NULL, ?, ?, ?, ?, ?, ?, NULL, ?)
       `,
       params: [
         incomeId,
@@ -390,6 +400,8 @@ export async function recoverMissedPaymentFromStatement(
         paymentId,
         order.id,
         order.cooperative_admin_fee,
+        order.cooperative_fee_rule_id||null,
+        order.cooperative_fee_snapshot||null,
         'Pendapatan Biaya Operasional Koperasi atas pembayaran BRIVA (Recovered)',
         timestamp,
       ],
@@ -477,6 +489,7 @@ export async function recoverMissedPaymentFromStatement(
   })
 
   // Execute entire batch atomically
+  if(input.reconciliationItemId)statements.push({sql:`UPDATE finance_reconciliation_items SET resolution_action='MANUAL_ALLOCATION',resolution_notes=?,resolved_by=?,resolved_at=? WHERE id=?`,params:[recoveryNotes||null,recoveredBy||null,timestamp,input.reconciliationItemId]})
   await batch(statements)
 
   briLog('info', 'BRI_MISSED_PAYMENT_RECOVERED_AND_SETTLED', {

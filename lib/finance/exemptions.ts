@@ -1,7 +1,7 @@
 // lib/finance/exemptions.ts
 // Modul manajemen pembebasan biaya santri Sistem Keuangan Baru (Fase 2C)
 
-import { query, queryOne, execute, generateId, now } from '@/lib/db'
+import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
 import { computeObligationStatus } from '@/lib/finance/types'
 import {
   assertSantriBillable,
@@ -78,72 +78,14 @@ export async function grantExemption(
   const notes = input.notes ?? null
   const createdBy = input.created_by ?? null
 
-  // 3. Simpan data pembebasan dengan status 'ACTIVE' (Non-destructive)
-  await execute(
-    `INSERT INTO finance_exemptions (
-      id, santri_id, item_type, academic_year_id,
-      period_start, period_end, reason, notes,
-      status, created_by, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`,
-    [
-      id,
-      input.santri_id,
-      input.item_type,
-      academicYearId,
-      periodStart,
-      periodEnd,
-      input.reason,
-      notes,
-      createdBy,
-      nowStr,
-    ]
-  )
-
-  const created = await getExemptionById(id)
-  if (!created) {
-    throw new Error('Gagal memverifikasi pembentukan data pembebasan biaya.')
-  }
-
-  // 4. Sinkronisasi non-retroaktif ke tagihan eksisting (finance_obligations)
-  const existingObligations = await query<{
-    id: string
-    item_type: FinanceItemType
-    period: string
-    amount_expected: number
-    amount_exempted: number
-    amount_paid: number
-    status: string
-  }>(
-    `SELECT id, item_type, period, amount_expected, amount_exempted, amount_paid, status
-     FROM finance_obligations
-     WHERE santri_id = ?`,
-    [input.santri_id]
-  )
-
-  for (const ob of existingObligations) {
-    const itemMatches = input.item_type === 'ALL' || input.item_type === ob.item_type
-    const periodMatches = isPeriodCoveredByExemption(ob.period, periodStart, periodEnd)
-
-    if (itemMatches && periodMatches) {
-      if (ob.amount_paid === 0 && ob.status === 'UNPAID') {
-        // Tagihan belum pernah dibayar sama sekali -> Bebaskan penuh
-        await execute(
-          `UPDATE finance_obligations
-           SET amount_exempted = amount_expected,
-               status = 'EXEMPTED',
-               updated_at = ?
-           WHERE id = ?`,
-          [nowStr, ob.id]
-        )
-      } else if (ob.amount_paid > 0 && ob.amount_paid < ob.amount_expected) {
-        // Tagihan sudah dibayar sebagian (PARTIALLY_PAID) / Blocker 6:
-        // JANGAN ubah secara diam-diam menjadi EXEMPTED atau PAID penuh.
-        // Status PARTIALLY_PAID dan riwayat pembayaran dipertahankan (REVIEW_REQUIRED).
-        // Tidak ada refund atau manipulasi saldo otomatis tanpa verifikasi operator.
-      }
-      // Jika sudah PAID (amount_paid >= amount_expected), jangan diubah secara retroaktif!
-    }
-  }
+  const existing=await queryOne<FinanceExemption>(`SELECT * FROM finance_exemptions WHERE santri_id=? AND item_type=? AND academic_year_id IS ? AND period_start IS ? AND period_end IS ? AND reason=? AND notes IS ? AND status='ACTIVE' LIMIT 1`,[input.santri_id,input.item_type,academicYearId,periodStart,periodEnd,input.reason,notes])
+  if(existing)return existing
+  await batch([
+    {sql:`INSERT INTO finance_exemptions(id,santri_id,item_type,academic_year_id,period_start,period_end,reason,notes,status,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,'ACTIVE',?,?)`,params:[id,input.santri_id,input.item_type,academicYearId,periodStart,periodEnd,input.reason,notes,createdBy,nowStr]},
+    {sql:`UPDATE finance_obligations SET amount_exempted=amount_expected,status='EXEMPTED',updated_at=? WHERE santri_id=? AND (?='ALL' OR item_type=?) AND (? IS NULL OR academic_year_id=?) AND (? IS NULL OR period>=?) AND (? IS NULL OR period<=?) AND amount_paid=0 AND status IN ('UNPAID','EXEMPTED')`,params:[nowStr,input.santri_id,input.item_type,input.item_type,academicYearId,academicYearId,periodStart,periodStart,periodEnd,periodEnd]}
+  ])
+  const created=await getExemptionById(id)
+  if(!created)throw new Error('Gagal memverifikasi pembebasan.')
 
   return created
 }
@@ -216,79 +158,13 @@ export async function revokeExemption(
 
   const timestamp = now()
 
-  // 1. Non-destructive: update status menjadi REVOKED dan catat metadata audit
-  await execute(
-    `UPDATE finance_exemptions
-     SET status = 'REVOKED',
-         revoked_at = ?,
-         revoked_by = ?,
-         revocation_reason = ?
-     WHERE id = ?`,
-    [
-      timestamp,
-      options?.revokedBy ?? null,
-      options?.reason ?? null,
-      exemptionId,
-    ]
-  )
-
-  // 2. Re-evaluasi seluruh tagihan santri bersangkutan yang memiliki potongan pembebasan
-  const obligations = await query<{
-    id: string
-    item_type: FinanceItemType
-    period: string
-    amount_expected: number
-    amount_exempted: number
-    amount_paid: number
-    status: string
-    academic_year_id: number | null
-  }>(
-    `SELECT id, item_type, period, amount_expected, amount_exempted, amount_paid, status, academic_year_id
-     FROM finance_obligations
-     WHERE santri_id = ? AND amount_exempted > 0`,
-    [exemption.santri_id]
-  )
-
-  let restoredCount = 0
-
-  for (const ob of obligations) {
-    // Periksa apakah masih ada pembebasan aktif lain yang meng-cover tagihan ini
-    const otherExemption = await checkExemption(
-      exemption.santri_id,
-      ob.item_type,
-      ob.period,
-      ob.academic_year_id
-    )
-
-    let newAmountExempted = 0
-    if (otherExemption) {
-      if (ob.amount_paid === 0) {
-        newAmountExempted = ob.amount_expected
-      } else {
-        newAmountExempted = Math.max(0, ob.amount_expected - ob.amount_paid)
-      }
-    } else {
-      newAmountExempted = 0
-    }
-
-    const newStatus = computeObligationStatus(
-      ob.amount_expected,
-      newAmountExempted,
-      ob.amount_paid
-    )
-
-    if (newAmountExempted !== ob.amount_exempted || newStatus !== ob.status) {
-      await execute(
-        `UPDATE finance_obligations
-         SET amount_exempted = ?,
-             status = ?,
-             updated_at = ?
-         WHERE id = ?`,
-        [newAmountExempted, newStatus, timestamp, ob.id]
-      )
-      restoredCount++
-    }
-  }
+  const affected=await query<{id:string}>(`SELECT id FROM finance_obligations WHERE santri_id=? AND amount_exempted>0 AND (?='ALL' OR item_type=?) AND (? IS NULL OR academic_year_id=?) AND (? IS NULL OR period>=?) AND (? IS NULL OR period<=?)`,[exemption.santri_id,exemption.item_type,exemption.item_type,exemption.academic_year_id,exemption.academic_year_id,exemption.period_start,exemption.period_start,exemption.period_end,exemption.period_end])
+  await batch([
+    {sql:`UPDATE finance_exemptions SET status='REVOKED',revoked_at=?,revoked_by=?,revocation_reason=? WHERE id=? AND status='ACTIVE'`,params:[timestamp,options?.revokedBy||null,options?.reason||null,exemptionId]},
+    {sql:`UPDATE finance_obligations SET amount_exempted=CASE WHEN EXISTS(SELECT 1 FROM finance_exemptions e WHERE e.santri_id=finance_obligations.santri_id AND e.status='ACTIVE' AND (e.item_type='ALL' OR e.item_type=finance_obligations.item_type) AND (e.academic_year_id IS NULL OR e.academic_year_id=finance_obligations.academic_year_id) AND (e.period_start IS NULL OR e.period_start<=finance_obligations.period) AND (e.period_end IS NULL OR e.period_end>=finance_obligations.period)) THEN CASE WHEN amount_paid=0 THEN amount_expected ELSE MIN(amount_exempted,MAX(0,amount_expected-amount_paid)) END ELSE 0 END,updated_at=? WHERE id IN (SELECT value FROM json_each(?))`,params:[timestamp,JSON.stringify(affected.map(r=>r.id))]},
+    {sql:`UPDATE finance_obligations SET status=CASE WHEN amount_paid>=MAX(0,amount_expected-amount_exempted) AND amount_paid>0 THEN 'PAID' WHEN amount_paid>0 THEN 'PARTIALLY_PAID' WHEN amount_exempted>=amount_expected THEN 'EXEMPTED' ELSE 'UNPAID' END WHERE id IN (SELECT value FROM json_each(?))`,params:[JSON.stringify(affected.map(r=>r.id))]}
+  ])
+  const restoredCount=affected.length
 
   return { success: true, restoredCount }
 }

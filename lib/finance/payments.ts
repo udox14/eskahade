@@ -1,3 +1,4 @@
+import { rupiah } from './money'
 // lib/finance/payments.ts
 // Modul Payment Execution & Allocation Engine (Fase 3A)
 // Mengelola pencatatan pembayaran, alokasi atomik ke kewajiban, dan unallocated transfer
@@ -63,9 +64,10 @@ export async function recordOrderPayment(
   const paymentNumber = generatePaymentNumber()
   const paidAt = input.paidAt ?? now()
   const cooperativeAdminFee = input.cooperativeAdminFee !== undefined
-    ? Math.max(0, Math.floor(input.cooperativeAdminFee))
+    ? rupiah(input.cooperativeAdminFee,'Biaya Koperasi',true)
     : order.cooperative_admin_fee
-  const briFeeAmount = input.briFeeAmount ?? null
+  if(input.cooperativeAdminFee!==undefined && input.cooperativeAdminFee!==order.cooperative_admin_fee)throw new Error('Biaya berbeda dari snapshot order.')
+  const briFeeAmount = input.briFeeAmount==null ? null : rupiah(input.briFeeAmount,'Fee bank',true)
   const briPaymentRequestId = input.briPaymentRequestId ?? null
   const briTrxId = input.briTrxId ?? null
   const grossAmount = order.gross_amount
@@ -323,8 +325,7 @@ export async function recordOrderPayment(
   if (cooperativeAdminFee > 0) {
     const incomeId = generateId()
     const incomeNumber = `INC-KOP-${paidAt.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
-    const coopRule = await getEffectiveCooperativeAdminFeeRule('ONLINE_CHECKOUT_FEE', paidAt).catch(() => null)
-    const ruleSnapshot = coopRule ? JSON.stringify({ id: coopRule.id, code: coopRule.code, amount: coopRule.amount }) : null
+    const ruleSnapshot=order.cooperative_fee_snapshot||null
 
     statements.push({
       sql: `
@@ -340,7 +341,7 @@ export async function recordOrderPayment(
         paymentId,
         order.id,
         cooperativeAdminFee,
-        coopRule?.id || null,
+        order.cooperative_fee_rule_id || null,
         ruleSnapshot,
         `Pendapatan Biaya Operasional Koperasi atas pembayaran ${paymentNumber}`,
         receivedBy,
@@ -594,7 +595,7 @@ export async function recordOrderPayment(
 export async function recordUnallocatedPayment(
   input: RecordUnallocatedPaymentInput
 ): Promise<PaymentWithAllocations> {
-  const amount = Math.floor(input.amount)
+  const amount = rupiah(input.amount)
   if (amount <= 0) {
     throw new Error('Nominal transfer unallocated harus lebih besar dari 0.')
   }

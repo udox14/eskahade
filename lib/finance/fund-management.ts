@@ -23,16 +23,13 @@ export const PAYMENT_SOURCE_LABELS: Record<FinancePaymentSource, string> = {
  * Jika NULL atau kosong, berarti sistem masih berada pada masa transisi pra-Koperasi.
  */
 export async function getKoperasiEffectiveTimestamp(): Promise<string | null> {
-  try {
-    const row = await queryOne<{ value: string | null }>(
+  const row = await queryOne<{ value: string | null }>(
       `SELECT value FROM app_settings WHERE key = ? LIMIT 1`,
       [APP_SETTING_KOPERASI_EFFECTIVE_AT]
     )
     const val = row?.value?.trim()
+    if(val && !Number.isFinite(Date.parse(val)))throw new Error('Konfigurasi tanggal Koperasi tidak valid.')
     return val ? val : null
-  } catch {
-    return null
-  }
 }
 
 /**

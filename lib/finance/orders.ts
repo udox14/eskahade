@@ -1,3 +1,4 @@
+import { getEffectiveCooperativeAdminFeeRule } from './cooperative-admin'
 // lib/finance/orders.ts
 // Modul Payment Order Engine (Fase 3A)
 // Mengelola siklus pesanan pembayaran, kalkulasi fee, dan validasi kewajiban
@@ -45,11 +46,15 @@ export async function createPaymentOrder(
 ): Promise<PaymentOrderWithItems> {
   const santriId = input.santriId
   const payerType = input.payerType
-  const feePayer = input.feePayer ?? 'CUSTOMER'
-  const cooperativeAdminFee = rupiah(input.cooperativeAdminFee ?? 0, 'Biaya Koperasi', true)
+  if(input.cooperativeAdminFee!==undefined)rupiah(input.cooperativeAdminFee,'Biaya Koperasi',true)
+  const feePayer = input.paymentMethod==='CASH' ? input.feePayer ?? 'CUSTOMER' : 'CUSTOMER'
+  const feeRule= (input.paymentMethod??'BRI_VA')==='BRI_VA' ? await getEffectiveCooperativeAdminFeeRule() : null
+  const cooperativeAdminFee=feeRule ? rupiah(feeRule.amount,'Biaya Koperasi',true) : 0
+  const feeSnapshot=JSON.stringify(feeRule || {is_enabled:0,amount:0})
   const expiresInHours = input.expiresInHours ?? 24
   const paymentMethod = input.paymentMethod ?? 'BRI_VA'
   const cashSessionId = input.cashSessionId ?? null
+  if(!Number.isFinite(expiresInHours) || expiresInHours<=0 || expiresInHours>168)throw new Error('Masa berlaku order tidak valid.')
 
   if (!input.items || input.items.length === 0) {
     throw new Error('Pesanan pembayaran wajib memuat minimal 1 item pembayaran.')
@@ -184,7 +189,7 @@ export async function createPaymentOrder(
       })
     }
 
-    grossAmount += amount
+    grossAmount = sumRupiah([grossAmount,amount])
   }
 
   // 3. Kalkulasi Total Tagihan (Gross + Biaya Operasional Koperasi)
@@ -194,6 +199,7 @@ export async function createPaymentOrder(
   let fixedVaNumber: string | null = null
   if (paymentMethod === 'BRI_VA') {
     const studentVa = await getStudentFixedVa(santriId)
+    if (!studentVa || studentVa.status!=='ACTIVE')throw new Error('Fixed BRIVA aktif belum tersedia.')
     if (studentVa) {
       fixedVaNumber = studentVa.va_number
     }
@@ -225,8 +231,8 @@ export async function createPaymentOrder(
       INSERT INTO finance_payment_orders (
         id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee,
         fee_payer, total_charged, payment_method, fixed_va_number, status,
-        expires_at, cash_session_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?)
+        expires_at, cash_session_id, created_at, updated_at, cooperative_fee_rule_id, cooperative_fee_snapshot
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, ?)
     `,
     params: [
       orderId,
@@ -243,6 +249,8 @@ export async function createPaymentOrder(
       cashSessionId,
       timestamp,
       timestamp,
+      feeRule?.id||null,
+      feeSnapshot,
     ],
   })
 
@@ -259,6 +267,7 @@ export async function createPaymentOrder(
   if (plan) {
     const staged: PaymentOrderWithItems = {
       id:orderId,order_number:orderNumber,santri_id:santriId,payer_type:payerType,gross_amount:grossAmount,
+      cooperative_fee_rule_id:feeRule?.id||null,cooperative_fee_snapshot:feeSnapshot,
       cooperative_admin_fee:cooperativeAdminFee,fee_payer:feePayer,total_charged:totalCharged,payment_method:paymentMethod,
       fixed_va_number:fixedVaNumber,status:'PENDING',expires_at:expiresAt,cash_session_id:cashSessionId,created_at:timestamp,updated_at:timestamp,
       items:preparedOrderItems.map(item=>({id:item.id,order_id:orderId,obligation_id:item.obligationId,item_type:item.itemType,amount:item.amount})),
@@ -284,7 +293,7 @@ export async function getPaymentOrderById(
   orderId: string
 ): Promise<PaymentOrderWithItems | null> {
   const order = await queryOne<FinancePaymentOrder>(
-    `SELECT id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee,
+    `SELECT id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, cooperative_fee_rule_id, cooperative_fee_snapshot,
             fee_payer, total_charged, payment_method, fixed_va_number, status,
             expires_at, cash_session_id, created_at, updated_at
      FROM finance_payment_orders
@@ -315,7 +324,7 @@ export async function getPaymentOrderByNumber(
   orderNumber: string
 ): Promise<PaymentOrderWithItems | null> {
   const order = await queryOne<FinancePaymentOrder>(
-    `SELECT id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee,
+    `SELECT id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, cooperative_fee_rule_id, cooperative_fee_snapshot,
             fee_payer, total_charged, payment_method, fixed_va_number, status,
             expires_at, cash_session_id, created_at, updated_at
      FROM finance_payment_orders
@@ -369,7 +378,7 @@ export async function cancelPaymentOrder(
   )
 
   const updated = await queryOne<FinancePaymentOrder>(
-    `SELECT id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee,
+    `SELECT id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, cooperative_fee_rule_id, cooperative_fee_snapshot,
             fee_payer, total_charged, payment_method, fixed_va_number, status,
             expires_at, cash_session_id, created_at, updated_at
      FROM finance_payment_orders
@@ -426,7 +435,7 @@ export async function listPaymentOrdersByStudent(
   }
 
   const orders = await query<FinancePaymentOrder>(
-    `SELECT id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee,
+    `SELECT id, order_number, santri_id, payer_type, gross_amount, cooperative_admin_fee, cooperative_fee_rule_id, cooperative_fee_snapshot,
             fee_payer, total_charged, payment_method, fixed_va_number, status,
             expires_at, cash_session_id, created_at, updated_at
      FROM finance_payment_orders

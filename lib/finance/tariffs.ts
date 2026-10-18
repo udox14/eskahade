@@ -1,3 +1,4 @@
+import { rupiah } from './money'
 // lib/finance/tariffs.ts
 // Modul manajemen tarif Sistem Keuangan Baru
 
@@ -59,7 +60,7 @@ export async function createTariff(input: CreateTariffInput): Promise<FinanceTar
       id,
       input.item_type,
       academicYearId,
-      Math.floor(input.nominal),
+      rupiah(input.nominal,'Tarif',true),
       installmentRule,
       input.effective_from,
       effectiveUntil,
@@ -270,7 +271,7 @@ export async function setTariffOverride(input: {
       `UPDATE finance_tariff_overrides
        SET nominal = ?, academic_year_id = ?, notes = ?, updated_at = ?
        WHERE id = ?`,
-      [Math.floor(input.nominal), academicYearId, notes, nowStr, existing.id]
+      [rupiah(input.nominal,'Tarif',true), academicYearId, notes, nowStr, existing.id]
     )
     const updated = await getTariffOverride(input.item_type, input.period)
     return updated!
@@ -286,7 +287,7 @@ export async function setTariffOverride(input: {
       id,
       input.item_type,
       input.period,
-      Math.floor(input.nominal),
+      rupiah(input.nominal,'Tarif',true),
       academicYearId,
       notes,
       createdBy,
