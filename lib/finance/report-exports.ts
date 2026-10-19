@@ -278,7 +278,7 @@ export async function exportDistributionsExcel(
   const headers = [
     'No',
     'No. Penyaluran',
-    'Tanggal Salur',
+    'Tanggal Aktivitas',
     'Penerima',
     'Nama Rekanan / Kas',
     'Metode',
@@ -290,6 +290,7 @@ export async function exportDistributionsExcel(
     'No. Ref Transfer',
     'Petugas',
     'Catatan',
+    'Status',
   ]
 
   headers.forEach((h, idx) => setCell(5, idx, h, thStyle))
@@ -300,10 +301,10 @@ export async function exportDistributionsExcel(
   items.forEach((item, index) => {
     setCell(rowIdx, 0, index + 1, tdCenter)
     setCell(rowIdx, 1, item.distributionNumber, tdCenter)
-    setCell(rowIdx, 2, item.transferredAt ? item.transferredAt.slice(0, 16) : '-', tdCenter)
+    setCell(rowIdx, 2, item.reportDate.slice(0, 16), tdCenter)
     setCell(rowIdx, 3, item.recipientType, tdCenter)
     setCell(rowIdx, 4, item.recipientName, tdText)
-    setCell(rowIdx, 5, item.method, tdCenter)
+    setCell(rowIdx, 5, item.method === 'BRI_QLOLA' ? 'BRI / QLola' : item.method === 'CASH' ? 'Tunai' : 'Transfer Manual', tdCenter)
     setCell(rowIdx, 6, item.destinationBank || '-', tdCenter)
     setCell(rowIdx, 7, item.destinationAccount || '-', tdCenter)
     setCell(rowIdx, 8, item.accountHolderName || '-', tdText)
@@ -312,15 +313,16 @@ export async function exportDistributionsExcel(
     setCell(rowIdx, 11, item.transferReference || '-', tdCenter)
     setCell(rowIdx, 12, item.operatorName || '-', tdCenter)
     setCell(rowIdx, 13, item.notes || '-', tdText)
+    setCell(rowIdx, 14, item.status, tdCenter)
 
-    totalDisbursed += item.amount
+    if (item.status === 'DISTRIBUTED') totalDisbursed += item.amount
     rowIdx++
   })
 
   setCell(rowIdx, 0, 'TOTAL', { ...totalStyle, alignment: { horizontal: 'center' } })
   for (let c = 1; c <= 9; c++) setCell(rowIdx, c, '', totalStyle)
   setCell(rowIdx, 10, totalDisbursed, totalStyle)
-  for (let c = 11; c <= 13; c++) setCell(rowIdx, c, '', totalStyle)
+  for (let c = 11; c <= 14; c++) setCell(rowIdx, c, '', totalStyle)
 
   ws['!cols'] = [
     { wch: 6 },
@@ -337,6 +339,7 @@ export async function exportDistributionsExcel(
     { wch: 16 },
     { wch: 18 },
     { wch: 25 },
+    { wch: 24 },
   ]
 
   const wb = XLSX.utils.book_new()

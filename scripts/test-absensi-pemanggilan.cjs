@@ -93,7 +93,9 @@ async function run() {
  assert.equal((await verif.getAntrianVerifikasi('2026-09-30', { kategori: 'SADESA' }))[0].santri_id, 's2')
  assert.equal((await verif.getAntrianVerifikasi('2026-09-30', { kategori: 'SADESA', asrama: 'A' })).length, 0)
  assert.ok((await verif.simpanVerifikasiMassal([payload('old','2026-01-07')], '2026-09-30')).error)
- assert.ok((await verif.simpanVerifikasiMassal([payload('current','2026-09-30'), payload('sadesa','2026-09-30','KESALAHAN','s2')])).error)
+ // Without tanggalRef the queue spans three months. Reject an older row and
+ // ensure the valid row in that same batch is never changed.
+ assert.ok((await verif.simpanVerifikasiMassal([payload('current','2026-09-30'), payload('old','2026-01-07')])).error)
  assert.equal((await verif.simpanVerifikasiMassal([payload('current','2026-09-30','KESALAHAN','s2')], '2026-09-30')).code, 'STALE')
  assert.equal((await verif.simpanVerifikasiMassal([payload('current','2026-09-30','BOGUS')], '2026-09-30')).error, 'Data vonis tidak valid')
  session = null

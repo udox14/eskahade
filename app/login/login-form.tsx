@@ -51,7 +51,7 @@ export default function LoginForm() {
 
         {/* Card */}
         <div className="bg-white/95 backdrop-blur-md rounded-2xl p-6 sm:p-8 shadow-xl shadow-[#12372a]/5 border border-[#ddd4c3]/60">
-          <form onSubmit={handleLogin} className="space-y-5">
+          <form method="post" onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-1.5">
               <label className="text-xs font-extrabold text-[#12372a]">Email / Username</label>
               <input 

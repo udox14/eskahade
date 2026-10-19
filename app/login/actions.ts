@@ -1,6 +1,6 @@
 'use server'
 
-import { queryOne } from '@/lib/db'
+import { findLoginAccount, type LoginUserRow } from '@/lib/auth/login-account'
 import { verifyPassword } from '@/lib/auth/password'
 import { ensureUserStructuralJabatanColumn, setSession, clearSession } from '@/lib/auth/session'
 import { getRequestAuditContext, logActivity } from '@/lib/activity-log'
@@ -18,23 +18,14 @@ export async function login(formData: FormData) {
     return { error: 'Email dan password wajib diisi.' }
   }
 
-  let user: {
-    id: string
-    email: string
-    password_hash: string
-    full_name: string
-    role: string
-    roles: string | null
-    asrama_binaan: string | null
-    structural_jabatan: string | null
-  } | null = null
+  let user: LoginUserRow | null = null
+  let demoSandbox = false
 
   try {
     await ensureUserStructuralJabatanColumn()
-    user = await queryOne(
-      'SELECT id, email, password_hash, full_name, role, roles, asrama_binaan, structural_jabatan FROM users WHERE email = ?',
-      [normalizedEmail]
-    )
+    const account = await findLoginAccount(normalizedEmail)
+    user = account?.user ?? null
+    demoSandbox = account?.demoSandbox ?? false
   } catch (err: any) {
     console.error('[LOGIN] Database query error:', err?.message)
     return { error: 'Gagal terhubung ke database. Coba lagi nanti.' }
@@ -110,6 +101,7 @@ export async function login(formData: FormData) {
       roles: rolesArray,          // semua role
       asrama_binaan: user.asrama_binaan,
       structural_jabatan: user.structural_jabatan,
+      demoSandbox,
     })
     console.log('[LOGIN] Step 4: session set OK')
   } catch (err: any) {

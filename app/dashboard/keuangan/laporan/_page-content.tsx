@@ -25,6 +25,7 @@ import {
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import Pagination from '@/components/ui/pagination'
 import ReportPrintableView from '@/components/finance/report-printable-view'
+import { formatFinanceDate } from '@/lib/finance/date-format'
 import { toast } from 'sonner'
 import {
   fetchReceiptsReport,
@@ -87,6 +88,27 @@ interface LaporanKeuanganContentProps {
 function formatRupiah(val: number): string {
   if (!Number.isFinite(val) || val === 0) return 'Rp0'
   return `Rp${Math.round(val).toLocaleString('id-ID')}`
+}
+
+function formatDistributionMethod(method: string): string {
+  if (method === 'BRI_QLOLA') return 'BRI / QLola'
+  if (method === 'MANUAL_TRANSFER' || method === 'TRANSFER') return 'Transfer Manual'
+  if (method === 'CASH') return 'Tunai'
+  return method
+}
+
+function formatDistributionStatus(status: string): string {
+  const labels: Record<string, string> = {
+    DRAFT: 'Draft',
+    PENDING_APPROVAL: 'Menunggu Approval QLola',
+    PROCESSING: 'Diproses',
+    CANCEL_PENDING: 'Menunggu Pembatalan',
+    DISTRIBUTED: 'Tersalurkan',
+    FAILED: 'Gagal',
+    REJECTED: 'Ditolak',
+    CANCELLED: 'Dibatalkan',
+  }
+  return labels[status] || status
 }
 
 export default function LaporanKeuanganContent({
@@ -940,15 +962,16 @@ export default function LaporanKeuanganContent({
                   <th className="py-3 px-3">Penerima</th>
                   <th className="py-3 px-3">Rekening / Kas</th>
                   <th className="py-3 px-3">Rincian Pos</th>
-                  <th className="py-3 px-3 text-right">Nominal Disalurkan</th>
+                  <th className="py-3 px-3 text-right">Nominal Penyaluran</th>
                   <th className="py-3 px-3 text-center">Ref Transfer</th>
                   <th className="py-3 px-3">Petugas</th>
+                  <th className="py-3 px-3 text-center">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {distributionsData.items.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-slate-400">
+                    <td colSpan={10} className="py-8 text-center text-slate-400">
                       Tidak ada transaksi penyaluran pada kriteria filter ini.
                     </td>
                   </tr>
@@ -959,24 +982,28 @@ export default function LaporanKeuanganContent({
                         {(currentPage - 1) * pageSize + idx + 1}
                       </td>
                       <td className="py-3 px-3 font-mono font-medium text-slate-800">{row.distributionNumber}</td>
-                      <td className="py-3 px-3 text-slate-500 whitespace-nowrap">{row.transferredAt.slice(0, 16)}</td>
+                      <td className="py-3 px-3 text-slate-500 whitespace-nowrap">{formatFinanceDate(row.reportDate, true)}</td>
                       <td className="py-3 px-3">
                         <div className="font-semibold text-slate-900">{row.recipientName}</div>
                         <div className="text-[10px] text-slate-500">{row.recipientType}</div>
                       </td>
                       <td className="py-3 px-3 text-slate-600">
-                        {row.method === 'TRANSFER' ? (
-                          <div>
-                            <span className="font-bold">{row.destinationBank}</span>: {row.destinationAccount}
+                        <div className="font-semibold">{formatDistributionMethod(row.method)}</div>
+                        {row.method !== 'CASH' && (row.destinationBank || row.destinationAccount) && (
+                          <div className="text-[10px] text-slate-500">
+                            {[row.destinationBank, row.destinationAccount].filter(Boolean).join(': ') || '-'}
                           </div>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-bold">TUNAI (CASH)</span>
                         )}
                       </td>
                       <td className="py-3 px-3 text-slate-600">{row.itemsSummary}</td>
                       <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">{formatRupiah(row.amount)}</td>
                       <td className="py-3 px-3 text-center font-mono text-slate-500">{row.transferReference || '-'}</td>
                       <td className="py-3 px-3 text-slate-600">{row.operatorName || '-'}</td>
+                      <td className="py-3 px-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${row.status === 'DISTRIBUTED' ? 'bg-emerald-100 text-emerald-800' : row.status === 'FAILED' || row.status === 'REJECTED' || row.status === 'CANCELLED' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'}`}>
+                          {formatDistributionStatus(row.status)}
+                        </span>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -1582,12 +1609,13 @@ export default function LaporanKeuanganContent({
           ]}
           columns={[
             { header: 'No. Penyaluran', accessor: (r) => r.distributionNumber, align: 'center' },
-            { header: 'Tanggal', accessor: (r) => r.transferredAt.slice(0, 16), align: 'center' },
+            { header: 'Tanggal', accessor: (r) => formatFinanceDate(r.reportDate, true), align: 'center' },
             { header: 'Penerima', accessor: (r) => `${r.recipientName} (${r.recipientType})` },
-            { header: 'Metode / Bank', accessor: (r) => r.method === 'TRANSFER' ? `${r.destinationBank}: ${r.destinationAccount}` : 'TUNAI' },
+            { header: 'Metode / Bank', accessor: (r) => `${formatDistributionMethod(r.method)}${r.method !== 'CASH' && (r.destinationBank || r.destinationAccount) ? ` — ${[r.destinationBank, r.destinationAccount].filter(Boolean).join(': ')}` : ''}` },
             { header: 'Item Pos', accessor: (r) => r.itemsSummary },
             { header: 'Nominal Salur', accessor: (r) => formatRupiah(r.amount), align: 'right' },
             { header: 'Petugas', accessor: (r) => r.operatorName || '-' },
+            { header: 'Status', accessor: (r) => formatDistributionStatus(r.status) },
           ]}
           data={distributionsData.items}
           footerTotals={[

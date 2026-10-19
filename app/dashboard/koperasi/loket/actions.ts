@@ -388,14 +388,13 @@ export async function verifyStudentLoketPin(
   attemptsLeft: number
 }> {
   const {userId} = await authorizeLoketOperator(true)
-  const result = await verifyStudentPin(santriId, pin)
+  const token = generateId()
+  const result = await verifyStudentPin(santriId, pin, { authorization: {
+    tokenHash: hashPinAuthorization(token), operatorId: userId,
+    expiresAt: new Date(Date.now()+5*60*1000).toISOString(),
+  } })
 
   if (result.verified) {
-    const token = generateId()
-    // Masa berlaku 5 menit
-    await execute(`INSERT INTO finance_pin_authorizations(token_hash,santri_id,operator_id,expires_at,created_at) VALUES (?,?,?,?,?)`,
-      [hashPinAuthorization(token),santriId,userId,new Date(Date.now()+5*60*1000).toISOString(),now()])
-
     return {
       verified: true,
       verificationToken: token,
@@ -445,21 +444,15 @@ export async function changeStudentPinAtLoketAction(
   }
 
   // Verifikasi PIN lama
-  const verifyResult = await verifyStudentPin(santriId, cleanOld)
+  const verifyResult = await verifyStudentPin(santriId, cleanOld, { replacement: {
+    pin: cleanNew, updatedBy: userId, reason: 'Diubah di loket atas permintaan santri',
+  } })
   if (!verifyResult.verified) {
     if (verifyResult.locked) {
       throw new Error('PIN santri sekarang terkunci sementara karena salah memasukkan PIN 3 kali.')
     }
     throw new Error(`PIN lama santri salah. Sisa kesempatan: ${verifyResult.attemptsLeft} kali.`)
   }
-
-  // Update hash PIN baru & catat audit log
-  await resetStudentPin(
-    santriId,
-    cleanNew,
-    userId,
-    'Diubah di loket atas permintaan santri'
-  )
 
   return { success: true, message: 'PIN santri berhasil diubah.' }
 }

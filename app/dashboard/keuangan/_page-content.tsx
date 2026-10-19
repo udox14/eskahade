@@ -30,6 +30,7 @@ import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { getDashboardData, type UserDashboardPermissions } from './actions'
 import type { FinanceDashboardData } from '@/lib/finance/dashboard'
 import type { FinanceCashSession } from '@/lib/finance/cash-session'
+import { formatFinanceDate } from '@/lib/finance/date-format'
 
 interface DashboardKeuanganContentProps {
   initialData: FinanceDashboardData
@@ -47,18 +48,7 @@ function formatRupiah(val: number): string {
 }
 
 function formatDateIndo(dateStr: string): string {
-  try {
-    const d = new Date(dateStr)
-    return d.toLocaleDateString('id-ID', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return dateStr
-  }
+  return formatFinanceDate(dateStr, true)
 }
 
 const BULAN_NAMES = [

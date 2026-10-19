@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "eskahade-local-test-only",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "eskahade-local-test-only" }],
+  "d1_databases": [
+    { "binding": "DB", "database_name": "local-synthetic-main", "database_id": "00000000-0000-0000-0000-000000000001", "remote": false },
+    { "binding": "DEMO_DB", "database_name": "local-synthetic-demo", "database_id": "00000000-0000-0000-0000-000000000002", "remote": false }
+  ],
+  "kv_namespaces": [{ "binding": "NEXT_INC_CACHE_KV", "id": "00000000000000000000000000000001", "remote": false }],
+  "r2_buckets": [{ "binding": "R2_BUCKET", "bucket_name": "local-synthetic-media", "remote": false }],
+  "vars": {
+    "JWT_SECRET": "synthetic-local-only-stabilization-20261019",
+    "BRI_ENV": "sandbox", "BRI_OUTBOUND_ENABLED": "false", "BRI_BRIVA_OUTBOUND_ENABLED": "false",
+    "BRI_BRIVA_INBOUND_ENABLED": "false", "BRI_STATEMENT_SYNC_ENABLED": "false",
+    "BRI_DIST_CASH_ENABLED": "false", "BRI_DIST_MANUAL_ENABLED": "false"
+  }
+}

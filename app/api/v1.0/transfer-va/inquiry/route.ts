@@ -8,6 +8,7 @@ import { extractBrivaHeaders, handleBrivaInquiry, loadBriConfig, BRI_VA_INQUIRY_
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
+  try {
   const config = loadBriConfig()
 
   // In production, non-canonical alias paths are strictly disabled
@@ -34,4 +35,8 @@ export async function POST(req: NextRequest) {
   })
 
   return NextResponse.json(result.body, { status: result.status })
+  } catch {
+    return NextResponse.json({ responseCode: BRI_VA_INQUIRY_CODES.GENERAL_ERROR, responseMessage: 'General Error' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } })
+  }
 }

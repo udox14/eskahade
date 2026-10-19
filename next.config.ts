@@ -2,7 +2,9 @@ import type { NextConfig } from "next";
 
 if (process.env.NODE_ENV === 'development') {
   const { initOpenNextCloudflareForDev } = require("@opennextjs/cloudflare");
-  initOpenNextCloudflareForDev();
+  initOpenNextCloudflareForDev(process.env.ESKAHADE_LOCAL_TEST === '1'
+    ? { configPath: 'wrangler.local-test.jsonc', persist: { path: '.wrangler/stabilization-local/v3' } }
+    : undefined);
 }
 
 const nextConfig: NextConfig = {

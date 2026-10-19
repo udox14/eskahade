@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { queryOne } from '@/lib/db'
+import { findLoginAccount } from '@/lib/auth/login-account'
 import { verifyPassword } from '@/lib/auth/password'
 import {
   createJWTToken,
@@ -10,66 +9,14 @@ import {
 } from '@/lib/auth/session'
 import { logActivity } from '@/lib/activity-log'
 
-type LoginUserRow = {
-  id: string
-  email: string
-  password_hash: string
-  full_name: string
-  role: string
-  roles: string | null
-  asrama_binaan: string | null
-  structural_jabatan: string | null
-}
-
-/**
- * Mencari akun demo pada database sandbox (DEMO_DB).
- *
- * Kenapa perlu terpisah: getDB() hanya mengarahkan query ke DEMO_DB ketika request
- * SUDAH membawa cookie session ber-role 'demo' (lihat lib/auth/demo-context.ts).
- * Pada saat login cookie itu belum ada, sehingga query biasa selalu membaca DB
- * produksi dan akun demo tidak akan pernah ditemukan — rute login jadi masalah
- * ayam-telur.
- *
- * Pengaman:
- *  - HANYA dijalankan bila akun tidak ditemukan di DB utama;
- *  - akun yang ditemukan WAJIB ber-role 'demo'. Akun non-demo di DEMO_DB ditolak,
- *    sehingga DEMO_DB tidak bisa dipakai untuk masuk sebagai admin/bendahara asli.
- */
-async function findDemoAccount(email: string): Promise<LoginUserRow | null> {
-  try {
-    const { env } = await getCloudflareContext({ async: true })
-    const demoDb = (env as { DEMO_DB?: { prepare: (sql: string) => { bind: (...args: unknown[]) => { first: () => Promise<unknown> } } } }).DEMO_DB
-    if (!demoDb) return null
-
-    const row = (await demoDb
-      .prepare(
-        'SELECT id, email, password_hash, full_name, role, roles, asrama_binaan, structural_jabatan FROM users WHERE email = ?'
-      )
-      .bind(email)
-      .first()) as LoginUserRow | null
-
-    if (!row) return null
-
-    const hasDemoRole =
-      row.role === 'demo' ||
-      (() => {
-        try {
-          const parsed = row.roles ? JSON.parse(row.roles) : []
-          return Array.isArray(parsed) && parsed.includes('demo')
-        } catch {
-          return false
-        }
-      })()
-
-    return hasDemoRole ? row : null
-  } catch {
-    return null
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    const body: unknown = await request.json().catch(() => null)
+    if (!body || typeof body !== 'object' || Array.isArray(body)
+      || !('email' in body) || typeof body.email !== 'string'
+      || !('password' in body) || typeof body.password !== 'string') {
+      return NextResponse.json({ error: 'Email dan password wajib diisi.' }, { status: 400 })
+    }
     const { email, password } = body
     const requestInfo = {
       ipAddress: request.headers.get('cf-connecting-ip')
@@ -78,7 +25,7 @@ export async function POST(request: NextRequest) {
       userAgent: request.headers.get('user-agent'),
     }
 
-    if (!email || !password) {
+    if (!email.trim() || !password) {
       return NextResponse.json(
         { error: 'Email dan password wajib diisi.' },
         { status: 400 }
@@ -87,18 +34,9 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = email.toLowerCase().trim()
     await ensureUserStructuralJabatanColumn()
-    let user = await queryOne<LoginUserRow>(
-      'SELECT id, email, password_hash, full_name, role, roles, asrama_binaan, structural_jabatan FROM users WHERE email = ?',
-      [normalizedEmail]
-    )
-
-    // Fallback khusus akun demo (lihat findDemoAccount).
-    // Login dari sandbox ditandai pada token agar hak tulis hanya berlaku di sandbox.
-    let loggedInFromSandbox = false
-    if (!user) {
-      user = await findDemoAccount(normalizedEmail)
-      loggedInFromSandbox = Boolean(user)
-    }
+    const account = await findLoginAccount(normalizedEmail)
+    const user = account?.user ?? null
+    const loggedInFromSandbox = account?.demoSandbox ?? false
 
     if (!user) {
       await logActivity({

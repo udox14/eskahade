@@ -1,4 +1,7 @@
 const assert=require('node:assert/strict'),crypto=require('node:crypto');
+// Keep relative bank/order timestamps within the dated statement fixture.
+const RealDate=Date,fixtureNow=RealDate.parse('2026-10-18T10:00:00Z');
+global.Date=class extends RealDate{constructor(...args){super(...(args.length?args:[fixtureNow]))}static now(){return fixtureNow}};
 const {harness}=require('./finance-remediation-fixture.cjs');const h=harness();
 const service=h.load('lib/finance/bri/briva-service.ts'),sign=h.load('lib/finance/bri/crypto.ts').generateBriInboundNotificationSignature;
 const statement=h.load('lib/finance/bri/statement-service.ts');let count=0;

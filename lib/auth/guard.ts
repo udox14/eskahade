@@ -31,11 +31,10 @@ export async function guardPage(href: string): Promise<SessionUser> {
   try {
     allowed = await canAccessFeatureForSession(session, href)
   } catch (err: any) {
-    // Kalau DB error (mis. tabel belum ada), log dan izinkan masuk
-    // supaya non-admin tidak ter-redirect loop secara diam-diam
+    // Permission lookup failure cannot grant access.
     console.error('[guard] canAccessHref ERROR untuk', href, '-', err?.message)
     console.error('[guard] PERINGATAN: pastikan migration 0011_fitur_akses.sql sudah dijalankan di D1!')
-    return session
+    redirect('/dashboard')
   }
 
   console.log('[guard] href:', href, '| roles:', roles, '| allowed:', allowed)

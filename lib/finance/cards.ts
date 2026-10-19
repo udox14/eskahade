@@ -5,7 +5,7 @@
 // 2. Token QR acak kriptografis (BUKAN raw NIS santri dan BUKAN raw ID).
 // 3. Multi-histori kartu (status: ACTIVE, REVOKED, LOST, BLOCKED) dengan integritas data masa lalu.
 
-import { query, queryOne, execute, generateId, now } from '@/lib/db'
+import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
 import {
   assertSantriBillable,
   nonBillableSantriSqlPredicate,
@@ -122,25 +122,23 @@ export async function issueCard(
   const revokeReason = options?.reason || 'Digantikan penerbitan kartu baru'
 
   // 1. Revoke kartu aktif yang sudah ada (jika ada)
-  await execute(
-    `UPDATE finance_credentials
+  await batch([{ sql: `UPDATE finance_credentials
      SET status = 'REVOKED',
          revoked_at = ?,
          revoked_by = ?,
          revocation_reason = ?,
          updated_at = ?
      WHERE santri_id = ? AND status = 'ACTIVE'`,
-    [timestamp, issuedBy || null, revokeReason, timestamp, santriId]
-  )
+    params: [timestamp, issuedBy || null, revokeReason, timestamp, santriId]
+  },
 
   // 2. Masukkan kartu baru berstatus 'ACTIVE'
-  await execute(
-    `INSERT INTO finance_credentials (
+  { sql: `INSERT INTO finance_credentials (
        id, santri_id, card_token, status, issued_at,
        issued_by, created_at, updated_at
      ) VALUES (?, ?, ?, 'ACTIVE', ?, ?, ?, ?)`,
-    [newCardId, santriId, cardToken, timestamp, issuedBy || null, timestamp, timestamp]
-  )
+    params: [newCardId, santriId, cardToken, timestamp, issuedBy || null, timestamp, timestamp]
+  }])
 
   const created = await queryOne<FinanceCredential>(
     `SELECT c.*, u.full_name AS issuer_name

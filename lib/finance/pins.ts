@@ -6,7 +6,7 @@
 // 3. Batas percobaan salah 3 kali dengan temporary lockout 15 menit.
 // 4. Audit trail mutlak di finance_pin_audit_logs untuk set, reset, lock, dan unlock.
 
-import { query, queryOne, execute, generateId, now } from '@/lib/db'
+import { query, queryOne, batch, generateId, now } from '@/lib/db'
 import { hashPassword, verifyPassword } from '@/lib/auth/password'
 import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
 
@@ -165,25 +165,22 @@ export async function resetStudentPin(
   const logReason = reason || 'Reset PIN santri oleh petugas'
 
   // Update hash PIN & bersihkan status lockout
-  await execute(
-    `UPDATE finance_student_pins
+  await batch([{ sql: `UPDATE finance_student_pins
      SET pin_hash = ?,
          failed_attempts = 0,
          locked_until = NULL,
          updated_at = ?,
          updated_by = ?
      WHERE santri_id = ?`,
-    [pinHash, timestamp, updatedBy || null, santriId]
-  )
+    params: [pinHash, timestamp, updatedBy || null, santriId]
+  },
 
   // Catat audit trail dengan action eksplisit 'RESET'
-  const logId = generateId()
-  await execute(
-    `INSERT INTO finance_pin_audit_logs (
+  { sql: `INSERT INTO finance_pin_audit_logs (
        id, santri_id, action, performed_by, reason, created_at
      ) VALUES (?, ?, 'RESET', ?, ?, ?)`,
-    [logId, santriId, updatedBy || null, logReason, timestamp]
-  )
+    params: [generateId(), santriId, updatedBy || null, logReason, timestamp]
+  }, { sql: 'UPDATE finance_pin_authorizations SET expires_at = ? WHERE santri_id = ? AND consumed_by IS NULL', params: [timestamp, santriId] }])
 }
 
 /**
@@ -227,21 +224,18 @@ export async function setStudentPin(
   const reason = options?.reason || 'Inisialisasi PIN awal santri'
 
   // 1. Simpan hash PIN awal
-  await execute(
-    `INSERT INTO finance_student_pins (
+  await batch([{ sql: `INSERT INTO finance_student_pins (
        santri_id, pin_hash, failed_attempts, locked_until, updated_at, updated_by
      ) VALUES (?, ?, 0, NULL, ?, ?)`,
-    [santriId, pinHash, timestamp, updatedBy || null]
-  )
+    params: [santriId, pinHash, timestamp, updatedBy || null]
+  },
 
   // 2. Catat audit trail dengan action 'SET'
-  const logId = generateId()
-  await execute(
-    `INSERT INTO finance_pin_audit_logs (
+  { sql: `INSERT INTO finance_pin_audit_logs (
        id, santri_id, action, performed_by, reason, created_at
      ) VALUES (?, ?, 'SET', ?, ?, ?)`,
-    [logId, santriId, updatedBy || null, reason, timestamp]
-  )
+    params: [generateId(), santriId, updatedBy || null, reason, timestamp]
+  }])
 }
 
 /**
@@ -252,119 +246,87 @@ export async function setStudentPin(
  * - Jika gagal >= 3 kali, kunci akun santri selama 15 menit dan catat log.
  * - Jika benar, reset failed_attempts = 0.
  */
+export interface PinVerificationOptions {
+  authorization?: { tokenHash: string; operatorId: string; expiresAt: string }
+  replacement?: { pin: string; updatedBy: string; reason: string }
+}
+
 export async function verifyStudentPin(
   santriId: string,
-  inputPin: string
+  inputPin: string,
+  options: PinVerificationOptions = {}
 ): Promise<VerifyPinResult> {
   const record = await queryOne<FinanceStudentPin>(
-    `SELECT * FROM finance_student_pins WHERE santri_id = ?`,
-    [santriId]
+    'SELECT * FROM finance_student_pins WHERE santri_id = ?', [santriId]
   )
+  if (!record) return { verified: false, locked: false, attemptsLeft: 0 }
+  const timestamp = now()
+  const lockActive = record.locked_until && new Date(record.locked_until).getTime() > Date.now()
+  if (lockActive) return { verified: false, locked: true, attemptsLeft: 0,
+    remainingLockSeconds: Math.ceil((new Date(record.locked_until!).getTime() - Date.now()) / 1000) }
 
-  if (!record) {
-    return { verified: false, locked: false, attemptsLeft: 0 }
-  }
-
-  const nowMs = Date.now()
-
-  // 1. Cek apakah sedang dalam masa lockout
-  if (record.locked_until) {
-    const lockExpiryMs = new Date(record.locked_until).getTime()
-    if (lockExpiryMs > nowMs) {
-      const remainingSecs = Math.ceil((lockExpiryMs - nowMs) / 1000)
-      return {
-        verified: false,
-        locked: true,
-        attemptsLeft: 0,
-        remainingLockSeconds: remainingSecs,
-      }
-    } else {
-      // Masa lockout telah kedaluwarsa, reset penghitung gagal
-      await execute(
-        `UPDATE finance_student_pins
-         SET failed_attempts = 0, locked_until = NULL, updated_at = ?
-         WHERE santri_id = ?`,
-        [now(), santriId]
-      )
-      record.failed_attempts = 0
-      record.locked_until = null
+  const valid = typeof inputPin === 'string' && await verifyPassword(inputPin.trim(), record.pin_hash)
+  if (valid) {
+    if (options.replacement) validatePinFormat(options.replacement.pin)
+    const replacementHash = options.replacement ? await hashPassword(options.replacement.pin.trim()) : null
+    // Password verification is asynchronous. Compare the current hash and lock
+    // inside the same batch that issues a withdrawal authorization or rotates PIN.
+    const statements: { sql: string; params: unknown[] }[] = [{
+      sql: `SELECT json(CASE WHEN EXISTS (SELECT 1 FROM finance_student_pins
+        WHERE santri_id = ? AND pin_hash = ?
+        AND (locked_until IS NULL OR julianday(locked_until) <= julianday(?)))
+        THEN 'true' ELSE 'pin_verification_stale' END)`,
+      params: [santriId, record.pin_hash, timestamp],
+    }, {
+      sql: `UPDATE finance_student_pins SET failed_attempts=0, locked_until=NULL,
+        pin_hash=COALESCE(?,pin_hash), updated_at=?, updated_by=COALESCE(?,updated_by)
+        WHERE santri_id=?`,
+      params: [replacementHash, timestamp, options.replacement?.updatedBy || null, santriId],
+    }]
+    if (options.replacement) {
+      statements.push({ sql: `INSERT INTO finance_pin_audit_logs
+        (id,santri_id,action,performed_by,reason,created_at) VALUES (?,?,'RESET',?,?,?)`,
+        params: [generateId(), santriId, options.replacement.updatedBy, options.replacement.reason, timestamp] },
+        { sql: 'UPDATE finance_pin_authorizations SET expires_at=? WHERE santri_id=? AND consumed_by IS NULL', params: [timestamp, santriId] })
+    } else if (options.authorization) {
+      statements.push({ sql: `INSERT INTO finance_pin_authorizations
+        (token_hash,santri_id,operator_id,expires_at,created_at) VALUES (?,?,?,?,?)`,
+        params: [options.authorization.tokenHash, santriId, options.authorization.operatorId, options.authorization.expiresAt, timestamp] })
     }
-  }
-
-  // 2. Verifikasi hash menggunakan PBKDF2 Web Crypto
-  const cleanPin = inputPin.trim()
-  const isValid = await verifyPassword(cleanPin, record.pin_hash)
-
-  if (isValid) {
-    // PIN benar: reset failed_attempts
-    if (record.failed_attempts > 0 || record.locked_until) {
-      await execute(
-        `UPDATE finance_student_pins
-         SET failed_attempts = 0, locked_until = NULL, updated_at = ?
-         WHERE santri_id = ?`,
-        [now(), santriId]
-      )
+    try { await batch(statements) }
+    catch (error) {
+      if (!(error instanceof Error) || !/malformed JSON|pin_verification_stale/i.test(error.message)) throw error
+      const current = await getStudentPinStatus(santriId)
+      return { verified: false, locked: current.isLocked, attemptsLeft: Math.max(0, MAX_PIN_FAILED_ATTEMPTS-current.failedAttempts), remainingLockSeconds: current.remainingLockSeconds }
     }
     return { verified: true, locked: false, attemptsLeft: MAX_PIN_FAILED_ATTEMPTS }
   }
 
-  // 3. PIN salah: inkremen hitungan gagal
-  const newAttempts = record.failed_attempts + 1
-  const isNowLocked = newAttempts >= MAX_PIN_FAILED_ATTEMPTS
-  const timestamp = now()
-
-  if (isNowLocked) {
-    const lockExpiry = new Date(nowMs + PIN_LOCKOUT_MINUTES * 60 * 1000).toISOString()
-    await execute(
-      `UPDATE finance_student_pins
-       SET failed_attempts = ?, locked_until = ?, updated_at = ?
-       WHERE santri_id = ?`,
-      [newAttempts, lockExpiry, timestamp, santriId]
-    )
-
-    // Catat log penguncian
-    const logId = generateId()
-    await execute(
-      `INSERT INTO finance_pin_audit_logs (
-         id, santri_id, action, reason, created_at
-       ) VALUES (?, ?, 'LOCK', ?, ?)`,
-      [
-        logId,
-        santriId,
-        `Terkunci otomatis karena ${newAttempts} kali salah memasukkan PIN berturut-turut`,
-        timestamp,
-      ]
-    )
-
-    return {
-      verified: false,
-      locked: true,
-      attemptsLeft: 0,
-      remainingLockSeconds: PIN_LOCKOUT_MINUTES * 60,
-    }
-  } else {
-    await execute(
-      `UPDATE finance_student_pins
-       SET failed_attempts = ?, updated_at = ?
-       WHERE santri_id = ?`,
-      [newAttempts, timestamp, santriId]
-    )
-
-    // Catat log percobaan gagal
-    const logId = generateId()
-    await execute(
-      `INSERT INTO finance_pin_audit_logs (
-         id, santri_id, action, reason, created_at
-       ) VALUES (?, ?, 'FAILED_ATTEMPT', ?, ?)`,
-      [logId, santriId, `Percobaan salah ke-${newAttempts}`, timestamp]
-    )
-
-    return {
-      verified: false,
-      locked: false,
-      attemptsLeft: MAX_PIN_FAILED_ATTEMPTS - newAttempts,
-    }
-  }
+  // Increment from the stored counter, never the earlier SELECT snapshot.
+  // Concurrent wrong attempts therefore reach the threshold instead of all
+  // overwriting the same count. Counter, lock, audit and token expiry are atomic.
+  const lockExpiry = new Date(Date.now() + PIN_LOCKOUT_MINUTES*60*1000).toISOString()
+  const attempts = "CASE WHEN locked_until IS NOT NULL AND julianday(locked_until)<=julianday(?) THEN 1 ELSE failed_attempts+1 END"
+  await batch([{
+    sql: `UPDATE finance_student_pins SET failed_attempts=${attempts},
+      locked_until=CASE WHEN ${attempts} >= ? THEN ? ELSE NULL END, updated_at=?
+      WHERE santri_id=? AND pin_hash=?
+      AND (locked_until IS NULL OR julianday(locked_until)<=julianday(?))`,
+    params: [timestamp, timestamp, MAX_PIN_FAILED_ATTEMPTS, lockExpiry, timestamp, santriId, record.pin_hash, timestamp],
+  }, {
+    sql: `INSERT INTO finance_pin_audit_logs(id,santri_id,action,reason,created_at)
+      SELECT ?,santri_id,CASE WHEN locked_until IS NOT NULL THEN 'LOCK' ELSE 'FAILED_ATTEMPT' END,
+      'Percobaan PIN salah ke-' || failed_attempts,? FROM finance_student_pins
+      WHERE santri_id=? AND changes()=1`,
+    params: [generateId(), timestamp, santriId],
+  }, {
+    sql: `UPDATE finance_pin_authorizations SET expires_at=? WHERE santri_id=? AND consumed_by IS NULL
+      AND EXISTS(SELECT 1 FROM finance_student_pins WHERE santri_id=? AND julianday(locked_until)>julianday(?))`,
+    params: [timestamp, santriId, santriId, timestamp],
+  }])
+  const current = await getStudentPinStatus(santriId)
+  return { verified: false, locked: current.isLocked,
+    attemptsLeft: Math.max(0, MAX_PIN_FAILED_ATTEMPTS-current.failedAttempts), remainingLockSeconds: current.remainingLockSeconds }
 }
 
 /**
@@ -376,29 +338,26 @@ export async function unlockStudentPin(
   reason?: string | null
 ): Promise<void> {
   const timestamp = now()
-  await execute(
-    `UPDATE finance_student_pins
+  await batch([{ sql: `UPDATE finance_student_pins
      SET failed_attempts = 0,
          locked_until = NULL,
          updated_at = ?,
          updated_by = ?
      WHERE santri_id = ?`,
-    [timestamp, unlockedBy || null, santriId]
-  )
+    params: [timestamp, unlockedBy || null, santriId]
+  },
 
-  const logId = generateId()
-  await execute(
-    `INSERT INTO finance_pin_audit_logs (
+  { sql: `INSERT INTO finance_pin_audit_logs (
        id, santri_id, action, performed_by, reason, created_at
      ) VALUES (?, ?, 'UNLOCK', ?, ?, ?)`,
-    [
-      logId,
+    params: [
+      generateId(),
       santriId,
       unlockedBy || null,
       reason || 'Buka kunci PIN manual oleh petugas',
       timestamp,
     ]
-  )
+  }])
 }
 
 /**

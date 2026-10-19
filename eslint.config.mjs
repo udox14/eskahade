@@ -13,6 +13,9 @@ const eslintConfig = defineConfig([
     ".wrangler/**",
     "out/**",
     "build/**",
+    // Release packages contain archived copies, not application source.
+    "output/**",
+    ".codex-temp/**",
     "next-env.d.ts",
   ]),
 ]);

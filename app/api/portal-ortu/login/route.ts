@@ -37,9 +37,14 @@ async function resetThrottle(santriId: string): Promise<void> {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const nis = String(body?.nis ?? '').trim()
-    const password = String(body?.password ?? '').trim()
+    const body: unknown = await request.json().catch(() => null)
+    if (!body || typeof body !== 'object' || Array.isArray(body)
+      || !('nis' in body) || typeof body.nis !== 'string'
+      || !('password' in body) || typeof body.password !== 'string') {
+      return NextResponse.json({ error: 'NIS dan password wajib diisi.' }, { status: 400 })
+    }
+    const nis = body.nis.trim()
+    const password = body.password.trim()
     const requestInfo = {
       ipAddress: request.headers.get('cf-connecting-ip')
         ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()

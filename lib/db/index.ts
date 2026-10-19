@@ -5,7 +5,6 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 
 const SESSION_COOKIE = 'eskahade_session'
 const READ_ONLY_ERROR = 'Akun tester hanya boleh membaca data.'
-const WRITE_SQL_RE = /^\s*(insert|update|delete|replace|create|alter|drop|truncate|merge|grant|revoke|vacuum|pragma\s+\w+\s*=)/i
 const SCHEMA_MAINTENANCE_SQL_RE = /^\s*(create\s+(table|index)\s+if\s+not\s+exists|alter\s+table\s+[\w"[\]`]+\s+add\s+column)\b/i
 
 function decodeBase64UrlJson<T>(value: string): T | null {
@@ -49,27 +48,27 @@ const isTesterRequest = cache(async (db: any): Promise<boolean> => {
     const payload = getSessionPayload(token)
     if (!payload || typeof payload.id !== 'string') return false
 
-    // Fast-path: jika session token tidak mengandung role 'tester', dipastikan bukan tester.
-    // Menghilangkan 100% query SELECT users di setiap getDB() untuk pengguna biasa/admin/staf.
-    const tokenRoles = parseRoles(
-      typeof payload.roles === 'string' ? payload.roles : Array.isArray(payload.roles) ? JSON.stringify(payload.roles) : null,
-      typeof payload.role === 'string' ? payload.role : null
-    )
-    if (!tokenRoles.includes('tester')) {
-      return false
-    }
-
-    // Hanya jika role tester terdeteksi di token, verifikasi ke DB (di-cache per-request via React.cache)
+    // Roles can be revoked after token issuance. React.cache keeps this current
+    // identity lookup to one per request; never trust a stale token fast path.
     const user = await db.prepare('SELECT role, roles FROM users WHERE id = ?').bind(payload.id).first() as { role: string | null; roles: string | null } | null
     const roles = parseRoles(user?.roles, user?.role)
     return roles.includes('tester') && !roles.includes('admin') && !roles.includes('demo')
   } catch {
-    return false
+    throw new Error('Tidak dapat memverifikasi hak akses database.')
   }
 })
 
 function isWriteSql(sql: unknown): boolean {
-  return typeof sql === 'string' && WRITE_SQL_RE.test(sql) && !SCHEMA_MAINTENANCE_SQL_RE.test(sql)
+  if (typeof sql !== 'string') return true
+  // Strip comments and literals before classifying every statement, including
+  // CTE writes and writes following a SELECT in exec(). Fail closed on unknown SQL.
+  const code = sql.replace(/--[^\r\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|`[^`]*`|\[[^\]]*\]/g,
+    match => match.startsWith('--') || match.startsWith('/*') ? ' ' : "''").trim()
+  if (/;\s*\S/.test(code)) return true
+  if (SCHEMA_MAINTENANCE_SQL_RE.test(code) && !/;\s*\S/.test(code)) return false
+  if (/\b(insert|update|delete|replace|create|alter|drop|truncate|merge|grant|revoke|vacuum|attach|detach|reindex|analyze)\b/i.test(code)) return true
+  if (/^pragma\b/i.test(code)) return !/^pragma\s+(?:table_info|table_xinfo|index_list|index_info|index_xinfo|foreign_key_list|foreign_key_check|integrity_check|quick_check)\b[^;]*(?:;\s*)?$/i.test(code) || code.includes('=')
+  return !/^(select|with|explain)\b/i.test(code)
 }
 
 function denyTesterWrite() {

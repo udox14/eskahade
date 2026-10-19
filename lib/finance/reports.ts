@@ -20,6 +20,7 @@ import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
 import { DEFAULT_FINANCE_PAGE_SIZE } from '@/lib/finance/constants'
 import { getGlobalDailyLimit } from '@/lib/finance/wallet'
 import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
+import type { FinanceDistributionMethod, FinanceDistributionStatus } from '@/lib/finance/distribution-types'
 
 // ── TYPES & INTERFACES ────────────────────────────────────────────────────────
 
@@ -102,16 +103,17 @@ export interface ReceiptsReportResponse {
 export interface DistributionsReportFilter extends BaseReportFilter {
   recipientType?: 'ALL' | 'BENDAHARA' | 'BENDAHARA_PESANTREN' | 'KATERING' | 'LAUNDRY'
   providerId?: string
-  method?: 'ALL' | 'TRANSFER' | 'CASH'
+  method?: 'ALL' | FinanceDistributionMethod
 }
 
 export interface DistributionItemRow {
   id: string
   distributionNumber: string
-  transferredAt: string
+  reportDate: string
   recipientType: 'BENDAHARA' | 'BENDAHARA_PESANTREN' | 'KATERING' | 'LAUNDRY' | string
   recipientName: string
-  method: 'TRANSFER' | 'CASH'
+  method: FinanceDistributionMethod
+  status: FinanceDistributionStatus
   destinationBank: string | null
   destinationAccount: string | null
   accountHolderName: string | null
@@ -781,14 +783,15 @@ export async function getDistributionsReport(
 
   const conditions: string[] = ['1 = 1']
   const params: unknown[] = []
+  const reportDateExpr = 'COALESCE(fd.transferred_at, fd.submitted_at, fd.created_at)'
 
   if (filters.startDate) {
-    conditions.push('fd.transferred_at >= ?')
+    conditions.push(`datetime(${reportDateExpr}) >= datetime(?)`)
     params.push(`${filters.startDate} 00:00:00`)
   }
   if (filters.endDate) {
-    conditions.push('fd.transferred_at <= ?')
-    params.push(`${filters.endDate} 23:59:59`)
+    conditions.push(`datetime(${reportDateExpr}) < datetime(?, '+1 day')`)
+    params.push(filters.endDate)
   }
   if (filters.recipientType && filters.recipientType !== 'ALL') {
     conditions.push('(fd.recipient_type = ? OR (? = "BENDAHARA_PESANTREN" AND fd.recipient_type = "BENDAHARA"))')
@@ -823,10 +826,10 @@ export async function getDistributionsReport(
     total_count: number
   }>(
     `SELECT
-       COALESCE(SUM(fd.total_amount), 0) AS total_disbursed,
-       COALESCE(SUM(CASE WHEN fd.recipient_type = 'BENDAHARA' THEN fd.total_amount ELSE 0 END), 0) AS total_bendahara,
-       COALESCE(SUM(CASE WHEN fd.recipient_type = 'KATERING' THEN fd.total_amount ELSE 0 END), 0) AS total_katering,
-       COALESCE(SUM(CASE WHEN fd.recipient_type = 'LAUNDRY' THEN fd.total_amount ELSE 0 END), 0) AS total_laundry,
+       COALESCE(SUM(CASE WHEN fd.status = 'DISTRIBUTED' THEN fd.total_amount ELSE 0 END), 0) AS total_disbursed,
+       COALESCE(SUM(CASE WHEN fd.status = 'DISTRIBUTED' AND fd.recipient_type IN ('BENDAHARA', 'PESANTREN', 'BENDAHARA_PESANTREN') THEN fd.total_amount ELSE 0 END), 0) AS total_bendahara,
+       COALESCE(SUM(CASE WHEN fd.status = 'DISTRIBUTED' AND fd.recipient_type = 'KATERING' THEN fd.total_amount ELSE 0 END), 0) AS total_katering,
+       COALESCE(SUM(CASE WHEN fd.status = 'DISTRIBUTED' AND fd.recipient_type = 'LAUNDRY' THEN fd.total_amount ELSE 0 END), 0) AS total_laundry,
        COUNT(*) AS total_count
      FROM finance_distributions fd
      LEFT JOIN master_jasa j ON j.id = fd.recipient_id
@@ -837,15 +840,17 @@ export async function getDistributionsReport(
   const rows = await query<{
     id: string
     distribution_number: string
-    transferred_at: string
+    report_date: string
     recipient_type: string
     recipient_name: string
-    method: 'TRANSFER' | 'CASH'
+    method: FinanceDistributionMethod
+    status: FinanceDistributionStatus
     destination_bank: string | null
     destination_account: string | null
     account_holder_name: string | null
     total_amount: number
     operator_name: string | null
+    transfer_reference: string | null
     notes: string | null
     items_count: number
     items_summary: string | null
@@ -853,18 +858,20 @@ export async function getDistributionsReport(
     `SELECT
        fd.id,
        fd.distribution_number,
-       fd.transferred_at,
+       ${reportDateExpr} AS report_date,
        fd.recipient_type,
        CASE
-         WHEN fd.recipient_type = 'BENDAHARA' THEN 'Bendahara Pesantren'
+         WHEN fd.recipient_type IN ('BENDAHARA', 'PESANTREN', 'BENDAHARA_PESANTREN') THEN 'Bendahara Pesantren'
          ELSE COALESCE(j.nama_jasa, fd.recipient_type)
        END AS recipient_name,
        fd.method,
+       fd.status,
        fd.destination_bank,
        fd.destination_account,
        fd.account_holder_name,
        fd.total_amount,
-       u.full_name AS operator_name,
+       COALESCE(u_transferred.full_name, u_submitted.full_name) AS operator_name,
+       COALESCE(fd.bank_transaction_reference, fd.external_reference, fd.maker_reference) AS transfer_reference,
        fd.notes,
        (SELECT COUNT(*) FROM finance_distribution_items fdi WHERE fdi.distribution_id = fd.id) AS items_count,
        (
@@ -875,9 +882,10 @@ export async function getDistributionsReport(
        ) AS items_summary
      FROM finance_distributions fd
      LEFT JOIN master_jasa j ON j.id = fd.recipient_id
-     LEFT JOIN users u ON u.id = fd.transferred_by
+     LEFT JOIN users u_transferred ON u_transferred.id = fd.transferred_by
+     LEFT JOIN users u_submitted ON u_submitted.id = fd.submitted_by
      WHERE ${whereSql}
-     ORDER BY fd.transferred_at DESC
+     ORDER BY ${reportDateExpr} DESC, fd.created_at DESC
      LIMIT ? OFFSET ?`,
     [...params, pageSize, offset]
   )
@@ -885,15 +893,16 @@ export async function getDistributionsReport(
   const items: DistributionItemRow[] = rows.map((r) => ({
     id: r.id,
     distributionNumber: r.distribution_number,
-    transferredAt: r.transferred_at,
+    reportDate: r.report_date,
     recipientType: r.recipient_type,
     recipientName: r.recipient_name,
     method: r.method,
+    status: r.status,
     destinationBank: r.destination_bank,
     destinationAccount: r.destination_account,
     accountHolderName: r.account_holder_name,
     amount: r.total_amount,
-    transferReference: r.distribution_number,
+    transferReference: r.transfer_reference,
     operatorName: r.operator_name,
     notes: r.notes,
     itemsCount: r.items_count,

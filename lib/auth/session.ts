@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers'
 import { cache } from 'react'
-import { execute, queryOne } from '@/lib/db'
+import { execute, query, queryOne } from '@/lib/db'
 
 export const SESSION_COOKIE = 'eskahade_session'
 
@@ -11,7 +11,6 @@ export const SESSION_COOKIE = 'eskahade_session'
 // panjang agar login bertahan setelah browser ditutup.
 export const STAFF_SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 365 * 10
 const STAFF_SESSION_TOKEN_MAX_AGE: number | null = null
-let structuralJabatanColumnReady = false
 const STRUCTURAL_ROLE_VALUES = ['pengurus_asrama', 'sekpen', 'dewan_santri', 'keamanan']
 const DEFAULT_STRUCTURAL_JABATAN = 'anggota'
 
@@ -56,25 +55,16 @@ type SessionUserRow = {
   upk_panitia_akses: number | null
 }
 
-export async function ensureUserStructuralJabatanColumn() {
-  if (structuralJabatanColumnReady) return
-  try {
-    await execute('ALTER TABLE users ADD COLUMN structural_jabatan TEXT')
-  } catch (error: any) {
-    if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
-      throw error
-    }
-  }
-  for (const col of ['psb_verifikasi_akses', 'psb_asrama_akses', 'psb_bayar_akses', 'upk_panitia_akses']) {
-    try {
-      await execute(`ALTER TABLE users ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`)
-    } catch (error: any) {
-      if (!String(error?.message || '').toLowerCase().includes('duplicate column name')) {
-        throw error
-      }
-    }
-  }
-  for (const { col, type } of [{ col: 'guru_id', type: 'INTEGER' }, { col: 'santri_id', type: 'TEXT' }]) {
+// Request-scoped: a warm Worker can serve both production and demo datasets.
+// An isolate-wide boolean must not treat the second database as initialized.
+const ensureUserStructure = cache(async () => {
+  const columns = new Set((await query<{ name: string }>('PRAGMA table_info(users)')).map(c => c.name))
+  const definitions = [
+    { col: 'structural_jabatan', type: 'TEXT' },
+    ...['psb_verifikasi_akses', 'psb_asrama_akses', 'psb_bayar_akses', 'upk_panitia_akses'].map(col => ({ col, type: 'INTEGER NOT NULL DEFAULT 0' })),
+    { col: 'guru_id', type: 'INTEGER' }, { col: 'santri_id', type: 'TEXT' },
+  ]
+  for (const { col, type } of definitions.filter(c => !columns.has(c.col))) {
     try {
       await execute(`ALTER TABLE users ADD COLUMN ${col} ${type}`)
     } catch (error: any) {
@@ -83,13 +73,14 @@ export async function ensureUserStructuralJabatanColumn() {
       }
     }
   }
-  try {
-    await execute(`UPDATE users SET guru_id = CAST(source_ref_id AS INTEGER) WHERE source_type = 'guru' AND guru_id IS NULL`)
-    await execute(`UPDATE users SET santri_id = source_ref_id WHERE (source_type = 'sadesa' OR source_type = 'santri') AND santri_id IS NULL`)
-  } catch (err: any) {
-    console.error('Failed to backfill guru_id/santri_id', err)
+  if (columns.has('source_type') && columns.has('source_ref_id')) {
+    if (!columns.has('guru_id')) await execute(`UPDATE users SET guru_id = CAST(source_ref_id AS INTEGER) WHERE source_type = 'guru' AND guru_id IS NULL`)
+    if (!columns.has('santri_id')) await execute(`UPDATE users SET santri_id = source_ref_id WHERE (source_type = 'sadesa' OR source_type = 'santri') AND santri_id IS NULL`)
   }
-  structuralJabatanColumnReady = true
+})
+
+export async function ensureUserStructuralJabatanColumn() {
+  await ensureUserStructure()
 }
 
 function base64urlEncode(data: string): string {
@@ -243,6 +234,9 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
     if (!user) return null
 
     const roles = parseRoles(user.roles, user.role || session.role)
+    // A role change across the demo boundary needs a fresh login. The current
+    // request has already selected its dataset from the signed token's roles.
+    if (getRoles(session).includes('demo') !== roles.includes('demo')) return null
     return {
       ...session,
       email: user.email || session.email,
@@ -259,11 +253,8 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
     }
   } catch (err: any) {
     console.error('[session] hydrateSessionFromDb ERROR:', err?.message)
-    return {
-      ...session,
-      roles: getRoles(session),
-      structural_jabatan: session.structural_jabatan ?? null,
-    }
+    // Stored permissions are authoritative, including when the DB is unavailable.
+    return null
   }
 }
 

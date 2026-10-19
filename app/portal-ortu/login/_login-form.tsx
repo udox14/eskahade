@@ -28,7 +28,7 @@ export function LoginForm() {
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-xs">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form method="post" onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="portal-login-nis" className="block text-xs font-semibold text-slate-700 dark:text-slate-300">NIS Santri</label>
           <input
