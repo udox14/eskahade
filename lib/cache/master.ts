@@ -7,7 +7,7 @@
 //
 // Invalidasi: panggil revalidateTag(TAG) di action yang menulis ke tabel tersebut.
 
-import { unstable_cache } from 'next/cache'
+import { datasetCache as unstable_cache } from './dataset-cache'
 import { query, queryOne } from '@/lib/db'
 
 // ─── MARHALAH ──────────────────────────────────────────────────────────────

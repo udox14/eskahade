@@ -2,6 +2,7 @@
 import { cookies } from 'next/headers'
 import { cache } from 'react'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { databaseCacheContext } from './cache-context'
 
 const SESSION_COOKIE = 'eskahade_session'
 const READ_ONLY_ERROR = 'Akun tester hanya boleh membaca data.'
@@ -125,6 +126,8 @@ function wrapReadOnlyDB(db: any): any {
 }
 
 export async function getDB() {
+  const cacheBinding = databaseCacheContext.getStore()
+  if (cacheBinding) return cacheBinding
   const { env } = await getCloudflareContext({ async: true })
   // Session role 'demo' → arahkan SEMUA query ke DB sandbox (data dummy),
   // sehingga tidak pernah menyentuh data asli.

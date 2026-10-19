@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
-const out = path.join(root, 'output/stabilization-20261019/regression');
+const out = path.join(root, process.env.ESKAHADE_EVIDENCE_DIR || 'output/stabilization-20261019', 'regression');
 fs.mkdirSync(out, { recursive: true });
 const excluded = {
   'test-demo-edge-uat.cjs': 'Remote D1 mutation requires separate approval',

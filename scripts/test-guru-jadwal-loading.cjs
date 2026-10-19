@@ -34,6 +34,9 @@ const sqlStubs = {
   '@/lib/auth/session': {},
   '@/lib/activity-log': {},
   'next/cache': { unstable_cache: fn => fn, revalidatePath() {} },
+  // Cache request/dataset isolation is covered by test-dataset-cache.cjs;
+  // this VM fixture exercises teacher loading and its real SQL/UI behavior.
+  './dataset-cache': { datasetCache: fn => fn },
 }
 function compile(file, requireFn, globals = {}) {
   const source = ts.transpileModule(fs.readFileSync(path.join(root, file), 'utf8'), {

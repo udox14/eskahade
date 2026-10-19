@@ -1,0 +1,23 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Actual cache/DB modules with Next cache-scope constraints. */
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),Module=require('node:module'),{AsyncLocalStorage}=require('node:async_hooks'),{DatabaseSync}=require('node:sqlite'),ts=require('typescript');
+const root=path.resolve(__dirname,'..'),requestContext=new AsyncLocalStorage(),cacheScope=new AsyncLocalStorage(),entries=new Map(),state={failRoles:false,cookieReads:0};
+function raw(label){const sql=new DatabaseSync(':memory:');sql.exec(`CREATE TABLE users(id TEXT PRIMARY KEY,role TEXT,roles TEXT);INSERT INTO users VALUES('actor','tester','["tester"]');CREATE TABLE marhalah(id INTEGER,nama TEXT,urutan INTEGER);CREATE TABLE example(value INTEGER);INSERT INTO example VALUES(1);`);sql.prepare('INSERT INTO marhalah VALUES(1,?,1)').run(label);return{sql,prepare(text){let p=[];const s={bind(...v){p=v;return s;},async first(){if(state.failRoles&&text.includes('FROM users'))throw Error('ROLE_LOOKUP_FAILED');return sql.prepare(text).get(...p)||null;},async all(){return{results:sql.prepare(text).all(...p)};},async run(){sql.prepare(text).run(...p);return{success:true};}};return s;}};}
+const primary=raw('PRIMARY_LEVEL'),demo=raw('DEMO_LEVEL'),env={DB:primary,DEMO_DB:demo};
+const original=Module._load;Module._load=function(r,p,m){
+ if(r==='react')return{...original.call(this,r,p,m),cache:fn=>fn};
+ if(r==='next/headers')return{cookies:async()=>{state.cookieReads++;if(cacheScope.getStore())throw Error('COOKIES_INSIDE_UNSTABLE_CACHE');return{get:()=>({value:'x.'+Buffer.from(JSON.stringify({id:'actor'})).toString('base64url')+'.x'})};}};
+ if(r==='next/cache')return{unstable_cache:(fn,keys)=>async(...args)=>{const key=JSON.stringify([keys,args]);if(!entries.has(key))entries.set(key,cacheScope.run(true,()=>fn(...args)));return entries.get(key);}};
+ if(r==='@opennextjs/cloudflare')return{getCloudflareContext:async()=>({env})};
+ if(r==='@/lib/auth/demo-context')return{isDemoRequest:async()=>requestContext.getStore()==='demo'};
+ if(r.startsWith('@/'))r=path.join(root,r.slice(2));return original.call(this,r,p,m);
+};
+require.extensions['.ts']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,f);
+async function main(){const master=require('../lib/cache/master.ts'),db=require('../lib/db/index.ts'),{datasetCache}=require('../lib/cache/dataset-cache.ts');let passed=0;async function test(name,fn){await fn();console.log('PASS '+name);passed++;}
+ await test('Cold cached query resolves cookie guard before Next cache scope',async()=>{assert.equal((await requestContext.run('primary',()=>master.getCachedMarhalahList()))[0].nama,'PRIMARY_LEVEL');assert.ok(state.cookieReads>0);});
+ await test('Demo and primary master data have distinct cache keys',async()=>{assert.equal((await requestContext.run('demo',()=>master.getCachedMarhalahList()))[0].nama,'DEMO_LEVEL');assert.equal((await requestContext.run('primary',()=>master.getCachedMarhalahList()))[0].nama,'PRIMARY_LEVEL');});
+ await test('Role outage fails closed even when cache value is warm',async()=>{state.failRoles=true;await assert.rejects(requestContext.run('primary',()=>master.getCachedMarhalahList()),/memverifikasi hak akses/);state.failRoles=false;});
+ await test('Concurrent request contexts never exchange dataset bindings',async()=>{const result=await Promise.all(Array.from({length:20},(_,i)=>requestContext.run(i%2?'demo':'primary',async()=>{await Promise.resolve();return(await master.getCachedMarhalahList())[0].nama;})));result.forEach((v,i)=>assert.equal(v,i%2?'DEMO_LEVEL':'PRIMARY_LEVEL'));});
+ await test('Tester read-only proxy survives async cache callback context',async()=>{const bad=datasetCache(async()=>{const target=await db.getDB();return target.prepare('UPDATE example SET value=2').run();},['forbidden-write']);await assert.rejects(requestContext.run('primary',()=>bad()),/hanya boleh membaca/);assert.equal(primary.sql.prepare('SELECT value FROM example').get().value,1);});
+ await test('Cache context is cleared after callback and cannot bypass later role lookup',async()=>{const target=await requestContext.run('primary',()=>db.getDB());await assert.rejects(async()=>target.prepare('UPDATE example SET value=3').run(),/hanya boleh membaca/);});
+ console.log('ALL '+passed+' DATASET CACHE REGRESSION CASES PASSED');primary.sql.close();demo.sql.close();}
+main().catch(e=>{console.error(e);process.exitCode=1;});

@@ -9,7 +9,7 @@
 // asli dan DB demo tidak saling menimpa. Tester berbagi scope 'live' karena
 // membaca DB yang sama (hanya dibungkus read-only).
 
-import { unstable_cache } from 'next/cache'
+import { datasetCache as unstable_cache } from '@/lib/cache/dataset-cache'
 import { getRingkasanPimpinan } from './ringkasan'
 import { getKeuanganMonitoring } from './keuangan'
 import { getAbsensiSantriMonitoring, getAbsensiGuruMonitoring } from './absensi'

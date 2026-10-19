@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Standalone Node verification tooling. */
 const fs = require('node:fs'), path = require('node:path');
-const root = path.resolve(__dirname, '../..'), out = path.join(root, 'output/stabilization-20261019');
+const root = path.resolve(__dirname, '../..'), out = path.resolve(root, process.env.ESKAHADE_EVIDENCE_DIR || 'output/stabilization-20261019');
 const base = 'http://localhost:3100';
 async function main() {
   const login = await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'admin@fixture.test', password: 'LocalFixture!2026' }) });
   if (!login.ok) throw Error('Synthetic login failed: ' + login.status);
   const cookie = login.headers.get('set-cookie')?.split(';')[0];
   if (!cookie) throw Error('Missing synthetic session cookie');
-  const inventory = JSON.parse(fs.readFileSync(path.join(out, 'application-inventory.json'), 'utf8'));
+  const inventory = JSON.parse(fs.readFileSync(path.join(root, 'output/stabilization-20261019/application-inventory.json'), 'utf8'));
   const pages = [...new Set(inventory.routes.filter(r => r.kind === 'page' && !r.route.includes('[') && !r.route.startsWith('/portal-ortu/')).map(r => r.route))];
   const results = [];
   // Sequential compilation avoids concurrent webpack memory spikes on Windows.
