@@ -2,49 +2,59 @@ name: Deploy Sandbox to Cloudflare Workers
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_worker:
+        description: 'Manual release only: type eskahade-sandbox to confirm sandbox'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-eskahade-sandbox
+  cancel-in-progress: false
 
 jobs:
   deploy-sandbox:
-    name: Build & Deploy Sandbox
+    if: github.ref == 'refs/heads/main'
+    name: Manual sandbox deployment
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_ENV: sandbox
+      CLOUDFLARE_ACCOUNT_ID: a170ed4144c00927988a828aa9a41896
+      CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false'
+      WRANGLER_SEND_METRICS: 'false'
+      ESKAHADE_CONFIRM_WORKER: ${{ inputs.confirm_worker }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
         with:
-          node-version: "22"
-          cache: "npm"
-
-      - name: Safety Guard - Validate Sandbox Configuration
-        run: node scripts/validate-sandbox-config.cjs
-
-      - name: Install dependencies
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
         run: npm ci
-
-      - name: Validate permanent environment isolation
+      - name: Validate shared environment topology
         run: node scripts/validate-sandbox-config.cjs
-
-      - name: Build
-        run: npx next build --webpack && npx opennextjs-cloudflare build --skipNextBuild
-
-      - name: Prune unused @vercel/og dependencies to fix Cloudflare 3MB Limit
-        run: |
-          echo "Removing heavy unused WASM binaries from root node_modules..."
-          rm -rf node_modules/next/dist/compiled/@vercel/og/* || true
-          echo "export const ImageResponse = class {};" > node_modules/next/dist/compiled/@vercel/og/index.edge.js || true
-          echo "module.exports.ImageResponse = class {};" > node_modules/next/dist/compiled/@vercel/og/index.node.js || true
-          
-          echo "Removing from .open-next node_modules as backup..."
-          rm -rf .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/* || true
-          echo "export const ImageResponse = class {};" > .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/index.edge.js || true
-          echo "module.exports.ImageResponse = class {};" > .open-next/server-functions/default/node_modules/next/dist/compiled/@vercel/og/index.node.js || true
-
-      - name: Deploy Sandbox
-        run: npx opennextjs-cloudflare deploy --env sandbox
+      - name: Validate explicit sandbox target and permanent isolation
+        run: node scripts/validate-manual-deploy.cjs sandbox
+      - name: Build reviewed sandbox application
+        env:
+          NODE_OPTIONS: --require=./scripts/stabilization/isolation/build-no-dotenv.cjs
+        run: >-
+          node node_modules/next/dist/bin/next build --webpack &&
+          node node_modules/@opennextjs/cloudflare/dist/cli/index.js build
+          --config wrangler.jsonc --env sandbox --skipNextBuild
+      - name: Recheck target before manual deployment
+        run: node scripts/validate-manual-deploy.cjs sandbox
+      - name: Deploy existing sandbox Worker only
+        run: >-
+          node node_modules/@opennextjs/cloudflare/dist/cli/index.js deploy
+          --config wrangler.jsonc --env sandbox --keep-vars
+          --experimental-provision=false --experimental-auto-create=false
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NODE_OPTIONS: --require=./scripts/stabilization/isolation/build-no-dotenv.cjs

@@ -86,3 +86,16 @@ next-env.d.ts
 /scratch/reset-kredensial/
 /scratch/reset-test/
 
+# Local release evidence, private exports and generated packages stay local.
+/output/
+__pycache__/
+*.pyc
+.dev.vars
+.dev.vars.*
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.db-wal
+*.db-shm
+
