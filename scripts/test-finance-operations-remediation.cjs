@@ -71,9 +71,9 @@ async function main(){
  });
  await test('A18 actual DB selector routes signed demo session exclusively to DEMO_DB and tester cannot write',async()=>{
   const crypto=require('node:crypto');process.env.JWT_SECRET='local-isolation-test-only';
-  function token(role){const data=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url')+'.'+Buffer.from(JSON.stringify({id:'isolated-user',role,roles:[role]})).toString('base64url');return data+'.'+crypto.createHmac('sha256',process.env.JWT_SECRET).update(data).digest('base64url')}
-  h.state.demoDB={name:'DEMO'};h.state.productionDB={name:'PRODUCTION'};h.state.cookieToken=token('demo');const actual=h.load('lib/db/index.ts');assert.equal(await actual.getDB(),h.state.demoDB);
-  h.state.demoDB=undefined;assert.equal(await actual.getDB(),undefined,'Missing sandbox binding must never select production');
+  function token(role){const data=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url')+'.'+Buffer.from(JSON.stringify({id:'isolated-user',role,roles:[role],environment:role==='demo'?'sandbox':'production'})).toString('base64url');return data+'.'+crypto.createHmac('sha256',process.env.JWT_SECRET).update(data).digest('base64url')}
+  h.state.demoDB={name:'DEMO',prepare:()=>({bind(){return this},first:async()=>({role:'demo',roles:'["demo"]'})})};h.state.productionDB={name:'PRODUCTION'};h.state.environment='sandbox';h.state.cookieToken=token('demo');const actual=h.load('lib/db/index.ts');assert.equal(await actual.getDB(),h.state.demoDB);
+  h.state.demoDB=undefined;await assert.rejects(()=>actual.getDB(),/Database|isolasi/);h.state.environment='production';
   let writes=0;h.state.productionDB={prepare:()=>({bind(){return this},first:async()=>({role:'tester',roles:'["tester"]'}),run:async()=>{writes++;return {success:true}}})};h.state.cookieToken=token('tester');
   const readOnly=await actual.getDB();assert.throws(()=>readOnly.prepare('INSERT INTO finance_payments(id) VALUES(?)').bind('unsafe').run(),/hanya boleh membaca/);assert.equal(writes,0);h.state.cookieToken=undefined;
  });

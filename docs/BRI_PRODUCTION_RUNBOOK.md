@@ -1,5 +1,7 @@
 # Panduan Operasional Produksi (Production Runbook) Integrasi Keuangan BRI
 
+> Current execution authority/order: `CONSOLIDATED_DELIVERY_2026-10-20.md`. Production DB-only; DEMO_DB belongs to sandbox only. BRI/QLola activation remains separately blocked. Historical commands below do not authorize replaying applied migrations, changing secrets or reconnecting environments.
+
 > **Koreksi 18 Oktober 2026:** gunakan [runbook remediation](FINANCE_BRI_REMEDIATION_RUNBOOK.md). Migration 0182–0186 sudah applied manual; jangan diaplikasikan ulang. Remediation lokal tidak memberi izin deploy/migrasi/aktivasi.
 
 **Sistem**: Eskahade — Sistem Keuangan Baru (BRIAPI / BRIVA / QLola / Loket Kas)  

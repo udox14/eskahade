@@ -1,4 +1,5 @@
 import { runUangJajanAutoPotong } from '../lib/uang-jajan/auto-potong'
+import { environmentDatabase } from '../lib/db/environment'
 
 const worker = {
   async fetch() {
@@ -6,8 +7,10 @@ const worker = {
   },
 
   async scheduled(_controller: ScheduledController, env: CloudflareEnv, ctx: ExecutionContext) {
+    const { db, environment } = environmentDatabase(env)
+    if (environment !== 'production') throw new Error('Worker auto-potong ini khusus production.')
     ctx.waitUntil(
-      runUangJajanAutoPotong(env.DB)
+      runUangJajanAutoPotong(db)
         .then(result => {
           console.log(JSON.stringify({ event: 'uang_jajan_auto_potong', result }))
         })

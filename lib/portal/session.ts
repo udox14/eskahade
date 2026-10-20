@@ -1,21 +1,17 @@
 // lib/portal/session.ts
 // Session Portal Orang Tua — JWT terpisah dari session staff.
 //
-// Cookie: eskahade_portal_session (staff memakai eskahade_session). Karena beda
-// cookie, guardPage/getSession staf & routing DEMO_DB/tester di getDB() tidak
-// tersentuh sama sekali oleh login ortu.
-//
-// Edge yang diterima: bila di browser yang sama ada staf ber-role `demo` yang
-// sedang login, getDB() mengarahkan SEMUA query request tsb ke DEMO_DB
-// (routing membaca eskahade_session). Santri produksi tidak ada di sana →
-// hidrasi di getPortalSession() gagal → ortu di-bounce ke halaman login.
-// Kegagalan aman, bukan kebocoran data.
+// Cookie portal terpisah dari staf. Token baru terikat pada environment Worker.
+// Seluruh query memakai DB Worker yang tetap; cookie staf tidak memilih database.
+// Cookie staf lintas environment/legacy ditolak, bukan diarahkan ke DB lain.
 
 import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { queryOne } from '@/lib/db'
 import { createJWTToken, verifyJWTToken } from '@/lib/auth/session'
+import { environmentAllowsSession, type AppEnvironment } from '@/lib/db/environment'
+import { runtimeEnvironment } from '@/lib/db/runtime-environment'
 
 export const PORTAL_COOKIE = 'eskahade_portal_session'
 // Portal orang tua juga dibuat persistent agar tidak logout sendiri.
@@ -29,6 +25,7 @@ export type PortalTokenPayload = {
   nama: string
   // Dinaikkan saat password diganti/direset agar cookie lama otomatis invalid.
   token_version?: number
+  environment?: AppEnvironment
 }
 
 export type PortalSession = PortalTokenPayload & {
@@ -41,7 +38,7 @@ export type PortalSession = PortalTokenPayload & {
 }
 
 export async function createPortalToken(payload: PortalTokenPayload): Promise<string> {
-  return createJWTToken(payload, null)
+  return createJWTToken({ ...payload, environment: await runtimeEnvironment() }, null)
 }
 
 export function portalCookieOptions() {
@@ -63,6 +60,7 @@ export const getPortalSession = cache(async function getPortalSession(): Promise
 
     const payload = await verifyJWTToken<Partial<PortalTokenPayload>>(token)
     if (!payload || payload.kind !== 'portal_ortu' || typeof payload.santri_id !== 'string') return null
+    if (!environmentAllowsSession(payload, await runtimeEnvironment())) return null
 
     const santri = await queryOne<{
       id: string

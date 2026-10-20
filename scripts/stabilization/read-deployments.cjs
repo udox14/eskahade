@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'../..'),out=path.join(root,'output/stabilization-20261019');
 const cli=path.join(root,'node_modules/wrangler/bin/wrangler.js');
-const publicFlags=new Set(['BRI_ENV','BRI_OUTBOUND_ENABLED','BRI_BRIVA_OUTBOUND_ENABLED','BRI_BRIVA_INBOUND_ENABLED','BRI_STATEMENT_SYNC_ENABLED','BRI_DIST_CASH_ENABLED','BRI_DIST_MANUAL_ENABLED','FINANCE_PROOFS_PRIVATE_STORAGE_CONFIRMED','BUILD_TIMESTAMP','NEXT_PUBLIC_BUILD_ID']);
+const publicFlags=new Set(['ESKAHADE_ENV','BRI_ENV','BRI_OUTBOUND_ENABLED','BRI_BRIVA_OUTBOUND_ENABLED','BRI_BRIVA_INBOUND_ENABLED','BRI_STATEMENT_SYNC_ENABLED','BRI_DIST_CASH_ENABLED','BRI_DIST_MANUAL_ENABLED','FINANCE_PROOFS_PRIVATE_STORAGE_CONFIRMED','BUILD_TIMESTAMP','NEXT_PUBLIC_BUILD_ID']);
 function read(args){return JSON.parse(execFileSync(process.execPath,[cli,...args,'--json'],{cwd:root,encoding:'utf8',timeout:60000,maxBuffer:8*1024*1024}));}
 for(const [label,name] of [['production','eskahade'],['sandbox','eskahade-sandbox']]){
   const deployments=read(['deployments','list','--name',name]);

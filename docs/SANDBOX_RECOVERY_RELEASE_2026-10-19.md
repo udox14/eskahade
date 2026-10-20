@@ -1,3 +1,5 @@
+> HISTORICAL PACKAGE: execution instructions are superseded by `PERMANENT_ENVIRONMENT_ISOLATION_2026-10-20.md`. Production DEMO_DB reconnection is forbidden. Use the new reviewed candidate and explicit sandbox D1 environment; do not execute this historical release sequence against the new configuration.
+
 # Eskahade — paket eksekusi recovery sandbox dan rilis produksi
 
 19 Oktober 2026. Baseline kode: `031e7f3d5878ba81beab443f8d58554af74d2af2`. Exact commit kandidat, hash SQL, hash input build dan seluruh gate final ada pada `release-manifest.json` paket ini. Ini melanjutkan stabilisasi sebelumnya, bukan mengulang inventaris aplikasi.

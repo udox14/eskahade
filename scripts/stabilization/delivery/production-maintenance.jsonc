@@ -1,0 +1,20 @@
+{
+  "name": "eskahade",
+  "account_id": "a170ed4144c00927988a828aa9a41896",
+  "main": "../isolation/sandbox-maintenance.mjs",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "preview_urls": false,
+  "d1_databases": [],
+  "kv_namespaces": [],
+  "r2_buckets": [],
+  "services": [],
+  "triggers": {"crons": []},
+  "vars": {
+    "ESKAHADE_ENV": "production",
+    "BRI_OUTBOUND_ENABLED": "false",
+    "BRI_BRIVA_OUTBOUND_ENABLED": "false",
+    "BRI_BRIVA_INBOUND_ENABLED": "false",
+    "BRI_STATEMENT_SYNC_ENABLED": "false"
+  }
+}

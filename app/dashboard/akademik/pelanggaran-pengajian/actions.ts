@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { revalidateDiscipline } from '@/lib/discipline/revalidate'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { isDemoRequest } from '@/lib/auth/demo-context'
+import { runtimeEnvironment } from '@/lib/db/runtime-environment'
 import { batch, getDB, query, queryOne, now } from '@/lib/db'
 import { assertFeature, canFeatureForSession } from '@/lib/auth/feature'
 import { getEffectiveRoles, type SessionUser } from '@/lib/auth/session'
@@ -102,7 +102,7 @@ export async function attachIncidentPhoto(incidentId:string,request:string,form:
   try{validateEvidenceWebP(bytes)}catch(error){throw new InputError(error instanceof Error?error.message:'Foto tidak valid.')}
   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(n=>n.toString(16).padStart(2,'0')).join('')
   const timestamp=now(),expiresAt=new Date(Date.parse(timestamp)+PHOTO_RETENTION_MS).toISOString()
-  const namespace=await isDemoRequest()?'demo':'prod'
+  const namespace=await runtimeEnvironment()==='sandbox'?'demo':'prod'
   const key=`${PHOTO_PREFIX}${namespace}/${timestamp}/${incidentId}/${request}.webp`
   const scope=studentScope(classes)
   // Reserve metadata before upload. Any failed/interrupted R2 upload stays tracked for cleanup.
@@ -127,7 +127,7 @@ export async function getIncidentPhotoKey(incidentId:string):Promise<Result<{key
  return result(async()=>{
   const {classes}=await access();requestId(incidentId);await existing(incidentId,classes)
   const photo=await queryOne<EvidenceRow>("SELECT * FROM pengajian_violation_photos WHERE violation_id=? AND state='attached' AND expires_at>?",[incidentId,now()])
-  const namespace=await isDemoRequest()?'demo':'prod'
+  const namespace=await runtimeEnvironment()==='sandbox'?'demo':'prod'
   if(!photo||!photo.object_key.startsWith(`${PHOTO_PREFIX}${namespace}/`))throw new InputError('Foto tidak tersedia atau sudah melewati 30 hari.')
   return {key:photo.object_key}
  })

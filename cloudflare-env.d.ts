@@ -55,8 +55,9 @@ interface CloudflareEnv {
   // D1 Database (pengganti Supabase)
   DB: D1Database
 
-  // D1 Database sandbox untuk role AKUN DEMO (data dummy, terpisah dari DB asli)
-  DEMO_DB: D1Database
+  // Present only on eskahade-sandbox; never a production fallback.
+  DEMO_DB?: D1Database
+  ESKAHADE_ENV?: 'production' | 'sandbox'
 
   // R2 Storage (pengganti Supabase Storage)
   R2_BUCKET: R2Bucket

@@ -1,4 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { environmentDatabase, type AppEnvironment } from '@/lib/db/environment'
+import { storedUserRoles } from '@/lib/auth/stored-roles'
 
 export type LoginUserRow = {
   id: string
@@ -11,23 +13,14 @@ export type LoginUserRow = {
   structural_jabatan: string | null
 }
 
-function isDemoAccount(user: LoginUserRow): boolean {
-  if (user.role === 'demo') return true
-  try {
-    const roles: unknown = user.roles ? JSON.parse(user.roles) : []
-    return Array.isArray(roles) && roles.includes('demo')
-  } catch { return false }
-}
-
-/** Authentication always chooses bindings explicitly, independent of the
- * existing session cookie. A demo session must never use DEMO_DB credentials
- * to mint a production admin token with a matching user ID. */
-export async function findLoginAccount(email: string): Promise<{ user: LoginUserRow; demoSandbox: boolean } | null> {
+/** Authentication uses this Worker's sole DB, independent of any old cookie. */
+export async function findLoginAccount(email: string): Promise<{ user: LoginUserRow; demoSandbox: boolean; environment: AppEnvironment } | null> {
   const { env } = await getCloudflareContext({ async: true })
+  const { db, environment } = environmentDatabase(env)
   const sql = 'SELECT id, email, password_hash, full_name, role, roles, asrama_binaan, structural_jabatan FROM users WHERE email = ?'
-  const primary = await env.DB.prepare(sql).bind(email).first<LoginUserRow>()
-  if (primary && !isDemoAccount(primary)) return { user: primary, demoSandbox: false }
-  if (!env.DEMO_DB) return null
-  const demo = await env.DEMO_DB.prepare(sql).bind(email).first<LoginUserRow>()
-  return demo && isDemoAccount(demo) ? { user: demo, demoSandbox: true } : null
+  const user = await db.prepare(sql).bind(email).first<LoginUserRow>()
+  if (!user) return null
+  const roles = storedUserRoles(user.role, user.roles)
+  if (!roles || (environment === 'production' && roles.includes('demo'))) return null
+  return { user: { ...user, roles: JSON.stringify(roles) }, demoSandbox: environment === 'sandbox' && roles.includes('demo'), environment }
 }

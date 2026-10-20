@@ -9,6 +9,7 @@ if (process.env.NODE_ENV === 'development') {
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  outputFileTracingRoot: process.cwd(),
 
   // Inject BUILD_TIMESTAMP ke dalam bundle saat build (tersedia di server & edge runtime)
   env: {
@@ -40,8 +41,11 @@ const nextConfig: NextConfig = {
   },
 
   experimental: {
+    cpus: 2,
+    webpackMemoryOptimizations: true,
     optimizePackageImports: [
       "lucide-react",
+      "@phosphor-icons/react",
       "@tanstack/react-table",
       "date-fns",
     ],

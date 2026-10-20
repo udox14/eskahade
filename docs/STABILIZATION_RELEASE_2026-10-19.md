@@ -1,5 +1,7 @@
 # Eskahade — stabilisasi dan paket rilis, 19 Oktober 2026
 
+> Historical evidence. The controlling release order is now `CONSOLIDATED_DELIVERY_2026-10-20.md`; production permanently loses DEMO_DB. Do not execute an old reconnect or full-candidate-first production plan.
+
 Laporan ini menggabungkan temuan, perbaikan, bukti pengujian, perbedaan lingkungan, serta runbook sandbox dan produksi. Status final, commit, Git tree, hash source, hash bundle, dan hasil gate dibaca dari `release-manifest.json` dalam paket rilis. Tidak ada push, merge, deployment, migrasi remote, reset demo, perubahan akses R2, atau aktivasi bank dalam pekerjaan ini. Operasi remote yang berhasil adalah pembacaan metadata/configuration dan SELECT; hasil D1 mencatat nol baris ditulis.
 
 ## Perbaikan kode

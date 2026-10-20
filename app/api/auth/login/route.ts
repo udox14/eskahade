@@ -3,7 +3,6 @@ import { findLoginAccount } from '@/lib/auth/login-account'
 import { verifyPassword } from '@/lib/auth/password'
 import {
   createJWTToken,
-  ensureUserStructuralJabatanColumn,
   SESSION_COOKIE,
   STAFF_SESSION_COOKIE_MAX_AGE,
 } from '@/lib/auth/session'
@@ -33,12 +32,11 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = email.toLowerCase().trim()
-    await ensureUserStructuralJabatanColumn()
     const account = await findLoginAccount(normalizedEmail)
     const user = account?.user ?? null
     const loggedInFromSandbox = account?.demoSandbox ?? false
 
-    if (!user) {
+    if (!account || !user) {
       await logActivity({
         actor: { email: normalizedEmail },
         module: 'auth',
@@ -105,10 +103,9 @@ export async function POST(request: NextRequest) {
       roles: rolesArray,
       asrama_binaan: user.asrama_binaan,
       structural_jabatan: user.structural_jabatan,
-      // Selalu eksplisit: true hanya bila akun ini benar-benar berasal dari DEMO_DB.
-      // Akun ber-role 'demo' yang ada di DB produksi TIDAK mendapat tanda ini,
-      // sehingga hak tulisnya tetap ditolak.
+      // Worker environment, never the previous cookie, determines this identity.
       demoSandbox: loggedInFromSandbox,
+      environment: account.environment,
     })
 
     const response = NextResponse.json({ success: true })

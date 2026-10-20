@@ -2,12 +2,12 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),Module=require('node:module'),{AsyncLocalStorage}=require('node:async_hooks'),{DatabaseSync}=require('node:sqlite'),ts=require('typescript');
 const root=path.resolve(__dirname,'..'),requestContext=new AsyncLocalStorage(),cacheScope=new AsyncLocalStorage(),entries=new Map(),state={failRoles:false,cookieReads:0};
 function raw(label){const sql=new DatabaseSync(':memory:');sql.exec(`CREATE TABLE users(id TEXT PRIMARY KEY,role TEXT,roles TEXT);INSERT INTO users VALUES('actor','tester','["tester"]');CREATE TABLE marhalah(id INTEGER,nama TEXT,urutan INTEGER);CREATE TABLE example(value INTEGER);INSERT INTO example VALUES(1);`);sql.prepare('INSERT INTO marhalah VALUES(1,?,1)').run(label);return{sql,prepare(text){let p=[];const s={bind(...v){p=v;return s;},async first(){if(state.failRoles&&text.includes('FROM users'))throw Error('ROLE_LOOKUP_FAILED');return sql.prepare(text).get(...p)||null;},async all(){return{results:sql.prepare(text).all(...p)};},async run(){sql.prepare(text).run(...p);return{success:true};}};return s;}};}
-const primary=raw('PRIMARY_LEVEL'),demo=raw('DEMO_LEVEL'),env={DB:primary,DEMO_DB:demo};
+const primary=raw('PRIMARY_LEVEL'),demo=raw('DEMO_LEVEL'),env={DB:primary,ESKAHADE_ENV:'production'};
 const original=Module._load;Module._load=function(r,p,m){
  if(r==='react')return{...original.call(this,r,p,m),cache:fn=>fn};
- if(r==='next/headers')return{cookies:async()=>{state.cookieReads++;if(cacheScope.getStore())throw Error('COOKIES_INSIDE_UNSTABLE_CACHE');return{get:()=>({value:'x.'+Buffer.from(JSON.stringify({id:'actor'})).toString('base64url')+'.x'})};}};
+ if(r==='next/headers')return{cookies:async()=>{state.cookieReads++;if(cacheScope.getStore())throw Error('COOKIES_INSIDE_UNSTABLE_CACHE');return{get:()=>({value:'x.'+Buffer.from(JSON.stringify({id:'actor',environment:requestContext.getStore()==='demo'?'sandbox':'production'})).toString('base64url')+'.x'})};}};
  if(r==='next/cache')return{unstable_cache:(fn,keys)=>async(...args)=>{const key=JSON.stringify([keys,args]);if(!entries.has(key))entries.set(key,cacheScope.run(true,()=>fn(...args)));return entries.get(key);}};
- if(r==='@opennextjs/cloudflare')return{getCloudflareContext:async()=>({env})};
+ if(r==='@opennextjs/cloudflare')return{getCloudflareContext:async()=>({env:requestContext.getStore()==='demo'?{DB:demo,DEMO_DB:demo,ESKAHADE_ENV:'sandbox'}:env})};
  if(r==='@/lib/auth/demo-context')return{isDemoRequest:async()=>requestContext.getStore()==='demo'};
  if(r.startsWith('@/'))r=path.join(root,r.slice(2));return original.call(this,r,p,m);
 };

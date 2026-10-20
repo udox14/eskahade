@@ -1,6 +1,6 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { query, queryOne } from '@/lib/db'
-import { isDemoRequest } from '@/lib/auth/demo-context'
+import { runtimeEnvironment } from '@/lib/db/runtime-environment'
 import { getEffectiveRoles, type SessionUser } from '@/lib/auth/session'
 import { toWibDateInputValue } from '@/lib/date/wib'
 import { DASHBOARD_WIDGETS, type DashboardWidgetKey } from './catalog'
@@ -281,7 +281,7 @@ export async function loadDashboardWidgets(
   const ctx: Context = {
     session, roles, hrefs, today, monthStart: `${today.slice(0, 7)}-01`,
     nextMonthStart: nextMonth(today), asrama: session.asrama_binaan,
-    unrestricted, refresh, demo: await isDemoRequest(),
+    unrestricted, refresh, demo: await runtimeEnvironment() === 'sandbox',
   }
   return Promise.all(keys.map(async key => {
     try { return await loadWidget(key, ctx) }

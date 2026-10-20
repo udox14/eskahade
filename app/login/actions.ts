@@ -2,7 +2,7 @@
 
 import { findLoginAccount, type LoginUserRow } from '@/lib/auth/login-account'
 import { verifyPassword } from '@/lib/auth/password'
-import { ensureUserStructuralJabatanColumn, setSession, clearSession } from '@/lib/auth/session'
+import { setSession, clearSession } from '@/lib/auth/session'
 import { getRequestAuditContext, logActivity } from '@/lib/activity-log'
 import { redirect } from 'next/navigation'
 
@@ -22,7 +22,6 @@ export async function login(formData: FormData) {
   let demoSandbox = false
 
   try {
-    await ensureUserStructuralJabatanColumn()
     const account = await findLoginAccount(normalizedEmail)
     user = account?.user ?? null
     demoSandbox = account?.demoSandbox ?? false

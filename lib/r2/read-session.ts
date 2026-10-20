@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { queryOne } from '@/lib/db'
 import { SESSION_COOKIE, getSessionFromCookieString, type SessionUser } from '@/lib/auth/session'
+import { storedUserRoles } from '@/lib/auth/stored-roles'
 
 /** Proof-route adapter: existing JWT verifier + SELECT-only current permissions.
  * getSession() intentionally isn't used here: its hydration runs lazy schema DDL.
@@ -16,10 +17,8 @@ export async function readProofStaffSession(): Promise<SessionUser|null> {
       role:string|null; roles:string|null; asrama_binaan:string|null; structural_jabatan:string|null
     }>('SELECT role,roles,asrama_binaan,structural_jabatan FROM users WHERE id=?', [signed.id])
     if (!row) return null
-    const parsed:unknown = row.roles ? JSON.parse(row.roles) : []
-    if (!Array.isArray(parsed) || parsed.some(role=>typeof role !== 'string')) return null
-    const roles:string[] = parsed.length ? parsed : row.role ? [row.role] : []
-    if (!roles.length) return null
+    const roles = storedUserRoles(row.role, row.roles)
+    if (!roles) return null
     return {...signed, role:roles[0], roles, asrama_binaan:row.asrama_binaan, structural_jabatan:row.structural_jabatan}
   } catch { return null }
 }

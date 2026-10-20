@@ -1,6 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "eskahade-uang-jajan-auto",
+  "preview_urls": false,
+  "vars": {"ESKAHADE_ENV":"production"},
   "main": "workers/uang-jajan-auto.ts",
   "compatibility_date": "2026-05-14",
   "compatibility_flags": [

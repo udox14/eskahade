@@ -16,7 +16,7 @@ Module._load = function(request, parent, main) {
   if (request === 'next/navigation') return { redirect: url => { throw Error('NEXT_REDIRECT '+url); } };
   if (request === 'react') return { ...original.call(this, request, parent, main), cache: fn => fn };
   if (request === 'next/headers') return { cookies: async () => ({ get: () => state.token ? { value: state.token } : undefined }) };
-  if (request === '@opennextjs/cloudflare') return { getCloudflareContext: async () => ({ env: state.identityEnv || { DB: raw, DEMO_DB: { wrong: true } } }) };
+  if (request === '@opennextjs/cloudflare') return { getCloudflareContext: async () => ({ env: state.identityEnv || { ESKAHADE_ENV:'production', DB: raw } }) };
   if (request.startsWith('@/')) request = path.join(root, request.slice(2));
   return original.call(this, request, parent, main);
 };
@@ -28,7 +28,7 @@ async function main() {
   process.env.JWT_SECRET = 'synthetic-security-regression-only';
   const auth = load('lib/auth/session.ts');
   const db = load('lib/db/index.ts');
-  state.token = await auth.createJWTToken({ id: 'actor', role: 'admin', roles: ['admin'] });
+  state.token = await auth.createJWTToken({ id: 'actor', role: 'admin', roles: ['admin'], environment:'production' });
   await test('stored revoked role replaces stale admin token', async () => assert.equal((await auth.getSession()).role, 'tester'));
   await test('DB outage cannot restore stale admin permission', async () => { state.fail = true; assert.equal(await auth.getSession(), null); state.fail = false; });
   await test('deleted account invalidates signed session', async () => { const previous = state.row; state.row = null; assert.equal(await auth.getSession(), null); state.row = previous; });
@@ -50,11 +50,11 @@ async function main() {
     const demo={...primary,password_hash:'synthetic-demo-hash'};
     const binding=row=>({prepare:()=>({bind:()=>({first:async()=>row})})});
     try{
-      state.identityEnv={DB:binding(primary),DEMO_DB:binding(demo)};
+      state.identityEnv={ESKAHADE_ENV:'production',DB:binding(primary)};
       assert.equal((await login.findLoginAccount(primary.email)).user.password_hash,primary.password_hash);
-      state.identityEnv={DB:binding(null),DEMO_DB:binding(demo)};
+      state.identityEnv={ESKAHADE_ENV:'production',DB:binding(null)};
       assert.equal(await login.findLoginAccount(primary.email),null);
-      state.identityEnv={DB:binding({...primary,role:'demo',roles:'["demo"]'}),DEMO_DB:binding({...demo,role:'demo',roles:'["demo"]'})};
+      state.identityEnv={ESKAHADE_ENV:'sandbox',DB:binding({...demo,role:'demo',roles:'["demo"]'}),DEMO_DB:binding({...demo,role:'demo',roles:'["demo"]'})};
       const account=await login.findLoginAccount(primary.email);assert.equal(account.demoSandbox,true);assert.equal(account.user.password_hash,demo.password_hash);
       for(const file of ['app/login/actions.ts','app/api/auth/login/route.ts'])assert.match(fs.readFileSync(path.join(root,file),'utf8'),/findLoginAccount\(normalizedEmail\)/);
     } finally {delete state.identityEnv;}

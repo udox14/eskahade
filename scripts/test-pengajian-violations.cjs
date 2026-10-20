@@ -34,7 +34,7 @@ const logs=[],errors=[]
 const objects=new Map();let failUpload=false,clock=null
 const stubs={
  '@opennextjs/cloudflare':{async getCloudflareContext(){return{env:{R2_BUCKET:{async put(key,bytes){if(failUpload)throw new Error('R2 unavailable');objects.set(key,bytes)},async get(key){const bytes=objects.get(key);return bytes?{body:new Blob([bytes]).stream()}:null}}}}}},
- '@/lib/auth/demo-context':{async isDemoRequest(){return session?.roles.includes('demo')??false}},
+ '@/lib/db/runtime-environment':{async runtimeEnvironment(){return session?.roles.includes('demo')?'sandbox':'production'}},
  'next/cache':{revalidatePath(){},revalidateTag(){}},
  '@/lib/auth/feature':{
   async assertFeature(_href,action){return session && permissions.has(action)?session:{error:'Akses ditolak'}},

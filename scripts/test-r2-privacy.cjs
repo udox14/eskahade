@@ -19,7 +19,7 @@ Module._load=function(request,parent,main){
  if(request==='@/lib/auth/demo-context')return{isDemoRequest:async()=>state.demo};
  if(request==='@/lib/auth/feature')return{canAccessFeatureForSession:async(s,feature)=>!!s&&(typeof state.feature==='function'?state.feature(feature):state.feature),canFeatureForSession:async(s,feature,action)=>!!s&&(typeof state.feature==='function'?state.feature(feature):state.feature)&&(action==='read'||state.write)};
  if(request==='@/lib/db')return{...h.adapter,queryOne:async(sql,params)=>{assert.match(sql,/^\s*SELECT\b/i,'private helpers must issue SELECT only');state.sql.push(sql);if(sql.includes('SELECT role,roles,asrama_binaan,structural_jabatan')&&!state.realJwt)return state.staff?{role:state.staff.role,roles:JSON.stringify(state.staff.roles),asrama_binaan:state.staff.asrama_binaan||null,structural_jabatan:null}:null;if(state.demo)return null;return h.db.prepare(sql).get(...(params||[]))||null}};
- if(request==='@opennextjs/cloudflare')return{getCloudflareContext:async()=>({env:{R2_BUCKET:bucket}})};
+ if(request==='@opennextjs/cloudflare')return{getCloudflareContext:async()=>({env:state.demo?{ESKAHADE_ENV:'sandbox',DB:h.adapter,DEMO_DB:h.adapter,R2_BUCKET:bucket}:{ESKAHADE_ENV:'production',DB:h.adapter,R2_BUCKET:bucket}})};
  if(request==='next/cache')return{revalidatePath(){},revalidateTag(){}};
  if(request==='@/lib/activity-log')return{logActivity:async()=>{}};
  if(['@/lib/spp/tunggakan','@/lib/keuangan/non-spp-outstanding','@/lib/portal/data'].includes(request))return{};
@@ -70,7 +70,7 @@ async function main(){
  await test('proof staff session reuses actual JWT verification and current DB roles without lazy DDL',async()=>{
   h.db.exec("ALTER TABLE users ADD COLUMN asrama_binaan TEXT; ALTER TABLE users ADD COLUMN structural_jabatan TEXT");
   process.env.JWT_SECRET=require('node:crypto').randomBytes(32).toString('hex');
-  const auth=h.load('lib/auth/session.ts');state.staff=staff();state.realJwt=await auth.createJWTToken({...state.staff,role:'admin',roles:['admin']});
+  const auth=h.load('lib/auth/session.ts');state.staff=staff();state.realJwt=await auth.createJWTToken({...state.staff,role:'admin',roles:['admin'],environment:'production'});
   const before=h.db.prepare('SELECT total_changes() n').get().n;await allowed(portal,'submission-a');await allowed(receipt,'expense-a','HEAD');assert.equal(h.db.prepare('SELECT total_changes() n').get().n,before);
   h.db.exec("UPDATE users SET role='unrelated',roles='[\"unrelated\"]' WHERE id='admin'");await denied(portal,'submission-a');await denied(receipt,'expense-a');
   h.db.exec("UPDATE users SET role='admin',roles='[\"admin\"]' WHERE id='admin'");state.realJwt=state.realJwt.slice(0,-5)+'xxxxx';await denied(portal,'submission-a');await denied(receipt,'expense-a');

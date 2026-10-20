@@ -2,9 +2,10 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const fixture=require('./recovery-fixture.cjs');
 async function main(){
- const {root,out,objects,q,read}=fixture,configPath=path.join(root,'wrangler.local-test.jsonc'),config=JSON.parse(fs.readFileSync(configPath));
+ const {root,objects,q,read}=fixture,out=path.resolve(process.env.ESKAHADE_EVIDENCE_DIR||fixture.out),configPath=path.resolve(process.env.ESKAHADE_LOCAL_CONFIG||path.join(root,'wrangler.local-test.jsonc')),config=JSON.parse(fs.readFileSync(configPath));
  assert.ok(config.d1_databases.every(d=>d.remote===false&&d.database_id.startsWith('00000000-')));
- const {getPlatformProxy}=await import('wrangler');const proxy=await getPlatformProxy({configPath,persist:{path:path.join(root,'.wrangler/sandbox-recovery-candidate/v3')},envFiles:[]});
+ const persistPath=path.resolve(process.env.ESKAHADE_LOCAL_RECOVERY_PERSIST||path.join(root,'.wrangler/sandbox-recovery-candidate/v3'));
+ const {getPlatformProxy}=await import('wrangler');const proxy=await getPlatformProxy({configPath,persist:{path:persistPath},envFiles:[]});
  const baseline=fixture.create(),snapshot=fixture.historicalSnapshot(baseline),plan=read('recovery-plan.json'),results=[];
  const passwordSalt=Buffer.from('recovery-synthetic-only'),passwordHash=passwordSalt.toString('hex')+':'+crypto.pbkdf2Sync('LocalFixture!2026',passwordSalt,100000,32,'sha256').toString('hex');
  const h=require('../finance-remediation-fixture.cjs').harness();
@@ -56,7 +57,7 @@ async function main(){
    await assert.rejects(target.prepare("INSERT INTO finance_wallet_ledger(id,santri_id,direction,movement_type,amount,balance_before,balance_after) VALUES('bad-native-wallet','student','IN','TOPUP_CASH',1000,0,999)").run(),/INVALID_BALANCE_AFTER/);
    results.push({binding,test:'Actual card/PIN/tariff/obligation engines and wallet guard on repaired demo D1',status:'PASS'});
   }
-  fs.writeFileSync(path.join(out,'native-d1-recovery.json'),JSON.stringify({generatedAt:new Date().toISOString(),engine:'LOCAL Cloudflare workerd D1 batch; fresh actual demo schema then 0192–0195, not a production-schema replacement',passed:results.length,failed:0,results,syntheticOnly:true,remoteMutations:0,persistPath:'.wrangler/sandbox-recovery-candidate/v3',knownSyntheticConservationCases:1},null,2));
+  fs.writeFileSync(path.join(out,'native-d1-recovery.json'),JSON.stringify({generatedAt:new Date().toISOString(),engine:'LOCAL Cloudflare workerd D1 batch; fresh actual demo schema then 0192–0195, not a production-schema replacement',passed:results.length,failed:0,results,syntheticOnly:true,remoteMutations:0,persistPath,knownSyntheticConservationCases:1},null,2));
   console.log('PASS '+results.length+' native D1 recovery checks; both isolated bindings initialized');
  }finally{h.db.close();baseline.close();await proxy.dispose();}
 }

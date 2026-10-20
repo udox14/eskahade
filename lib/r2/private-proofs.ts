@@ -4,7 +4,7 @@ import { hasAnyRole, hasRole, isAdmin, type SessionUser } from '@/lib/auth/sessi
 import { readProofStaffSession } from './read-session'
 import { canAccessFeatureForSession, canFeatureForSession } from '@/lib/auth/feature'
 import { getPortalSession } from '@/lib/portal/session'
-import { isDemoRequest } from '@/lib/auth/demo-context'
+import { runtimeEnvironment } from '@/lib/db/runtime-environment'
 import { getSppScope, isSadesaCategory } from '@/lib/spp/unit-setor'
 import { operationalUnitIds } from '@/lib/operasional/scope'
 import { canonicalObjectKey, storedObjectKey, transactionReceiptUrl, LEGACY_R2_ORIGIN } from './references'
@@ -20,7 +20,7 @@ type ProofBucket = Omit<R2Bucket, 'get'> & {
   head(key:string):Promise<ProofObject|null>
 }
 export const privateNotFound = (head = false) => new Response(head ? null : 'Not found', {status: 404, headers: {'Cache-Control': 'no-store'}})
-export const proofDataset = async () => await isDemoRequest() ? 'demo' : 'production'
+export const proofDataset = async () => await runtimeEnvironment() === 'sandbox' ? 'demo' : 'production'
 
 export async function privateBucket() {
   const {env} = await getCloudflareContext({async: true})

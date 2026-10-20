@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const wranglerPath = path.resolve(__dirname, '..', 'wrangler.jsonc');
+const wranglerPath = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(__dirname, '..', 'wrangler.jsonc');
 if (!fs.existsSync(wranglerPath)) {
   console.error('FATAL: wrangler.jsonc not found at', wranglerPath);
   process.exit(1);
@@ -70,6 +70,21 @@ const errors = [];
 const PROD_WORKER_NAME = config.name || 'eskahade';
 const PROD_DB_ID = 'a2010f08-f314-46af-88fd-dbb9b4ef1bb1';
 const DEMO_DB_ID = '677f05ba-9b52-4534-9542-96cc785f25e4';
+
+if (config.name !== 'eskahade' || config.vars?.ESKAHADE_ENV !== 'production') errors.push('Production Worker/environment marker must be explicit');
+if (config.unsafe || sandbox.unsafe) errors.push('Unsafe binding inheritance/metadata is forbidden for isolated deployments');
+for (const [target, name] of [[config, 'eskahade'], [sandbox, 'eskahade-sandbox']]) if (target.services?.length !== 1 || target.services[0].binding !== 'WORKER_SELF_REFERENCE' || target.services[0].service !== name) errors.push('Only the matching Worker self-reference is permitted: ' + name);
+for (const flag of ['BRI_OUTBOUND_ENABLED','BRI_BRIVA_OUTBOUND_ENABLED','BRI_BRIVA_INBOUND_ENABLED','BRI_STATEMENT_SYNC_ENABLED']) if (config.vars?.[flag] !== 'false') errors.push('Production bank operations must remain OFF: ' + flag);
+if (config.preview_urls !== false || sandbox.preview_urls !== false) errors.push('Historical version URLs must remain disabled');
+const productionD1 = config.d1_databases || [];
+if (productionD1.length !== 1 || productionD1[0].binding !== 'DB' || productionD1[0].database_id !== PROD_DB_ID || productionD1[0].database_name !== 'eskahade-db') errors.push('Production must have only its primary DB; DEMO_DB is permanently forbidden');
+if (sandbox.vars?.ESKAHADE_ENV !== 'sandbox') errors.push('Sandbox environment marker must be explicit');
+if ((sandbox.d1_databases || []).length !== 2) errors.push('Sandbox must have exactly DB and DEMO_DB');
+if (!(sandbox.d1_databases || []).some(d => d.binding === 'DEMO_DB')) errors.push('Sandbox DEMO_DB is required');
+for (const file of ['wrangler.pengajian-photo-cleanup.jsonc', 'wrangler.uang-jajan-auto.jsonc']) {
+  const auxiliary = JSON.parse(stripJsonComments(fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8')));
+  if (auxiliary.vars?.ESKAHADE_ENV !== 'production' || auxiliary.preview_urls !== false || auxiliary.d1_databases?.length !== 1 || auxiliary.d1_databases[0].binding !== 'DB' || auxiliary.d1_databases[0].database_id !== PROD_DB_ID) errors.push('Background Worker must remain production-only: ' + file);
+}
 
 const prodKvBinding = (config.kv_namespaces || []).find(k => k.binding === 'NEXT_INC_CACHE_KV');
 const PROD_KV_ID = prodKvBinding ? prodKvBinding.id : '5c584e05fa9749b3a4320199513c2275';
@@ -143,6 +158,7 @@ if (sandboxR2) {
 
 // 6. BRI_ENV check
 const vars = sandbox.vars || {};
+for (const flag of ['BRI_OUTBOUND_ENABLED','BRI_BRIVA_OUTBOUND_ENABLED','BRI_BRIVA_INBOUND_ENABLED','BRI_STATEMENT_SYNC_ENABLED','BRI_DIST_CASH_ENABLED','BRI_DIST_MANUAL_ENABLED']) if (vars[flag] !== 'false') errors.push('Sandbox flag must be explicitly OFF: ' + flag);
 if (vars.BRI_ENV === 'production') {
   errors.push('CRITICAL: Sandbox vars.BRI_ENV is configured as "production"!');
 }
@@ -167,4 +183,4 @@ console.log('  R2 Bucket:          ', sandboxR2 ? sandboxR2.bucket_name : 'NONE'
 console.log('  Self Service Ref:   ', selfRef ? selfRef.service : 'NONE');
 console.log('  BRI_ENV:            ', vars.BRI_ENV);
 console.log('  BRI_BASE_URL:       ', vars.BRI_BASE_URL);
-console.log('  Production Isolation: COMPLETE (No shared DB, KV, R2, or Service bindings)');
+console.log('  Permanent isolation configuration: PASS; deployed bindings still require remote verification.');

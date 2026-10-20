@@ -3,6 +3,9 @@
 import { cookies } from 'next/headers'
 import { cache } from 'react'
 import { execute, query, queryOne } from '@/lib/db'
+import { environmentAllowsSession, type AppEnvironment } from '@/lib/db/environment'
+import { runtimeEnvironment } from '@/lib/db/runtime-environment'
+import { storedUserRoles } from '@/lib/auth/stored-roles'
 
 export const SESSION_COOKIE = 'eskahade_session'
 
@@ -34,11 +37,11 @@ export type SessionUser = {
   psb_bayar_akses?: boolean
   upk_panitia_akses?: boolean
   /**
-   * Ditandai true oleh rute login HANYA bila akun demo ini berasal dari DEMO_DB.
-   * Akun ber-role 'demo' yang kebetulan ada di DB produksi tidak mendapat tanda
-   * ini, sehingga tidak pernah memperoleh hak tulis ke data pesantren sebenarnya.
+   * Ditandai hanya untuk akun demo yang login pada Worker sandbox.
+   * Production menolak akun demo; penanda ini tidak memilih binding database.
    */
   demoSandbox?: boolean
+  environment?: AppEnvironment
 }
 
 type SessionUserRow = {
@@ -55,8 +58,7 @@ type SessionUserRow = {
   upk_panitia_akses: number | null
 }
 
-// Request-scoped: a warm Worker can serve both production and demo datasets.
-// An isolate-wide boolean must not treat the second database as initialized.
+// Request-scoped schema readiness for this Worker's database.
 const ensureUserStructure = cache(async () => {
   const columns = new Set((await query<{ name: string }>('PRAGMA table_info(users)')).map(c => c.name))
   const definitions = [
@@ -64,7 +66,9 @@ const ensureUserStructure = cache(async () => {
     ...['psb_verifikasi_akses', 'psb_asrama_akses', 'psb_bayar_akses', 'upk_panitia_akses'].map(col => ({ col, type: 'INTEGER NOT NULL DEFAULT 0' })),
     { col: 'guru_id', type: 'INTEGER' }, { col: 'santri_id', type: 'TEXT' },
   ]
-  for (const { col, type } of definitions.filter(c => !columns.has(c.col))) {
+  const missing = definitions.filter(c => !columns.has(c.col))
+  if (missing.length && await runtimeEnvironment() === 'production') throw new Error('Skema akun production belum siap. Hubungi operator.')
+  for (const { col, type } of missing) {
     try {
       await execute(`ALTER TABLE users ADD COLUMN ${col} ${type}`)
     } catch (error: any) {
@@ -162,7 +166,9 @@ async function verifyJWT(token: string): Promise<SessionUser | null> {
 }
 
 export async function setSession(user: SessionUser): Promise<void> {
-  const token = await createJWT(user)
+  const environment = await runtimeEnvironment()
+  if ((user.environment !== undefined && user.environment !== environment) || !environmentAllowsSession({ ...user, environment }, environment)) throw new Error('Sesi tidak berlaku di environment ini.')
+  const token = await createJWT({ ...user, environment })
   const cookieStore = await cookies()
   cookieStore.set({
     name: SESSION_COOKIE,
@@ -182,6 +188,7 @@ export const getSession = cache(async function getSession(): Promise<SessionUser
     if (!token) return null
     const session = await verifyJWT(token)
     if (!session) return null
+    if (!environmentAllowsSession(session, await runtimeEnvironment())) return null
     return await hydrateSessionFromDb(session)
   } catch {
     return null
@@ -196,7 +203,9 @@ export async function clearSession(): Promise<void> {
 export async function getSessionFromCookieString(cookieString: string): Promise<SessionUser | null> {
   const match = cookieString.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`))
   if (!match) return null
-  return await verifyJWT(match[1])
+  const session = await verifyJWT(match[1])
+  if (!session) return null
+  try { return environmentAllowsSession(session, await runtimeEnvironment()) ? session : null } catch { return null }
 }
 // ── Multi-role helpers ────────────────────────────────────────
 // Backward-compatible: jika session.roles belum ada (JWT lama),
@@ -209,20 +218,6 @@ function getRoles(session: SessionUser): string[] {
   return session.role ? [session.role] : []
 }
 
-function parseRoles(rolesJson: string | null | undefined, fallbackRole: string | null | undefined): string[] {
-  try {
-    if (rolesJson) {
-      const parsed = JSON.parse(rolesJson)
-      if (Array.isArray(parsed)) {
-        const roles = parsed.filter((role): role is string => typeof role === 'string' && role.length > 0)
-        if (roles.length > 0) return roles
-      }
-    }
-  } catch {}
-
-  return fallbackRole ? [fallbackRole] : []
-}
-
 async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser | null> {
   try {
     await ensureUserStructuralJabatanColumn()
@@ -233,7 +228,9 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
 
     if (!user) return null
 
-    const roles = parseRoles(user.roles, user.role || session.role)
+    const roles = storedUserRoles(user.role, user.roles)
+    if (!roles) return null
+    if (!environmentAllowsSession({ ...session, role: user.role, roles }, await runtimeEnvironment())) return null
     // A role change across the demo boundary needs a fresh login. The current
     // request has already selected its dataset from the signed token's roles.
     if (getRoles(session).includes('demo') !== roles.includes('demo')) return null
@@ -242,7 +239,7 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
       email: user.email || session.email,
       full_name: user.full_name || session.full_name,
       avatar_url: user.avatar_url ?? null,
-      role: roles[0] || user.role || session.role,
+      role: roles[0],
       roles,
       asrama_binaan: user.asrama_binaan ?? null,
       structural_jabatan: user.structural_jabatan ?? null,
@@ -296,15 +293,14 @@ export function hasUpkPanitiaAkses(session: SessionUser | null): boolean {
   return Boolean(session?.upk_panitia_akses)
 }
 
-// Role AKUN DEMO: setara super admin (bypass gate fitur). Data sudah disandbox
-// ke DEMO_DB lewat getDB(), jadi akses penuh ini aman terhadap data asli.
+// Role demo hanya dapat dihidrasi pada Worker sandbox; DB tidak dipilih oleh role.
 export function isDemo(session: SessionUser | null): boolean {
   return hasRole(session, 'demo')
 }
 
 /**
  * True hanya bila request ini adalah sesi demo yang BENAR-BENAR login dari
- * database sandbox (DEMO_DB).
+ * Worker sandbox, dengan token yang terikat environment.
  *
  * Dipakai sebagai syarat tambahan sebelum memberi hak tulis ke role 'demo'.
  *
@@ -312,13 +308,13 @@ export function isDemo(session: SessionUser | null): boolean {
  * ikut memiliki akun ber-role 'demo' (contoh nyata: demo@sukahideng.or.id ada di
  * DB produksi). Akun seperti itu TIDAK boleh mendapat akses tulis ke data
  * pesantren sebenarnya. Karena itu penanda `demoSandbox` diisi oleh rute login
- * hanya ketika akun ditemukan di DEMO_DB.
+ * hanya pada Worker sandbox dan sesi production menolak role demo.
  *
  * Catatan: menjaga kompatibilitas sesi lama -> bila penanda tidak ada, hasilnya
  * false (read-only), yang merupakan default paling aman.
  */
 export function isDemoSandboxRequest(session: SessionUser | null): boolean {
-  return isDemo(session) && session?.demoSandbox === true
+  return isDemo(session) && session?.demoSandbox === true && session.environment === 'sandbox'
 }
 
 // Akses super: admin asli ATAU akun demo. Dipakai di titik bypass akses fitur.

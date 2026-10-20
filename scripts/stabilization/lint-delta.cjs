@@ -7,10 +7,11 @@ async function main(){
   const baselineCommit=process.env.ESKAHADE_LINT_BASELINE||'c8994bbd3fefeac3158138c4543398d3276bad2d';
   if(!/^[a-f0-9]{40}$/.test(baselineCommit))throw Error('Exact baseline commit required');
   const changed=git(['diff',baselineCommit,'--name-only']).split('\n').filter(f=>/\.[cm]?[jt]sx?$/.test(f));
-  const added=git(['ls-files','--others','--exclude-standard','scripts/stabilization','scripts/test-sandbox-recovery.cjs','scripts/test-dataset-cache.cjs','lib/cache/dataset-cache.ts','lib/db/cache-context.ts','app/dashboard/guru/page.tsx','scripts/test-stabilization-security.cjs','scripts/test-stabilization-credentials.cjs','scripts/test-stabilization-reports.cjs','lib/finance/date-format.ts']).split('\n').filter(f=>/\.[cm]?[jt]sx?$/.test(f));
+  const added=git(['ls-files','--others','--exclude-standard','scripts/stabilization','scripts/test-environment-isolation.cjs','lib/db/environment.ts','lib/db/runtime-environment.ts','scripts/test-sandbox-recovery.cjs','scripts/test-dataset-cache.cjs','lib/cache/dataset-cache.ts','lib/db/cache-context.ts','app/dashboard/guru/page.tsx','scripts/test-stabilization-security.cjs','scripts/test-stabilization-credentials.cjs','scripts/test-stabilization-reports.cjs','lib/finance/date-format.ts']).split('\n').filter(f=>/\.[cm]?[jt]sx?$/.test(f));
   const counts=results=>{const rows={};for(const m of results.flatMap(r=>r.messages).filter(m=>m.severity===2))rows[m.ruleId||'parse']=(rows[m.ruleId||'parse']||0)+1;return rows;};
   const files=[];
   for(const file of [...new Set([...changed,...added])]){
+    if(!fs.existsSync(path.join(root,file)))continue; // Deleted source has no current diagnostics.
     const current=counts(await eslint.lintText(fs.readFileSync(path.join(root,file),'utf8'),{filePath:path.join(root,file)}));
     let baseline={};
     if(git(['ls-tree','--name-only',baselineCommit,'--',file]))baseline=counts(await eslint.lintText(git(['show',baselineCommit+':'+file]),{filePath:path.join(root,file)}));

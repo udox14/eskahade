@@ -3,6 +3,8 @@ import { execute, queryOne } from '@/lib/db'
 import { hashPassword, verifyPassword } from '@/lib/auth/password'
 import { createPortalToken, portalCookieOptions, PORTAL_COOKIE } from '@/lib/portal/session'
 import { logActivity } from '@/lib/activity-log'
+import { cookies } from 'next/headers'
+import { getSession, SESSION_COOKIE } from '@/lib/auth/session'
 
 // Password default saat kredensial belum pernah dibuat: NIS itu sendiri,
 // atau tanggal lahir format DDMMYYYY (santri.tanggal_lahir = 'YYYY-MM-DD').
@@ -55,6 +57,12 @@ export async function POST(request: NextRequest) {
     if (!nis || !password) {
       return NextResponse.json({ error: 'NIS dan password wajib diisi.' }, { status: 400 })
     }
+
+    // A stale/cross-environment staff cookie must not trap a parent in a login
+    // loop. Discard that rejected identity; parent credentials are verified below
+    // against this Worker's fixed DB, never by routing the staff cookie.
+    const cookieStore = await cookies()
+    if (cookieStore.get(SESSION_COOKIE) && !await getSession()) cookieStore.delete(SESSION_COOKIE)
 
     const santri = await queryOne<{
       id: string

@@ -41,7 +41,7 @@ function harness(){
   if(request==='@/lib/auth/session')return{getSession:async()=>state.session,getEffectiveRoles:s=>s?.roles||[],isDemoSandboxRequest:s=>s?.role==='demo',hasFinanceMutateRole:(roles,demo)=>roles.some(r=>['admin','bendahara','admin_koperasi','petugas_koperasi'].includes(r))||(demo&&roles.includes('demo'))};
   if(request==='@/lib/auth/feature')return{canAccessFeatureForSession:async()=>state.feature};
   if(request==='next/headers')return{cookies:async()=>({get:()=>state.cookieToken?{value:state.cookieToken}:undefined})};
-  if(request==='@opennextjs/cloudflare')return{getCloudflareContext:async()=>({env:{R2_BUCKET:state.bucket,DB:state.productionDB,DEMO_DB:state.demoDB}})};
+  if(request==='@opennextjs/cloudflare')return{getCloudflareContext:async()=>({env:state.environment==='sandbox'?{ESKAHADE_ENV:'sandbox',R2_BUCKET:state.bucket,DB:state.demoDB,DEMO_DB:state.demoDB}:{ESKAHADE_ENV:'production',R2_BUCKET:state.bucket,DB:state.productionDB}})};
   if(request.startsWith('@/'))request=path.join(root,request.slice(2));return original.call(this,request,parent,main);
  };
  require.extensions['.ts']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,f);

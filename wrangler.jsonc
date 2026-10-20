@@ -1,6 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "eskahade",
+	"preview_urls": false,
 	"account_id": "a170ed4144c00927988a828aa9a41896",
 	"main": ".open-next/worker.js",
 	"compatibility_date": "2025-04-01",
@@ -18,6 +19,11 @@
 		}
 	],
 	"vars": {
+		"ESKAHADE_ENV": "production",
+		"BRI_OUTBOUND_ENABLED": "false",
+		"BRI_BRIVA_OUTBOUND_ENABLED": "false",
+		"BRI_BRIVA_INBOUND_ENABLED": "false",
+		"BRI_STATEMENT_SYNC_ENABLED": "false",
 		"CLOUDFLARE_ACCOUNT_ID": "a170ed4144c00927988a828aa9a41896"
 	},
 	"kv_namespaces": [
@@ -34,15 +40,6 @@
 			"database_name": "eskahade-db",
 			"database_id": "a2010f08-f314-46af-88fd-dbb9b4ef1bb1",
 			"remote": true
-		},
-		{
-			// DB sandbox untuk role AKUN DEMO. Schema sama dgn DB asli (jalankan
-			// semua migrasi yang sama), berisi data dummy. CRUD demo diarahkan ke sini.
-			// TODO: isi database_id setelah `wrangler d1 create eskahade-demo-db`.
-			"binding": "DEMO_DB",
-			"database_name": "eskahade-demo-db",
-			"database_id": "677f05ba-9b52-4534-9542-96cc785f25e4",
-			"remote": true
 		}
 	],
 	"r2_buckets": [
@@ -55,6 +52,7 @@
 	"env": {
 		"sandbox": {
 			"name": "eskahade-sandbox",
+			"preview_urls": false,
 			"services": [
 				{
 					"binding": "WORKER_SELF_REFERENCE",
@@ -62,6 +60,7 @@
 				}
 			],
 			"vars": {
+				"ESKAHADE_ENV": "sandbox",
 				"CLOUDFLARE_ACCOUNT_ID": "a170ed4144c00927988a828aa9a41896",
 				"BRI_ENV": "sandbox",
 				"BRI_BASE_URL": "https://sandbox.partner.api.bri.co.id",

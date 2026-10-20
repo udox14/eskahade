@@ -5,7 +5,9 @@ const fs = require('node:fs'), path = require('node:path'), crypto = require('no
 const { DatabaseSync } = require('node:sqlite');
 const root = path.resolve(__dirname, '../..'), out = path.join(root, 'output/stabilization-20261019');
 async function main() {
-  const config = JSON.parse(fs.readFileSync(path.join(root, 'wrangler.local-test.jsonc'), 'utf8'));
+  const configPath = path.resolve(process.env.ESKAHADE_LOCAL_CONFIG || path.join(root, 'wrangler.local-test.jsonc'));
+  const outputDir = path.resolve(process.env.ESKAHADE_EVIDENCE_DIR || out);
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   if (config.name !== 'eskahade-local-test-only' || config.d1_databases.some(d => d.remote !== false || !d.database_id.startsWith('00000000-'))) throw Error('Local isolation assertion failed');
   const rawObjects = JSON.parse(fs.readFileSync(path.join(out, 'production-schema-readonly.json'), 'utf8').replace(/^\uFEFF/, ''))[0].results.filter(o => o.sql);
   const virtualNames = rawObjects.filter(o => /CREATE VIRTUAL TABLE/i.test(o.sql)).map(o => o.name);
@@ -20,7 +22,7 @@ async function main() {
   }
   const final = db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type,name").all().filter(o => !isShadow(o));
   const { getPlatformProxy } = await import('wrangler');
-  const proxy = await getPlatformProxy({ configPath: path.join(root, 'wrangler.local-test.jsonc'), persist: { path: path.join(root, '.wrangler/stabilization-local/v3') }, envFiles: [] });
+  const proxy = await getPlatformProxy({ configPath, persist: { path: path.resolve(process.env.ESKAHADE_LOCAL_PRODUCTION_PERSIST || path.join(root, '.wrangler/stabilization-local/v3')) }, envFiles: [] });
   try {
     const salt = Buffer.from('local-only-fixture-salt');
     const passwordHash = salt.toString('hex') + ':' + crypto.pbkdf2Sync('LocalFixture!2026', salt, 100000, 32, 'sha256').toString('hex');
@@ -40,8 +42,15 @@ async function main() {
     }
     const routes = JSON.parse(fs.readFileSync(path.join(out, 'application-inventory.json'), 'utf8')).routes;
     const roles = ['admin', 'tester', 'bendahara', 'admin_koperasi', 'petugas_koperasi', 'wali_kelas', 'guru', 'pengurus_asrama', 'pimpinan', 'keamanan', 'sekpen', 'dewan_santri', 'demo'];
-    for (const r of routes.filter(r => r.kind === 'page' && r.route.startsWith('/dashboard') && !r.route.includes('['))) {
+    for (const r of routes.filter(r => !process.env.ESKAHADE_LOCAL_ACTUAL_RBAC && r.kind === 'page' && r.route.startsWith('/dashboard') && !r.route.includes('['))) {
       add("INSERT OR IGNORE INTO fitur_akses(group_name,title,href,roles,is_active) VALUES('Local Test',?,?,?,1)", r.route.split('/').pop() || 'Dashboard', r.route, JSON.stringify(roles));
+    }
+    if (process.env.ESKAHADE_LOCAL_ACTUAL_RBAC) {
+      const [features, permissions] = JSON.parse(fs.readFileSync(path.join(out, 'production-feature-config-readonly.json'), 'utf8'));
+      for (const [table, rows] of [['fitur_akses', features.results], ['role_fitur_crud_permission', permissions.results]]) for (const row of rows) {
+        const keys = Object.keys(row);
+        add(`INSERT OR REPLACE INTO ${table}(${keys.join(',')}) VALUES(${keys.map(() => '?').join(',')})`, ...Object.values(row));
+      }
     }
     for (const binding of ['DB', 'DEMO_DB']) {
       const target = proxy.env[binding];
@@ -52,8 +61,8 @@ async function main() {
       const fk = await target.prepare('PRAGMA foreign_key_check').all();
       if (fk.results.length) throw Error('Synthetic seed FK failure: ' + JSON.stringify(fk.results));
     }
-    fs.writeFileSync(path.join(out, 'local-fixture-provenance.json'), JSON.stringify({ generatedAt: new Date().toISOString(), source: 'Fresh remote production schema definitions only; no remote records', appliedLocally: applied, skipped0191: 'Column already exists in actual production schema', objects: final.length, bindings: ['DB', 'DEMO_DB'], syntheticOnly: true, remoteMutations: 0, foreignKeyCheck: 'PASS' }, null, 2));
-    fs.writeFileSync(path.join(out, 'local-final-schema.json'), JSON.stringify(final, null, 2));
+    fs.writeFileSync(path.join(outputDir, 'local-fixture-provenance.json'), JSON.stringify({ generatedAt: new Date().toISOString(), source: 'Historical actual production schema definitions only; no remote records; latest revalidation separate gate', appliedLocally: applied, skipped0191: 'Column already exists in actual production schema', objects: final.length, bindings: ['DB', 'DEMO_DB'], syntheticOnly: true, actualRbac: !!process.env.ESKAHADE_LOCAL_ACTUAL_RBAC, remoteMutations: 0, foreignKeyCheck: 'PASS' }, null, 2));
+    fs.writeFileSync(path.join(outputDir, 'local-final-schema.json'), JSON.stringify(final, null, 2));
     console.log('Local D1 synthetic fixture initialized for both isolated bindings.');
   } finally { await proxy.dispose(); db.close(); }
 }

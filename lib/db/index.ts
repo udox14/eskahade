@@ -3,6 +3,9 @@ import { cookies } from 'next/headers'
 import { cache } from 'react'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { databaseCacheContext } from './cache-context'
+import { environmentDatabase, environmentAllowsSession } from './environment'
+import { runtimeEnvironment } from './runtime-environment'
+import { storedUserRoles } from '@/lib/auth/stored-roles'
 
 const SESSION_COOKIE = 'eskahade_session'
 const READ_ONLY_ERROR = 'Akun tester hanya boleh membaca data.'
@@ -18,20 +21,12 @@ function decodeBase64UrlJson<T>(value: string): T | null {
   }
 }
 
-function parseRoles(rolesJson: string | null | undefined, fallbackRole: string | null | undefined): string[] {
-  try {
-    if (rolesJson) {
-      const parsed = JSON.parse(rolesJson)
-      if (Array.isArray(parsed)) return parsed.filter((role): role is string => typeof role === 'string' && role.length > 0)
-    }
-  } catch {}
-  return fallbackRole ? [fallbackRole] : []
-}
-
 interface SessionPayload {
   id?: unknown
   role?: unknown
   roles?: unknown
+  demoSandbox?: unknown
+  environment?: unknown
 }
 
 function getSessionPayload(token: string | undefined): SessionPayload | null {
@@ -52,7 +47,10 @@ const isTesterRequest = cache(async (db: any): Promise<boolean> => {
     // Roles can be revoked after token issuance. React.cache keeps this current
     // identity lookup to one per request; never trust a stale token fast path.
     const user = await db.prepare('SELECT role, roles FROM users WHERE id = ?').bind(payload.id).first() as { role: string | null; roles: string | null } | null
-    const roles = parseRoles(user?.roles, user?.role)
+    const roles = user && storedUserRoles(user.role, user.roles)
+    if (!roles) throw new Error('Hak akses akun tidak tersedia.')
+    const environment = await runtimeEnvironment()
+    if (user && !environmentAllowsSession({ role: user.role, roles, environment }, environment)) throw new Error('Sesi demo tidak tersedia di production.')
     return roles.includes('tester') && !roles.includes('admin') && !roles.includes('demo')
   } catch {
     throw new Error('Tidak dapat memverifikasi hak akses database.')
@@ -129,12 +127,12 @@ export async function getDB() {
   const cacheBinding = databaseCacheContext.getStore()
   if (cacheBinding) return cacheBinding
   const { env } = await getCloudflareContext({ async: true })
-  // Session role 'demo' → arahkan SEMUA query ke DB sandbox (data dummy),
-  // sehingga tidak pernah menyentuh data asli.
-  const { isDemoRequest } = await import('@/lib/auth/demo-context')
-  if (await isDemoRequest()) return env.DEMO_DB
-  if (await isTesterRequest(env.DB)) return wrapReadOnlyDB(env.DB)
-  return env.DB
+  const { environment, db } = environmentDatabase(env)
+  const payload = getSessionPayload((await cookies()).get(SESSION_COOKIE)?.value)
+  // A token claim may deny access, never select or grant a database binding.
+  if (payload && !environmentAllowsSession(payload, environment)) throw new Error('Sesi tidak berlaku di environment ini.')
+  if (await isTesterRequest(db)) return wrapReadOnlyDB(db)
+  return db
 }
 
 // Banyak baris
