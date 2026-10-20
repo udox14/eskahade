@@ -2,7 +2,6 @@ import { batch, execute, generateId, now, query, queryOne } from '@/lib/db'
 import { getSession, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
 import { operationalUnitIds, asramaUnitId } from '@/lib/operasional/scope'
 import { deleteFromR2 } from '@/lib/r2/upload'
-import { revalidateTag } from 'next/cache'
 
 export const OPERASIONAL_RECIPIENT_FEATURE = '/dashboard/operasional'
 export const OPERASIONAL_BENDAHARA_FEATURE = '/dashboard/keuangan/operasional'
@@ -280,9 +279,9 @@ async function ensureOperasionalSchemaOnce() {
   // Catatan: UPDATE/DELETE pemindahan grup & penghapusan menu operasional lama
   // sudah dipindahkan ke migrations/0135_legacy_sidebar_fixes.sql agar tidak
   // menimpa kustomisasi admin tiap request.
-  try {
-    revalidateTag('fitur-akses', 'everything')
-  } catch {}
+  // Schema readiness also runs from read actions. Invalidating the sidebar here
+  // schedules another Flight render while that read is still being streamed.
+  // Sidebar changes belong to migrations or the explicit feature-edit action.
   await syncOperasionalUnits()
 }
 
