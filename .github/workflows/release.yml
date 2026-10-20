@@ -1,5 +1,6 @@
 name: Eskahade CI/CD
 
+ # Pull requests validate only; deploy jobs run only for application pushes to main.
 on:
   push:
     branches: [main]
