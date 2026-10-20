@@ -61,7 +61,7 @@ jobs:
       - name: Block releases that include database migrations
         shell: bash
         env:
-          BEFORE_SHA: ${{ github.event.before }}
+          BEFORE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           set -euo pipefail
           if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
