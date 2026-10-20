@@ -3,6 +3,8 @@ name: Eskahade CI/CD
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
@@ -21,6 +23,8 @@ jobs:
     name: Validate, test, and build the exact main commit
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      application_changed: ${{ steps.scope.outputs.application_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,6 +37,27 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Classify changed files
+        id: scope
+        env:
+          BEFORE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
+            echo 'Release stopped: cannot determine the base commit for change classification.' >&2
+            exit 1
+          fi
+          changed="$(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA")"
+          app_changed=false
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            case "$file" in
+              .github/workflows/release.yml|.github/workflows/deploy.yml|.github/workflows/deploy-sandbox.yml|scripts/ci/*|scripts/test-manual-deploy.cjs|scripts/validate-manual-deploy.cjs) ;;
+              *) app_changed=true ;;
+            esac
+          done <<< "$changed"
+          echo "application_changed=$app_changed" >> "$GITHUB_OUTPUT"
       - name: Block releases that include database migrations
         shell: bash
         env:
@@ -58,6 +83,17 @@ jobs:
         run: node scripts/validate-manual-deploy.cjs sandbox
         env:
           CLOUDFLARE_ENV: sandbox
+      - name: Verify deployment secret and URL variables
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ESKAHADE_SANDBOX_URL: ${{ vars.ESKAHADE_SANDBOX_URL }}
+          ESKAHADE_PRODUCTION_URL: ${{ vars.ESKAHADE_PRODUCTION_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'CLOUDFLARE_API_TOKEN is not configured.' >&2; exit 1; }
+          node scripts/ci/smoke-http.cjs --validate sandbox "$ESKAHADE_SANDBOX_URL"
+          node scripts/ci/smoke-http.cjs --validate production "$ESKAHADE_PRODUCTION_URL"
       - name: Type check
         run: npx tsc --noEmit
       - name: Run repository test suites
@@ -86,6 +122,7 @@ jobs:
   deploy-sandbox:
     name: Deploy sandbox and run HTTP smoke test
     needs: validate-build-test
+    if: github.event_name == 'push' && needs.validate-build-test.outputs.application_changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -134,6 +171,7 @@ jobs:
   deploy-production:
     name: Deploy production and run HTTP smoke test
     needs: deploy-sandbox
+    if: github.event_name == 'push' && needs.validate-build-test.outputs.application_changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
