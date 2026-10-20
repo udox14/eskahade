@@ -107,6 +107,29 @@ jobs:
           path: .open-next/
           if-no-files-found: error
           retention-days: 1
+      - name: Verify deploy credential and HTTP smoke-test URLs exist
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ESKAHADE_SANDBOX_URL: ${{ vars.ESKAHADE_SANDBOX_URL }}
+          ESKAHADE_PRODUCTION_URL: ${{ vars.ESKAHADE_PRODUCTION_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          if [[ -z "$CLOUDFLARE_API_TOKEN" ]]; then echo 'Missing GitHub Actions secret: CLOUDFLARE_API_TOKEN' >&2; missing=1; fi
+          if [[ -z "$ESKAHADE_SANDBOX_URL" ]]; then echo 'Missing GitHub Actions variable: ESKAHADE_SANDBOX_URL' >&2; missing=1; fi
+          if [[ -z "$ESKAHADE_PRODUCTION_URL" ]]; then echo 'Missing GitHub Actions variable: ESKAHADE_PRODUCTION_URL' >&2; missing=1; fi
+          if [[ "$missing" -ne 0 ]]; then exit 1; fi
+          node scripts/ci/smoke-http.cjs --validate sandbox "$ESKAHADE_SANDBOX_URL"
+          node scripts/ci/smoke-http.cjs --validate production "$ESKAHADE_PRODUCTION_URL"
+      - name: Read-only smoke test current sandbox
+        run: node scripts/ci/smoke-http.cjs sandbox "$ESKAHADE_SANDBOX_URL"
+        env:
+          ESKAHADE_SANDBOX_URL: ${{ vars.ESKAHADE_SANDBOX_URL }}
+      - name: Read-only smoke test current production
+        run: node scripts/ci/smoke-http.cjs production "$ESKAHADE_PRODUCTION_URL"
+        env:
+          ESKAHADE_PRODUCTION_URL: ${{ vars.ESKAHADE_PRODUCTION_URL }}
 
   deploy-sandbox:
     name: Deploy sandbox and run HTTP smoke test
