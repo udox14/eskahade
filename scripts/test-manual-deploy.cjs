@@ -19,11 +19,14 @@ for (const target of ['production', 'sandbox']) {
 test('one main push workflow serializes sandbox then production from one immutable build', () => {
   const workflow = yaml.parse(fs.readFileSync('.github/workflows/release.yml', 'utf8'));
   assert.deepEqual(workflow.on.push.branches, ['main']);
+  assert.deepEqual(workflow.on.pull_request.branches, ['main']);
   assert.deepEqual(workflow.permissions, { contents: 'read' });
   assert.deepEqual(workflow.concurrency, { group: 'eskahade-main-release', 'cancel-in-progress': false });
   assert.deepEqual(Object.keys(workflow.jobs), ['validate-build-test', 'deploy-sandbox', 'deploy-production']);
   assert.equal(workflow.jobs['deploy-production'].needs, 'deploy-sandbox');
   assert.equal(workflow.jobs['deploy-sandbox'].needs, 'validate-build-test');
+  assert.equal(workflow.jobs['deploy-sandbox'].if, "github.event_name == 'push' && needs.validate-build-test.outputs.application_changed == 'true'");
+  assert.equal(workflow.jobs['deploy-production'].if, "github.event_name == 'push' && needs.validate-build-test.outputs.application_changed == 'true'");
   const content = fs.readFileSync('.github/workflows/release.yml', 'utf8');
   assert.doesNotMatch(content, /workflow_dispatch/);
   assert.match(content, /scripts\/ci\/smoke-http\.cjs sandbox/);
