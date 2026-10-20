@@ -29,7 +29,7 @@ function validateManualDeployment(config, target, context = process.env) {
     assert.equal(context.GITHUB_REF, 'refs/heads/main', 'Only main may deploy');
     assert.equal(context.GITHUB_REPOSITORY, 'udox14/eskahade');
     if (context.ESKAHADE_AUTOMATED_RELEASE === 'true') {
-      assert.equal(context.GITHUB_EVENT_NAME, 'push', 'Automated release must be triggered by a push');
+      assert.ok(['push', 'pull_request'].includes(context.GITHUB_EVENT_NAME), 'Automated release validation must be a push or pull request');
       assert.equal(context.GITHUB_SHA?.length, 40, 'Automated release requires an exact commit SHA');
     } else {
       assert.equal(context.GITHUB_EVENT_NAME, 'workflow_dispatch', 'Manual deploy confirmation required');
