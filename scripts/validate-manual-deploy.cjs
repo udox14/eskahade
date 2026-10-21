@@ -26,10 +26,17 @@ function validateManualDeployment(config, target, context = process.env) {
   if (context.CLOUDFLARE_ENV !== undefined) assert.equal(context.CLOUDFLARE_ENV, target === 'production' ? '' : 'sandbox', 'CLI environment override forbidden');
   if (context.CLOUDFLARE_ACCOUNT_ID !== undefined) assert.equal(context.CLOUDFLARE_ACCOUNT_ID, ACCOUNT);
   if (context.GITHUB_ACTIONS === 'true') {
-    assert.equal(context.GITHUB_EVENT_NAME, 'workflow_dispatch', 'Automatic deployment forbidden');
-    assert.equal(context.GITHUB_REF, 'refs/heads/main', 'Only reviewed main may deploy');
     assert.equal(context.GITHUB_REPOSITORY, 'udox14/eskahade');
-    assert.equal(context.ESKAHADE_CONFIRM_WORKER, worker, 'Type the exact Worker name to confirm');
+    if (context.ESKAHADE_AUTOMATED_RELEASE === 'true') {
+      assert.ok(['push', 'pull_request'].includes(context.GITHUB_EVENT_NAME), 'Automated release validation must be a push or pull request');
+      assert.equal(context.GITHUB_SHA?.length, 40, 'Automated release requires an exact commit SHA');
+      if (context.GITHUB_EVENT_NAME === 'push') assert.equal(context.GITHUB_REF, 'refs/heads/main', 'Only main may deploy');
+      else assert.equal(context.GITHUB_BASE_REF, 'main', 'Pull request validation must target main');
+    } else {
+      assert.equal(context.GITHUB_EVENT_NAME, 'workflow_dispatch', 'Manual deploy confirmation required');
+      assert.equal(context.GITHUB_REF, 'refs/heads/main', 'Manual deployment must use main');
+      assert.equal(context.ESKAHADE_CONFIRM_WORKER, worker, 'Type the exact Worker name to confirm');
+    }
   }
   return { target, worker, account: ACCOUNT, bankNetwork: 'OFF' };
 }
@@ -46,3 +53,4 @@ if (require.main === module) {
   } catch (error) { console.error('DEPLOYMENT BLOCKED: ' + error.message); process.exitCode = 1; }
 }
 module.exports = { validateManualDeployment };
+

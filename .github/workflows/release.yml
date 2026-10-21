@@ -1,0 +1,232 @@
+name: Eskahade CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  ESKAHADE_AUTOMATED_RELEASE: 'true'
+
+# One queue for both environments. A newer main push waits until the current
+# sandbox -> production transaction has completed; it cannot race it.
+concurrency:
+  group: eskahade-main-release
+  cancel-in-progress: false
+
+jobs:
+  validate-build-test:
+    name: Validate, test, and build the exact main commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      application_changed: ${{ steps.scope.outputs.application_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Classify changed files
+        id: scope
+        env:
+          BEFORE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
+            echo 'Release stopped: cannot determine the base commit for change classification.' >&2
+            exit 1
+          fi
+          changed="$(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA")"
+          app_changed=false
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            case "$file" in
+              .github/workflows/release.yml|.github/workflows/deploy.yml|.github/workflows/deploy-sandbox.yml|scripts/ci/*|scripts/test-manual-deploy.cjs|scripts/validate-manual-deploy.cjs) ;;
+              *) app_changed=true ;;
+            esac
+          done <<< "$changed"
+          echo "application_changed=$app_changed" >> "$GITHUB_OUTPUT"
+      - name: Block releases that include database migrations
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
+            echo 'Release stopped: cannot determine the previous main commit for migration detection.' >&2
+            exit 1
+          fi
+          git fetch --no-tags --depth=1 origin "$BEFORE_SHA"
+          changed="$(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA" -- migrations)"
+          if [[ -n "$changed" ]]; then
+            echo 'Release stopped: database migration files changed. Apply migrations only through the separately approved procedure.' >&2
+            printf '%s\n' "$changed" >&2
+            exit 1
+          fi
+      - name: Validate sandbox and production isolation
+        run: node scripts/validate-sandbox-config.cjs
+      - name: Validate production release target
+        run: node scripts/validate-manual-deploy.cjs production
+      - name: Validate sandbox release target
+        run: node scripts/validate-manual-deploy.cjs sandbox
+        env:
+          CLOUDFLARE_ENV: sandbox
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Run repository test suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/test-manual-deploy.cjs
+          npm run test:poskestren
+          npm run test:poskestren:disease
+          npm run test:discipline
+          npm run test:pengajian-violations
+          npm run test:pengajian-photos
+          npm run test:supervisi
+      - name: Build Cloudflare Worker
+        env:
+          NODE_OPTIONS: --require=./scripts/stabilization/isolation/build-no-dotenv.cjs
+        run: npm run build:cf
+      - name: Upload immutable Worker build
+        uses: actions/upload-artifact@v4
+        with:
+          name: eskahade-worker-${{ github.sha }}
+          path: .open-next/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+      - name: Verify deploy credential and HTTP smoke-test URLs exist
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ESKAHADE_SANDBOX_URL: ${{ vars.ESKAHADE_SANDBOX_URL }}
+          ESKAHADE_PRODUCTION_URL: ${{ vars.ESKAHADE_PRODUCTION_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          if [[ -z "$CLOUDFLARE_API_TOKEN" ]]; then echo 'Missing GitHub Actions secret: CLOUDFLARE_API_TOKEN' >&2; missing=1; fi
+          if [[ -z "$ESKAHADE_SANDBOX_URL" ]]; then echo 'Missing GitHub Actions variable: ESKAHADE_SANDBOX_URL' >&2; missing=1; fi
+          if [[ -z "$ESKAHADE_PRODUCTION_URL" ]]; then echo 'Missing GitHub Actions variable: ESKAHADE_PRODUCTION_URL' >&2; missing=1; fi
+          if [[ "$missing" -ne 0 ]]; then exit 1; fi
+          node scripts/ci/smoke-http.cjs --validate sandbox "$ESKAHADE_SANDBOX_URL"
+          node scripts/ci/smoke-http.cjs --validate production "$ESKAHADE_PRODUCTION_URL"
+      - name: Read-only smoke test current sandbox
+        run: node scripts/ci/smoke-http.cjs sandbox "$ESKAHADE_SANDBOX_URL"
+        env:
+          ESKAHADE_SANDBOX_URL: ${{ vars.ESKAHADE_SANDBOX_URL }}
+      - name: Read-only smoke test current production
+        run: node scripts/ci/smoke-http.cjs production "$ESKAHADE_PRODUCTION_URL"
+        env:
+          ESKAHADE_PRODUCTION_URL: ${{ vars.ESKAHADE_PRODUCTION_URL }}
+
+  deploy-sandbox:
+    name: Deploy sandbox and run HTTP smoke test
+    needs: validate-build-test
+    if: github.event_name == 'push' && needs.validate-build-test.outputs.application_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_ENV: sandbox
+      CLOUDFLARE_ACCOUNT_ID: a170ed4144c00927988a828aa9a41896
+      CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false'
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: eskahade-worker-${{ github.sha }}
+          path: .open-next
+      - name: Recheck isolated target immediately before deployment
+        run: node scripts/validate-manual-deploy.cjs sandbox
+      - name: Verify deploy credential is configured
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: >-
+          test -n "$CLOUDFLARE_API_TOKEN" || (echo 'Release stopped: CLOUDFLARE_API_TOKEN is not configured.' >&2; exit 1)
+      - name: Verify sandbox smoke-test URL is configured
+        env:
+          ESKAHADE_SANDBOX_URL: ${{ vars.ESKAHADE_SANDBOX_URL }}
+        run: node scripts/ci/smoke-http.cjs --validate sandbox "$ESKAHADE_SANDBOX_URL"
+      - name: Deploy existing sandbox Worker only
+        run: >-
+          node node_modules/@opennextjs/cloudflare/dist/cli/index.js deploy
+          --config wrangler.jsonc --env sandbox --keep-vars
+          --experimental-provision=false --experimental-auto-create=false
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          NODE_OPTIONS: --require=./scripts/stabilization/isolation/build-no-dotenv.cjs
+      - name: Smoke test sandbox HTTP endpoint
+        run: node scripts/ci/smoke-http.cjs sandbox "$ESKAHADE_SANDBOX_URL"
+        env:
+          ESKAHADE_SANDBOX_URL: ${{ vars.ESKAHADE_SANDBOX_URL }}
+
+  deploy-production:
+    name: Deploy production and run HTTP smoke test
+    needs: deploy-sandbox
+    if: github.event_name == 'push' && needs.validate-build-test.outputs.application_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_ENV: ''
+      CLOUDFLARE_ACCOUNT_ID: a170ed4144c00927988a828aa9a41896
+      CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false'
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: eskahade-worker-${{ github.sha }}
+          path: .open-next
+      - name: Final fail-closed production target check
+        run: node scripts/validate-manual-deploy.cjs production
+      - name: Verify deploy credential is configured
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: >-
+          test -n "$CLOUDFLARE_API_TOKEN" || (echo 'Release stopped: CLOUDFLARE_API_TOKEN is not configured.' >&2; exit 1)
+      - name: Verify production smoke-test URL is configured
+        env:
+          ESKAHADE_PRODUCTION_URL: ${{ vars.ESKAHADE_PRODUCTION_URL }}
+        run: node scripts/ci/smoke-http.cjs --validate production "$ESKAHADE_PRODUCTION_URL"
+      - name: Deploy existing production Worker only
+        run: >-
+          node node_modules/@opennextjs/cloudflare/dist/cli/index.js deploy
+          --config wrangler.jsonc --env "" --keep-vars
+          --experimental-provision=false --experimental-auto-create=false
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          NODE_OPTIONS: --require=./scripts/stabilization/isolation/build-no-dotenv.cjs
+      - name: Smoke test production HTTP endpoint
+        run: node scripts/ci/smoke-http.cjs production "$ESKAHADE_PRODUCTION_URL"
+        env:
+          ESKAHADE_PRODUCTION_URL: ${{ vars.ESKAHADE_PRODUCTION_URL }}
+
