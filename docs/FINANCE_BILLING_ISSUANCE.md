@@ -314,3 +314,13 @@ menghapus kewajiban atau riwayat.
 Bukti final deployment, status CI, dan batch awal dicatat pada laporan
 penyelesaian serta artefak privat output/billing-production-*. Tidak ada secret,
 backup data pribadi, atau ekspor database yang dimasukkan ke Git.
+
+## Koreksi cutover operasional makan/nyuci — 22 Oktober 2026
+
+- Instruksi user: makan dan nyuci baru aktif setelah cutover; gunakan setting existing `finance_koperasi_effective_at`, terpisah dari batas historis Juli 2026.
+- Tanpa cutover, atau sebelum timestamp efektif: kedua layanan dilewati termasuk periode pembayaran di muka. Tarif belum lengkap sebelum cutover tidak menghasilkan kegagalan penerbitan layanan.
+- Setelah efektif: semua santri aktif disisir bertahap melalui cron lima menit sesuai kepesertaan, pengecualian, pembebasan dan nominal tarif periode existing. Bulan cutover menjadi awal layanan, tanpa prorata baru atau utang baru sebelum bulan cutover.
+- Identitas putaran harian memasukkan timestamp cutover efektif sehingga putaran yang sudah selesai sebelum cutover tidak menghalangi penyisiran baru. Cursor, lease, dan uniqueness existing tetap berlaku.
+- Record existing tetap immutable. Predicate daftar/total dan guard pembayaran menahan makan/nyuci sebelum cutover tanpa menghapus snapshot. Wrapper engine dibuat per pemanggilan agar konfigurasi tidak tersimpan lintas request hangat.
+- Tidak ada migration baru, perubahan nominal existing, pengubahan cutover production, atau aktivasi Worker otomatis dalam koreksi ini. Worker otomatis production tetap OFF menunggu persetujuan aktivasi eksplisit setelah penolakan automatic approval review sebelumnya.
+- Pengujian lokal: 43 billing, 6 D1 lokal, 17 remediation, 12 operations, 15 BRI, 13 callback evidence (106 total). TypeScript lulus; lint modul berubah tanpa error (satu warning unused userId existing di fund-management).

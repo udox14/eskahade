@@ -6,7 +6,8 @@
 import { queryOne, execute, now } from '@/lib/db'
 import type { FinanceFundManagement, FinancePaymentSource } from '@/lib/finance/payment-types'
 
-export const APP_SETTING_KOPERASI_EFFECTIVE_AT = 'finance_koperasi_effective_at'
+import { APP_SETTING_KOPERASI_EFFECTIVE_AT } from './billing-cutover'
+export { APP_SETTING_KOPERASI_EFFECTIVE_AT } from './billing-cutover'
 
 export const FUND_MANAGEMENT_LABELS: Record<FinanceFundManagement, string> = {
   PRE_KOPERASI: 'Pra-Koperasi',

@@ -1,6 +1,7 @@
 import type { BillingStore } from './billing-store'
 import { createBillingIssuance, summarizeIssuance, type BillingCandidate } from './billing-issuance'
 import { billingClock } from './billing-periods'
+import { readBillingCutover } from './billing-cutover'
 
 export async function recordBillingIssue(store: BillingStore, candidate: BillingCandidate) {
   if (candidate.outcome === 'REVIEW' || candidate.outcome === 'FAILED') {
@@ -18,7 +19,10 @@ export async function recordBillingIssue(store: BillingStore, candidate: Billing
 /** Keyset batches; an interrupted page is safe to replay because obligations have a UNIQUE key. */
 export async function runBillingJob(store: BillingStore, at = new Date(), pageSize = 5) {
   const date = billingClock(at).date
-  await store.execute('INSERT OR IGNORE INTO finance_billing_runs(id,business_date) VALUES(?,?)', [`DAILY:${date}`,date])
+  // A cutover becoming effective after today's completed sweep needs a fresh cursor.
+  const cutover = await readBillingCutover(store,at)
+  const runId = `DAILY:${date}${cutover ? ':CUTOVER:'+cutover.effectiveAt : ''}`
+  await store.execute('INSERT OR IGNORE INTO finance_billing_runs(id,business_date) VALUES(?,?)', [runId,date])
   const oldest = await store.queryOne<{ id: string }>(
     "SELECT id FROM finance_billing_runs WHERE id LIKE 'DAILY:%' AND status='RUNNING' ORDER BY business_date LIMIT 1")
   if (!oldest) return { status:'IDLE' as const,cursor:null }

@@ -48,7 +48,17 @@ async function main(){
   assert.equal((await db.prepare("SELECT COUNT(*) n FROM finance_payment_orders WHERE id='d1-order'").first()).n,0);
   assert.equal((await db.prepare('PRAGMA foreign_key_check').all()).results.length,0);
   console.log('PASS D1 batch rolls back header and items on late legacy conflict; foreign keys intact');
-  console.log('ALL 5 LOCAL D1 BILLING TESTS PASSED');
+  await db.prepare("DELETE FROM app_settings WHERE key='finance_koperasi_effective_at'").run();
+  const gated=await createBillingIssuance(store,at).ensureStudent('student','2026-11');
+  assert.equal(gated.failed,0);
+  assert.equal((await db.prepare("SELECT COUNT(*) n FROM finance_obligations WHERE period='2026-11' AND item_type IN ('UANG_MAKAN','UANG_NYUCI')").first()).n,0);
+  const {collectibleBillingSql}=h.load('lib/finance/billing-legacy.ts');
+  assert.equal((await db.prepare(`SELECT COUNT(*) n FROM finance_obligations o WHERE ${collectibleBillingSql()} AND item_type IN ('UANG_MAKAN','UANG_NYUCI')`).first()).n,0);
+  await db.prepare("INSERT INTO app_settings(key,value) VALUES('finance_koperasi_effective_at','2026-10-21T00:00:00+07:00')").run();
+  const enabled=await createBillingIssuance(store,at).ensureStudent('student','2026-11');assert.equal(enabled.failed,0);
+  assert.equal((await db.prepare("SELECT COUNT(*) n FROM finance_obligations WHERE period='2026-11' AND item_type IN ('UANG_MAKAN','UANG_NYUCI')").first()).n,2);
+  console.log('PASS D1 operational cutover gates service creation and collection without deleting snapshots');
+  console.log('ALL 6 LOCAL D1 BILLING TESTS PASSED');
  }finally{await mf.dispose()}
 }
 main().catch(error=>{console.error(error);process.exitCode=1});

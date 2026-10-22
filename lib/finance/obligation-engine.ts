@@ -5,8 +5,10 @@ import { computeObligationStatus } from './types'
 import type { FinanceObligation, FinanceItemType, EnsureObligationOptions, FinanceExemption } from './types'
 import { assertSantriBillable, assertSantriBillableUntukItem } from './non-billable-santri'
 import { rupiah } from './money'
+import { createServiceBillingGate } from './billing-cutover'
 
-export function createObligationEngine(store: BillingStore) {
+export function createObligationEngine(store: BillingStore, at = new Date()) {
+  const serviceGate = createServiceBillingGate(store,at)
   const { queryOne, execute } = store
   const generateId = () => crypto.randomUUID()
   const now = () => new Date().toISOString()
@@ -142,6 +144,9 @@ export function createObligationEngine(store: BillingStore) {
     if (existing) {
       return existing
     }
+
+    const cutoverBlock = await serviceGate(itemType,period)
+    if (cutoverBlock) throw new Error(cutoverBlock)
 
     // 2b. Cutover / Legacy Guard: Cegah pembuatan kewajiban baru untuk periode/item historis legacy
     const legacyCheck = await checkLegacySettlement(santriId, itemType, period)

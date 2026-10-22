@@ -5,6 +5,7 @@ import { FINANCE_CUTOVER_START_ANNUAL, FINANCE_CUTOVER_START_MONTHLY } from './l
 import { billingClock, billingPhase, currentBillingTargets, advanceBillingPeriods } from './billing-periods'
 import { isSantriBebasItem } from './non-billable-santri'
 import { legacyBillingEvidence, legacyReviewSql, legacyExemptSql } from './billing-legacy'
+import { createServiceBillingGate } from './billing-cutover'
 
 export type BillingOutcome = 'READY' | 'EXISTING' | 'EXEMPTED' | 'LEGACY' | 'SKIPPED' | 'REVIEW' | 'FAILED' | 'CREATED'
 export interface BillingCandidate {
@@ -28,7 +29,8 @@ export interface IssuanceResult {
 }
 
 export function createBillingIssuance(store: BillingStore, at = new Date()) {
-  const engine = createObligationEngine(store)
+  const engine = createObligationEngine(store, at)
+  const serviceGate = createServiceBillingGate(store,at)
 
   const readStudent = (santriId: string) => store.queryOne<BillingStudent>(
     `SELECT id,status_global,asrama,kategori_santri,tempat_makan_id,tempat_mencuci_id,
@@ -51,6 +53,8 @@ export function createBillingIssuance(store: BillingStore, at = new Date()) {
       return review?.review ? result('REVIEW', 'Pembayaran modul lama perlu sinkronisasi/pemeriksaan.', existing)
         : result(existing.status === 'EXEMPTED' ? 'EXEMPTED' : mirrored ? 'LEGACY' : 'EXISTING', undefined, existing)
     }
+    const cutoverBlock = await serviceGate(itemType,period)
+    if (cutoverBlock) return result('SKIPPED',cutoverBlock)
     if ((period.length === 7 && period < FINANCE_CUTOVER_START_MONTHLY) ||
       (period.length === 4 && Number(period) < FINANCE_CUTOVER_START_ANNUAL)) return result('SKIPPED', 'Periode sebelum CUTOVER.')
 

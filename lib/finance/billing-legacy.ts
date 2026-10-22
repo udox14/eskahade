@@ -1,4 +1,5 @@
 import type { BillingStore } from './billing-store'
+import { serviceBillingBlock, serviceBillingSql } from './billing-cutover'
 import { nonBillableItemSqlPredicate, nonBillableSantriSqlPredicate } from './non-billable-santri'
 import { FINANCE_CUTOVER_START_ANNUAL, FINANCE_CUTOVER_START_MONTHLY } from './legacy-reader'
 
@@ -50,7 +51,7 @@ export function collectibleBillingSql(alias = 'o'): string {
     AND ${nonBillableSantriSqlPredicate('bstudent.asrama')}
     AND (${alias}.item_type NOT IN ('UANG_MAKAN','UANG_NYUCI') OR
       ${nonBillableItemSqlPredicate('bstudent.asrama','bstudent.kategori_santri','UANG_MAKAN')}))`
-  return `(NOT (${legacyReviewSql(alias)}) AND NOT ${legacyExemptSql(alias)} AND ${billable})`
+  return `(NOT (${legacyReviewSql(alias)}) AND NOT ${legacyExemptSql(alias)} AND ${billable} AND ${serviceBillingSql(alias)})`
 }
 
 export function orderBillingConflictSql(): string {
@@ -76,9 +77,11 @@ export async function billingReviewCount(store: BillingStore, santriId?: string)
 }
 
 export async function assertBillingCollectible(store: BillingStore, obligationId: string): Promise<void> {
-  const row = await store.queryOne<{ review: number; exempted: number }>(
-    `SELECT (${legacyReviewSql('o')}) AS review,${legacyExemptSql('o')} AS exempted FROM finance_obligations o WHERE o.id=?`, [obligationId])
+  const row = await store.queryOne<{ review: number; exempted: number; item_type: string; period: string }>(
+    `SELECT o.item_type,o.period,(${legacyReviewSql('o')}) AS review,${legacyExemptSql('o')} AS exempted FROM finance_obligations o WHERE o.id=?`, [obligationId])
   if (!row) throw new Error('Tagihan tidak ditemukan.')
+  const cutoverBlock = await serviceBillingBlock(store,row.item_type,row.period)
+  if (cutoverBlock) throw new Error(cutoverBlock)
   if (row.review) throw new Error('Perlu Pemeriksaan: pembayaran modul lama untuk tagihan ini belum sesuai. Pembayaran ulang ditahan.')
   if (row.exempted) throw new Error('Tagihan SPP ini dibebaskan/ditiadakan pada pengaturan existing.')
 }

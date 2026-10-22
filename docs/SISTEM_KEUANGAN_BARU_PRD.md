@@ -638,6 +638,14 @@ Pembebasan, tarif, snapshot existing, dan batas CUTOVER tetap mengikuti aturan
 yang sudah berlaku. Pelengkapan kewajiban historis memerlukan pratinjau dan
 pemeriksaan bukti; tidak boleh mengubah transaksi atau snapshot existing.
 
+Khusus UANG_MAKAN dan UANG_NYUCI, penerbitan dan penagihan baru aktif saat
+`finance_koperasi_effective_at` mencapai waktu efektifnya. Sebelum itu kedua
+item dilewati, termasuk pembayaran di muka. Setelah cutover, proses otomatis
+menyisir seluruh santri aktif sesuai kepesertaan, pembebasan, dan tarif periode
+yang berlaku. Bulan cutover menjadi bulan awal layanan; tidak membuat tunggakan
+baru untuk bulan sebelumnya. Nominal memakai tarif penuh existing, tanpa model
+prorata tambahan. Snapshot dan transaksi yang sudah ada tetap disimpan.
+
 Contoh:
 
 Orang tua membayar SPP November pada September.

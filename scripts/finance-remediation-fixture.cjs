@@ -29,6 +29,7 @@ function createDatabase(through=189,seed=true){
  `);
  db.exec(`INSERT INTO tahun_ajaran VALUES(2,'2026/2027',1);`);
  if(seed)db.exec(`
+ INSERT INTO app_settings(key,value) VALUES('finance_koperasi_effective_at','2026-07-01T00:00:00+07:00');
  INSERT INTO users(id,full_name,role,roles) VALUES('admin','Admin','admin','["admin"]'),('cashier','Kasir','petugas_koperasi','["petugas_koperasi"]'),('viewer','Pimpinan','pimpinan','["pimpinan"]');
  INSERT INTO master_jasa(id,nama_jasa,jenis) VALUES('provider-meal','Katering','Makan'),('provider-wash','Laundry','Cuci');
  INSERT INTO santri(id,nis,nama_lengkap,asrama,kategori_santri,tempat_makan_id,tempat_mencuci_id) VALUES('student','1001','Santri','ASRAMA A','REGULER','provider-meal','provider-wash'),('other','1002','Lain','ASRAMA B','REGULER',NULL,NULL);`);

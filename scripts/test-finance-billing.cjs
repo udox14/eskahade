@@ -22,6 +22,52 @@ function issuer(){return createBillingIssuance(h.adapter,at)}
 async function test(name,fn){setup();await fn();count++;console.log('PASS '+name)}
 function snapshot(){return JSON.stringify(h.db.prepare('SELECT * FROM finance_obligations ORDER BY id').all())}
 async function main(){
+ await test('meal and laundry wait for operational cutover including advance payment and direct engine calls',async()=>{
+  h.db.exec("DELETE FROM app_settings WHERE key='finance_koperasi_effective_at';DELETE FROM finance_tariffs WHERE item_type IN ('UANG_MAKAN','UANG_NYUCI')");
+  const r=await issuer().ensureStudent('student','2026-11');assert.equal(r.failed,0);assert.equal(r.created,6);
+  assert.equal(h.db.prepare("SELECT COUNT(*) n FROM finance_obligations WHERE item_type IN ('UANG_MAKAN','UANG_NYUCI')").get().n,0);
+  await assert.rejects(()=>h.load('lib/finance/obligation-engine.ts').createObligationEngine(h.adapter,at).ensureObligation('student','UANG_MAKAN','2026-10'),/cutover/);
+ });
+ await test('effective instant activates both services at the applicable full monthly tariff without pre-cutover debt',async()=>{
+  h.db.exec("UPDATE app_settings SET value='2026-10-15T19:00:00+07:00' WHERE key='finance_koperasi_effective_at'");
+  const before=createBillingIssuance(h.adapter,new Date('2026-10-15T11:59:59Z'));
+  assert.equal((await before.issue('student','UANG_MAKAN','2026-11')).outcome,'SKIPPED');
+  const after=createBillingIssuance(h.adapter,new Date('2026-10-15T12:00:00Z'));
+  for(const item of ['UANG_MAKAN','UANG_NYUCI']){
+   const r=await after.issue('student',item,'2026-10');assert.equal(r.created,true);assert.equal(r.obligation.amount_expected,70000);
+   assert.equal((await after.assess('student',item,'2026-09')).outcome,'SKIPPED');
+  }
+ });
+ await test('cutover starts a new persisted sweep after an already completed daily run and replays safely',async()=>{
+  h.db.exec("DELETE FROM app_settings WHERE key='finance_koperasi_effective_at'");
+  assert.equal((await runBillingJob(h.adapter,at,10)).status,'COMPLETED');
+  assert.equal((await runBillingJob(h.adapter,at,10)).status,'IDLE');
+  h.db.exec("INSERT INTO app_settings(key,value) VALUES('finance_koperasi_effective_at','2026-10-15T00:00:00+07:00')");
+  const r=await runBillingJob(h.adapter,at,10);assert.equal(r.status,'COMPLETED');assert.equal(r.created,2);
+  const before=snapshot();assert.equal((await runBillingJob(h.adapter,at,10)).status,'IDLE');assert.equal(snapshot(),before);
+  assert.equal(h.db.prepare("SELECT COUNT(*) n FROM finance_billing_runs WHERE id LIKE 'DAILY:%'").get().n,2);
+ });
+ await test('cutover gating hides existing service snapshots and blocks payment without mutating history',async()=>{
+  await issuer().ensureStudent('student');const before=snapshot();
+  h.db.exec("DELETE FROM app_settings WHERE key='finance_koperasi_effective_at'");
+  assert.equal(h.db.prepare(`SELECT COUNT(*) n FROM finance_obligations o WHERE ${collectibleBillingSql()} AND item_type IN ('UANG_MAKAN','UANG_NYUCI')`).get().n,0);
+  const o=h.db.prepare("SELECT id FROM finance_obligations WHERE item_type='UANG_MAKAN'").get();
+  await assert.rejects(()=>assertBillingCollectible(h.adapter,o.id),/cutover/);assert.equal(snapshot(),before);
+ });
+ await test('invalid cutover is reported and post-cutover missing tariffs remain failures',async()=>{
+  h.db.exec("UPDATE app_settings SET value='invalid' WHERE key='finance_koperasi_effective_at'");
+  await assert.rejects(()=>runBillingJob(h.adapter,at,10),/tidak valid/);
+  assert.equal((await issuer().ensureStudent('student')).failed,2);
+  h.db.exec("UPDATE app_settings SET value='2026-10-01T00:00:00+07:00' WHERE key='finance_koperasi_effective_at';DELETE FROM finance_tariffs WHERE item_type='UANG_MAKAN'");
+  assert.equal((await issuer().issue('student','UANG_MAKAN','2026-10')).outcome,'FAILED');
+ });
+ await test('warm request wrapper observes changed cutover instead of caching the prior request setting',async()=>{
+  const service=h.load('lib/finance/obligations.ts');
+  h.db.exec("DELETE FROM app_settings WHERE key='finance_koperasi_effective_at'");
+  await assert.rejects(()=>service.ensureObligation('student','UANG_MAKAN','2026-10'),/cutover/);
+  h.db.exec("INSERT INTO app_settings(key,value) VALUES('finance_koperasi_effective_at','2026-10-01T00:00:00+07:00')");
+  assert.equal((await service.ensureObligation('student','UANG_MAKAN','2026-10')).amount_expected,70000);
+ });
  await test('portal select-all excludes future bills and cancel-all clears explicitly selected future bills',()=>{
   const ts=require('typescript'),vm=require('node:vm');
   const file='app/portal-ortu/(app)/tagihan/_tagihan-client.tsx';
@@ -291,7 +337,7 @@ async function main(){
   try{await h.load('workers/finance-billing.ts').default.scheduled({scheduledTime:at.getTime()},
    {DB:db,DEMO_DB:db,ESKAHADE_ENV:'sandbox',FINANCE_BILLING_AUTO_ENABLED:'true'})}
   finally{Date.now=originalNow;console.log=originalLog}
-  const run=h.db.prepare("SELECT * FROM finance_billing_runs WHERE id='DAILY:2026-10-15'").get();
+  const run=h.db.prepare("SELECT * FROM finance_billing_runs WHERE id LIKE 'DAILY:2026-10-15%'").get();
   const processed=(run.created_count+run.existing_count+run.skipped_count+run.review_count+run.failed_count)/7;
   assert(processed>=Math.ceil(2500/288),'Insufficient daily throughput: '+processed+' students/tick');
   assert(queries<1000,'D1 query ceiling exceeded: '+queries);assert(clock<300000,'Five-minute tick overlap');

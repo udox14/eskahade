@@ -27,7 +27,8 @@ const ANNUAL_ITEM_TYPES: readonly FinanceItemType[] = [
 const obligationEngine = createObligationEngine({ query, queryOne, execute })
 export const validateAndMapPeriod = obligationEngine.validateAndMapPeriod
 export async function ensureObligation(santriId: string, itemType: FinanceItemType, period: string, options?: EnsureObligationOptions): Promise<FinanceObligation> {
-  return obligationEngine.ensureObligation(santriId,itemType,period,options)
+  // Request-local engine: cutover/configuration must not leak across warm requests.
+  return createObligationEngine({ query, queryOne, execute }).ensureObligation(santriId,itemType,period,options)
 }
 
 /**
