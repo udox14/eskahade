@@ -61,6 +61,7 @@ async function main(){
   h.reset();h.db.exec("INSERT INTO finance_cash_sessions(id,session_code,operator_id,opened_at,opening_balance,expected_closing_balance) VALUES('session','CROSS-PROCESS','admin',datetime('now'),50000,50000)");
   const req={santriId:'student',idempotencyKey:'cross-process',items:[{itemType:'UANG_JAJAN',amount:10000}]};const receipt=await h.load('app/dashboard/koperasi/loket/actions.ts').executeLoketDepositOrPayment(req);
   h.db.exec("UPDATE finance_cash_sessions SET status='CLOSED'");const file=path.resolve('output/remediation-regression/cross-process.sqlite');
+  fs.mkdirSync(path.dirname(file),{recursive:true});
   await require('node:sqlite').backup(h.db,file);
   const child=require('node:child_process').spawnSync(process.execPath,['-e',`const h=require('./scripts/finance-remediation-fixture.cjs').harness();h.openFile(${JSON.stringify(file)});h.load('app/dashboard/koperasi/loket/actions.ts').executeLoketDepositOrPayment(${JSON.stringify(req)}).then(r=>process.stdout.write(r.receiptNumber)).catch(e=>{console.error(e);process.exitCode=1})`],{encoding:'utf8'});
   assert.equal(child.status,0,child.stderr);assert.equal(child.stdout,receipt.receiptNumber);
