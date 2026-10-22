@@ -620,6 +620,24 @@ Backend tetap harus membentuk record kewajiban yang dapat diaudit.
 
 Tagihan dapat dibuat dinamis saat diperlukan.
 
+Penerbitan tidak boleh bergantung pada login Portal Ortu. Proses otomatis dan
+formulir pembayaran petugas menggunakan layanan penerbitan yang sama dengan
+Portal Ortu. Pembayaran modul lama tetap authoritative selama coexistence;
+bukti yang belum sesuai sinkronisasinya harus ditahan untuk pemeriksaan.
+
+Klasifikasi waktu terpisah dari status pembayaran:
+
+- Bulanan berjalan sejak tanggal 1 dan menjadi tunggakan setelah bulannya lewat.
+- Tahunan berjalan pada tahun ajaran Juli–Juni dan menjadi tunggakan setelah
+  tahun ajaran tersebut berakhir.
+- Periode mendatang dapat dipilih untuk pembayaran di muka, tetapi tidak masuk
+  total tagihan berjalan atau tunggakan. Record dibuat saat periode dipilih.
+- USPP tetap kewajiban sekali masuk dengan sisa cicilan, bukan tunggakan berkala.
+
+Pembebasan, tarif, snapshot existing, dan batas CUTOVER tetap mengikuti aturan
+yang sudah berlaku. Pelengkapan kewajiban historis memerlukan pratinjau dan
+pemeriksaan bukti; tidak boleh mengubah transaksi atau snapshot existing.
+
 Contoh:
 
 Orang tua membayar SPP November pada September.

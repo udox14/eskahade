@@ -42,7 +42,7 @@ export default async function PortalBerandaPage() {
   const end = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
 
   const [billing, absen, pelanggaran, disiplin] = await Promise.all([
-    getPortalStudentBilling(session.santri_id).catch(() => null),
+    getPortalStudentBilling(session.santri_id),
     getRekapAbsensiAnak(session.santri_id, start, end),
     getPelanggaranAnak(session.santri_id),
     getTotalPelanggaranAnak(session.santri_id),

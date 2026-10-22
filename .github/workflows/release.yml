@@ -90,6 +90,12 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/test-manual-deploy.cjs
+          npm run test:finance:billing
+          npm run test:finance:billing:d1
+          node scripts/test-finance-remediation.cjs
+          node scripts/test-finance-operations-remediation.cjs
+          node scripts/test-finance-bri-remediation.cjs
+          node scripts/test-finance-bri-callback-evidence.cjs
           npm run test:poskestren
           npm run test:poskestren:disease
           npm run test:discipline

@@ -8,11 +8,24 @@ function createDatabase(through=189,seed=true){
  CREATE TABLE users(id TEXT PRIMARY KEY,full_name TEXT,username TEXT,role TEXT,roles TEXT,email TEXT,password_hash TEXT);
  CREATE TABLE santri(id TEXT PRIMARY KEY,nis TEXT,nama_lengkap TEXT,status_global TEXT DEFAULT 'aktif',asrama TEXT,kamar TEXT,
    tempat_makan_id TEXT,tempat_mencuci_id TEXT,kategori_santri TEXT,jenis_kelamin TEXT DEFAULT 'L',foto_url TEXT,
-   kelas_sekolah TEXT,saldo_uang_jajan INTEGER DEFAULT 0,created_at TEXT DEFAULT CURRENT_TIMESTAMP,updated_at TEXT);
+   kelas_sekolah TEXT,saldo_uang_jajan INTEGER DEFAULT 0,created_at TEXT DEFAULT CURRENT_TIMESTAMP,updated_at TEXT,
+   tanggal_masuk TEXT,tahun_masuk INTEGER,bebas_spp INTEGER DEFAULT 0);
  CREATE TABLE master_jasa(id TEXT PRIMARY KEY,nama_jasa TEXT,jenis TEXT,created_at TEXT);
  CREATE TABLE tahun_ajaran(id INTEGER PRIMARY KEY,nama TEXT,is_active INTEGER);
  CREATE TABLE app_settings(key TEXT PRIMARY KEY,value TEXT,updated_at TEXT);
  CREATE TABLE fitur_akses(id INTEGER PRIMARY KEY,group_name TEXT,title TEXT,href TEXT UNIQUE,icon TEXT,roles TEXT,is_active INTEGER,urutan INTEGER);
+ CREATE TABLE spp_log(id TEXT PRIMARY KEY,santri_id TEXT REFERENCES santri(id),bulan INTEGER,tahun INTEGER,
+   nominal_bayar INTEGER,tanggal_bayar TEXT DEFAULT CURRENT_TIMESTAMP,penerima_id TEXT,keterangan TEXT);
+ CREATE TABLE spp_tagihan_ditiadakan(id TEXT PRIMARY KEY,santri_id TEXT,tahun INTEGER,bulan INTEGER,is_active INTEGER DEFAULT 1);
+ CREATE TABLE spp_tunggakan_historis(id TEXT PRIMARY KEY,santri_id TEXT,tahun INTEGER,bulan INTEGER,nominal_tagihan INTEGER,
+   status TEXT,tanggal_lunas TEXT,penerima_id TEXT,updated_at TEXT);
+ CREATE TABLE pembayaran_tahunan(id TEXT PRIMARY KEY,santri_id TEXT REFERENCES santri(id),jenis_biaya TEXT,tahun_tagihan INTEGER,
+   tahun_ajaran_id INTEGER,nominal_bayar INTEGER,tanggal_bayar TEXT DEFAULT CURRENT_TIMESTAMP,penerima_id TEXT,keterangan TEXT,status TEXT DEFAULT 'AKTIF',psb_receipt_id TEXT);
+ CREATE TABLE biaya_settings(id INTEGER PRIMARY KEY,tahun_angkatan INTEGER,jenis_biaya TEXT,nominal INTEGER);
+ CREATE TABLE psb_flow(santri_id TEXT);
+ CREATE TABLE psb_payment_receipt(id TEXT PRIMARY KEY,metode TEXT);
+ CREATE TABLE keuangan_non_spp_opening_balance(id TEXT PRIMARY KEY,santri_id TEXT,jenis_biaya TEXT,nominal_tagihan INTEGER,status TEXT);
+ CREATE TABLE santri_nonaktif_log(id TEXT PRIMARY KEY,santri_id TEXT,tanggal_mulai TEXT,tanggal_aktif_aktual TEXT);
  `);
  db.exec(`INSERT INTO tahun_ajaran VALUES(2,'2026/2027',1);`);
  if(seed)db.exec(`

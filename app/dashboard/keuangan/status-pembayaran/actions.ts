@@ -1,4 +1,8 @@
 'use server'
+
+import { ensureStudentBilling } from '@/lib/finance/billing'
+import { collectibleBillingSql, billingReviewCount } from '@/lib/finance/billing-legacy'
+import { billingPhase, billingClock, dueBillingSql, overdueBillingSql } from '@/lib/finance/billing-periods'
 import { rupiah } from '@/lib/finance/money'
 
 import { authorizeFinanceFeature } from '@/lib/finance/authorization'
@@ -226,7 +230,7 @@ export interface TunggakanRowItem {
   asrama: string | null
   kamar: string | null
   kelasSekolah: string | null
-  itemType: 'SPP' | 'UANG_MAKAN' | 'UANG_NYUCI'
+  itemType: FinanceItemType
   itemLabel: string
   period: string
   periodLabel: string
@@ -256,6 +260,7 @@ export interface StatusPembayaranQueryParams {
 }
 
 export interface StatusPembayaranResponse {
+  billingReviewCount: number
   activeTab: TabType
   items: EnrichedStudentObligationMatrixItem[]
   ringkasanItems?: RingkasanRowItem[]
@@ -321,6 +326,7 @@ export interface ObligationBreakdownItem {
   amountPaid: number
   remaining: number
   status: FinanceObligationStatus
+  billingPhase: 'PAST' | 'CURRENT' | 'UPCOMING'
   providerName: string | null
   createdAt: string
   updatedAt: string
@@ -381,6 +387,7 @@ export interface UsppInstallmentHistoryItem {
 }
 
 export interface StudentPaymentDetailResponse {
+  billingReviewCount: number
   santri: StudentIdentityDetail
   summary: {
     totalTagihan: number
@@ -405,6 +412,7 @@ export interface StudentPaymentDetailResponse {
 // â”€â”€â”€ TIPE DATA FASE 4C: CATAT PEMBAYARAN TUNAI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface PayableObligationItem {
+  billingPhase: 'PAST' | 'CURRENT' | 'UPCOMING'
   id: string
   itemType: string
   itemLabel: string
@@ -478,7 +486,7 @@ function formatPeriodLabel(period: string): string {
   if (!period) return '-'
   if (period === 'LIFETIME') return 'Sepanjang Pendidikan'
   const parts = period.split('-')
-  if (parts.length === 1) return `Tahun ${period}`
+  if (parts.length === 1 && /^\d{4}$/.test(period)) return `Tahun Ajaran ${period}/${Number(period)+1}`
   if (parts.length !== 2) return period
   const year = parseInt(parts[0], 10)
   const monthIdx = parseInt(parts[1], 10) - 1
@@ -533,8 +541,8 @@ function normalizePaymentMethod(channel?: string | null, method?: string | null)
 function calculateOverdueAge(period: string, currentPeriod: string): { overdueSince: string; overdueDuration: string } {
   const parts = period.split('-').map(Number)
   const cParts = currentPeriod.split('-').map(Number)
-  const pYear = parts[0]
-  const pMonth = parts[1] || 1
+  const pYear = parts[0] + (period.length === 4 ? 1 : 0)
+  const pMonth = parts[1] || 6
   const cYear = cParts[0]
   const cMonth = cParts[1] || 1
   const diffMonths = (cYear - pYear) * 12 + (cMonth - pMonth)
@@ -836,7 +844,7 @@ async function fetchRingkasanData(options: {
 
   // Mapping periode bulanan dan tahunan
   const monthlyPeriod = options.selectedPeriod
-  const annualYear = monthlyPeriod.split('-')[0] || '2026'
+  const annualYear = String(Number(monthlyPeriod.slice(0,4)) - (Number(monthlyPeriod.slice(5,7)) < 7 ? 1 : 0))
 
   // Ambil seluruh kewajiban untuk santri pada page ini dengan net allocation authoritative
   const ph = santriIds.map(() => '?').join(',')
@@ -862,7 +870,7 @@ async function fetchRingkasanData(options: {
        (SELECT COALESCE(SUM(amount), 0) FROM finance_allocations WHERE obligation_id = o.id) as gross_paid,
        (SELECT COALESCE(SUM(amount), 0) FROM finance_correction_items WHERE obligation_id = o.id) as total_corr
      FROM finance_obligations o
-     WHERE o.santri_id IN (${ph})
+     WHERE o.santri_id IN (${ph}) AND ${collectibleBillingSql('o')} AND ${dueBillingSql('o',new Date(`${options.currentPeriod}-15T12:00:00+07:00`))}
        AND (o.period = ? OR o.period = ? OR o.period = 'LIFETIME')
        AND ${nonBillableItemSqlPredicate(
          '(SELECT s.asrama FROM santri s WHERE s.id = o.santri_id)',
@@ -984,7 +992,7 @@ async function fetchRingkasanData(options: {
     const hasPartial = allItems.some(it => it.status === 'PARTIALLY_PAID')
 
     let overallStatus: 'LUNAS' | 'CICILAN' | 'BELUM_LUNAS' | 'BEBAS' = 'LUNAS'
-    if (!hasUnpaid) {
+    if (!hasUnpaid && allItems.some(it => it.status !== 'NOT_MATERIALIZED')) {
       overallStatus = 'LUNAS'
     } else if (hasPartial) {
       overallStatus = 'CICILAN'
@@ -1030,6 +1038,8 @@ async function fetchBulananData(options: {
 }): Promise<{ items: BulananRowItem[]; totalCount: number; kpi: BulananKpi }> {
   const whereClauses: string[] = [
     "s.status_global = 'aktif'",
+    collectibleBillingSql('o'),
+    dueBillingSql('o',new Date(`${options.currentPeriod}-15T12:00:00+07:00`)),
     "o.item_type IN ('SPP', 'UANG_MAKAN', 'UANG_NYUCI')",
     "o.period = ?",
     nonBillableSantriSqlPredicate('s.asrama'),
@@ -1255,6 +1265,7 @@ async function fetchBulananData(options: {
 }
 
 async function fetchTahunanData(options: {
+  currentPeriod: string
   academicYear?: string
   asramaFilter?: string
   kelasFilter?: string
@@ -1264,10 +1275,12 @@ async function fetchTahunanData(options: {
   page: number
   pageSize: number
 }): Promise<{ items: TahunanRowItem[]; totalCount: number; kpi: TahunanKpi }> {
-  const annualPeriod = options.academicYear ? options.academicYear.split('/')[0] : '2026'
+  const annualPeriod = options.academicYear ? options.academicYear.split('/')[0] : billingClock().annual
 
   const whereClauses: string[] = [
     "s.status_global = 'aktif'",
+    collectibleBillingSql('o'),
+    dueBillingSql('o',new Date(`${options.currentPeriod}-15T12:00:00+07:00`)),
     "o.item_type IN ('EHB', 'KESEHATAN', 'EKSKUL')",
     "o.period = ?",
     nonBillableSantriSqlPredicate('s.asrama'),
@@ -1543,7 +1556,7 @@ async function fetchUsppData(options: {
   const countPromise = queryOne<{ total: number }>(
     `SELECT COUNT(*) as total
      FROM santri s
-     LEFT JOIN finance_obligations o ON s.id = o.santri_id AND o.item_type = 'USPP' AND o.period = 'LIFETIME'
+     LEFT JOIN finance_obligations o ON s.id = o.santri_id AND o.item_type = 'USPP' AND o.period = 'LIFETIME' AND ${collectibleBillingSql('o')}
      WHERE ${whereSql}`,
     params
   )
@@ -1572,7 +1585,7 @@ async function fetchUsppData(options: {
          ${netPaidSql} as net_paid,
          ${remainingSql} as remaining
        FROM santri s
-       LEFT JOIN finance_obligations o ON s.id = o.santri_id AND o.item_type = 'USPP' AND o.period = 'LIFETIME'
+       LEFT JOIN finance_obligations o ON s.id = o.santri_id AND o.item_type = 'USPP' AND o.period = 'LIFETIME' AND ${collectibleBillingSql('o')}
        WHERE ${whereSql}
      ) calc`,
     params
@@ -1611,7 +1624,7 @@ async function fetchUsppData(options: {
        ${grossSql} as gross_paid,
        ${corrSql} as total_corr
      FROM santri s
-     LEFT JOIN finance_obligations o ON s.id = o.santri_id AND o.item_type = 'USPP' AND o.period = 'LIFETIME'
+     LEFT JOIN finance_obligations o ON s.id = o.santri_id AND o.item_type = 'USPP' AND o.period = 'LIFETIME' AND ${collectibleBillingSql('o')}
      WHERE ${whereSql}
      ORDER BY s.nama_lengkap ASC
      LIMIT ? OFFSET ?`,
@@ -1695,14 +1708,13 @@ async function fetchTunggakanData(options: {
   page: number
   pageSize: number
 }): Promise<{ items: TunggakanRowItem[]; totalCount: number; kpi: TunggakanKpi }> {
-  // Aturan kaku: Tunggakan hanya mencakup SPP, Uang Makan, dan Uang Nyuci
-  // yang periodenya < currentPeriodJakarta DAN memiliki sisa > 0.
+  // Monthly arrears begin next month; annual arrears begin after June of the following year.
   const emptyKpi: TunggakanKpi = {
     totalTunggakanNominal: 0,
     totalTagihanMenunggak: 0,
     totalSantriMenunggak: 0,
     tunggakanTertuaLabel: '-',
-    itemBreakdown: ['SPP', 'UANG_MAKAN', 'UANG_NYUCI'].map(t => ({
+    itemBreakdown: ['SPP', 'UANG_MAKAN', 'UANG_NYUCI', 'EHB', 'EKSKUL', 'KESEHATAN'].map(t => ({
       itemType: t,
       itemLabel: FINANCE_ITEM_LABELS[t as keyof typeof FINANCE_ITEM_LABELS] || t,
       nominalTunggakan: 0,
@@ -1713,14 +1725,15 @@ async function fetchTunggakanData(options: {
 
   const whereClauses: string[] = [
     "s.status_global = 'aktif'",
-    "o.item_type IN ('SPP', 'UANG_MAKAN', 'UANG_NYUCI')",
-    "o.period < ?",
+    collectibleBillingSql('o'),
+    "o.item_type IN ('SPP', 'UANG_MAKAN', 'UANG_NYUCI', 'EHB', 'EKSKUL', 'KESEHATAN')",
+    overdueBillingSql('o', new Date(`${options.currentPeriod}-15T12:00:00+07:00`)),
     nonBillableSantriSqlPredicate('s.asrama'),
     // SADESA tidak ditagih UANG_MAKAN & UANG_NYUCI (tidak boleh muncul sebagai tunggakan)
     nonBillableItemSqlPredicate('s.asrama', 's.kategori_santri', 'o.item_type'),
     "o.status <> 'EXEMPTED'",
   ]
-  const params: unknown[] = [options.currentPeriod]
+  const params: unknown[] = []
 
   if (options.periodFilter && options.periodFilter !== 'ALL') {
     // Validasi: jika filter periode >= currentPeriod, periode tersebut bukan tunggakan
@@ -1732,11 +1745,11 @@ async function fetchTunggakanData(options: {
   }
 
   if (options.itemFilter && options.itemFilter !== 'ALL') {
-    if (['SPP', 'UANG_MAKAN', 'UANG_NYUCI'].includes(options.itemFilter)) {
+    if (['SPP', 'UANG_MAKAN', 'UANG_NYUCI', 'EHB', 'EKSKUL', 'KESEHATAN'].includes(options.itemFilter)) {
       whereClauses.push('o.item_type = ?')
       params.push(options.itemFilter)
     } else {
-      // Item selain SPP/Makan/Cuci (misal Tahunan/USPP) tidak punya due date authoritative -> 0 rows
+      // USPP remains a lifetime installment balance, not a dated arrear.
       return { items: [], totalCount: 0, kpi: emptyKpi }
     }
   }
@@ -1800,7 +1813,7 @@ async function fetchTunggakanData(options: {
   }>(
     `SELECT
        COUNT(DISTINCT o.santri_id) as total_santri,
-       MIN(o.period) as oldest_period
+       MIN(CASE WHEN length(o.period)=4 THEN CAST(CAST(o.period AS INTEGER)+1 AS TEXT)||'-06' ELSE o.period END) as oldest_period
      FROM finance_obligations o
      JOIN santri s ON o.santri_id = s.id
      WHERE ${whereSql}`,
@@ -1819,7 +1832,7 @@ async function fetchTunggakanData(options: {
     asrama: string | null
     kamar: string | null
     kelas_sekolah: string | null
-    item_type: 'SPP' | 'UANG_MAKAN' | 'UANG_NYUCI'
+    item_type: FinanceItemType
     period: string
     amount_expected: number
     amount_exempted: number
@@ -1858,7 +1871,7 @@ async function fetchTunggakanData(options: {
   const totalCount = countRes?.total ?? 0
 
   let totalTunggakanNominal = 0
-  const monthlyTypes: Array<'SPP' | 'UANG_MAKAN' | 'UANG_NYUCI'> = ['SPP', 'UANG_MAKAN', 'UANG_NYUCI']
+  const monthlyTypes: FinanceItemType[] = ['SPP', 'UANG_MAKAN', 'UANG_NYUCI', 'EHB', 'EKSKUL', 'KESEHATAN']
   const itemBreakdown: TunggakanItemBreakdownKpi[] = monthlyTypes.map((type) => {
     const r = aggRows.find((row) => row.item_type === type)
     const target = r?.target_nominal ?? 0
@@ -1957,10 +1970,10 @@ export async function getStatusPembayaranData(
 
   // 1 & 2. Hitung matriks & KPI secara paralel dengan query data tab aktif
   const matrixAndKpiPromise = (async () => {
-    const rawMatrix = await getStudentsObligationMatrix(selectedPeriod, {
+    const rawMatrix = await getStudentsObligationMatrix(selectedPeriod === 'ALL' ? currentPeriod : selectedPeriod, {
       asrama: asramaFilter,
       search: searchFilter,
-    })
+    },new Date(`${currentPeriod}-15T12:00:00+07:00`))
 
     const santriIds = rawMatrix.map(item => item.santriId)
     const legacyArrearsMap = await fetchLegacySppArrears(santriIds)
@@ -1993,7 +2006,18 @@ export async function getStatusPembayaranData(
       } else {
         totalBelumLunas += 1
       }
-      totalTunggakanNominal += item.adjustedTotalRemaining
+      totalTunggakanNominal += item.legacyTunggakanSpp
+    }
+
+    for (let offset=0; offset<santriIds.length; offset+=80) {
+      const ids=santriIds.slice(offset,offset+80)
+      const total=await queryOne<{ amount: number }>(`SELECT COALESCE(SUM(MAX(0,o.amount_expected-o.amount_exempted-
+        (SELECT COALESCE(SUM(a.amount),0) FROM finance_allocations a WHERE a.obligation_id=o.id)+
+        (SELECT COALESCE(SUM(ci.amount),0) FROM finance_correction_items ci WHERE ci.obligation_id=o.id))),0) amount
+        FROM finance_obligations o WHERE o.santri_id IN (${ids.map(()=>'?').join(',')})
+        AND o.status<>'EXEMPTED' AND ${overdueBillingSql('o',new Date(`${currentPeriod}-15T12:00:00+07:00`))}
+        AND ${collectibleBillingSql('o')}`,ids)
+      totalTunggakanNominal += total?.amount ?? 0
     }
 
     const kpi: StatusPembayaranKpi = {
@@ -2035,6 +2059,7 @@ export async function getStatusPembayaranData(
       return { bulananItems: res.items, totalCount: res.totalCount, bulananKpi: res.kpi }
     } else if (activeTab === 'TAHUNAN') {
       const res = await fetchTahunanData({
+        currentPeriod,
         academicYear: params?.academicYear,
         asramaFilter,
         kelasFilter,
@@ -2070,9 +2095,10 @@ export async function getStatusPembayaranData(
     }
   })()
 
-  const [{ enrichedList, kpi }, tabResult] = await Promise.all([
+  const [{ enrichedList, kpi }, tabResult, pendingBillingCount] = await Promise.all([
     matrixAndKpiPromise,
     tabPromise,
+    billingReviewCount({ query,queryOne,execute }),
   ])
 
   const ringkasanItems = tabResult.ringkasanItems
@@ -2112,6 +2138,7 @@ export async function getStatusPembayaranData(
   const paginatedRawItems = pageSize === 0 ? filteredRawList : filteredRawList.slice(startIndex, startIndex + effectiveSize)
 
   return {
+    billingReviewCount: pendingBillingCount,
     activeTab,
     items: paginatedRawItems,
     ringkasanItems,
@@ -2301,7 +2328,7 @@ export async function getStudentPaymentDetail(
             ${corrSql} as total_corr
      FROM finance_obligations o
      LEFT JOIN master_jasa m ON o.provider_id = m.id
-     WHERE o.santri_id = ?
+     WHERE o.santri_id = ? AND ${collectibleBillingSql('o')}
      ORDER BY o.period DESC, o.item_type ASC`,
     [santriId]
   )
@@ -2333,6 +2360,7 @@ export async function getStudentPaymentDetail(
       amountPaid: netPaid,
       remaining,
       status: computedStatus,
+      billingPhase: billingPhase(r.item_type,r.period),
       providerName: r.provider_name,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
@@ -2344,7 +2372,7 @@ export async function getStudentPaymentDetail(
   const bulanan = allObligations.filter(o => ['SPP', 'UANG_MAKAN', 'UANG_NYUCI'].includes(o.itemType))
   const tahunan = allObligations.filter(o => ['EHB', 'EKSKUL', 'KESEHATAN'].includes(o.itemType))
   const usppItem = allObligations.find(o => o.itemType === 'USPP') ?? null
-  const tunggakanModern = allObligations.filter(o => o.status !== 'PAID' && o.status !== 'EXEMPTED' && o.remaining > 0)
+  const tunggakanModern = allObligations.filter(o => o.status !== 'PAID' && o.status !== 'EXEMPTED' && o.remaining > 0 && billingPhase(o.itemType,o.period) === 'PAST')
 
   // 3. Ambil tunggakan legacy pra-cutover dari spp_tunggakan_historis (< 2026-07)
   let tunggakanLegacy: LegacyArrearDetailItem[] = []
@@ -2420,14 +2448,13 @@ export async function getStudentPaymentDetail(
       channel: string
       method: string
       gross_amount: number
-      gateway_fee: number
       net_amount: number
       status: string
       allocation_status: string
       paid_at: string
       external_reference: string | null
     }>(
-      `SELECT id, payment_number, channel, method, gross_amount, gateway_fee, net_amount,
+      `SELECT id, payment_number, channel, method, gross_amount, net_amount,
               status, allocation_status, paid_at, external_reference
        FROM finance_payments
        WHERE santri_id = ?
@@ -2543,14 +2570,17 @@ export async function getStudentPaymentDetail(
   }
 
   // 6. Hitung ringkasan total
-  const totalTagihan = allObligations.reduce((acc, o) => acc + o.amountExpected, 0)
-  const totalDibayar = allObligations.reduce((acc, o) => acc + o.amountPaid, 0)
-  const totalPotongan = allObligations.reduce((acc, o) => acc + o.amountExempted, 0)
-  const totalSisaModern = allObligations.reduce((acc, o) => acc + o.remaining, 0)
+  const dueObligations = allObligations.filter(o => billingPhase(o.itemType,o.period) !== 'UPCOMING')
+  const totalTagihan = dueObligations.reduce((acc, o) => acc + o.amountExpected, 0)
+  const totalDibayar = dueObligations.reduce((acc, o) => acc + o.amountPaid, 0)
+  const totalPotongan = dueObligations.reduce((acc, o) => acc + o.amountExempted, 0)
+  const totalSisaModern = dueObligations.reduce((acc, o) => acc + o.remaining, 0)
   const totalLegacyTunggakan = tunggakanLegacy.reduce((acc, l) => acc + l.nominalTagihan, 0)
-  const grandTotalTunggakan = totalSisaModern + totalLegacyTunggakan
+  const grandTotalTunggakan = tunggakanModern.reduce((sum,o) => sum + o.remaining,0) + totalLegacyTunggakan
+  const pendingBillingCount = await billingReviewCount({ query,queryOne,execute },santriId)
 
   return {
+    billingReviewCount: pendingBillingCount,
     santri,
     summary: {
       totalTagihan,
@@ -2615,7 +2645,7 @@ export async function searchStudentsForPayment(
       `SELECT COUNT(id) as count,
               SUM(amount_expected - amount_exempted - amount_paid) as total
        FROM finance_obligations
-       WHERE santri_id = ? AND status NOT IN ('PAID', 'EXEMPTED')`,
+       WHERE santri_id = ? AND status NOT IN ('PAID', 'EXEMPTED') AND ${dueBillingSql('finance_obligations')} AND ${collectibleBillingSql('finance_obligations')}`,
       [r.id]
     )
     results.push({
@@ -2637,10 +2667,13 @@ export async function searchStudentsForPayment(
  * Mengambil seluruh kewajiban santri yang belum lunas beserta aturan cicilan (ALLOWED vs DISALLOWED).
  */
 export async function getUnpaidObligationsForCashPayment(
-  santriId: string
+  santriId: string,
+  selectedPeriod?: string
 ): Promise<{
   santri: StudentIdentityDetail
   obligations: PayableObligationItem[]
+  billingWarnings: string[]
+  advancePeriods: string[]
 }> {
   await authorizeFinanceFeature('/dashboard/keuangan/status-pembayaran', false)
 
@@ -2687,6 +2720,8 @@ export async function getUnpaidObligationsForCashPayment(
   }
   assertSantriBillable(santriRow.asrama, santriRow.nama_lengkap, santriRow.kategori_santri)
 
+  const issuance = await ensureStudentBilling(santriId,selectedPeriod)
+
   const rows = await query<{
     id: string
     item_type: string
@@ -2703,9 +2738,9 @@ export async function getUnpaidObligationsForCashPayment(
      FROM finance_obligations o
      LEFT JOIN finance_tariffs t ON o.tariff_id = t.id
      LEFT JOIN master_jasa m ON o.provider_id = m.id
-     WHERE o.santri_id = ? AND o.status NOT IN ('PAID', 'EXEMPTED')
+     WHERE o.santri_id = ? AND o.status NOT IN ('PAID', 'EXEMPTED') AND ${collectibleBillingSql('o')} AND (${dueBillingSql('o')} OR o.period=?)
      ORDER BY o.period ASC, o.item_type ASC`,
-    [santriId]
+    [santriId,selectedPeriod ?? '']
   )
 
   const obligations: PayableObligationItem[] = []
@@ -2724,6 +2759,7 @@ export async function getUnpaidObligationsForCashPayment(
 
     obligations.push({
       id: r.id,
+      billingPhase: billingPhase(r.item_type,r.period),
       itemType: r.item_type,
       itemLabel: FINANCE_ITEM_LABELS[r.item_type as keyof typeof FINANCE_ITEM_LABELS] || r.item_type,
       period: r.period,
@@ -2738,6 +2774,8 @@ export async function getUnpaidObligationsForCashPayment(
   }
 
   return {
+    billingWarnings: issuance.warnings,
+    advancePeriods: issuance.advancePeriods,
     santri: {
       id: santriRow.id,
       nis: santriRow.nis,

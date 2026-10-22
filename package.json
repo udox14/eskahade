@@ -18,6 +18,8 @@
     "test:discipline": "node scripts/test-discipline-occurrences.cjs",
     "test:pengajian-violations": "node scripts/test-pengajian-violations.cjs",
     "test:pengajian-photos": "node scripts/test-pengajian-photos.cjs",
+    "test:finance:billing": "node scripts/test-finance-billing.cjs",
+    "test:finance:billing:d1": "node scripts/test-finance-billing-d1.cjs",
     "test:supervisi": "node scripts/test-supervisi.cjs"
   },
   "dependencies": {

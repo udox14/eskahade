@@ -1,5 +1,9 @@
 'use server'
 
+import { ensureStudentBilling } from '@/lib/finance/billing'
+import { collectibleBillingSql } from '@/lib/finance/billing-legacy'
+import { billingPhase, dueBillingSql, advanceBillingPeriods } from '@/lib/finance/billing-periods'
+
 import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
 import {
   getSession,
@@ -66,11 +70,14 @@ export interface StudentLoketProfile {
 }
 
 export interface StudentLoketFinancials {
+  billingWarnings: string[]
+  advancePeriods: string[]
   balance: number
   cachedBalance: number
   isSynced: boolean
   limits: WalletLimitEvaluation
   unpaidObligations: Array<{
+    billingPhase: 'PAST' | 'CURRENT' | 'UPCOMING'
     id: string
     itemType: string
     itemLabel: string
@@ -505,9 +512,12 @@ export async function resetStudentPinAtLoketAction(
  * Saldo uang jajan, limit harian & sisa kuota, serta daftar tagihan belum lunas.
  */
 export async function getStudentLoketAccountData(
-  santriId: string
+  santriId: string,
+  selectedPeriod?: string
 ): Promise<StudentLoketFinancials> {
-  await authorizeLoketOperator()
+  const { isViewOnly } = await authorizeLoketOperator()
+  if (selectedPeriod && isViewOnly) throw new Error('Akses ditolak: akun hanya boleh membaca.')
+  const issuance = isViewOnly ? null : await ensureStudentBilling(santriId,selectedPeriod)
 
   const { balance, cachedBalance } = await getStudentWalletBalance(santriId)
   const limits = await evaluateWalletLimit(santriId)
@@ -528,9 +538,9 @@ export async function getStudentLoketAccountData(
      FROM finance_obligations o
      LEFT JOIN finance_tariffs t ON o.tariff_id = t.id
      LEFT JOIN master_jasa j ON o.provider_id = j.id
-     WHERE o.santri_id = ? AND o.status IN ('UNPAID', 'PARTIALLY_PAID')
+     WHERE o.santri_id = ? AND o.status IN ('UNPAID', 'PARTIALLY_PAID') AND ${collectibleBillingSql('o')} AND (${dueBillingSql('o')} OR o.period=?)
      ORDER BY o.period ASC, o.item_type ASC`,
-    [santriId]
+    [santriId,selectedPeriod ?? '']
   )
 
   const unpaidObligations = rows.map(r => {
@@ -544,6 +554,7 @@ export async function getStudentLoketAccountData(
 
     return {
       id: r.id,
+      billingPhase: billingPhase(r.item_type,r.period),
       itemType: r.item_type,
       itemLabel: FINANCE_ITEM_LABELS[r.item_type as FinanceItemType] ?? r.item_type,
       period: r.period,
@@ -557,6 +568,8 @@ export async function getStudentLoketAccountData(
   })
 
   return {
+    billingWarnings: issuance?.warnings ?? [],
+    advancePeriods: advanceBillingPeriods(),
     balance,
     cachedBalance,
     isSynced: balance === cachedBalance,

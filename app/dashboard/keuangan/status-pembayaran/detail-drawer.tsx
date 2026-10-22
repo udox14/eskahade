@@ -150,7 +150,7 @@ export function StatusPembayaranDetailDrawer({
           <div>
             <h4 className="text-sm font-semibold text-slate-900">{item.itemLabel}</h4>
             <p className="text-xs text-slate-500 mt-0.5">
-              Periode: <span className="font-medium text-slate-700">{item.periodLabel}</span>
+              Periode: <span className="font-medium text-slate-700">{item.periodLabel}</span> · {item.billingPhase === 'UPCOMING' ? 'Mendatang' : item.billingPhase === 'PAST' ? 'Tunggakan' : 'Berjalan'}
             </p>
             {item.providerName && (
               <p className="text-xs text-slate-500 mt-0.5">
@@ -265,6 +265,7 @@ export function StatusPembayaranDetailDrawer({
             </button>
           </div>
 
+          {detail && detail.billingReviewCount>0 && <p role="status" className="bg-amber-50 px-6 py-3 text-xs text-amber-900">Perlu Pemeriksaan: {detail.billingReviewCount} bukti pembayaran lama belum sesuai. Total tagihan yang dapat dibayar belum mencakup kasus tersebut.</p>}
           {/* 2. SUMMARY STRIP (KPI RINGKAS) */}
           {detail && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-3.5 bg-slate-50 border-b border-slate-200 text-xs">
@@ -523,7 +524,7 @@ export function StatusPembayaranDetailDrawer({
                       <div className="space-y-1">
                         <p className="font-semibold">Akumulasi Seluruh Tunggakan Santri</p>
                         <p className="text-amber-800 leading-relaxed">
-                          Total tunggakan keseluruhan: <strong className="font-mono">{formatRupiah(detail.summary.grandTotalTunggakan)}</strong> (termasuk tagihan aktif berjalan dan tunggakan pra-cutover).
+                          Total tunggakan keseluruhan: <strong className="font-mono">{formatRupiah(detail.summary.grandTotalTunggakan)}</strong> (tagihan yang periodenya telah lewat dan tunggakan pra-cutover).
                         </p>
                       </div>
                     </div>

@@ -9,8 +9,20 @@ import { getTunggakanSppSantri } from '@/lib/spp/tunggakan'
 import { getNonSppOutstandingSantri, NON_SPP_JENIS_ALL, type NonSppJenis } from '@/lib/keuangan/non-spp-outstanding'
 import { getPaymentChannels, getPendingSubmission } from '@/lib/portal/data'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
+import { ensureStudentBilling } from '@/lib/finance/billing'
+import { getPortalStudentBilling } from '@/lib/portal/finance'
 
 const PORTAL_PATHS = ['/portal-ortu/tagihan', '/portal-ortu/riwayat', '/portal-ortu/beranda']
+
+export async function selectPortalAdvancePeriodAction(period: string) {
+  const session = await requirePortalSessionAction()
+  const issuance = await ensureStudentBilling(session.santri_id,period)
+  const data = await getPortalStudentBilling(session.santri_id)
+  if (issuance.failed || issuance.review) {
+    data.billingWarnings = [...data.billingWarnings,'Sebagian tagihan periode pilihan perlu diperiksa petugas sebelum dapat dibayar.']
+  }
+  return { data }
+}
 
 // Detail item yang disimpan di detail_json — nominal SELALU hasil hitung server
 export type SppDetailItem = {

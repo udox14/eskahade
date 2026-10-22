@@ -19,7 +19,7 @@ import type {
   PortalStudentBillingData,
   PortalCheckoutResponse,
 } from '@/lib/portal/finance'
-import { createPortalCheckoutAction } from './actions'
+import { createPortalCheckoutAction, selectPortalAdvancePeriodAction } from './actions'
 import { BottomSheet } from '../../_components/bottom-sheet'
 
 function formatRupiah(amount: number): string {
@@ -54,7 +54,10 @@ interface TagihanClientProps {
   billingData: PortalStudentBillingData
 }
 
-export function TagihanClient({ billingData }: TagihanClientProps) {
+export function TagihanClient({ billingData: initialBillingData }: TagihanClientProps) {
+  const [billingOverride,setBillingOverride] = useState<PortalStudentBillingData | null>(null)
+  const billingData = billingOverride ?? initialBillingData
+  const [loadingAdvance,setLoadingAdvance] = useState(false)
   const router = useRouter()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
     // Default kosong agar orang tua secara sadar memilih tagihan yang ingin dibayar,
@@ -81,12 +84,12 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
   const [copied, setCopied] = useState<boolean>(false)
 
   // Daftar seluruh kewajiban standar yang aktif (past, current, annual)
-  // CATATAN: upcoming/bayar di muka sengaja TIDAK diikutkan di portal ortu sesuai aturan.
+  // Select-all applies only to current/past bills; advance payment requires explicit selection.
   const activeObligations = useMemo(() => {
     return [
       ...billingData.obligations.past,
       ...billingData.obligations.current,
-      ...billingData.obligations.annual,
+      ...billingData.obligations.annual.filter(o=>o.periodType !== 'UPCOMING'),
     ]
   }, [billingData.obligations])
 
@@ -104,7 +107,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
     const allSelected = activeObligations.every(ob => selectedIds.has(ob.id))
     const next = new Set(selectedIds)
     if (allSelected) {
-      activeObligations.forEach(ob => next.delete(ob.id))
+      next.clear()
     } else {
       activeObligations.forEach(ob => next.add(ob.id))
     }
@@ -122,7 +125,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
       amount: number
     }> = []
 
-    for (const ob of activeObligations) {
+    for (const ob of [...activeObligations,...billingData.obligations.upcoming]) {
       if (selectedIds.has(ob.id)) {
         items.push({
           obligationId: ob.id,
@@ -168,6 +171,8 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
     }
   }, [
     activeObligations,
+    billingData.obligations.upcoming,
+    billingData.obligations.annual,
     selectedIds,
     isUsppSelected,
     usppAmount,
@@ -185,6 +190,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
   }
 
   const handleProceedCheckout = async () => {
+    if (loadingAdvance) return
     if (selectedItemsSummary.count === 0) {
       toast.error('Pilih minimal satu tagihan untuk melanjutkan.')
       return
@@ -211,6 +217,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
       }
 
       setCheckoutResult(res)
+      setBillingOverride(null)
       setIsReviewOpen(false)
       setIsModalOpen(true)
       setSelectedIds(new Set())
@@ -227,7 +234,7 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
 
   const pastObligations = billingData.obligations.past
   const currentObligations = billingData.obligations.current
-  const annualObligations = billingData.obligations.annual
+  const annualObligations = billingData.obligations.annual.filter(o=>o.periodType !== 'UPCOMING')
 
   const currentPeriodTitle = useMemo(() => {
     if (currentObligations.length > 0 && currentObligations[0].periodLabel) {
@@ -306,6 +313,31 @@ export function TagihanClient({ billingData }: TagihanClientProps) {
           <CaretRight className="w-4 h-4 text-emerald-300" />
         </Link>
       </div>
+
+      {billingData.billingWarnings?.map(w=><p key={w} role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{w}</p>)}
+      <details className="rounded-xl border border-slate-200 p-4">
+        <summary className="cursor-pointer text-sm font-semibold">Bayar periode mendatang</summary>
+        <p className="my-2 text-xs text-slate-500">Pilihan ini belum termasuk tagihan berjalan atau tunggakan.</p>
+        <select aria-label="Pilih periode pembayaran di muka" defaultValue="" disabled={loadingAdvance}
+          className="w-full rounded-lg border bg-transparent p-2 text-sm" onChange={async e=>{
+            const period=e.target.value;if(!period)return
+            setLoadingAdvance(true)
+            try {
+              const result=await selectPortalAdvancePeriodAction(period)
+              setBillingOverride(result.data);setSelectedIds(new Set())
+            } catch {toast.error('Tagihan periode mendatang belum dapat dimuat. Hubungi bagian keuangan.')}
+            finally {setLoadingAdvance(false)}
+          }}>
+          <option value="">Pilih periode</option>
+          {billingData.advancePeriods?.map(p=><option key={p} value={p}>{p}</option>)}
+        </select>
+        {loadingAdvance && <p className="my-2 text-xs">Memuat tagihan…</p>}
+        {billingData.obligations.upcoming.map(ob=><label key={ob.id} className="mt-3 flex items-center gap-3 text-sm">
+          <input type="checkbox" checked={selectedIds.has(ob.id)} onChange={()=>toggleSelect(ob.id)}/>
+          <span className="flex-1">{ob.itemLabel} · {ob.periodLabel} <span className="text-xs text-slate-500">Mendatang</span></span>
+          <span>{formatRupiah(ob.remaining)}</span>
+        </label>)}
+      </details>
 
       {/* 2. SPLIT CARD: MENUNGGU PEMBAYARAN VA (NOMOR VA TIDAK BOLEH WRAPPED, CORNER BADGE SUDUT KANAN ATAS) */}
       {billingData.pendingOrders.length > 0 && (() => {

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { BILLING_PHASE_LABELS } from '@/lib/finance/billing-periods'
 import {
   Coins,
   ArrowDownLeft,
@@ -14,6 +15,7 @@ import type { StudentLoketFinancials, LoketPaymentItemInput, LoketItemType } fro
 
 interface PosActionPanelProps {
   financials: StudentLoketFinancials
+  onSelectBillingPeriod: (period: string) => Promise<void>
   isSubmitting: boolean
   onWithdraw: (amount: number, notes?: string) => Promise<void>
   onDepositOrPay: (items: LoketPaymentItemInput[], notes?: string) => Promise<void>
@@ -24,10 +26,14 @@ const TOPUP_QUICK_CHIPS = [20000, 50000, 100000, 200000]
 
 export default function PosActionPanel({
   financials,
+  onSelectBillingPeriod,
   isSubmitting,
   onWithdraw,
   onDepositOrPay,
 }: PosActionPanelProps) {
+  const [billingPeriod,setBillingPeriod] = useState('')
+  const [billingError,setBillingError] = useState('')
+  const [loadingBilling,setLoadingBilling] = useState(false)
   const [activeTab, setActiveTab] = useState<'WITHDRAW' | 'DEPOSIT_PAY'>('WITHDRAW')
 
   // State Penarikan Uang Jajan
@@ -58,7 +64,7 @@ export default function PosActionPanel({
   // Hitung total setoran / pembayaran
   const obligationsTotal = Object.values(selectedObligations).reduce((a, b) => a + b, 0)
   const totalDepositOrPay = topupAmount + obligationsTotal
-  const isDepositOrPayValid = totalDepositOrPay > 0 && !isSubmitting
+  const isDepositOrPayValid = totalDepositOrPay > 0 && !isSubmitting && !loadingBilling
 
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -117,6 +123,22 @@ export default function PosActionPanel({
 
   return (
     <div className="w-full bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      {activeTab === 'DEPOSIT_PAY' && <div className="space-y-2 p-3 text-xs">
+        <label>Periode pembayaran
+          <select aria-label="Periode pembayaran loket" value={billingPeriod} disabled={isSubmitting || loadingBilling}
+            className="ml-2 rounded-lg border p-2" onChange={async e=>{
+              const period=e.target.value;setLoadingBilling(true);setBillingError('')
+              try {await onSelectBillingPeriod(period);setBillingPeriod(period);setSelectedObligations({})}
+              catch(error){setBillingError(error instanceof Error?error.message:'Tagihan gagal dimuat.')}
+              finally {setLoadingBilling(false)}
+            }}>
+            <option value="">Tagihan berjalan dan tunggakan</option>
+            {financials.advancePeriods.map(p=><option key={p} value={p}>Bayar di muka: {p}</option>)}
+          </select>
+        </label>
+        {(billingError || financials.billingWarnings.length>0) && <p role="status" className="text-amber-800">{billingError || `Perlu Pemeriksaan: ${financials.billingWarnings.join('; ')}`}</p>}
+      </div>}
+
       {/* Tab Switcher POS */}
       <div className="flex border-b border-slate-200 bg-slate-50/70 p-1.5 gap-1.5">
         <button
@@ -420,7 +442,7 @@ export default function PosActionPanel({
                             className="text-xs font-bold text-slate-900 cursor-pointer"
                           >
                             {ob.itemLabel}{' '}
-                            <span className="text-slate-500 font-normal">({ob.period})</span>
+                            <span className="text-slate-500 font-normal">({ob.period}) · {BILLING_PHASE_LABELS[ob.billingPhase]}</span>
                           </label>
                           <p className="text-[11px] text-slate-500">
                             Sisa: <strong className="text-slate-800">{formatRupiah(ob.remaining)}</strong>

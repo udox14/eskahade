@@ -1,3 +1,4 @@
+import { assertBillingCollectible } from './billing-legacy'
 import { getEffectiveCooperativeAdminFeeRule } from './cooperative-admin'
 // lib/finance/orders.ts
 // Modul Payment Order Engine (Fase 3A)
@@ -132,6 +133,8 @@ export async function createPaymentOrder(
           `Kewajiban "${obligation.item_type}" sudah dibebaskan penuh (EXEMPTED).`
         )
       }
+
+      await assertBillingCollectible({ query,queryOne,execute }, obligation.id)
 
       const effectiveExpected = Math.max(0, obligation.amount_expected - obligation.amount_exempted)
       const remaining = Math.max(0, effectiveExpected - obligation.amount_paid)

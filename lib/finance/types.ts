@@ -141,6 +141,8 @@ export interface CreateExemptionInput {
 
 export interface EnsureObligationOptions {
   academicYearId?: number | null
+  /** Server-verified historical membership; never accepted from a checkout amount/payload. */
+  providerSnapshotId?: string
 }
 
 export interface StudentObligationsFilter {

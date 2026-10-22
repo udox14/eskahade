@@ -1,5 +1,6 @@
 'use client'
 
+import { BillingAuditPanel } from './billing-audit-panel'
 import { publicMediaUrl } from '@/lib/r2/references'
 
 import React, { useState, useTransition, useId } from 'react'
@@ -174,10 +175,12 @@ export default function StatusPembayaranContent({
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab)
+    if (tab === 'TUNGGAKAN') setSelectedPeriod('ALL')
+    else if (selectedPeriod === 'ALL') setSelectedPeriod(filterOptions.currentPeriod)
     setCurrentPage(1)
     setSelectedStatus('ALL')
     setSelectedItemType('ALL')
-    fetchData({ tab, page: 1, status: 'ALL', itemType: 'ALL' })
+    fetchData({ tab, period: tab === 'TUNGGAKAN' ? 'ALL' : selectedPeriod === 'ALL' ? filterOptions.currentPeriod : selectedPeriod, page: 1, status: 'ALL', itemType: 'ALL' })
   }
 
   const handlePeriodChange = (val: string) => {
@@ -343,6 +346,9 @@ export default function StatusPembayaranContent({
           ) : null
         }
       />
+
+      {data.billingReviewCount>0 && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Perlu Pemeriksaan: {data.billingReviewCount} bukti pembayaran modul lama belum sesuai. Jumlah tersebut ditahan dari tagihan yang dapat dibayar ulang.</p>}
+      <BillingAuditPanel canApply={!!data.userPermissions?.canRecordPayment} onUpdated={()=>fetchData()} />
 
       {/* 2. TABS NAVIGASI */}
       <div className="border-b border-slate-200">
@@ -863,7 +869,7 @@ export default function StatusPembayaranContent({
                 </span>
                 <span className="text-xs text-slate-400">Tagihan</span>
               </div>
-              <p className="mt-1 text-xs text-slate-500">Total item bulan lalu belum lunas</p>
+              <p className="mt-1 text-xs text-slate-500">Item bulanan dan tahunan yang menunggak</p>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -908,7 +914,7 @@ export default function StatusPembayaranContent({
                   className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs cursor-pointer"
                 >
                   <ChevronDown className={`h-3.5 w-3.5 text-slate-500 transition-transform duration-200 ${showBreakdown.TUNGGAKAN ? 'rotate-180' : ''}`} />
-                  <span>{showBreakdown.TUNGGAKAN ? 'Sembunyikan Rincian Tunggakan Pos' : 'Lihat Rincian Tunggakan Per Pos (SPP, Makan, Cuci)'}</span>
+                  <span>{showBreakdown.TUNGGAKAN ? 'Sembunyikan Rincian Tunggakan Pos' : 'Lihat Rincian Tunggakan Bulanan dan Tahunan'}</span>
                 </button>
               </div>
 
@@ -998,6 +1004,8 @@ export default function StatusPembayaranContent({
                   onChange={(e) => handlePeriodChange(e.target.value)}
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 cursor-pointer"
                 >
+                  {activeTab === 'TUNGGAKAN' && <option value="ALL">Semua periode tunggakan</option>}
+                  {activeTab === 'TUNGGAKAN' && filterOptions.academicYearList.map(y=><option key={`annual:${y.value}`} value={y.value.split('/')[0]}>Tahun ajaran {y.label}</option>)}
                   {filterOptions.periodList.map((p) => (
                     <option key={p.value} value={p.value}>
                       {p.label}
@@ -1074,6 +1082,9 @@ export default function StatusPembayaranContent({
                   <option value="SPP">SPP</option>
                   <option value="UANG_MAKAN">Uang Makan</option>
                   <option value="UANG_NYUCI">Uang Nyuci</option>
+                  <option value="EHB">EHB</option>
+                  <option value="EKSKUL">Ekstrakurikuler</option>
+                  <option value="KESEHATAN">Kesehatan</option>
                 </select>
               </div>
             )}

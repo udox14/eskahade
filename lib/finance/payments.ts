@@ -1,3 +1,4 @@
+import { legacyReviewSql, legacyExemptSql } from './billing-legacy'
 import { rupiah } from './money'
 // lib/finance/payments.ts
 // Modul Payment Execution & Allocation Engine (Fase 3A)
@@ -204,6 +205,14 @@ export async function recordOrderPayment(
       if (!curObligation) {
         unallocatedExcess += item.amount
         unallocatedReasons.push(`Kewajiban ID "${item.obligation_id}" tidak ditemukan`)
+        continue
+      }
+
+      const review = await queryOne<{ review: number }>(
+        `SELECT ((${legacyReviewSql('o')}) OR ${legacyExemptSql('o')}) AS review FROM finance_obligations o WHERE o.id=?`, [curObligation.id])
+      if (review?.review) {
+        unallocatedExcess += item.amount
+        unallocatedReasons.push('Perlu Pemeriksaan: bukti pembayaran modul lama belum sesuai')
         continue
       }
 

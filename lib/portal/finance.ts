@@ -1,3 +1,7 @@
+import { ensureStudentBilling } from '@/lib/finance/billing'
+import { createBillingIssuance } from '@/lib/finance/billing-issuance'
+import { collectibleBillingSql } from '@/lib/finance/billing-legacy'
+import { billingPhase, advanceBillingPeriods } from '@/lib/finance/billing-periods'
 import { rupiah } from '@/lib/finance/money'
 // lib/portal/finance.ts
 // Modul Integrasi Finansial Portal Orang Tua ke Sistem Keuangan Baru
@@ -6,7 +10,7 @@ import { rupiah } from '@/lib/finance/money'
 // top-up uang jajan, batas limit dompet, dan riwayat transaksi terpadu.
 
 import { cache } from 'react'
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne, execute } from '@/lib/db'
 import { createPaymentOrder, getPaymentOrderById } from '@/lib/finance/orders'
 import { getStudentFixedVa } from '@/lib/finance/va'
 import { getEffectiveCooperativeAdminFee } from '@/lib/finance/cooperative-admin'
@@ -16,7 +20,6 @@ import {
   setParentWalletLimits,
   getGlobalDailyLimit,
 } from '@/lib/finance/wallet'
-import { ensureObligation } from '@/lib/finance/obligations'
 import { isAsramaBebasTagihan } from '@/lib/finance/non-billable-santri'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
 import { toWibDateInputValue } from '@/lib/date/wib'
@@ -40,6 +43,8 @@ export interface PortalObligationItem {
 }
 
 export interface PortalStudentBillingData {
+  billingWarnings: string[]
+  advancePeriods: string[]
   santri: {
     id: string
     nis: string
@@ -199,85 +204,8 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
   // kewajiban apa pun, sehingga materialisasi kewajiban tidak perlu dijalankan.
   const santriBebasTagihan = isAsramaBebasTagihan(santri.asrama)
 
-  // 2. On-demand materialisasi kewajiban (past, current, upcoming) secara aman & idempotent
-  const todayWib = toWibDateInputValue()
-  const currentMonthlyPeriod = todayWib.slice(0, 7) // 'YYYY-MM'
-  const currentYear = parseInt(todayWib.slice(0, 4), 10)
-  const currentMonth = parseInt(todayWib.slice(5, 7), 10)
-  const currentAcademicStartYear = currentMonth >= 7 ? currentYear : currentYear - 1
-  const currentAcademicEndYear = currentAcademicStartYear + 1
-  const currentAnnualPeriod = String(currentAcademicStartYear)
-
-  // Kumpulkan daftar periode bulanan relevan:
-  // - Seluruh bulan dalam Tahun Ajaran berjalan (Juli s.d. Juni)
-  // - Serta hingga 6 bulan mendatang dari bulan berjalan
-  const candidatePeriods: string[] = []
-  for (let m = 7; m <= 12; m++) {
-    candidatePeriods.push(`${currentAcademicStartYear}-${String(m).padStart(2, '0')}`)
-  }
-  for (let m = 1; m <= 6; m++) {
-    candidatePeriods.push(`${currentAcademicEndYear}-${String(m).padStart(2, '0')}`)
-  }
-  for (let i = 1; i <= 6; i++) {
-    let nextM = currentMonth + i
-    let nextY = currentYear
-    if (nextM > 12) {
-      nextM -= 12
-      nextY += 1
-    }
-    const p = `${nextY}-${String(nextM).padStart(2, '0')}`
-    if (!candidatePeriods.includes(p)) {
-      candidatePeriods.push(p)
-    }
-  }
-  candidatePeriods.sort()
-
-  // Ambil record kewajiban santri yang sudah ada secara batch (1 query)
-  // untuk menghindari 58 query berurutan yang memicu latensi tinggi.
-  const existingRecords = await query<{ item_type: string; period: string }>(
-    `SELECT item_type, period FROM finance_obligations WHERE santri_id = ?`,
-    [santriId]
-  )
-  const existingSet = new Set(existingRecords.map(r => `${r.item_type}:${r.period}`))
-
-  const missingTasks: Array<Promise<unknown>> = []
-  // Santri bebas tagihan (penduduk setempat, AL-BAGHORY) tidak boleh memiliki
-  // kewajiban apa pun, sehingga materialisasi kewajiban dilewati sepenuhnya.
-  const bisaDimaterialisasi = !santriBebasTagihan
-
-  // Hanya jalankan ensureObligation untuk kewajiban yang BELUM ada di database
-  for (const p of candidatePeriods) {
-    if (bisaDimaterialisasi && !existingSet.has(`SPP:${p}`)) {
-      missingTasks.push(ensureObligation(santriId, 'SPP', p).catch(() => null))
-    }
-    if (bisaDimaterialisasi && santri.tempat_makan_id && !existingSet.has(`UANG_MAKAN:${p}`)) {
-      missingTasks.push(ensureObligation(santriId, 'UANG_MAKAN', p).catch(() => null))
-    }
-    if (bisaDimaterialisasi && santri.tempat_mencuci_id && !existingSet.has(`UANG_NYUCI:${p}`)) {
-      missingTasks.push(ensureObligation(santriId, 'UANG_NYUCI', p).catch(() => null))
-    }
-  }
-
-  // Materialisasi tahunan periode berjalan jika belum ada
-  if (bisaDimaterialisasi && !existingSet.has(`EHB:${currentAnnualPeriod}`)) {
-    missingTasks.push(ensureObligation(santriId, 'EHB', currentAnnualPeriod).catch(() => null))
-  }
-  if (bisaDimaterialisasi && !existingSet.has(`EKSKUL:${currentAnnualPeriod}`)) {
-    missingTasks.push(ensureObligation(santriId, 'EKSKUL', currentAnnualPeriod).catch(() => null))
-  }
-  if (bisaDimaterialisasi && !existingSet.has(`KESEHATAN:${currentAnnualPeriod}`)) {
-    missingTasks.push(ensureObligation(santriId, 'KESEHATAN', currentAnnualPeriod).catch(() => null))
-  }
-
-  // Materialisasi USPP (Lifetime) jika belum ada
-  if (bisaDimaterialisasi && !existingSet.has('USPP:LIFETIME')) {
-    missingTasks.push(ensureObligation(santriId, 'USPP', 'LIFETIME').catch(() => null))
-  }
-
-  // Eksekusi pembuatan kewajiban yang belum ada secara paralel (bukan sekuensial)
-  if (missingTasks.length > 0) {
-    await Promise.all(missingTasks)
-  }
+  // Only issue the current period here. Future obligations are materialized on explicit selection.
+  const issuance = await ensureStudentBilling(santriId)
 
   // 3. Query seluruh kewajiban aktif santri yang belum lunas
   const rawObligations = await query<{
@@ -300,7 +228,7 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
      LEFT JOIN finance_tariffs t ON o.tariff_id = t.id
      LEFT JOIN tahun_ajaran ta ON o.academic_year_id = ta.id
      LEFT JOIN master_jasa m ON o.provider_id = m.id
-     WHERE o.santri_id = ? AND o.status NOT IN ('PAID', 'EXEMPTED')
+     WHERE o.santri_id = ? AND o.status NOT IN ('PAID', 'EXEMPTED') AND ${collectibleBillingSql('o')}
      ORDER BY o.period ASC, o.item_type ASC`,
     [santriId]
   )
@@ -326,36 +254,8 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
       ? 'DISALLOWED'
       : ((r.installment_rule as 'ALLOWED' | 'DISALLOWED') || 'DISALLOWED')
 
-    let periodType: 'PAST' | 'CURRENT' | 'UPCOMING' = 'CURRENT'
-    let isTunggakan = false
-
-    if (r.item_type === 'USPP') {
-      periodType = 'CURRENT'
-      isTunggakan = false
-    } else if (r.item_type === 'EHB' || r.item_type === 'EKSKUL' || r.item_type === 'KESEHATAN') {
-      if (r.period < currentAnnualPeriod) {
-        periodType = 'PAST'
-        isTunggakan = true
-      } else if (r.period === currentAnnualPeriod) {
-        periodType = 'CURRENT'
-        isTunggakan = false
-      } else {
-        periodType = 'UPCOMING'
-        isTunggakan = false
-      }
-    } else {
-      // Bulanan (SPP, UANG_MAKAN, UANG_NYUCI)
-      if (r.period < currentMonthlyPeriod) {
-        periodType = 'PAST'
-        isTunggakan = true
-      } else if (r.period === currentMonthlyPeriod) {
-        periodType = 'CURRENT'
-        isTunggakan = false
-      } else {
-        periodType = 'UPCOMING'
-        isTunggakan = false
-      }
-    }
+    const periodType = billingPhase(r.item_type, r.period)
+    const isTunggakan = periodType === 'PAST'
 
     const item: PortalObligationItem = {
       id: r.id,
@@ -377,9 +277,11 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
 
     if (r.item_type === 'USPP') {
       uspp = item
+      totalRemaining += remaining
     } else if (r.item_type === 'EHB' || r.item_type === 'EKSKUL' || r.item_type === 'KESEHATAN') {
       annual.push(item)
-      totalRemaining += remaining
+      if (periodType !== 'UPCOMING') totalRemaining += remaining
+      else upcoming.push(item)
     } else {
       monthly.push(item)
       if (periodType === 'PAST') {
@@ -469,6 +371,8 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
     const brivaGate = await isOnlineBrivaAvailable(santriId)
 
     return {
+      billingWarnings: issuance.warnings.length ? ['Sebagian tagihan perlu diperiksa petugas. Hubungi bagian keuangan untuk memastikan jumlah yang harus dibayar.'] : [],
+      advancePeriods: advanceBillingPeriods(),
       santri: {
         id: santri.id,
         nis: santri.nis,
@@ -622,7 +526,11 @@ export async function createPortalPaymentOrder(
       )
     } else if (item.itemType !== 'UANG_JAJAN' && item.period) {
       // Dynamic on-demand materialization using locked engine (PRD Section 12)
-      const ensured = await ensureObligation(santriId, item.itemType as FinanceItemType, item.period)
+      const issuer = createBillingIssuance({ query,queryOne,execute })
+      if (!advanceBillingPeriods().includes(item.period)) throw new Error('Periode pembayaran tidak tersedia. Muat ulang tagihan.')
+      const issued = await issuer.issue(santriId, item.itemType as FinanceItemType, item.period)
+      if (!issued.obligation || !['CREATED','EXISTING'].includes(issued.outcome)) throw new Error('Tagihan perlu diperiksa petugas sebelum dibayar.')
+      const ensured = issued.obligation
       obligation = await queryOne<{
         id: string
         santri_id: string

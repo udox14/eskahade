@@ -1,3 +1,5 @@
+import { dueBillingSql } from './billing-periods'
+import { collectibleBillingSql } from './billing-legacy'
 // lib/finance/matrix.ts
 // Obligation Matrix Aggregator - Sistem Keuangan Baru Pesantren (Fase 2C)
 
@@ -77,13 +79,14 @@ function mapRowToSummary(
  */
 export async function getStudentsObligationMatrix(
   period: string, // YYYY-MM
-  filter?: StudentObligationMatrixFilter
+  filter?: StudentObligationMatrixFilter,
+  at = new Date()
 ): Promise<StudentObligationMatrixItem[]> {
   const santriConditions: string[] = [
     "s.status_global = 'aktif'",
     nonBillableSantriSqlPredicate('s.asrama'),
   ]
-  const params: unknown[] = [period, period]
+  const params: unknown[] = [period, period, period]
 
   if (filter?.asrama) {
     santriConditions.push('s.asrama = ?')
@@ -124,8 +127,9 @@ export async function getStudentsObligationMatrix(
       AND (
         o.period = ?
         OR o.period = 'LIFETIME'
-        OR (length(o.period) = 4 AND substr(?, 1, 4) = o.period)
+        OR (length(o.period) = 4 AND CAST(CAST(substr(?,1,4) AS INTEGER) - CASE WHEN CAST(substr(?,6,2) AS INTEGER)<7 THEN 1 ELSE 0 END AS TEXT) = o.period)
       )
+      AND ${collectibleBillingSql('o')} AND ${dueBillingSql('o',at)}
     LEFT JOIN master_jasa m ON o.provider_id = m.id
     WHERE ${santriConditions.join(' AND ')}
     ORDER BY s.nama_lengkap ASC, o.item_type ASC

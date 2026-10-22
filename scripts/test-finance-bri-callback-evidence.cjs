@@ -17,6 +17,21 @@ function evidence(n){const events=h.db.prepare("SELECT * FROM finance_gateway_ev
 async function payable(){seed();h.db.prepare("INSERT INTO finance_payment_orders(id,order_number,santri_id,payer_type,gross_amount,cooperative_admin_fee,total_charged,payment_method,fixed_va_number,status,created_at,expires_at) VALUES('order','SYNTHETIC-ORDER','student','PORTAL_ORTU',10000,2000,12000,'BRI_VA',?,'PENDING','2026-10-18T01:00:00Z','2026-10-18T03:00:00Z')").run(identity.virtualAccountNo.trim());h.db.exec("INSERT INTO finance_obligations(id,santri_id,item_type,period,academic_year_id,amount_expected) VALUES('ob','student','SPP','2026-10',2,7000); INSERT INTO finance_order_items(id,order_id,obligation_id,item_type,amount) VALUES('ob-item','order','ob','SPP',7000),('wallet-item','order',NULL,'UANG_JAJAN',3000)");clock=RealDate.parse('2026-10-18T02:30:00Z');assert.equal((await service.handleBrivaInquiry(signed({...identity,inquiryRequestId:'SYNTHETIC-REVIEW-001'},'inquiry'))).status,200);clock=RealDate.parse('2026-10-18T03:05:00Z')}
 const results=[];async function test(name,fn){try{await fn();results.push({name,status:'PASS'});console.log('PASS '+name)}catch(e){results.push({name,status:'FAIL',error:e.message});console.error('FAIL '+name+': '+e.message)}}
 async function main(){
+ await test('legacy conflict keeps authenticated callback evidence without allocations, admin income or wallet top-up',async()=>{
+  await payable();h.db.exec(fs.readFileSync('migrations/0196_finance_billing_issuance.sql','utf8'));
+  h.db.exec("INSERT INTO spp_log(id,santri_id,bulan,tahun,nominal_bayar) VALUES('legacy-conflict','student',10,2026,7000)");
+  assert.equal((await pay(payload({trxDateTime:'2026-10-18T02:59:00Z'}))).status,404);evidence(1);
+  assert.equal(h.db.prepare('SELECT amount_paid FROM finance_obligations').get().amount_paid,0);
+ });
+ await test('legacy payment committed after callback precheck rolls back the financial batch and retains evidence',async()=>{
+  await payable();h.db.exec(fs.readFileSync('migrations/0196_finance_billing_issuance.sql','utf8'));
+  const original=h.adapter.batch;let injected=false;
+  h.adapter.batch=async statements=>{
+   if(!injected&&statements.some(s=>/INSERT INTO finance_payments\s*\(/.test(s.sql))){injected=true;h.db.exec("INSERT INTO spp_log(id,santri_id,bulan,tahun,nominal_bayar) VALUES('legacy-race','student',10,2026,7000)")}
+   return original(statements)
+  };
+  try {assert.equal((await pay(payload({trxDateTime:'2026-10-18T02:59:00Z'}))).status,404);evidence(1)}finally{h.adapter.batch=original}
+ });
  await test('authenticated conflicting review-only events preserve both amounts',async()=>{seed();assert.equal((await pay(payload())).status,404);assert.equal((await pay(payload({paidAmount:{value:'13000.00',currency:'IDR'}}))).status,404);const rows=evidence(2);assert.equal(new Set(rows.map(x=>JSON.stringify(x))).size,2);assert.deepEqual(h.db.prepare('SELECT expected_amount FROM finance_bri_recovery_queue ORDER BY expected_amount').all().map(x=>x.expected_amount),[12000,13000])});
  await test('same signed payload with fresh headers replays one durable review',async()=>{seed();const body=payload();await pay(body);clock+=60000;await pay(body);evidence(1)});
  await test('same identifiers and amount retain changed authenticated payload fields',async()=>{seed();await pay(payload({additionalInfo:{channelCode:'A'}}));await pay(payload({additionalInfo:{channelCode:'B'}}));evidence(2)});

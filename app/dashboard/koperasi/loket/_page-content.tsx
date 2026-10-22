@@ -323,6 +323,10 @@ export default function LoketContent({ initialData }: LoketContentProps) {
               <div className="animate-in fade-in duration-200">
                 <PosActionPanel
                   financials={financials}
+                  onSelectBillingPeriod={async period=>{
+                    if (!currentStudent) return
+                    setFinancials(await getStudentLoketAccountData(currentStudent.id,period || undefined))
+                  }}
                   isSubmitting={isSubmittingTx}
                   onWithdraw={handleWithdrawal}
                   onDepositOrPay={handleDepositOrPay}

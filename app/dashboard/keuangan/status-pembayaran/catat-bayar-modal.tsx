@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { BILLING_PHASE_LABELS } from '@/lib/finance/billing-periods'
 import {
   X,
   Search,
@@ -99,6 +100,10 @@ export function CatatPembayaranModal({
   const [obligations, setObligations] = useState<PayableObligationItem[]>([])
   const [isLoadingObligations, setIsLoadingObligations] = useState(false)
 
+  const [advancePeriods,setAdvancePeriods] = useState<string[]>([])
+  const [selectedBillingPeriod,setSelectedBillingPeriod] = useState('')
+  const [billingWarnings,setBillingWarnings] = useState<string[]>([])
+
   // Item selections & amounts: { [obligationId]: { selected: boolean; amount: number } }
   const [itemSelections, setItemSelections] = useState<Record<string, { selected: boolean; amount: number }>>({})
 
@@ -174,10 +179,11 @@ export function CatatPembayaranModal({
             kamar: res.santri.kamar,
           })
           setObligations(res.obligations)
+          setAdvancePeriods(res.advancePeriods);setBillingWarnings(res.billingWarnings);setSelectedBillingPeriod('')
           // Default: select all unpaid items with their full remaining amounts
           const initMap: Record<string, { selected: boolean; amount: number }> = {}
           for (const ob of res.obligations) {
-            initMap[ob.id] = { selected: true, amount: ob.remaining }
+            initMap[ob.id] = { selected: ob.billingPhase !== 'UPCOMING', amount: ob.remaining }
           }
           setItemSelections(initMap)
         })
@@ -239,9 +245,10 @@ export function CatatPembayaranModal({
         kamar: res.santri.kamar,
       })
       setObligations(res.obligations)
+      setAdvancePeriods(res.advancePeriods);setBillingWarnings(res.billingWarnings);setSelectedBillingPeriod('')
       const initMap: Record<string, { selected: boolean; amount: number }> = {}
       for (const ob of res.obligations) {
-        initMap[ob.id] = { selected: true, amount: ob.remaining }
+        initMap[ob.id] = { selected: ob.billingPhase !== 'UPCOMING', amount: ob.remaining }
       }
       setItemSelections(initMap)
     } catch (err) {
@@ -249,6 +256,17 @@ export function CatatPembayaranModal({
     } finally {
       setIsLoadingObligations(false)
     }
+  }
+
+  const selectBillingPeriod = async (period: string) => {
+    if (!selectedStudent) return
+    setIsLoadingObligations(true);setErrorMessage(null)
+    try {
+      const res = await getUnpaidObligationsForCashPayment(selectedStudent.id,period || undefined)
+      setObligations(res.obligations);setBillingWarnings(res.billingWarnings)
+      setSelectedBillingPeriod(period);setItemSelections({});setIdempotencyKey(crypto.randomUUID())
+    } catch (error) { setErrorMessage(error instanceof Error ? error.message : 'Tagihan gagal dimuat.') }
+    finally { setIsLoadingObligations(false) }
   }
 
   // Toggle item selection
@@ -696,6 +714,14 @@ export function CatatPembayaranModal({
                 </div>
               )}
 
+              <label className="block text-xs text-slate-600">Periode pembayaran
+                <select aria-label="Periode pembayaran" value={selectedBillingPeriod} disabled={isLoadingObligations}
+                  onChange={e=>selectBillingPeriod(e.target.value)} className="ml-2 rounded-lg border p-2">
+                  <option value="">Tagihan berjalan dan tunggakan</option>
+                  {advancePeriods.map(p=><option key={p} value={p}>Bayar di muka: {p}</option>)}
+                </select>
+              </label>
+              {billingWarnings.length>0 && <p role="status" className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Perlu Pemeriksaan: {billingWarnings.join('; ')}</p>}
               {/* Obligations Loading / Empty / List */}
               {isLoadingObligations ? (
                 <div className="py-12 flex flex-col items-center justify-center text-slate-400 gap-2">
@@ -705,9 +731,9 @@ export function CatatPembayaranModal({
               ) : obligations.length === 0 ? (
                 <div className="text-center py-10 border border-dashed border-slate-200 rounded-xl space-y-2">
                   <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto" />
-                  <p className="text-sm font-semibold text-slate-800">Semua Kewajiban Lunas</p>
+                  <p className="text-sm font-semibold text-slate-800">Tidak Ada Tagihan yang Dapat Dipilih</p>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                    Santri ini tidak memiliki kewajiban aktif yang belum terbayar pada sistem keuangan baru.
+                    Periksa peringatan penerbitan atau pilih periode pembayaran lain bila diperlukan.
                   </p>
                 </div>
               ) : (
@@ -756,7 +782,7 @@ export function CatatPembayaranModal({
                                 >
                                   {ob.itemLabel}
                                   <span className="ml-2 text-xs font-normal text-slate-500">
-                                    ({ob.period})
+                                    ({ob.period}) · {BILLING_PHASE_LABELS[ob.billingPhase]}
                                   </span>
                                 </label>
                                 <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">

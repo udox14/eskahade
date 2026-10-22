@@ -1,4 +1,5 @@
 import { configuredBrivaPartnerServiceId } from './briva-config'
+import { orderBillingConflictSql } from '../billing-legacy'
 import { walletMutationStatements } from '../wallet-statements'
 import { isValidIsoDateTimeWithOffset } from './statement-service'
 // lib/finance/bri/briva-service.ts
@@ -781,6 +782,9 @@ export async function handleBrivaInquiry(params: {
   }
 
   const inquiryItems=await query<{item_type:string}>('SELECT item_type FROM finance_order_items WHERE order_id=?',[activeOrder.id])
+  if (await queryOne(orderBillingConflictSql(),[activeOrder.id])) {
+    return {status:404,body:{responseCode:BRI_VA_INQUIRY_CODES.BILL_NOT_FOUND,responseMessage:'Invalid Bill'}}
+  }
   if(!inquiryItems.length || inquiryItems.some(item=>isSantriBebasItem({asrama:student.asrama,kategoriSantri:student.kategori_santri},item.item_type)))return {status:404,body:{responseCode:BRI_VA_INQUIRY_CODES.BILL_NOT_FOUND,responseMessage:'Invalid Bill'}}
   // Inquiry identifiers and their financial snapshot are append-only.
   const previous=await queryOne<{order_id:string;virtual_account_no:string;total_amount:number;customer_no:string;partner_service_id:string}>(
@@ -1323,6 +1327,12 @@ export async function handleBrivaPayment(params: {
   if(!orderItems.length || orderItems.some(item=>isSantriBebasItem({asrama:student.asrama,kategoriSantri:student.kategori_santri},item.item_type)))return {status:404,body:{responseCode:BRI_VA_PAYMENT_CODES.BILL_NOT_FOUND,responseMessage:'Invalid Bill'}}
   if(orderItems.some(item=>!Number.isSafeInteger(item.amount)||item.amount<=0||(!item.obligation_id && item.item_type!=='UANG_JAJAN')) || orderItems.reduce((sum,item)=>sum+item.amount,0)!==activeOrder.gross_amount)return {status:500,body:{responseCode:BRI_VA_PAYMENT_CODES.GENERAL_ERROR,responseMessage:'General Error'}}
   const hasUangJajan = orderItems.some((item) => item.item_type === 'UANG_JAJAN')
+  // Local allocation safety only: preserve authenticated bank evidence for legacy conflicts.
+  // No BRI headers, signatures, endpoint, or response-code contract is changed.
+  if (await queryOne(orderBillingConflictSql(),[activeOrder.id])) {
+    await recordReview('LEGACY_BILLING_CONFLICT_REQUIRES_REVIEW',activeOrder.id)
+    return {status:404,body:{responseCode:BRI_VA_PAYMENT_CODES.BILL_NOT_FOUND,responseMessage:'Invalid Bill'}}
+  }
   let currentWalletBalance = 0
   if (hasUangJajan) {
     const balanceRow = await queryOne<{ balance: number }>(
@@ -1470,7 +1480,7 @@ export async function handleBrivaPayment(params: {
   }
 
   // Step F: Create Allocations & Update Obligations
-  let runningWalletBalance = currentWalletBalance
+  const runningWalletBalance = currentWalletBalance
 
   for (const item of orderItems) {
     const allocId = generateId()
@@ -1675,6 +1685,11 @@ export async function handleBrivaPayment(params: {
       }
     }
 
+    // The additive DB guard can catch a legacy payment committed after the precheck.
+    if (errMsg.includes('BILLING_REVIEW_REQUIRED')) {
+      await recordReview('LEGACY_BILLING_CONFLICT_REQUIRES_REVIEW',activeOrder.id)
+      return {status:404,body:{responseCode:BRI_VA_PAYMENT_CODES.BILL_NOT_FOUND,responseMessage:'Invalid Bill'}}
+    }
     // Unforeseen batch failure: Do NOT ACK success!
     briLog('error', 'BRIVA_PAYMENT_PERSIST_ERROR', {
       durationMs: Date.now() - startTime,
