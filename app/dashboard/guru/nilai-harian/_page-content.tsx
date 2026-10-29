@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { GuruExportButton } from '@/components/akademik/guru-export-button'
 import {
   getNilaiHarianInitialData,
   getNilaiHarianInputData,
@@ -578,6 +579,16 @@ export default function NilaiHarianContent() {
           </div>
         </div>
       )}
+
+      <GuruExportButton module="nilai" kelasId={kelasId}
+        kelasNama={kelasList.find(k => String(k.id) === kelasId)?.nama_kelas ?? ''}
+        tahunAjaran={kelasList.find(k => String(k.id) === kelasId)?.tahun_ajaran_nama ?? ''}
+        mapelId={tab === 'rekap' ? rekapView === 'semua' ? null : rekapView === 'mapel'
+          ? Number(rekapMapelId) || rekapData?.selectedMapelId
+          : Number(rekapMapelFilter) || rekapData?.selectedSesi?.mapel_id : mapelId}
+        sesiId={tab === 'rekap' ? rekapView === 'sesi' ? rekapSesiId || rekapData?.selectedSesiId : null : sesiId === NEW_SESI ? null : sesiId}
+        getBlocked={() => dirty || saving || saveStatus === 'error' || metadataDirtyRef.current ||
+          autosaveInFlightRef.current.size > 0 || Array.from(pendingChangesRef.current.values()).some(p => p.size > 0)} />
 
       <div className="rounded-xl border bg-white p-4 shadow-sm">
         <div className="flex rounded-lg bg-slate-100 p-1">

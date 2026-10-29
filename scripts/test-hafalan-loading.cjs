@@ -75,6 +75,7 @@ function mount(initialAction) {
     'lucide-react': new Proxy({}, { get: (_, key) => key }),
     sonner: { toast: { error() {} } },
     '@/components/dashboard/page-header': { DashboardPageHeader: 'Header' },
+    '@/components/akademik/guru-export-button': { GuruExportButton: 'ExportButton' },
     './actions': { getHafalanInitialData: initialAction },
   }, {
     window: { history: { state: {}, replaceState() {} }, location: { href: '/hafalan' }, addEventListener() {}, removeEventListener() {} },

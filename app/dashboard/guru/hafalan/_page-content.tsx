@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { GuruExportButton } from '@/components/akademik/guru-export-button'
 import {
   getAvailableHafalanTypes, getHafalanInitialData, getHafalanInputData,
   simpanHafalanHighlightBatch, simpanHafalanProgressBatch,
@@ -1176,6 +1177,13 @@ export default function HafalanPageContent() {
           </div>
         </div>
       )}
+
+      <GuruExportButton module="hafalan" kelasId={kelasId}
+        kelasNama={kelasList.find(k => String(k.id) === kelasId)?.nama_kelas ?? ''}
+        tahunAjaran={kelasList.find(k => String(k.id) === kelasId)?.tahun_ajaran_nama ?? ''}
+        jenis={selectedType?.key}
+        getBlocked={() => dirty || saving || saveStatus === 'error' ||
+          autosaveInFlightRef.current.size > 0 || Array.from(pendingChangesRef.current.values()).some(p => p.size > 0)} />
 
       {/* HOME */}
       {step === 'home' && (
