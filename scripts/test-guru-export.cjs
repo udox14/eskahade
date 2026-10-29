@@ -162,6 +162,14 @@ async function run() {
  for (const doc of [all.data, hf.data, multiSesi.data, perSesi.data]) {
   const built = workbook.buildGuruWorkbook(XLSX, doc)
   const read = XLSX.read(XLSX.write(built, { type:'buffer', bookType:'xlsx' }), { type:'buffer' })
+  // A successful SheetJS read does not validate Excel's named-range formulas.
+  // In particular, ASCII apostrophes inside worksheet names must be escaped.
+  for (const named of read.Workbook.Names ?? []) {
+   if (named.Name !== '_xlnm._FilterDatabase') continue
+   const name=read.SheetNames[named.Sheet]
+   const expected=`'${name.replace(/'/g,"''")}'!${built.Sheets[name]['!autofilter'].ref}`
+   assert.equal(named.Ref,expected,'Excel filter range must quote its worksheet name correctly')
+  }
   assert.equal(read.SheetNames.length,doc.sheets.length); assert.ok(!read.SheetNames.includes('Detail'))
   for(const name of read.SheetNames) {
    const sheet=read.Sheets[name]
@@ -175,9 +183,10 @@ async function run() {
  }
  const singleBook=workbook.buildGuruWorkbook(XLSX,perSesi.data)
  assert.equal(XLSX.utils.sheet_to_json(singleBook.Sheets[singleBook.SheetNames[0]],{range:6})[0]['Sesi A (2026-10-01)'],0)
- const odd={...all.data,sheets:['Gabungan','Gabungan','gabungan','Nama/:*?[] Sangat Panjang Sekali 123456789','Nama/:*?[] Sangat Panjang Sekali 123456789'].map(name=>({...all.data.sheets[1],name}))}
+ const odd={...all.data,sheets:['Gabungan','Gabungan','gabungan','Nama/:*?[] Sangat Panjang Sekali 123456789','Nama/:*?[] Sangat Panjang Sekali 123456789',"O'Brien",'O’Brien'].map(name=>({...all.data.sheets[1],name}))}
  const oddBook=workbook.buildGuruWorkbook(XLSX,odd)
- assert.equal(new Set(oddBook.SheetNames.map(n=>n.toLowerCase())).size,5)
+ assert.equal(new Set(oddBook.SheetNames.map(n=>n.toLowerCase())).size,7)
+ assert.equal(oddBook.SheetNames.filter(n=>n.startsWith('O’Brien')).length,2)
  assert.ok(oddBook.SheetNames.every(n=>n.length<=31&&!/[\\/?*\[\]:]/.test(n)))
  db.exec('BEGIN')
  try {

@@ -12,7 +12,10 @@ export function buildGuruWorkbook(XLSX: typeof Excel, doc: ExportDocument) {
   // Reserve the combined sheet's name before normalizing subject/session names.
   if (doc.sheets.length > 1 && doc.sheets[0].name === 'Gabungan') usedNames.add('gabungan')
   for (const [index, sheet] of doc.sheets.entries()) {
-    const base = sheet.name.replace(/[\\/?*\[\]:\u0000-\u001f]/g, ' ').trim().replace(/^'+|'+$/g, '').trim().slice(0, 31).replace(/'+$/g, '') || 'Rekap'
+    // SheetJS 0.18 writes unescaped ASCII apostrophes in AutoFilter named
+    // ranges (e.g. 'Hafalan Al-Qur'an'!A7:J9), which Excel cannot parse.
+    // Use a typographic apostrophe for tab names; cell content stays intact.
+    const base = sheet.name.replace(/[\\/?*\[\]:\u0000-\u001f]/g, ' ').trim().replace(/^'+|'+$/g, '').replace(/'/g, '’').trim().slice(0, 31) || 'Rekap'
     let name = base, suffix = 2
     if (!(index === 0 && base === 'Gabungan')) {
       while (usedNames.has(name.toLowerCase())) {
