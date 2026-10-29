@@ -67,6 +67,8 @@ export default function HafalanPageContent() {
   const [dragMode, setDragMode] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [atScrollTop, setAtScrollTop] = useState(true)
@@ -161,19 +163,33 @@ export default function HafalanPageContent() {
   }
 
   useEffect(() => {
+    let active = true
+    setLoading(true)
+    setLoadError(false)
+    const timeout = setTimeout(() => {
+      active = false
+      setLoadError(true)
+      setLoading(false)
+    }, 20000)
     getHafalanInitialData().then(res => {
+      if (!active) return
       setKelasList(res.kelas)
       let cachedKelasId = ''
       try { cachedKelasId = localStorage.getItem('hafalan-selected-kelas') || '' } catch {}
       const availableKelasIds = res.kelas.map((kelas: any) => String(kelas.id))
       if (res.kelas.length === 1) setKelasId(String(res.kelas[0].id))
       else if (cachedKelasId && availableKelasIds.includes(cachedKelasId)) setKelasId(cachedKelasId)
-      setLoading(false)
+    }).catch(() => {
+      if (active) setLoadError(true)
+    }).finally(() => {
+      clearTimeout(timeout)
+      if (active) setLoading(false)
     })
-  }, [])
+    return () => { active = false; clearTimeout(timeout) }
+  }, [loadAttempt])
 
   useEffect(() => {
-    if (loading || historyReadyRef.current) return
+    if (loading || loadError || historyReadyRef.current) return
     if (!readHafalanHistory()) {
       writeHafalanHistory({
         kelasId,
@@ -184,7 +200,7 @@ export default function HafalanPageContent() {
       }, true)
     }
     historyReadyRef.current = true
-  }, [kelasId, loading])
+  }, [kelasId, loading, loadError])
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
@@ -1134,6 +1150,12 @@ export default function HafalanPageContent() {
     }).length
 
   if (loading) return <div className="py-20 text-center text-slate-400"><Loader2 className="mx-auto h-7 w-7 animate-spin" /></div>
+  if (loadError) return (
+    <div role="alert" className="py-20 text-center">
+      <p className="text-sm text-slate-500">Data hafalan belum berhasil dimuat. Silakan coba lagi.</p>
+      <button type="button" onClick={() => setLoadAttempt(value => value + 1)} className="mt-3 text-sm font-semibold text-emerald-700">Coba lagi</button>
+    </div>
+  )
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 pb-28">
