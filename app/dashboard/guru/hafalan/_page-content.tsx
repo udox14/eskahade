@@ -1158,32 +1158,36 @@ export default function HafalanPageContent() {
     </div>
   )
 
+  const exportAction = <GuruExportButton module="hafalan" kelasId={kelasId}
+    kelasNama={kelasList.find(k => String(k.id) === kelasId)?.nama_kelas ?? ''}
+    tahunAjaran={kelasList.find(k => String(k.id) === kelasId)?.tahun_ajaran_nama ?? ''}
+    jenis={selectedType?.key}
+    getBlocked={() => dirty || saving || saveStatus === 'error' ||
+      autosaveInFlightRef.current.size > 0 || Array.from(pendingChangesRef.current.values()).some(p => p.size > 0)} />
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 pb-28">
       {step === 'home' && (
-        <DashboardPageHeader title="Hafalan" description="Pilih jenis hafalan, lalu santri, lalu tandai bagian yang sudah dihafal." />
+        <DashboardPageHeader title="Hafalan" description="Pilih jenis hafalan, lalu santri, lalu tandai bagian yang sudah dihafal."
+          action={kelasId ? exportAction : undefined} className="flex-row [&>div:last-child]:w-auto" />
       )}
 
       {step !== 'home' && (
-        <div className="-mx-4 -mt-4 mb-4 border-b border-slate-100 bg-white px-4 pb-3 pt-2 md:-mx-8 md:-mt-8 md:px-8">
-          <button onClick={goBack} className="mb-1.5 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700">
-            <ArrowLeft className="h-4 w-4" />
-            {step === 'santri' ? 'Jenis Hafalan' : step === 'bab' ? 'Daftar Santri' : selectedType.label}
-          </button>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <Crumb on>{selectedType.label.replace('Hafalan ', '')}</Crumb>
-            {selectedSantri && <><Sep /><Crumb on={step !== 'santri'}>{selectedSantri.nama}</Crumb></>}
-            {selectedBab && step === 'blok' && <><Sep /><span className="font-bold text-slate-900" dir="rtl" style={{ fontFamily: isQuran ? QURAN_FONT : ARABIC_FONT }}>{selectedBab.judul}</span></>}
+        <div className="-mx-4 -mt-4 mb-4 flex items-start justify-between gap-3 border-b border-slate-100 bg-white px-4 pb-3 pt-2 md:-mx-8 md:-mt-8 md:px-8">
+          <div className="min-w-0">
+            <button onClick={goBack} className="mb-1.5 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700">
+              <ArrowLeft className="h-4 w-4" />
+              {step === 'santri' ? 'Jenis Hafalan' : step === 'bab' ? 'Daftar Santri' : selectedType.label}
+            </button>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+              <Crumb on>{selectedType.label.replace('Hafalan ', '')}</Crumb>
+              {selectedSantri && <><Sep /><Crumb on={step !== 'santri'}>{selectedSantri.nama}</Crumb></>}
+              {selectedBab && step === 'blok' && <><Sep /><span className="font-bold text-slate-900" dir="rtl" style={{ fontFamily: isQuran ? QURAN_FONT : ARABIC_FONT }}>{selectedBab.judul}</span></>}
+            </div>
           </div>
+          <div className="shrink-0">{exportAction}</div>
         </div>
       )}
-
-      <GuruExportButton module="hafalan" kelasId={kelasId}
-        kelasNama={kelasList.find(k => String(k.id) === kelasId)?.nama_kelas ?? ''}
-        tahunAjaran={kelasList.find(k => String(k.id) === kelasId)?.tahun_ajaran_nama ?? ''}
-        jenis={selectedType?.key}
-        getBlocked={() => dirty || saving || saveStatus === 'error' ||
-          autosaveInFlightRef.current.size > 0 || Array.from(pendingChangesRef.current.values()).some(p => p.size > 0)} />
 
       {/* HOME */}
       {step === 'home' && (

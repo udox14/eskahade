@@ -1,16 +1,16 @@
 export type ExportModule = 'nilai' | 'hafalan'
 export type ExportRequest =
   | { module: 'nilai'; kelasId: string; scope: 'semua' }
-  | { module: 'nilai'; kelasId: string; scope: 'mapel'; mapelId: number }
-  | { module: 'nilai'; kelasId: string; scope: 'sesi'; mapelId: number; sesiId: string }
+  | { module: 'nilai'; kelasId: string; scope: 'mapel'; mapelIds: number[] }
+  | { module: 'nilai'; kelasId: string; scope: 'sesi'; sesiIds: string[] }
   | { module: 'hafalan'; kelasId: string; scope: 'semua' }
   | { module: 'hafalan'; kelasId: string; scope: 'jenis'; jenis: string }
 
 export type ExportCell = string | number | null
-export type ExportSheet = { headers: string[]; rows: ExportCell[][] }
+export type ExportSheet = { name: string; headers: string[]; rows: ExportCell[][] }
 export type ExportDocument = {
   title: string; kelas: string; tahunAjaran: string; cakupan: string; exportedAt: string
-  rekap: ExportSheet; detail: ExportSheet
+  sheets: ExportSheet[]
 }
 export type ExportResult<T> = { ok: true; data: T } | { ok: false; error: string }
 export type ExportOptions = {
@@ -31,31 +31,35 @@ const identity = (s: ExportSantri): ExportCell[] => [String(s.nis ?? ''), s.nama
 const identityHeaders = ['NIS', 'Nama', 'Asrama', 'Kamar']
 const round = (n: number) => Math.round(n * 10) / 10
 
-export function buildNilaiSheets(santri: ExportSantri[], sesi: ExportSesi[], nilai: ExportNilai[]) {
+export function buildNilaiSheets(santri: ExportSantri[], sesi: ExportSesi[], nilai: ExportNilai[], groupBy: 'mapel' | 'sesi' = 'mapel') {
   const scores = new Map(nilai.map(n => [`${n.riwayat_pendidikan_id}:${n.sesi_id}`, n.nilai]))
-  const groups = new Map<number, ExportSesi[]>()
+  const groups = new Map<number | string, ExportSesi[]>()
   for (const item of sesi) {
-    const group = groups.get(item.mapel_id) ?? []
-    group.push(item); groups.set(item.mapel_id, group)
+    const key = groupBy === 'sesi' ? item.id : item.mapel_id
+    const group = groups.get(key) ?? []
+    group.push(item); groups.set(key, group)
   }
-  const rekap: ExportSheet = { headers: ['No', ...identityHeaders, 'Mapel', 'Jumlah Sesi', 'Nilai Terisi', 'Rata-rata', 'Minimum', 'Maksimum', 'Tuntas', 'Tidak Tuntas'], rows: [] }
-  const detail: ExportSheet = { headers: ['No', ...identityHeaders, 'Mapel', 'Sesi', 'Tanggal', 'Guru', 'KKM', 'Nilai', 'Ketuntasan'], rows: [] }
-  for (const s of santri) {
-    for (const sessions of groups.values()) {
-      const values: number[] = []
-      let tuntas = 0
-      for (const item of sessions) {
-        const score = scores.get(`${s.riwayat_id}:${item.id}`) ?? null
-        if (score !== null) { values.push(score); if (score >= item.kkm) tuntas++ }
-        detail.rows.push([detail.rows.length + 1, ...identity(s), item.mapel_nama, item.nama_sesi, item.tanggal, item.guru_nama ?? '', item.kkm, score, score === null ? 'Belum diisi' : score >= item.kkm ? 'Tuntas' : 'Tidak Tuntas'])
-      }
-      rekap.rows.push([rekap.rows.length + 1, ...identity(s), sessions[0].mapel_nama, sessions.length, values.length,
-        values.length ? round(values.reduce((a, b) => a + b, 0) / values.length) : null,
-        values.length ? values.reduce((a, b) => Math.min(a, b)) : null,
-        values.length ? values.reduce((a, b) => Math.max(a, b)) : null, tuntas, values.length - tuntas])
+  function sheet(name: string, sessions: ExportSesi[], combined = false): ExportSheet {
+    const used = new Set<string>()
+    const columns = sessions.map(item => {
+      const base = `${combined ? `${item.mapel_nama} · ` : ''}${item.nama_sesi} (${item.tanggal})`
+      let label = base, suffix = 2
+      while (used.has(label)) label = `${base} (${suffix++})`
+      used.add(label)
+      return label
+    })
+    return {
+      name, headers: ['No', ...identityHeaders, ...columns, ...(sessions.length > 1 ? ['Rata-rata'] : [])],
+      rows: santri.map((s, i) => {
+        const values = sessions.map(item => scores.get(`${s.riwayat_id}:${item.id}`) ?? null)
+        const filled = values.filter((v): v is number => v !== null)
+        return [i + 1, ...identity(s), ...values, ...(sessions.length > 1 ? [filled.length ? round(filled.reduce((a, b) => a + b, 0) / filled.length) : null] : [])]
+      }),
     }
   }
-  return { rekap, detail }
+  const sheets = Array.from(groups.values()).map(items => sheet(groupBy === 'sesi' ? `${items[0].mapel_nama} - ${items[0].nama_sesi}` : items[0].mapel_nama, items))
+  if (sheets.length > 1) sheets.unshift(sheet('Gabungan', sesi, true))
+  return { sheets }
 }
 
 export type ExportBlok = {
@@ -87,26 +91,29 @@ export function buildHafalanSheets(santri: ExportSantri[], blok: ExportBlok[], p
     const group = groups.get(b.jenis) ?? []
     group.push(b); groups.set(b.jenis, group)
   }
-  const rekap: ExportSheet = { headers: ['No', ...identityHeaders, 'Jenis Hafalan', 'Total Blok', 'Hafal', 'Proses', 'Belum Dihafal', 'Penyelesaian (%)', 'Target Kata', 'Kata Dihafal', 'Kata Dihafal (%)'], rows: [] }
-  const detail: ExportSheet = { headers: ['No', ...identityHeaders, 'Jenis Hafalan', 'Bab/Surat', 'Bagian/Ayat', 'Status', 'Target Kata', 'Kata Dihafal', 'Kata Dihafal (%)'], rows: [] }
-  for (const s of santri) for (const blocks of groups.values()) {
-    let hafal = 0, proses = 0, totalWords = 0, doneWords = 0
+  const sheets: ExportSheet[] = []
+  for (const blocks of groups.values()) {
     const jurumiyah = blocks[0].jenis === 'jurumiyah'
-    for (const b of blocks) {
-      const p = byProgress.get(`${s.santri_id}:${b.id}`)
-      const words = p?.words.size ?? 0
-      const done = jurumiyah ? b.total_kata > 0 && words === b.total_kata : !!p?.hafal
-      const partial = !done && (jurumiyah ? words > 0 : !!p?.proses)
-      if (done) hafal++
-      if (partial) proses++
-      totalWords += b.total_kata; doneWords += words
-      detail.rows.push([detail.rows.length + 1, ...identity(s), b.jenis_label, b.judul, b.label,
-        done ? 'Hafal' : partial ? 'Proses' : 'Belum dihafal',
-        jurumiyah ? b.total_kata : null, jurumiyah ? words : null, jurumiyah && b.total_kata ? round(words / b.total_kata * 100) : null])
+    const sheet: ExportSheet = { name: blocks[0].jenis_label, headers: ['No', ...identityHeaders, 'Total Blok', 'Hafal', 'Proses', 'Belum Dihafal', 'Penyelesaian (%)', ...(jurumiyah ? ['Target Kata', 'Kata Dihafal', 'Kata Dihafal (%)'] : [])], rows: [] }
+    for (const s of santri) {
+      let hafal = 0, proses = 0, totalWords = 0, doneWords = 0
+      for (const b of blocks) {
+        const p = byProgress.get(`${s.santri_id}:${b.id}`)
+        const words = p?.words.size ?? 0
+        const done = jurumiyah ? b.total_kata > 0 && words === b.total_kata : !!p?.hafal
+        const partial = !done && (jurumiyah ? words > 0 : !!p?.proses)
+        if (done) hafal++
+        if (partial) proses++
+        totalWords += b.total_kata; doneWords += words
+      }
+      sheet.rows.push([sheet.rows.length + 1, ...identity(s), blocks.length, hafal, proses,
+        blocks.length - hafal - proses, round(hafal / blocks.length * 100), ...(jurumiyah ? [totalWords, doneWords, totalWords ? round(doneWords / totalWords * 100) : null] : [])])
     }
-    rekap.rows.push([rekap.rows.length + 1, ...identity(s), blocks[0].jenis_label, blocks.length, hafal, proses,
-      blocks.length - hafal - proses, round(hafal / blocks.length * 100), jurumiyah ? totalWords : null,
-      jurumiyah ? doneWords : null, jurumiyah && totalWords ? round(doneWords / totalWords * 100) : null])
+    sheets.push(sheet)
   }
-  return { rekap, detail }
+  if (sheets.length > 1) sheets.unshift({
+    name: 'Gabungan', headers: ['No', ...identityHeaders, ...sheets.flatMap(sheet => sheet.headers.slice(5).map(header => `${sheet.name} · ${header}`))],
+    rows: santri.map((s, i) => [i + 1, ...identity(s), ...sheets.flatMap(sheet => sheet.rows[i].slice(5))]),
+  })
+  return { sheets }
 }

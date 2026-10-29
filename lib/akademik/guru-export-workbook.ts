@@ -8,7 +8,19 @@ export function safeExportFilename(doc: ExportDocument) {
 
 export function buildGuruWorkbook(XLSX: typeof Excel, doc: ExportDocument) {
   const workbook = XLSX.utils.book_new()
-  for (const [name, sheet] of [['Rekap', doc.rekap], ['Detail', doc.detail]] as const) {
+  const usedNames = new Set<string>()
+  // Reserve the combined sheet's name before normalizing subject/session names.
+  if (doc.sheets.length > 1 && doc.sheets[0].name === 'Gabungan') usedNames.add('gabungan')
+  for (const [index, sheet] of doc.sheets.entries()) {
+    const base = sheet.name.replace(/[\\/?*\[\]:\u0000-\u001f]/g, ' ').trim().replace(/^'+|'+$/g, '').trim().slice(0, 31).replace(/'+$/g, '') || 'Rekap'
+    let name = base, suffix = 2
+    if (!(index === 0 && base === 'Gabungan')) {
+      while (usedNames.has(name.toLowerCase())) {
+        const ending = ` (${suffix++})`
+        name = base.slice(0, 31 - ending.length) + ending
+      }
+    }
+    usedNames.add(name.toLowerCase())
     const headerRow = 6
     const rows = [
       [doc.title], ['Kelas', doc.kelas], ['Tahun Ajaran', doc.tahunAjaran], ['Cakupan', doc.cakupan],

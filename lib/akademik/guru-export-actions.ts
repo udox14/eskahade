@@ -80,25 +80,31 @@ export async function getGuruExportData(request: ExportRequest): Promise<ExportR
     if (request.module === 'nilai') {
       if (!['semua', 'mapel', 'sesi'].includes(request.scope)) return { ok: false, error: 'Cakupan ekspor tidak valid.' }
       const allSesi = await nilaiSesi(request.kelasId)
-      if (request.scope !== 'semua' && (!Number.isInteger(request.mapelId) || !allSesi.some(s => s.mapel_id === request.mapelId))) {
-        return { ok: false, error: 'Mapel tidak memiliki sesi pada kelas ini.' }
+      if (request.scope === 'mapel' && (!Array.isArray(request.mapelIds) || !request.mapelIds.length || request.mapelIds.some(id => !Number.isInteger(id) || !allSesi.some(s => s.mapel_id === id)))) {
+        return { ok: false, error: 'Pilihan mapel tidak valid untuk kelas ini.' }
+      }
+      if (request.scope === 'sesi' && (!Array.isArray(request.sesiIds) || !request.sesiIds.length || request.sesiIds.some(id => typeof id !== 'string' || !allSesi.some(s => s.id === id)))) {
+        return { ok: false, error: 'Pilihan sesi tidak valid untuk kelas ini.' }
       }
       const sesi = allSesi.filter(s => request.scope === 'semua' ||
-        (s.mapel_id === request.mapelId && (request.scope !== 'sesi' || s.id === request.sesiId)))
+        (request.scope === 'mapel' ? request.mapelIds.includes(s.mapel_id) : request.sesiIds.includes(s.id)))
       if (!sesi.length) return { ok: false, error: 'Tidak ada sesi untuk pilihan ekspor ini.' }
-      const params: unknown[] = [request.kelasId]
-      let filter = ''
-      if (request.scope !== 'semua') { filter += ' AND nhs.mapel_id = ?'; params.push(request.mapelId) }
-      if (request.scope === 'sesi') { filter += ' AND nhs.id = ?'; params.push(request.sesiId) }
-      const nilai = await query<ExportNilai>(`
-        SELECT nhd.sesi_id, nhd.riwayat_pendidikan_id, nhd.nilai FROM nilai_harian_detail nhd
-        JOIN nilai_harian_sesi nhs ON nhs.id = nhd.sesi_id
-        WHERE nhs.kelas_id = ? ${filter}
-      `, params)
+      const nilai: ExportNilai[] = []
+      // Keep each D1 query below its bound-parameter limit for large selections.
+      for (let i = 0; i < sesi.length; i += 90) {
+        const ids = sesi.slice(i, i + 90).map(s => s.id)
+        nilai.push(...await query<ExportNilai>(`
+          SELECT nhd.sesi_id, nhd.riwayat_pendidikan_id, nhd.nilai FROM nilai_harian_detail nhd
+          JOIN nilai_harian_sesi nhs ON nhs.id = nhd.sesi_id
+          WHERE nhs.kelas_id = ? AND nhs.id IN (${ids.map(() => '?').join(',')})
+        `, [request.kelasId, ...ids]))
+      }
       return { ok: true, data: {
         ...metadata, title: 'Nilai Harian',
-        cakupan: request.scope === 'semua' ? 'Seluruh Mapel' : request.scope === 'mapel' ? sesi[0].mapel_nama : `${sesi[0].mapel_nama} - ${sesi[0].nama_sesi}`,
-        ...buildNilaiSheets(santri, sesi, nilai),
+        cakupan: request.scope === 'semua' ? 'Seluruh Mapel' : request.scope === 'mapel'
+          ? Array.from(new Set(sesi.map(s => s.mapel_nama))).join(', ')
+          : sesi.map(s => `${s.mapel_nama} - ${s.nama_sesi}`).join(', '),
+        ...buildNilaiSheets(santri, sesi, nilai, request.scope === 'sesi' ? 'sesi' : 'mapel'),
       } }
     }
     if (!['semua', 'jenis'].includes(request.scope)) return { ok: false, error: 'Cakupan ekspor tidak valid.' }

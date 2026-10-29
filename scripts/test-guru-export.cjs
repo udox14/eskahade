@@ -61,7 +61,7 @@ db.exec(`
 let featureAllowed = true, session = { id: 'u' }, failQuery = false
 const reads = []
 const dbApi = {
- async query(sql, params = []) { reads.push(sql); if (failQuery) throw new Error('private database detail'); return db.prepare(sql).all(...params) },
+ async query(sql, params = []) { assert.ok(params.length<=100); reads.push(sql); if (failQuery) throw new Error('private database detail'); return db.prepare(sql).all(...params) },
  async queryOne(sql, params = []) { reads.push(sql); return db.prepare(sql).get(...params) ?? null },
 }
 const access = compile('lib/akademik/guru-access.ts', { '@/lib/db': dbApi, '@/lib/auth/session': {} })
@@ -116,29 +116,37 @@ async function run() {
  const options = await actions.getGuruExportOptions('nilai', 'k1')
  assert.equal(options.data.mapel.length, 2); assert.equal(options.data.sesi.length, 3)
  const all = await actions.getGuruExportData(request('semua'))
- assert.ok(all.ok); assert.equal(all.data.detail.rows.length, 6); assert.equal(all.data.rekap.rows.length, 4)
- const recap = rows(all.data.rekap)
- const fiqih = recap.find(r => r.NIS === '00123' && r.Mapel === 'Fiqih')
- assert.equal(fiqih['Rata-rata'], 40); assert.equal(fiqih['Nilai Terisi'], 2); assert.equal(fiqih['Tidak Tuntas'], 2)
- const nahwuEmpty = recap.find(r => r.NIS === '00002' && r.Mapel === 'Nahwu')
- assert.equal(nahwuEmpty['Rata-rata'], null); assert.equal(nahwuEmpty['Tidak Tuntas'], 0)
- const perMapel = await actions.getGuruExportData(request('mapel', { mapelId: 1 }))
- assert.ok(perMapel.ok); assert.equal(perMapel.data.detail.rows.length, 4)
- const perSesi = await actions.getGuruExportData(request('sesi', { mapelId: 1, sesiId: 'a' }))
- assert.ok(perSesi.ok); assert.equal(perSesi.data.detail.rows.length, 2)
- for (const req of [request('sesi', { mapelId: 1, sesiId: 'c' }), request('sesi', { mapelId: 3, sesiId: 'x' }), request('mapel', { mapelId: 3 }), request('invalid')]) assert.equal((await actions.getGuruExportData(req)).ok, false)
+ assert.ok(all.ok); assert.deepEqual(Array.from(all.data.sheets,s=>s.name), ['Gabungan','Fiqih','Nahwu'])
+ assert.ok(all.data.sheets.every(s=>s.rows.length===2))
+ const fiqih = rows(all.data.sheets[1])[0]
+ assert.equal(fiqih['Rata-rata'], 40); assert.equal(fiqih['Sesi A (2026-10-01)'],0); assert.equal(fiqih['Sesi B (2026-10-02)'],80)
+ assert.equal(rows(all.data.sheets[2])[1]['Sesi C (2026-10-03)'],null)
+ const combined = rows(all.data.sheets[0])[0]
+ assert.equal(combined['Fiqih · Sesi A (2026-10-01)'],0); assert.equal(combined['Nahwu · Sesi C (2026-10-03)'],70)
+ assert.equal(combined['Rata-rata'],50)
+ const perMapel = await actions.getGuruExportData(request('mapel', { mapelIds: [1] }))
+ assert.ok(perMapel.ok); assert.equal(perMapel.data.sheets.length,1)
+ const multiMapel = await actions.getGuruExportData(request('mapel', { mapelIds: [2,1,1] }))
+ assert.deepEqual(Array.from(multiMapel.data.sheets,s=>s.name),['Gabungan','Fiqih','Nahwu'])
+ const perSesi = await actions.getGuruExportData(request('sesi', { sesiIds: ['a'] }))
+ assert.ok(perSesi.ok); assert.equal(perSesi.data.sheets.length,1); assert.equal(perSesi.data.sheets[0].rows.length,2)
+ const multiSesi = await actions.getGuruExportData(request('sesi', { sesiIds:['c','a','a'] }))
+ assert.deepEqual(Array.from(multiSesi.data.sheets,s=>s.name), ['Gabungan','Fiqih - Sesi A','Nahwu - Sesi C'])
+ assert.equal(multiSesi.data.sheets[0].headers.length,8)
+ for (const req of [request('sesi',{sesiIds:['a','x']}), request('sesi',{sesiIds:[]}),request('sesi',{sesiIds:'a'}),request('mapel',{mapelIds:[1,3]}), request('mapel',{mapelIds:[]}),request('mapel',{mapelIds:['1']}), request('invalid')]) assert.equal((await actions.getGuruExportData(req)).ok, false)
  const hfOptions = await actions.getGuruExportOptions('hafalan','k1')
  assert.equal(hfOptions.data.jenis.length, 3)
  const hf = await actions.getGuruExportData({ module: 'hafalan', kelasId: 'k1', scope: 'semua' })
- assert.ok(hf.ok); assert.equal(hf.data.detail.rows.length, 6)
- const hfRows = rows(hf.data.detail)
- assert.equal(hfRows.find(r => r.NIS === '00123' && r['Jenis Hafalan'] === 'Hafalan Jurumiyah')['Kata Dihafal'], 3)
- assert.equal(hfRows.find(r => r.NIS === '00123' && r['Jenis Hafalan'] === 'Hafalan Jurumiyah').Status, 'Proses')
- assert.equal(hfRows.find(r => r.NIS === '00002' && r['Jenis Hafalan'] === 'Hafalan Jurumiyah').Status, 'Hafal')
- assert.equal(hfRows.find(r => r.NIS === '00123' && r['Jenis Hafalan'] === "Hafalan Al-Qur'an").Status, 'Hafal')
- assert.ok(hfRows.every(r => !String(r['Bagian/Ayat']).includes('Nonaktif') && r['Bagian/Ayat'] !== 'Lama'))
+ assert.ok(hf.ok); assert.equal(hf.data.sheets.length,4); assert.ok(hf.data.sheets.every(s=>s.rows.length===2))
+ const jurumiyah = rows(hf.data.sheets.find(s=>s.name==='Hafalan Jurumiyah'))
+ assert.equal(jurumiyah[0]['Kata Dihafal'],3); assert.equal(jurumiyah[0].Proses,1); assert.equal(jurumiyah[0].Hafal,0)
+ assert.equal(jurumiyah[1].Hafal,1)
+ const quran = rows(hf.data.sheets.find(s=>s.name==="Hafalan Al-Qur'an"))
+ assert.equal(quran[0].Hafal,1); assert.equal(quran[0]['Total Blok'],1)
+ assert.ok(hf.data.sheets.every(s=>!s.name.includes('Hadits')))
+ assert.equal(rows(hf.data.sheets[0])[0]['Hafalan Jurumiyah · Kata Dihafal'],3)
  const one = await actions.getGuruExportData({ module:'hafalan',kelasId:'k1',scope:'jenis',jenis:'quran' })
- assert.ok(one.ok); assert.equal(one.data.detail.rows.length, 2)
+ assert.ok(one.ok); assert.equal(one.data.sheets.length,1); assert.equal(one.data.sheets[0].rows.length,2)
  for (const jenis of ['hadits','unknown']) assert.equal((await actions.getGuruExportData({ module:'hafalan',kelasId:'k1',scope:'jenis',jenis })).ok, false)
  db.exec('UPDATE hafalan_paket SET is_active=1 WHERE id=4')
  assert.ok((await actions.getGuruExportData({ module:'hafalan',kelasId:'k1',scope:'jenis',jenis:'hadits' })).ok)
@@ -151,18 +159,39 @@ async function run() {
  const failed = await actions.getGuruExportData(request('semua'))
  assert.equal(failed.ok, false); assert.ok(!failed.error.includes('private')); failQuery = false
 
- for (const doc of [all.data, hf.data]) {
+ for (const doc of [all.data, hf.data, multiSesi.data, perSesi.data]) {
   const built = workbook.buildGuruWorkbook(XLSX, doc)
   const read = XLSX.read(XLSX.write(built, { type:'buffer', bookType:'xlsx' }), { type:'buffer' })
-  assert.deepEqual(read.SheetNames, ['Rekap','Detail'])
-  assert.equal(read.Sheets.Detail.B8.t, 's'); assert.equal(read.Sheets.Detail.B8.v, '00123')
-  assert.equal(read.Sheets.Detail.C8.t, 's'); assert.equal(read.Sheets.Detail.C8.v, '=SUM(1,2)'); assert.equal(read.Sheets.Detail.C8.f, undefined)
-  assert.equal(read.Sheets.Detail.A8.t, 'n')
-  assert.equal(read.Sheets.Rekap.B3.v, '2026/2027')
+  assert.equal(read.SheetNames.length,doc.sheets.length); assert.ok(!read.SheetNames.includes('Detail'))
+  for(const name of read.SheetNames) {
+   const sheet=read.Sheets[name]
+   assert.equal(sheet.B8.t,'s'); assert.equal(sheet.B8.v,'00123')
+   assert.equal(sheet.C8.t,'s'); assert.equal(sheet.C8.v,'=SUM(1,2)'); assert.equal(sheet.C8.f,undefined)
+   assert.equal(sheet.A8.t,'n'); assert.equal(sheet.B3.v,'2026/2027')
+   const data=XLSX.utils.sheet_to_json(sheet,{range:6})
+   assert.equal(data.length,2); assert.equal(new Set(data.map(r=>r.NIS)).size,2)
+  }
   assert.ok(!/[<>:"/\\|?*]/.test(workbook.safeExportFilename(doc)))
  }
- assert.equal(XLSX.utils.sheet_to_json(workbook.buildGuruWorkbook(XLSX, perSesi.data).Sheets.Detail, { range:6 })[0].Nilai, 0)
- console.log('PASS: server scopes, authorization, class isolation, zero/missing grades, KKM, historical/current hafalan, word highlights, empty/failure, XLSX readback and text cells')
+ const singleBook=workbook.buildGuruWorkbook(XLSX,perSesi.data)
+ assert.equal(XLSX.utils.sheet_to_json(singleBook.Sheets[singleBook.SheetNames[0]],{range:6})[0]['Sesi A (2026-10-01)'],0)
+ const odd={...all.data,sheets:['Gabungan','Gabungan','gabungan','Nama/:*?[] Sangat Panjang Sekali 123456789','Nama/:*?[] Sangat Panjang Sekali 123456789'].map(name=>({...all.data.sheets[1],name}))}
+ const oddBook=workbook.buildGuruWorkbook(XLSX,odd)
+ assert.equal(new Set(oddBook.SheetNames.map(n=>n.toLowerCase())).size,5)
+ assert.ok(oddBook.SheetNames.every(n=>n.length<=31&&!/[\\/?*\[\]:]/.test(n)))
+ db.exec('BEGIN')
+ try {
+  const ids=Array.from({length:95},(_,i)=>`bulk-${i}`)
+  const insert=db.prepare("INSERT INTO nilai_harian_sesi(id,kelas_id,mapel_id,guru_id,tanggal,nama_sesi,kkm) VALUES(?,'k1',1,1,'2026-10-05','Ulangan',70)")
+  ids.forEach(id=>insert.run(id))
+  db.prepare("INSERT INTO nilai_harian_detail(id,sesi_id,riwayat_pendidikan_id,nilai) VALUES('bulk-score',?,'r1',88)").run(ids[94])
+  const many=await actions.getGuruExportData(request('sesi',{sesiIds:ids}))
+  assert.ok(many.ok); assert.equal(many.data.sheets.length,96)
+  assert.equal(new Set(many.data.sheets[0].headers).size,many.data.sheets[0].headers.length)
+  assert.ok(many.data.sheets[0].rows[0].includes(88))
+  assert.equal(workbook.buildGuruWorkbook(XLSX,many.data).SheetNames.length,96)
+ } finally {db.exec('ROLLBACK')}
+ console.log('PASS: multi-selection, column-based scores, one row per santri, separate/combined sheets, authorization, historical/current hafalan, XLSX readback, text cells and safe sheet names')
 
  let blocked = false, calls = 0, closed = 0
  const waiting = deferred()
@@ -172,7 +201,8 @@ async function run() {
  assert.ok(!client.loaded.includes('@/lib/akademik/guru-export-workbook'))
  let tree = client.render()
  const selects = nodes(tree).filter(n => n.type === 'select')
- assert.equal(selects[0].props.value, 'sesi'); assert.equal(selects[1].props.value,'1'); assert.equal(selects[2].props.value,'a')
+ assert.equal(selects[0].props.value,'sesi')
+ assert.equal(nodes(tree).filter(n=>n.type==='input'&&n.props.type==='checkbox').filter(n=>n.props.checked).length,1)
  const button = () => nodes(client.render()).find(n => n.type === 'button' && n.props.children?.includes?.('Unduh Excel'))
  blocked = true; assert.equal(button().props.disabled,true); await button().props.onClick(); assert.equal(calls,0)
  blocked = false
@@ -203,6 +233,16 @@ async function run() {
   const modal = mount({ ...props, ...defaults }, { getGuruExportOptions:async () => defaults.module === 'hafalan' ? hfOptions : options })
   await flush()
   assert.equal(nodes(modal.render()).find(n => n.type === 'select').props.value, expected)
+  modal.cleanup()
+ }
+ for (const mode of ['mapel','sesi']) {
+  let exported
+  const modal=mount({...props,sesiId:mode==='sesi'?'a':null},{getGuruExportOptions:async()=>options,getGuruExportData:async req=>{exported=req;return perSesi}})
+  await flush()
+  const checkboxes=nodes(modal.render()).filter(n=>n.type==='input'&&n.props.type==='checkbox')
+  checkboxes[mode==='mapel'?1:2].props.onChange({target:{checked:true}})
+  await nodes(modal.render()).find(n=>n.type==='button'&&n.props.children?.includes?.('Unduh Excel')).props.onClick()
+  assert.deepEqual(Array.from(mode==='mapel'?exported.mapelIds:exported.sesiIds),mode==='mapel'?[1,2]:['a','c'])
   modal.cleanup()
  }
  console.log('PASS: modal defaults, blocked saves, duplicate clicks, cancelled download, option retry and export failure')

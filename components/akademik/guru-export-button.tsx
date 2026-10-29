@@ -17,11 +17,9 @@ export function GuruExportButton(props: Props) {
   const trigger = useRef<HTMLButtonElement>(null)
   if (!props.kelasId) return null
   return <>
-    <div className="flex justify-end">
-      <button ref={trigger} type="button" onClick={() => setOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
-        <Download className="h-4 w-4" /> Export Excel
-      </button>
-    </div>
+    <button ref={trigger} type="button" aria-label="Export Excel" onClick={() => setOpen(true)} className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700">
+      <Download className="h-4 w-4" /><span><span className="hidden sm:inline">Export </span>Excel</span>
+    </button>
     {open && <ExportDialog key={`${props.module}:${props.kelasId}`} {...props} onClose={() => { setOpen(false); trigger.current?.focus() }} />}
   </>
 }
@@ -34,8 +32,8 @@ function ExportDialog(props: Props & { onClose: () => void }) {
   currentProps.current = props
   const [options, setOptions] = useState<ExportOptions | null>(null)
   const [scope, setScope] = useState('semua')
-  const [mapelId, setMapelId] = useState('')
-  const [sesiId, setSesiId] = useState('')
+  const [mapelIds, setMapelIds] = useState<number[]>([])
+  const [sesiIds, setSesiIds] = useState<string[]>([])
   const [jenis, setJenis] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -65,8 +63,8 @@ function ExportDialog(props: Props & { onClose: () => void }) {
       const chosenMapel = result.data.mapel.find(m => m.id === props.mapelId)
       const chosenSesi = result.data.sesi.find(s => s.id === props.sesiId && s.mapel_id === chosenMapel?.id)
       const chosenJenis = result.data.jenis.find(t => t.key === props.jenis)
-      setMapelId(chosenMapel ? String(chosenMapel.id) : '')
-      setSesiId(chosenSesi?.id ?? '')
+      setMapelIds(chosenMapel ? [chosenMapel.id] : [])
+      setSesiIds(chosenSesi ? [chosenSesi.id] : [])
       setJenis(chosenJenis?.key ?? '')
       setScope(props.module === 'nilai' ? chosenSesi ? 'sesi' : chosenMapel ? 'mapel' : 'semua' : chosenJenis ? 'jenis' : 'semua')
     }).catch(() => { if (valid) setError('Pilihan ekspor belum berhasil dimuat. Silakan coba lagi.') })
@@ -77,20 +75,19 @@ function ExportDialog(props: Props & { onClose: () => void }) {
   }, [props.module, props.kelasId, attempt])
 
   const blocked = props.getBlocked()
-  const sessions = options?.sesi.filter(s => String(s.mapel_id) === mapelId) ?? []
   const empty = options && (props.module === 'nilai' ? options.sesi.length === 0 : options.jenis.length === 0)
-  const validSelection = scope === 'semua' || (props.module === 'hafalan' ? !!jenis : !!mapelId && (scope !== 'sesi' || !!sesiId))
+  const validSelection = scope === 'semua' || (props.module === 'hafalan' ? !!jenis : scope === 'mapel' ? mapelIds.length > 0 : sesiIds.length > 0)
   const summary = scope === 'semua' ? (props.module === 'nilai' ? 'Seluruh mapel dan sesi' : 'Seluruh jenis hafalan')
     : scope === 'jenis' ? options?.jenis.find(t => t.key === jenis)?.label
-      : `${options?.mapel.find(m => String(m.id) === mapelId)?.nama ?? 'Pilih mapel'}${scope === 'sesi' ? ` · ${sessions.find(s => s.id === sesiId)?.nama_sesi ?? 'Pilih sesi'}` : ' · Semua sesi'}`
+      : scope === 'mapel' ? `${mapelIds.length} mapel dipilih · Semua sesi` : `${sesiIds.length} sesi dipilih`
 
   async function download() {
     if (busyRef.current || !options || !validSelection || props.getBlocked() || empty) return
     busyRef.current = true; setBusy(true); setError('')
     const request: ExportRequest = props.module === 'nilai'
       ? scope === 'semua' ? { module: 'nilai', kelasId: props.kelasId, scope: 'semua' }
-        : scope === 'sesi' ? { module: 'nilai', kelasId: props.kelasId, scope: 'sesi', mapelId: Number(mapelId), sesiId }
-          : { module: 'nilai', kelasId: props.kelasId, scope: 'mapel', mapelId: Number(mapelId) }
+        : scope === 'sesi' ? { module: 'nilai', kelasId: props.kelasId, scope: 'sesi', sesiIds }
+          : { module: 'nilai', kelasId: props.kelasId, scope: 'mapel', mapelIds }
       : scope === 'semua' ? { module: 'hafalan', kelasId: props.kelasId, scope: 'semua' }
         : { module: 'hafalan', kelasId: props.kelasId, scope: 'jenis', jenis }
     try {
@@ -131,22 +128,35 @@ function ExportDialog(props: Props & { onClose: () => void }) {
               {props.module === 'nilai' ? <><option value="mapel">Per Mapel</option><option value="sesi">Per Sesi</option></> : <option value="jenis">Per Jenis</option>}
             </select>
           </label>
-          {props.module === 'nilai' && scope !== 'semua' && <label className="block text-sm font-semibold">Mapel
-            <select value={mapelId} disabled={busy} onChange={e => { setMapelId(e.target.value); setSesiId('') }} className={selectClass}>
-              <option value="">Pilih mapel</option>{options.mapel.map(m => <option key={m.id} value={m.id}>{m.nama}</option>)}
-            </select>
-          </label>}
-          {scope === 'sesi' && <label className="block text-sm font-semibold">Sesi
-            <select value={sesiId} disabled={busy || !mapelId} onChange={e => setSesiId(e.target.value)} className={selectClass}>
-              <option value="">Pilih sesi</option>{sessions.map(s => <option key={s.id} value={s.id}>{s.nama_sesi} · {s.tanggal}</option>)}
-            </select>
-          </label>}
+          {props.module === 'nilai' && scope === 'mapel' && <fieldset disabled={busy} className="space-y-2">
+            <legend className="text-sm font-semibold">Pilih mapel</legend>
+            <div className="flex justify-end">
+              <button type="button" onClick={() => setMapelIds(mapelIds.length === options.mapel.length ? [] : options.mapel.map(m => m.id))} className="text-xs font-semibold text-emerald-700">{mapelIds.length === options.mapel.length ? 'Kosongkan' : 'Pilih semua'}</button></div>
+            <div className="max-h-60 overflow-y-auto rounded-lg border border-slate-200">
+              {options.mapel.map(m => <label key={m.id} className="flex cursor-pointer items-center gap-3 p-3 text-sm hover:bg-slate-50">
+                <input type="checkbox" checked={mapelIds.includes(m.id)} onChange={e => setMapelIds(ids => e.target.checked ? [...ids, m.id] : ids.filter(id => id !== m.id))} className="h-4 w-4 accent-emerald-600" />{m.nama}
+              </label>)}
+            </div>
+          </fieldset>}
+          {scope === 'sesi' && <fieldset disabled={busy} className="space-y-2">
+            <legend className="text-sm font-semibold">Pilih sesi</legend>
+            <div className="flex justify-end">
+              <button type="button" onClick={() => setSesiIds(sesiIds.length === options.sesi.length ? [] : options.sesi.map(s => s.id))} className="text-xs font-semibold text-emerald-700">{sesiIds.length === options.sesi.length ? 'Kosongkan' : 'Pilih semua'}</button></div>
+            <div className="max-h-60 overflow-y-auto rounded-lg border border-slate-200">
+              {options.sesi.map(s => <label key={s.id} className="flex cursor-pointer items-start gap-3 p-3 text-sm hover:bg-slate-50">
+                <input type="checkbox" checked={sesiIds.includes(s.id)} onChange={e => setSesiIds(ids => e.target.checked ? [...ids, s.id] : ids.filter(id => id !== s.id))} className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-600" />
+                <span>{s.nama_sesi}<span className="mt-0.5 block text-xs text-slate-500">{options.mapel.find(m => m.id === s.mapel_id)?.nama} · {s.tanggal}</span></span>
+              </label>)}
+            </div>
+          </fieldset>}
           {scope === 'jenis' && <label className="block text-sm font-semibold">Jenis hafalan
             <select value={jenis} disabled={busy} onChange={e => setJenis(e.target.value)} className={selectClass}>
               <option value="">Pilih jenis</option>{options.jenis.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
             </select>
           </label>}
-          <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">{summary}. File berisi lembar Rekap dan Detail.{props.module === 'hafalan' && ' Hanya materi marhalah saat ini.'}</p>
+          <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">{summary}. Satu baris per santri.{props.module === 'nilai'
+            ? ' Nilai setiap sesi ditampilkan dalam kolom. Jika lebih dari satu mapel/sesi, tersedia sheet masing-masing dan Gabungan.'
+            : ' Ringkasan tiap jenis dipisah dalam sheet, disertai Gabungan jika lebih dari satu jenis. Hanya materi marhalah saat ini.'}</p>
         </>}
       </>}
       {blocked && <p role="status" className="text-sm text-amber-800">Tunggu hingga seluruh perubahan berhasil tersimpan. Jika penyimpanan gagal, gunakan Coba lagi pada halaman input terlebih dahulu.</p>}
