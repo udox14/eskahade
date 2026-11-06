@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ArrowDown, ArrowLeft, ArrowUp, BookOpenCheck, Check, ChevronRight, Languages, Loader2,
+  ArrowDown, ArrowLeft, ArrowUp, BookOpenCheck, Check, ChevronRight, Download, Languages, Loader2,
   RotateCcw, Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
-  getAvailableHafalanTypes, getHafalanInitialData, getHafalanInputData,
+  getAvailableHafalanTypes, getHafalanInitialData, getHafalanInputData, getQuranExportRows,
   simpanHafalanHighlightBatch, simpanHafalanProgressBatch,
 } from './actions'
 
@@ -67,6 +67,7 @@ export default function HafalanPageContent() {
   const [dragMode, setDragMode] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [atScrollTop, setAtScrollTop] = useState(true)
@@ -1133,6 +1134,34 @@ export default function HafalanPageContent() {
       return k.startsWith(`${riwayatId}:`) && currentBlokIds.has(Number(blokId)) && data.progress[k]
     }).length
 
+  const exportQuran = async () => {
+    const kelas = kelasList.find(item => String(item.id) === kelasId)
+    if (!kelas || exporting) return
+    setExporting(true)
+    try {
+      const result = await getQuranExportRows(kelasId)
+      if (!result.rows) {
+        toast.error(result.error)
+        return
+      }
+      const XLSX = await import('xlsx')
+      const sheet = XLSX.utils.aoa_to_sheet([
+        ['NIS', 'Nama Santri', 'Surat', 'Ayat Awal', 'Sampai Ayat', 'Status'],
+        ...result.rows,
+      ])
+      sheet['!cols'] = [14, 32, 20, 12, 14, 34].map(wch => ({ wch }))
+      sheet['!autofilter'] = { ref: `A1:F${result.rows.length + 1}` }
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, sheet, 'Hafalan Al-Quran')
+      const kelasFilename = kelas.nama_kelas.replace(/[^\p{L}\p{N}_-]+/gu, '_')
+      XLSX.writeFile(workbook, `Hafalan_Al-Quran_${kelasFilename}.xlsx`)
+    } catch {
+      toast.error('Ekspor Excel gagal. Coba lagi.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (loading) return <div className="py-20 text-center text-slate-400"><Loader2 className="mx-auto h-7 w-7 animate-spin" /></div>
 
   return (
@@ -1147,10 +1176,23 @@ export default function HafalanPageContent() {
             <ArrowLeft className="h-4 w-4" />
             {step === 'santri' ? 'Jenis Hafalan' : step === 'bab' ? 'Daftar Santri' : selectedType.label}
           </button>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <Crumb on>{selectedType.label.replace('Hafalan ', '')}</Crumb>
-            {selectedSantri && <><Sep /><Crumb on={step !== 'santri'}>{selectedSantri.nama}</Crumb></>}
-            {selectedBab && step === 'blok' && <><Sep /><span className="font-bold text-slate-900" dir="rtl" style={{ fontFamily: isQuran ? QURAN_FONT : ARABIC_FONT }}>{selectedBab.judul}</span></>}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+              <Crumb on>{selectedType.label.replace('Hafalan ', '')}</Crumb>
+              {selectedSantri && <><Sep /><Crumb on={step !== 'santri'}>{selectedSantri.nama}</Crumb></>}
+              {selectedBab && step === 'blok' && <><Sep /><span className="font-bold text-slate-900" dir="rtl" style={{ fontFamily: isQuran ? QURAN_FONT : ARABIC_FONT }}>{selectedBab.judul}</span></>}
+            </div>
+            {isQuran && step === 'santri' && (
+              <button
+                type="button"
+                onClick={exportQuran}
+                disabled={exporting}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 text-sm font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+              >
+                {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                {exporting ? 'Menyiapkan Excel…' : 'Ekspor Excel Kelas'}
+              </button>
+            )}
           </div>
         </div>
       )}

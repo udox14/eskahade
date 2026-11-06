@@ -13,8 +13,10 @@ import {
   getSantriForKelas,
   HAFALAN_TYPES,
   isHafalanType,
+  QURAN_SURAHS,
 } from '@/lib/akademik/guru-access'
 import { resolveHafalanText } from '@/lib/hafalan/text'
+import { buildQuranExportRows } from './_quran-export'
 
 export async function getHafalanInitialData() {
   const session = await getSession()
@@ -183,7 +185,7 @@ export async function getHafalanInputData(kelasId: string, jenis: string) {
     if (!riwayatId) continue
     const key = `${riwayatId}:${row.blok_id}`
     progress[key] = true
-    progressStatus[key] = row.status
+    if (jenis !== 'quran' || progressStatus[key] !== 'hafal') progressStatus[key] = row.status
     progressEditable[key] = !!progressEditable[key] || row.marhalah_id === kelas.marhalah_id
     const words = parseWords(row.highlight)
     if (words.length) {
@@ -195,6 +197,12 @@ export async function getHafalanInputData(kelasId: string, jenis: string) {
     }
   }
   return { santri, bab, progress, progressStatus, progressEditable, progressHighlight, progressHighlightLocked, editableBlokIds }
+}
+
+export async function getQuranExportRows(kelasId: string) {
+  const data = await getHafalanInputData(kelasId, 'quran')
+  if (!data.santri.length || !data.bab.length) return { error: 'Data hafalan Al-Qur’an untuk kelas ini tidak tersedia.' }
+  return buildQuranExportRows(data, QURAN_SURAHS)
 }
 
 export async function simpanHafalanProgressBatch(payload: {
