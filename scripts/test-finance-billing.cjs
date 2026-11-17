@@ -1,5 +1,6 @@
 // Behavioral checks against the real finance migrations and the explicit-DB issuance runtime.
 const assert=require('node:assert/strict'),fs=require('node:fs');
+const {mock}=require('node:test');
 const {harness}=require('./finance-remediation-fixture.cjs');
 const h=harness();
 const {createBillingIssuance}=h.load('lib/finance/billing-issuance.ts');
@@ -357,4 +358,6 @@ async function main(){
  });
  console.log(`ALL ${count} BILLING TESTS PASSED`)
 }
-main().catch(error=>{console.error(error);process.exitCode=1});
+// Server actions use the current WIB month. Keep it aligned with fixture dates.
+mock.timers.enable({apis:['Date'],now:at});
+main().catch(error=>{console.error(error);process.exitCode=1}).finally(()=>mock.timers.reset());
