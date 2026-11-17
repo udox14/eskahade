@@ -1,5 +1,5 @@
 import { batch, execute, query, queryOne } from '@/lib/db'
-import { ehbActiveClassRosterCte, ehbParticipantsCte } from './ehb-participants'
+import { ehbParticipantsCte } from './ehb-participants'
 import {
   getHariIndexFromDate,
 } from '@/lib/akademik/guru-jadwal'
@@ -296,10 +296,7 @@ function dedupeAssignmentsForHonor(rows: GuruKitabAssignmentRow[]) {
   return deduped
 }
 
-export async function getGuruKitabResolvedForEhb(
-  eventId: number,
-  roster: 'mapped' | 'active-class' = 'mapped',
-): Promise<GuruKitabResolvedRow[]> {
+export async function getGuruKitabResolvedForEhb(eventId: number): Promise<GuruKitabResolvedRow[]> {
   await ensureGuruKitabSchema()
   const event = await queryOne<{ tahun_ajaran_id: number }>('SELECT tahun_ajaran_id FROM ehb_event WHERE id = ?', [eventId])
   if (!event?.tahun_ajaran_id) return []
@@ -308,10 +305,8 @@ export async function getGuruKitabResolvedForEhb(
     'tanggal' | 'sesi_id' | 'sesi_label' | 'kelas_id' | 'nama_kelas' | 'marhalah_id' |
     'marhalah_nama' | 'mapel_id' | 'mapel_nama' | 'jumlah_santri'
   >>(`
-    WITH ${roster === 'active-class' ? ehbActiveClassRosterCte : ehbParticipantsCte}, participant_counts AS (
-      SELECT kelas_id, COUNT(*) AS jumlah_santri
-      FROM ${roster === 'active-class' ? 'active_class_roster' : 'ehb_participants'}
-      GROUP BY kelas_id
+    WITH ${ehbParticipantsCte}, participant_counts AS (
+      SELECT kelas_id, COUNT(*) AS jumlah_santri FROM ehb_participants GROUP BY kelas_id
     )
     SELECT
       j.tanggal, j.sesi_id, j.kelas_id, j.mapel_id, s.label AS sesi_label,

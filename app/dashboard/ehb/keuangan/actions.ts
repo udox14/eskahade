@@ -6,7 +6,7 @@ import { assertFeature } from '@/lib/auth/feature'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
 import { getGuruKitabResolvedForEhb } from '@/lib/akademik/guru-kitab'
-import { ehbActiveClassRosterCte } from '@/lib/akademik/ehb-participants'
+import { ehbParticipantsCte } from '@/lib/akademik/ehb-participants'
 import { linkedRabItemsSql, normalizeRabSave, rabWriteStatements, type RabSaveRequest } from './rab-write'
 
 export type ActiveEvent = {
@@ -145,16 +145,22 @@ export type HonorPanitiaInput = {
   keterangan?: string | null
 }
 
-type SantriPerMarhalah = {
+export type PemeriksaanBasis = {
   marhalah_id: number | null
+  marhalah_nama: string
   jumlah_santri: number
+  jumlah_mapel: number
+  jumlah_hasil: number
 }
 
 export type RabAutoBasis = {
-  jumlahSantriAktif: number
+  totalHasilUjian: number
+  totalPemeriksaan: number
+  jumlahKelasPeserta: number
   rekomendasiRim: number
   pembuatanSoal: number
-  santriPerMarhalah: SantriPerMarhalah[]
+  pemeriksaan: PemeriksaanBasis[]
+  raporSantri: number
   totalSesiEhb: number
   jumlahPanitia: number
   jumlahPengawas: number
@@ -486,15 +492,32 @@ export async function getRabTemplate(eventId: number, sourceId: number) {
 }
 
 async function getRabAutoBasis(eventId: number): Promise<RabAutoBasis> {
-  const [santriRow, santriPerMarhalah, sesiRow, panitiaRow, pengawasRow, soalRow] = await Promise.all([
-    queryOne<{ total: number }>("SELECT COUNT(*) AS total FROM santri WHERE status_global = 'aktif'"),
-    query<SantriPerMarhalah>(`
-      WITH ${ehbActiveClassRosterCte}
-      SELECT k.marhalah_id, COUNT(*) AS jumlah_santri
-      FROM active_class_roster p
+  const [pemeriksaan, raporRow, sesiRow, panitiaRow, pengawasRow, soalRow, pemeriksaanResolved] = await Promise.all([
+    query<PemeriksaanBasis>(`
+      WITH ${ehbParticipantsCte}, exam_packages AS (
+        SELECT DISTINCT kelas_id, mapel_id FROM ehb_jadwal WHERE ehb_event_id = ?
+      )
+      SELECT
+        m.id as marhalah_id,
+        COALESCE(m.nama, 'Tanpa Marhalah') as marhalah_nama,
+        COUNT(DISTINCT p.santri_id) as jumlah_santri,
+        COUNT(DISTINCT j.mapel_id) as jumlah_mapel,
+        COUNT(*) as jumlah_hasil
+      FROM ehb_participants p
       JOIN kelas k ON k.id = p.kelas_id
-      GROUP BY k.marhalah_id
-    `, [eventId]),
+      JOIN marhalah m ON m.id = k.marhalah_id
+      JOIN exam_packages j ON j.kelas_id = k.id
+      GROUP BY m.id, m.nama, m.urutan
+      ORDER BY m.urutan
+    `, [eventId, eventId]),
+    queryOne<{ total: number; kelas: number }>(`
+      WITH ${ehbParticipantsCte}
+      SELECT COUNT(DISTINCT CASE WHEN m.nama NOT LIKE '%Mutawassithah%' THEN p.santri_id END) AS total,
+        (SELECT COUNT(*) FROM ehb_kelas_jam WHERE ehb_event_id = ?) AS kelas
+      FROM ehb_participants p
+      JOIN kelas k ON k.id = p.kelas_id
+      JOIN marhalah m ON m.id = k.marhalah_id
+    `, [eventId, eventId]),
     queryOne<{ total: number }>(`
       SELECT COUNT(*) as total
       FROM (
@@ -526,14 +549,32 @@ async function getRabAutoBasis(eventId: number): Promise<RabAutoBasis> {
         WHERE j.ehb_event_id = ?
       )
     `, [eventId]),
+    getGuruKitabResolvedForEhb(eventId),
   ])
 
-  const jumlahSantriAktif = Number(santriRow?.total ?? 0)
+  const totalHasilUjian = pemeriksaan.reduce((sum, item) => sum + Number(item.jumlah_hasil || 0), 0)
+  // Budget each exam package once, plus any additional assigned examiners.
+  const countedPackages = new Set<string>()
+  let totalPemeriksaan = totalHasilUjian
+  for (const item of pemeriksaanResolved) {
+    const key = `${item.kelas_id}|${item.mapel_id}`
+    if (countedPackages.has(key)) totalPemeriksaan += item.jumlah_santri
+    countedPackages.add(key)
+  }
+
   return {
-    jumlahSantriAktif,
-    rekomendasiRim: Math.ceil(jumlahSantriAktif / 500),
+    totalHasilUjian,
+    totalPemeriksaan,
+    jumlahKelasPeserta: Number(raporRow?.kelas || 0),
+    rekomendasiRim: Math.max(1, Math.ceil(totalHasilUjian / 500)),
     pembuatanSoal: Number(soalRow?.total || 0),
-    santriPerMarhalah,
+    pemeriksaan: pemeriksaan.map(item => ({
+      ...item,
+      jumlah_santri: Number(item.jumlah_santri || 0),
+      jumlah_mapel: Number(item.jumlah_mapel || 0),
+      jumlah_hasil: Number(item.jumlah_hasil || 0),
+    })),
+    raporSantri: Number(raporRow?.total || 0),
     totalSesiEhb: Number(sesiRow?.total || 0),
     jumlahPanitia: Number(panitiaRow?.total || 0),
     jumlahPengawas: Number(pengawasRow?.total || 0),
@@ -884,8 +925,7 @@ export async function getHonorDetailData(eventId: number) {
     tarifLoad,
     getHonorMapelConfig(eventId),
     queryOne<{ hasClasses: number; hasSchedule: number }>(`
-      WITH ${ehbActiveClassRosterCte}
-      SELECT EXISTS (SELECT 1 FROM active_class_roster) AS hasClasses,
+      SELECT EXISTS (SELECT 1 FROM ehb_kelas_jam WHERE ehb_event_id = ?) AS hasClasses,
         EXISTS (SELECT 1 FROM ehb_jadwal WHERE ehb_event_id = ?) AS hasSchedule
     `, [eventId, eventId]),
     tarifLoad.then(tarif => getHonorItems(eventId, tarif)),
@@ -909,14 +949,14 @@ async function getHonorItems(eventId: number, tarif: HonorTarif): Promise<HonorI
       ORDER BY nama
     `, [eventId]),
     query<{ wali_id: string | null; nama: string; qty: number; detail: string }>(`
-      WITH ${ehbActiveClassRosterCte}
+      WITH ${ehbParticipantsCte}
       SELECT
         COALESCE('guru:' || CASE WHEN u.source_type = 'guru' THEN u.source_ref_id END,
           k.wali_kelas_id, 'guru:' || dg.id) AS wali_id,
         COALESCE(MAX(u.full_name), MAX(dg.nama_lengkap), 'Wali kelas belum diatur') as nama,
         COUNT(DISTINCT p.santri_id) as qty,
         GROUP_CONCAT(DISTINCT k.nama_kelas) as detail
-      FROM active_class_roster p
+      FROM ehb_participants p
       JOIN kelas k ON k.id = p.kelas_id
       JOIN marhalah m ON m.id = k.marhalah_id
       LEFT JOIN users u ON u.id = k.wali_kelas_id
@@ -925,7 +965,7 @@ async function getHonorItems(eventId: number, tarif: HonorTarif): Promise<HonorI
       GROUP BY wali_id
       ORDER BY nama
     `, [eventId]),
-    getGuruKitabResolvedForEhb(eventId, 'active-class'),
+    getGuruKitabResolvedForEhb(eventId),
     query<{ pengawas_id: number | null; guru_id: number | null; nama: string; qty: number; detail: string }>(`
       WITH hadir AS (
         SELECT

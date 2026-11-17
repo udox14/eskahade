@@ -178,7 +178,7 @@ function systemRabRows(basis: RabAutoBasis): RabItemInput[] {
       nama_barang: 'Kertas HVS',
       qty: basis.rekomendasiRim,
       harga: 0,
-      keterangan: 'Estimasi 1 lembar per santri aktif, 500 lembar per rim.',
+      keterangan: `Rekomendasi sistem: ${basis.totalHasilUjian.toLocaleString('id-ID')} lembar hasil ujian / 500 = ${basis.rekomendasiRim} rim`,
       is_system: 1,
       system_key: 'atk_hvs',
       urutan: 1,
@@ -188,7 +188,7 @@ function systemRabRows(basis: RabAutoBasis): RabItemInput[] {
       nama_barang: 'Kertas Buram',
       qty: basis.rekomendasiRim,
       harga: 0,
-      keterangan: 'Estimasi 1 lembar per santri aktif, 500 lembar per rim.',
+      keterangan: `Rekomendasi sistem: ${basis.totalHasilUjian.toLocaleString('id-ID')} lembar hasil ujian / 500 = ${basis.rekomendasiRim} rim`,
       is_system: 1,
       system_key: 'atk_buram',
       urutan: 2,
@@ -206,9 +206,9 @@ function systemRabRows(basis: RabAutoBasis): RabItemInput[] {
     {
       kategori: 'honorarium',
       nama_barang: 'Insentif Pemeriksaan Hasil EHB',
-      qty: basis.jumlahSantriAktif,
+      qty: basis.totalPemeriksaan,
       harga: 0,
-      keterangan: 'Estimasi 1 pemeriksaan per santri aktif.',
+      keterangan: `Total ${basis.totalPemeriksaan.toLocaleString('id-ID')} hasil ujian untuk diperiksa.`,
       is_system: 1,
       system_key: 'honor_pemeriksaan_hasil',
       urutan: 10,
@@ -216,9 +216,9 @@ function systemRabRows(basis: RabAutoBasis): RabItemInput[] {
     {
       kategori: 'honorarium',
       nama_barang: 'Insentif Pengisian Rapor',
-      qty: basis.jumlahSantriAktif,
+      qty: basis.raporSantri,
       harga: 0,
-      keterangan: 'Estimasi 1 rapor per santri aktif.',
+      keterangan: 'Jumlah santri selain Mutawassithah.',
       is_system: 1,
       system_key: 'honor_pengisian_rapor',
       urutan: 50,
@@ -255,8 +255,8 @@ function getSystemRabQuantities(basis: RabAutoBasis) {
   for (const row of systemRabRows(basis)) {
     if (row.system_key) quantities.set(row.system_key, row.qty)
   }
-  for (const row of basis.santriPerMarhalah) {
-    if (row.marhalah_id !== null) quantities.set(`honor_pemeriksaan_${row.marhalah_id}`, row.jumlah_santri)
+  for (const row of basis.pemeriksaan) {
+    if (row.marhalah_id !== null) quantities.set(`honor_pemeriksaan_${row.marhalah_id}`, row.jumlah_hasil)
   }
   return quantities
 }
@@ -1679,18 +1679,13 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab', cacheScope }
 
   const redetectQtyRecommendation = () => {
     if (!basis || !rabEditor) return
-    const systemNotes = new Map(systemRabRows(basis).map(item => [item.system_key, item.keterangan]))
     rabEditor.editDrafts(current => {
       let changed = false
       const next = current.map(item => {
         const qty = recommendedQty(systemQty, item.system_key)
-        if (qty === undefined) return item
-        const note = item.keterangan ?? ''
-        const legacyNote = /^(Rekomendasi sistem: [\d.]+ lembar hasil ujian \/ 500 = \d+ rim|Total [\d.]+ hasil ujian (untuk diperiksa|dari seluruh marhalah)\.|Jumlah santri selain Mutawassithah\.)$/
-        const keterangan = legacyNote.test(note) ? systemNotes.get(item.system_key) ?? item.keterangan : item.keterangan
-        if (qty === item.qty && keterangan === item.keterangan) return item
+        if (qty === undefined || qty === item.qty) return item
         changed = true
-        return { ...item, qty, keterangan }
+        return { ...item, qty }
       })
       if (!changed) toast.info('QTY RAB sudah sesuai rekomendasi')
       return changed ? next : current
@@ -2081,7 +2076,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab', cacheScope }
             <div className="px-5 py-4 border-b bg-slate-50">
               <h2 className="font-bold text-slate-800">Daftar Rincian Honor</h2>
               <p className="text-sm text-slate-500">Rekap per penerima dalam format tabel ringkas.</p>
-              {honorSetup && !honorSetup.hasClasses && <p className="mt-1 text-sm text-amber-800">Tetapkan kelas santri pada tahun ajaran event untuk menampilkan rincian honor per guru.</p>}
+              {honorSetup && !honorSetup.hasClasses && <p className="mt-1 text-sm text-amber-800">Atur kelas peserta di Jadwal EHB untuk menghitung honor rapor dan pemeriksaan.</p>}
               {honorSetup?.hasClasses && !honorSetup.hasSchedule ? (
                 <p className="mt-1 text-sm text-amber-800">Atur jadwal mapel EHB untuk menghitung honor pemeriksaan.</p>
               ) : null}
@@ -2507,7 +2502,10 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab', cacheScope }
               {drafts.some(item => !item.nama_barang.trim()) && (
                 <p className="text-sm text-indigo-700">Baris tanpa nama masih berupa draf.</p>
               )}
-              {basis && <p className="text-sm text-indigo-700">Basis estimasi kertas, pemeriksaan, dan rapor: {basis.jumlahSantriAktif.toLocaleString('id-ID')} santri aktif.</p>}
+              {basis?.jumlahKelasPeserta === 0 && <p className="text-sm text-amber-800">Atur kelas peserta di Jadwal EHB untuk menghitung QTY.</p>}
+              {basis && basis.jumlahKelasPeserta > 0 && basis.totalSesiEhb === 0 && (
+                <p className="text-sm text-amber-800">Atur jadwal mapel EHB untuk menghitung QTY berdasarkan ujian.</p>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               {rabState?.status === 'error' && (
