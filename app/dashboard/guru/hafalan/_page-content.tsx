@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { GuruExportButton } from '@/components/akademik/guru-export-button'
 import {
   getAvailableHafalanTypes, getHafalanInitialData, getHafalanInputData, getQuranExportRows,
   simpanHafalanHighlightBatch, simpanHafalanProgressBatch,
@@ -68,6 +69,8 @@ export default function HafalanPageContent() {
   const [dirty, setDirty] = useState(false)
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [atScrollTop, setAtScrollTop] = useState(true)
@@ -162,19 +165,33 @@ export default function HafalanPageContent() {
   }
 
   useEffect(() => {
+    let active = true
+    setLoading(true)
+    setLoadError(false)
+    const timeout = setTimeout(() => {
+      active = false
+      setLoadError(true)
+      setLoading(false)
+    }, 20000)
     getHafalanInitialData().then(res => {
+      if (!active) return
       setKelasList(res.kelas)
       let cachedKelasId = ''
       try { cachedKelasId = localStorage.getItem('hafalan-selected-kelas') || '' } catch {}
       const availableKelasIds = res.kelas.map((kelas: any) => String(kelas.id))
       if (res.kelas.length === 1) setKelasId(String(res.kelas[0].id))
       else if (cachedKelasId && availableKelasIds.includes(cachedKelasId)) setKelasId(cachedKelasId)
-      setLoading(false)
+    }).catch(() => {
+      if (active) setLoadError(true)
+    }).finally(() => {
+      clearTimeout(timeout)
+      if (active) setLoading(false)
     })
-  }, [])
+    return () => { active = false; clearTimeout(timeout) }
+  }, [loadAttempt])
 
   useEffect(() => {
-    if (loading || historyReadyRef.current) return
+    if (loading || loadError || historyReadyRef.current) return
     if (!readHafalanHistory()) {
       writeHafalanHistory({
         kelasId,
@@ -185,7 +202,7 @@ export default function HafalanPageContent() {
       }, true)
     }
     historyReadyRef.current = true
-  }, [kelasId, loading])
+  }, [kelasId, loading, loadError])
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
@@ -1163,25 +1180,41 @@ export default function HafalanPageContent() {
   }
 
   if (loading) return <div className="py-20 text-center text-slate-400"><Loader2 className="mx-auto h-7 w-7 animate-spin" /></div>
+  if (loadError) return (
+    <div role="alert" className="py-20 text-center">
+      <p className="text-sm text-slate-500">Data hafalan belum berhasil dimuat. Silakan coba lagi.</p>
+      <button type="button" onClick={() => setLoadAttempt(value => value + 1)} className="mt-3 text-sm font-semibold text-emerald-700">Coba lagi</button>
+    </div>
+  )
+
+  const exportAction = <GuruExportButton module="hafalan" kelasId={kelasId}
+    kelasNama={kelasList.find(k => String(k.id) === kelasId)?.nama_kelas ?? ''}
+    tahunAjaran={kelasList.find(k => String(k.id) === kelasId)?.tahun_ajaran_nama ?? ''}
+    jenis={selectedType?.key}
+    getBlocked={() => dirty || saving || saveStatus === 'error' ||
+      autosaveInFlightRef.current.size > 0 || Array.from(pendingChangesRef.current.values()).some(p => p.size > 0)} />
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 pb-28">
       {step === 'home' && (
-        <DashboardPageHeader title="Hafalan" description="Pilih jenis hafalan, lalu santri, lalu tandai bagian yang sudah dihafal." />
+        <DashboardPageHeader title="Hafalan" description="Pilih jenis hafalan, lalu santri, lalu tandai bagian yang sudah dihafal."
+          action={kelasId ? exportAction : undefined} className="flex-row [&>div:last-child]:w-auto" />
       )}
 
       {step !== 'home' && (
-        <div className="-mx-4 -mt-4 mb-4 border-b border-slate-100 bg-white px-4 pb-3 pt-2 md:-mx-8 md:-mt-8 md:px-8">
-          <button onClick={goBack} className="mb-1.5 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700">
-            <ArrowLeft className="h-4 w-4" />
-            {step === 'santri' ? 'Jenis Hafalan' : step === 'bab' ? 'Daftar Santri' : selectedType.label}
-          </button>
-          <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="-mx-4 -mt-4 mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 bg-white px-4 pb-3 pt-2 md:-mx-8 md:-mt-8 md:px-8">
+          <div className="min-w-0">
+            <button onClick={goBack} className="mb-1.5 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700">
+              <ArrowLeft className="h-4 w-4" />
+              {step === 'santri' ? 'Jenis Hafalan' : step === 'bab' ? 'Daftar Santri' : selectedType.label}
+            </button>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
               <Crumb on>{selectedType.label.replace('Hafalan ', '')}</Crumb>
               {selectedSantri && <><Sep /><Crumb on={step !== 'santri'}>{selectedSantri.nama}</Crumb></>}
               {selectedBab && step === 'blok' && <><Sep /><span className="font-bold text-slate-900" dir="rtl" style={{ fontFamily: isQuran ? QURAN_FONT : ARABIC_FONT }}>{selectedBab.judul}</span></>}
             </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
             {isQuran && step === 'santri' && (
               <button
                 type="button"
@@ -1190,9 +1223,10 @@ export default function HafalanPageContent() {
                 className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 text-sm font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
               >
                 {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                {exporting ? 'Menyiapkan Excel…' : 'Ekspor Excel Kelas'}
+                {exporting ? 'Menyiapkan Excel…' : 'Ekspor Ringkasan Al-Quran'}
               </button>
             )}
+            {exportAction}
           </div>
         </div>
       )}

@@ -20,7 +20,8 @@
     "test:pengajian-photos": "node scripts/test-pengajian-photos.cjs",
     "test:finance:billing": "node scripts/test-finance-billing.cjs",
     "test:finance:billing:d1": "node scripts/test-finance-billing-d1.cjs",
-    "test:supervisi": "node scripts/test-supervisi.cjs"
+    "test:supervisi": "node scripts/test-supervisi.cjs",
+    "test:guru-export": "node scripts/test-guru-export.cjs"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "latest",

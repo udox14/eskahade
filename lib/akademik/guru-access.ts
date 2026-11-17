@@ -212,6 +212,31 @@ export async function ensureGuruFeatureSchema() {
 }
 
 async function ensureGuruFeatureSchemaOnce() {
+  // On cold Workers, inspect metadata once instead of replaying DDL, failed
+  // ALTERs and data backfills on the page's critical path. Keep the legacy
+  // bootstrap below for databases that have not received migrations 0076–0080.
+  const schema = await queryOne<{ ready: number }>(`
+    SELECT (
+      (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (
+        'nilai_harian_sesi', 'nilai_harian_detail', 'hafalan_paket',
+        'hafalan_paket_marhalah', 'hafalan_bab', 'hafalan_blok', 'hafalan_progress'
+      )) = 7
+      AND (SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name IN (
+        'idx_nilai_harian_sesi_kelas', 'idx_nilai_harian_detail_sesi',
+        'idx_hafalan_paket_lookup', 'idx_hafalan_paket_marhalah_lookup',
+        'idx_hafalan_bab_lookup', 'idx_hafalan_bab_paket', 'idx_hafalan_bab_parent',
+        'idx_hafalan_blok_bab', 'idx_hafalan_blok_ref',
+        'idx_hafalan_progress_riwayat', 'idx_hafalan_progress_santri', 'idx_hafalan_progress_scope'
+      )) = 12
+      AND (SELECT COUNT(*) FROM pragma_table_info('hafalan_bab')
+        WHERE name IN ('parent_id', 'paket_id')) = 2
+      AND (SELECT COUNT(*) FROM pragma_table_info('hafalan_blok') WHERE name = 'ref') = 1
+      AND (SELECT COUNT(*) FROM pragma_table_info('hafalan_progress')
+        WHERE name IN ('santri_id', 'kelas_id', 'marhalah_id', 'highlight')) = 4
+    ) AS ready
+  `)
+  if (schema?.ready === 1) return
+
   await execute(`
     CREATE TABLE IF NOT EXISTS nilai_harian_sesi (
       id TEXT PRIMARY KEY,
