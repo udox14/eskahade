@@ -1,11 +1,13 @@
 'use server'
 
-import { batch, execute, query, queryOne } from '@/lib/db'
+import { batch, execute, getDB, query, queryOne } from '@/lib/db'
 import { getSession } from '@/lib/auth/session'
+import { assertFeature } from '@/lib/auth/feature'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
-import { backfillManualWaliKelasFromGuruMaghrib } from '@/lib/akademik/wali-kelas-sync'
 import { getGuruKitabResolvedForEhb } from '@/lib/akademik/guru-kitab'
+import { ehbParticipantsCte } from '@/lib/akademik/ehb-participants'
+import { linkedRabItemsSql, normalizeRabSave, rabWriteStatements, type RabSaveRequest } from './rab-write'
 
 export type ActiveEvent = {
   id: number
@@ -18,6 +20,7 @@ export type RabKategori = 'atk_administrasi' | 'konsumsi' | 'honorarium'
 
 export type RabItem = {
   id: number
+  client_key?: string | null
   ehb_event_id: number
   kategori: RabKategori
   nama_barang: string
@@ -152,6 +155,8 @@ export type PemeriksaanBasis = {
 
 export type RabAutoBasis = {
   totalHasilUjian: number
+  totalPemeriksaan: number
+  jumlahKelasPeserta: number
   rekomendasiRim: number
   pembuatanSoal: number
   pemeriksaan: PemeriksaanBasis[]
@@ -159,6 +164,14 @@ export type RabAutoBasis = {
   totalSesiEhb: number
   jumlahPanitia: number
   jumlahPengawas: number
+}
+
+const KEUANGAN_HREF = '/dashboard/ehb/keuangan'
+
+async function requireKeuanganAccess() {
+  const session = await assertFeature(KEUANGAN_HREF)
+  if ('error' in session) throw new Error(session.error)
+  return session
 }
 
 let keuanganSchemaReady: Promise<void> | null = null
@@ -360,20 +373,19 @@ async function ensureKeuanganSchemaOnce() {
 }
 
 export async function getActiveEventForKeuangan() {
-  await ensureKeuanganSchema()
+  await requireKeuanganAccess()
   return queryOne<ActiveEvent>(`
     SELECT e.id, e.nama, e.semester, ta.nama as tahun_ajaran_nama
     FROM ehb_event e
     JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
     WHERE e.is_active = 1
+    ORDER BY e.id DESC
     LIMIT 1
   `)
 }
 
-export async function getRabItems(eventId: number) {
-  await ensureKeuanganSchema()
-  return query<RabItem>(`
-    SELECT id, ehb_event_id, kategori, nama_barang, qty, harga, keterangan, is_system, system_key, urutan
+const rabRowsSql = `
+    SELECT id, client_key, ehb_event_id, kategori, nama_barang, qty, harga, keterangan, is_system, system_key, urutan
     FROM ehb_rab_item
     WHERE ehb_event_id = ?
     ORDER BY
@@ -384,8 +396,10 @@ export async function getRabItems(eventId: number) {
       END,
       urutan,
       id
-  `, [eventId])
-}
+`
+
+const rabRevisionSql = 'SELECT revision, request_id, request_hash FROM ehb_rab_revision WHERE ehb_event_id = ?'
+type RabRevision = { revision: string; request_id: string; request_hash: string }
 
 export async function getKetuaPelaksanaName(eventId: number) {
   await ensureKeuanganSchema()
@@ -398,60 +412,112 @@ export async function getKetuaPelaksanaName(eventId: number) {
   return row?.nama || ''
 }
 
-export async function getKeuanganSigners(eventId: number): Promise<KeuanganSigners> {
-  await ensureKeuanganSchema()
-  const [panitiaRows, signerRows] = await Promise.all([
-    query<{ jabatan_key: string; nama: string }>(`
+const panitiaSignersSql = `
     SELECT jabatan_key, nama
     FROM ehb_panitia
     WHERE ehb_event_id = ? AND tipe = 'inti' AND jabatan_key IN ('ketua', 'bendahara')
-    `, [eventId]),
-    query<{ role: string; nama: string }>(`
-      SELECT role, nama
-      FROM ehb_keuangan_signer
-      WHERE ehb_event_id = ?
-    `, [eventId]),
-  ])
+`
+const savedSignersSql = 'SELECT role, nama FROM ehb_keuangan_signer WHERE ehb_event_id = ?'
+
+function resolveSigners(
+  panitiaRows: { jabatan_key: string; nama: string }[],
+  signerRows: { role: string; nama: string }[],
+): KeuanganSigners {
   const saved = new Map(signerRows.map(row => [row.role, row.nama]))
   const ketuaPanitia = panitiaRows.find(row => row.jabatan_key === 'ketua')?.nama || ''
   const bendaharaPanitia = panitiaRows.find(row => row.jabatan_key === 'bendahara')?.nama || ''
 
   return {
-    ketua: saved.get('ketua') || ketuaPanitia,
-    bendahara: saved.get('bendahara') || bendaharaPanitia,
+    ketua: saved.get('ketua') ?? ketuaPanitia,
+    bendahara: saved.get('bendahara') ?? bendaharaPanitia,
     wakil_akademik: saved.get('wakil_akademik') || '',
     wakil_keuangan: saved.get('wakil_keuangan') || '',
   }
 }
 
-export async function getRabAutoBasis(eventId: number): Promise<RabAutoBasis> {
-  await ensureKeuanganSchema()
+async function getRabSnapshot(eventId: number) {
+  const db = await getDB()
+  const [rows, revision, panitia, signers] = await db.batch([
+    db.prepare(rabRowsSql).bind(eventId),
+    db.prepare(rabRevisionSql).bind(eventId),
+    db.prepare(panitiaSignersSql).bind(eventId),
+    db.prepare(savedSignersSql).bind(eventId),
+  ])
+  return {
+    rows: rows.results as RabItem[],
+    revision: (revision.results[0] as RabRevision | undefined)?.revision ?? '',
+    signers: resolveSigners(
+      panitia.results as { jabatan_key: string; nama: string }[],
+      signers.results as { role: string; nama: string }[],
+    ),
+  }
+}
 
-  const [pemeriksaan, raporRow, sesiRow, panitiaRow, pengawasRow, soalRow] = await Promise.all([
+export async function getRabData(eventId: number) {
+  await requireKeuanganAccess()
+  await ensureKeuanganSchema()
+  const [snapshot, autoBasis] = await Promise.all([getRabSnapshot(eventId), getRabAutoBasis(eventId)])
+  return { snapshot, autoBasis }
+}
+
+const priorRabEventsSql = `
+    FROM ehb_event e
+    JOIN ehb_event target ON target.id = ? AND target.is_active = 1
+    JOIN tahun_ajaran ta ON ta.id = e.tahun_ajaran_id
+    WHERE e.is_active = 0
+      AND (COALESCE(e.tanggal_mulai, substr(e.created_at, 1, 10)), e.id)
+        < (COALESCE(target.tanggal_mulai, substr(target.created_at, 1, 10)), target.id)
+      AND EXISTS (SELECT 1 FROM ehb_rab_item r WHERE r.ehb_event_id = e.id)
+`
+
+export async function getPriorRabEvents(eventId: number) {
+  await requireKeuanganAccess()
+  await ensureKeuanganSchema()
+  return query<ActiveEvent>(`
+    SELECT e.id, e.nama, e.semester, ta.nama AS tahun_ajaran_nama
+    ${priorRabEventsSql}
+    ORDER BY COALESCE(e.tanggal_mulai, substr(e.created_at, 1, 10)) DESC, e.id DESC
+  `, [eventId])
+}
+
+export async function getRabTemplate(eventId: number, sourceId: number) {
+  await requireKeuanganAccess()
+  const rows = await query<Omit<RabItemInput, 'qty'>>(`
+    WITH source_event AS (SELECT e.id ${priorRabEventsSql} AND e.id = ?)
+    SELECT kategori, nama_barang, harga, keterangan, is_system, system_key, urutan
+    FROM ehb_rab_item r JOIN source_event e ON e.id = r.ehb_event_id ORDER BY r.urutan, r.id
+  `, [eventId, sourceId])
+  if (!rows.length) throw new Error('Event sumber RAB tidak tersedia.')
+  return rows
+}
+
+async function getRabAutoBasis(eventId: number): Promise<RabAutoBasis> {
+  const [pemeriksaan, raporRow, sesiRow, panitiaRow, pengawasRow, soalRow, pemeriksaanResolved] = await Promise.all([
     query<PemeriksaanBasis>(`
+      WITH ${ehbParticipantsCte}, exam_packages AS (
+        SELECT DISTINCT kelas_id, mapel_id FROM ehb_jadwal WHERE ehb_event_id = ?
+      )
       SELECT
         m.id as marhalah_id,
         COALESCE(m.nama, 'Tanpa Marhalah') as marhalah_nama,
-        COUNT(DISTINCT ps.santri_id) as jumlah_santri,
+        COUNT(DISTINCT p.santri_id) as jumlah_santri,
         COUNT(DISTINCT j.mapel_id) as jumlah_mapel,
         COUNT(*) as jumlah_hasil
-      FROM ehb_plotting_santri ps
-      JOIN riwayat_pendidikan rp ON rp.santri_id = ps.santri_id AND rp.status_riwayat = 'aktif'
-      JOIN kelas k ON k.id = rp.kelas_id
+      FROM ehb_participants p
+      JOIN kelas k ON k.id = p.kelas_id
       JOIN marhalah m ON m.id = k.marhalah_id
-      JOIN ehb_jadwal j ON j.ehb_event_id = ps.ehb_event_id AND j.kelas_id = k.id
-      WHERE ps.ehb_event_id = ?
+      JOIN exam_packages j ON j.kelas_id = k.id
       GROUP BY m.id, m.nama, m.urutan
       ORDER BY m.urutan
-    `, [eventId]),
-    queryOne<{ total: number }>(`
-      SELECT COUNT(DISTINCT ps.santri_id) as total
-      FROM ehb_plotting_santri ps
-      JOIN riwayat_pendidikan rp ON rp.santri_id = ps.santri_id AND rp.status_riwayat = 'aktif'
-      JOIN kelas k ON k.id = rp.kelas_id
+    `, [eventId, eventId]),
+    queryOne<{ total: number; kelas: number }>(`
+      WITH ${ehbParticipantsCte}
+      SELECT COUNT(DISTINCT CASE WHEN m.nama NOT LIKE '%Mutawassithah%' THEN p.santri_id END) AS total,
+        (SELECT COUNT(*) FROM ehb_kelas_jam WHERE ehb_event_id = ?) AS kelas
+      FROM ehb_participants p
+      JOIN kelas k ON k.id = p.kelas_id
       JOIN marhalah m ON m.id = k.marhalah_id
-      WHERE ps.ehb_event_id = ? AND m.nama NOT LIKE '%Mutawassithah%'
-    `, [eventId]),
+    `, [eventId, eventId]),
     queryOne<{ total: number }>(`
       SELECT COUNT(*) as total
       FROM (
@@ -483,15 +549,23 @@ export async function getRabAutoBasis(eventId: number): Promise<RabAutoBasis> {
         WHERE j.ehb_event_id = ?
       )
     `, [eventId]),
+    getGuruKitabResolvedForEhb(eventId),
   ])
 
-  const pemeriksaanResolved = await getGuruKitabResolvedForEhb(eventId)
-  const totalHasilUjianLegacy = pemeriksaan.reduce((sum, item) => sum + Number(item.jumlah_hasil || 0), 0)
-  const totalHasilUjianResolved = pemeriksaanResolved.reduce((sum, item) => sum + Number(item.jumlah_santri || 0), 0)
-  const totalHasilUjian = totalHasilUjianResolved > 0 ? totalHasilUjianResolved : totalHasilUjianLegacy
+  const totalHasilUjian = pemeriksaan.reduce((sum, item) => sum + Number(item.jumlah_hasil || 0), 0)
+  // Budget each exam package once, plus any additional assigned examiners.
+  const countedPackages = new Set<string>()
+  let totalPemeriksaan = totalHasilUjian
+  for (const item of pemeriksaanResolved) {
+    const key = `${item.kelas_id}|${item.mapel_id}`
+    if (countedPackages.has(key)) totalPemeriksaan += item.jumlah_santri
+    countedPackages.add(key)
+  }
 
   return {
     totalHasilUjian,
+    totalPemeriksaan,
+    jumlahKelasPeserta: Number(raporRow?.kelas || 0),
     rekomendasiRim: Math.max(1, Math.ceil(totalHasilUjian / 500)),
     pembuatanSoal: Number(soalRow?.total || 0),
     pemeriksaan: pemeriksaan.map(item => ({
@@ -507,85 +581,67 @@ export async function getRabAutoBasis(eventId: number): Promise<RabAutoBasis> {
   }
 }
 
-async function saveKeuanganSignersInternal(eventId: number, signers: Partial<KeuanganSigners>) {
-  const entries = ([
-    ['ketua', signers.ketua],
-    ['bendahara', signers.bendahara],
-    ['wakil_akademik', signers.wakil_akademik],
-    ['wakil_keuangan', signers.wakil_keuangan],
-  ] as const).map(([role, nama]) => ({ role, nama: nama?.trim() || '' }))
-
-  await batch(entries.map(item => ({
-    sql: `
-      INSERT INTO ehb_keuangan_signer (ehb_event_id, role, nama, updated_at)
-      VALUES (?, ?, ?, datetime('now'))
-      ON CONFLICT(ehb_event_id, role) DO UPDATE SET
-        nama = excluded.nama,
-        updated_at = datetime('now')
-    `,
-    params: [eventId, item.role, item.nama],
-  })))
-}
-
-export async function saveRabItems(eventId: number, items: RabItemInput[], signers?: Partial<KeuanganSigners>) {
-  const session = await getSession()
-  if (!session) return { error: 'Unauthorized' }
-  await ensureKeuanganSchema()
-
-  const cleanItems = items
-    .map((item, index) => ({
-      ...item,
-      nama_barang: item.nama_barang.trim(),
-      qty: Number.isFinite(Number(item.qty)) ? Number(item.qty) : 0,
-      harga: Math.max(0, Math.round(Number(item.harga) || 0)),
-      keterangan: item.keterangan?.trim() || null,
-      is_system: item.is_system ? 1 : 0,
-      urutan: item.urutan ?? index + 1,
-    }))
-    .filter(item => item.nama_barang)
-
-  await execute(`DELETE FROM ehb_rab_item WHERE ehb_event_id = ?`, [eventId])
-
-  if (cleanItems.length > 0) {
-    await batch(cleanItems.map(item => ({
-      sql: `
-        INSERT INTO ehb_rab_item
-          (ehb_event_id, kategori, nama_barang, qty, harga, keterangan, is_system, system_key, urutan)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      params: [
-        eventId,
-        item.kategori,
-        item.nama_barang,
-        item.qty,
-        item.harga,
-        item.keterangan,
-        item.is_system,
-        item.system_key ?? null,
-        item.urutan,
-      ],
-    })))
+export async function saveRabItems(eventId: number, actorId: string, request: RabSaveRequest) {
+  const session = await assertFeature(KEUANGAN_HREF)
+  if ('error' in session) return { ok: false as const, error: session.error }
+  if (session.id !== actorId) return { ok: false as const, error: 'Sesi RAB sudah berubah. Muat ulang halaman.' }
+  if (!Number.isSafeInteger(eventId) || eventId <= 0) {
+    return { ok: false as const, error: 'Event RAB tidak valid.' }
   }
-
-  if (signers) await saveKeuanganSignersInternal(eventId, signers)
-
-  revalidatePath('/dashboard/ehb/keuangan')
-  await logActivity({
-    actor: actorFromSession(session),
-    module: 'ehb_keuangan',
-    action: 'update',
-    fiturHref: '/dashboard/ehb/keuangan',
-    logKind: 'update',
-    entityType: 'ehb_rab_batch',
-    entityId: String(eventId),
-    entityLabel: 'RAB EHB',
-    summary: `Menyimpan ${cleanItems.length} item RAB EHB`,
-    details: { event_id: eventId, total_items: cleanItems.length },
-  })
-  return { success: true, saved: cleanItems.length }
+  let changes: ReturnType<typeof normalizeRabSave>
+  try {
+    changes = normalizeRabSave(request)
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : 'Perubahan RAB tidak valid.' }
+  }
+  await ensureKeuanganSchema()
+  const db = await getDB()
+  const revision = crypto.randomUUID()
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([session.id, request.revision, changes])))
+  const hash = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('')
+  const statements = rabWriteStatements(eventId, request, changes, revision, hash)
+  const results = await db.batch([
+    ...statements.map(statement => db.prepare(statement.sql).bind(...statement.params)),
+    db.prepare(rabRevisionSql).bind(eventId),
+    db.prepare(rabRowsSql).bind(eventId),
+    db.prepare(linkedRabItemsSql + ' LIMIT 1').bind(JSON.stringify(changes.deletes)),
+    db.prepare('SELECT id FROM ehb_event WHERE id = ? AND is_active = 1').bind(eventId),
+  ])
+  const state = results[statements.length].results[0] as RabRevision | undefined
+  if (!results[statements.length + 3].results.length) {
+    return { ok: false as const, conflict: true, error: 'Event ini sudah tidak aktif. Draf RAB tetap tersedia.' }
+  }
+  if (state?.request_id !== request.requestId || state.request_hash !== hash) {
+    if (results[statements.length + 2].results.length) {
+      return { ok: false as const, error: 'Item yang dipakai di Buku Kas tidak bisa dihapus. Urungkan penghapusan atau muat ulang RAB.' }
+    }
+    return { ok: false as const, conflict: true, error: 'RAB sudah berubah. Muat versi terbaru setelah meninjau draf Anda.' }
+  }
+  if (state.revision === revision) {
+    await logActivity({
+      actor: actorFromSession(session),
+      module: 'ehb_keuangan',
+      action: 'update',
+      fiturHref: KEUANGAN_HREF,
+      logKind: 'update',
+      entityType: 'ehb_rab_batch',
+      entityId: String(eventId),
+      entityLabel: 'RAB EHB',
+      summary: 'Menyimpan perubahan RAB EHB',
+      details: {
+        event_id: eventId,
+        request_id: request.requestId,
+        upserts: changes.upserts.length,
+        deletes: changes.deletes,
+        signer_roles: changes.signers.map(signer => signer.role),
+      },
+    })
+  }
+  return { ok: true as const, revision: state.revision, rows: results[statements.length + 1].results as RabItem[] }
 }
 
 export async function getTransaksiItems(eventId: number) {
+  await requireKeuanganAccess()
   await ensureKeuanganSchema()
   return query<TransaksiItem>(`
     SELECT
@@ -622,31 +678,37 @@ export async function saveTransaksiItems(eventId: number, items: TransaksiInput[
     })
     .filter(item => item.tanggal && item.kategori && item.uraian)
 
-  await execute(`DELETE FROM ehb_keuangan_transaksi WHERE ehb_event_id = ?`, [eventId])
-
-  if (cleanItems.length > 0) {
-    await batch(cleanItems.map(item => ({
-      sql: `
-        INSERT INTO ehb_keuangan_transaksi
-          (ehb_event_id, tipe, tanggal, kategori, uraian, qty, harga, nominal, keterangan, rab_item_id, is_system, system_key, urutan)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      params: [
-        eventId,
-        item.tipe,
-        item.tanggal,
-        item.kategori,
-        item.uraian,
-        item.qty,
-        item.harga,
-        item.nominal,
-        item.keterangan,
-        item.rab_item_id ?? null,
-        item.is_system,
-        item.system_key ?? null,
-        item.urutan,
-      ],
-    })))
+  // A draft may still reference a RAB item another operator just removed.
+  // A foreign-key failure must leave the previously recorded Buku Kas intact.
+  try {
+    await batch([
+      { sql: 'DELETE FROM ehb_keuangan_transaksi WHERE ehb_event_id = ?', params: [eventId] },
+      ...cleanItems.map(item => ({
+        sql: `
+          INSERT INTO ehb_keuangan_transaksi
+            (ehb_event_id, tipe, tanggal, kategori, uraian, qty, harga, nominal, keterangan, rab_item_id, is_system, system_key, urutan)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        params: [
+          eventId,
+          item.tipe,
+          item.tanggal,
+          item.kategori,
+          item.uraian,
+          item.qty,
+          item.harga,
+          item.nominal,
+          item.keterangan,
+          item.rab_item_id ?? null,
+          item.is_system,
+          item.system_key ?? null,
+          item.urutan,
+        ],
+      })),
+    ])
+  } catch (error) {
+    console.error('[ehb-keuangan] Gagal menyimpan Buku Kas', error)
+    return { error: 'Buku Kas gagal disimpan. Periksa kembali item RAB yang dipilih.' }
   }
 
   revalidatePath('/dashboard/ehb/keuangan')
@@ -706,6 +768,7 @@ export async function ensureHonorMapelDefaults(eventId: number) {
         sql: `
           INSERT INTO ehb_honor_mapel_config (ehb_event_id, marhalah_id, waktu, jumlah_mapel)
           VALUES (?, ?, ?, ?)
+          ON CONFLICT(ehb_event_id, marhalah_id, waktu) DO NOTHING
         `,
         params: [eventId, marhalah.id, waktu, defaults[waktu]],
       })
@@ -855,14 +918,23 @@ export async function savePembuatanSoalManual(eventId: number, rows: { guru_id?:
   return { success: true, saved: cleanRows.length }
 }
 
-export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
-  await Promise.all([
-    ensureHonorMapelDefaults(eventId),
-    backfillManualWaliKelasFromGuruMaghrib(),
+export async function getHonorDetailData(eventId: number) {
+  await requireKeuanganAccess()
+  const tarifLoad = getHonorTarif(eventId)
+  const [tarif, configs, setup, rows] = await Promise.all([
+    tarifLoad,
+    getHonorMapelConfig(eventId),
+    queryOne<{ hasClasses: number; hasSchedule: number }>(`
+      SELECT EXISTS (SELECT 1 FROM ehb_kelas_jam WHERE ehb_event_id = ?) AS hasClasses,
+        EXISTS (SELECT 1 FROM ehb_jadwal WHERE ehb_event_id = ?) AS hasSchedule
+    `, [eventId, eventId]),
+    tarifLoad.then(tarif => getHonorItems(eventId, tarif)),
   ])
+  return { tarif, configs, setup, rows }
+}
 
-  const [tarif, pembuatSoalRows, raporRows, pemeriksaanResolvedRows, pengawasanRows, pengajarGuruRows] = await Promise.all([
-    getHonorTarif(eventId),
+async function getHonorItems(eventId: number, tarif: HonorTarif): Promise<HonorItem[]> {
+  const [pembuatSoalRows, raporRows, pemeriksaanResolvedRows, pengawasanRows, pengajarGuruRows] = await Promise.all([
     query<{ guru_id: number | null; nama: string; qty: number; detail: string }>(`
       SELECT
         ps.guru_id,
@@ -877,22 +949,22 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
       ORDER BY nama
     `, [eventId]),
     query<{ wali_id: string | null; nama: string; qty: number; detail: string }>(`
+      WITH ${ehbParticipantsCte}
       SELECT
-        k.wali_kelas_id as wali_id,
-        COALESCE(u.full_name, 'Wali kelas belum diatur') as nama,
-        COUNT(DISTINCT ps.santri_id) as qty,
+        COALESCE('guru:' || CASE WHEN u.source_type = 'guru' THEN u.source_ref_id END,
+          k.wali_kelas_id, 'guru:' || dg.id) AS wali_id,
+        COALESCE(MAX(u.full_name), MAX(dg.nama_lengkap), 'Wali kelas belum diatur') as nama,
+        COUNT(DISTINCT p.santri_id) as qty,
         GROUP_CONCAT(DISTINCT k.nama_kelas) as detail
-      FROM ehb_plotting_santri ps
-      JOIN riwayat_pendidikan rp ON rp.santri_id = ps.santri_id AND rp.status_riwayat = 'aktif'
-      JOIN santri s ON s.id = ps.santri_id AND s.status_global = 'aktif'
-      JOIN kelas k ON k.id = rp.kelas_id
+      FROM ehb_participants p
+      JOIN kelas k ON k.id = p.kelas_id
       JOIN marhalah m ON m.id = k.marhalah_id
       LEFT JOIN users u ON u.id = k.wali_kelas_id
-      JOIN ehb_kelas_jam kj ON kj.kelas_id = k.id AND kj.ehb_event_id = ?
-      WHERE ps.ehb_event_id = ? AND m.nama NOT LIKE '%Mutawassithah%'
-      GROUP BY k.wali_kelas_id, u.full_name
-      ORDER BY u.full_name
-    `, [eventId, eventId]),
+      LEFT JOIN data_guru dg ON dg.id = k.guru_maghrib_id AND k.wali_kelas_id IS NULL
+      WHERE m.nama NOT LIKE '%Mutawassithah%'
+      GROUP BY wali_id
+      ORDER BY nama
+    `, [eventId]),
     getGuruKitabResolvedForEhb(eventId),
     query<{ pengawas_id: number | null; guru_id: number | null; nama: string; qty: number; detail: string }>(`
       WITH hadir AS (
@@ -1069,6 +1141,7 @@ export async function getHonorItems(eventId: number): Promise<HonorItem[]> {
 }
 
 export async function getHonorPanitiaData(eventId: number): Promise<HonorPanitiaData> {
+  await requireKeuanganAccess()
   await ensureKeuanganSchema()
 
   const [budgetRow, rows] = await Promise.all([

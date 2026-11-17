@@ -1,4 +1,5 @@
 import { batch, execute, query, queryOne } from '@/lib/db'
+import { ehbParticipantsCte } from './ehb-participants'
 import {
   getHariIndexFromDate,
 } from '@/lib/akademik/guru-jadwal'
@@ -300,36 +301,29 @@ export async function getGuruKitabResolvedForEhb(eventId: number): Promise<GuruK
   const event = await queryOne<{ tahun_ajaran_id: number }>('SELECT tahun_ajaran_id FROM ehb_event WHERE id = ?', [eventId])
   if (!event?.tahun_ajaran_id) return []
 
-  const jadwalRows = await query<any>(`
+  const jadwalRows = await query<Pick<GuruKitabResolvedRow,
+    'tanggal' | 'sesi_id' | 'sesi_label' | 'kelas_id' | 'nama_kelas' | 'marhalah_id' |
+    'marhalah_nama' | 'mapel_id' | 'mapel_nama' | 'jumlah_santri'
+  >>(`
+    WITH ${ehbParticipantsCte}, participant_counts AS (
+      SELECT kelas_id, COUNT(*) AS jumlah_santri FROM ehb_participants GROUP BY kelas_id
+    )
     SELECT
-      j.ehb_event_id, j.tanggal, j.sesi_id, j.kelas_id, j.mapel_id,
-      s.label AS sesi_label, s.jam_group,
+      j.tanggal, j.sesi_id, j.kelas_id, j.mapel_id, s.label AS sesi_label,
       k.nama_kelas, k.marhalah_id, m.nama AS marhalah_nama,
       mp.nama AS mapel_nama,
-      COALESCE(NULLIF((
-        SELECT COUNT(DISTINCT ps.santri_id)
-        FROM ehb_plotting_santri ps
-        JOIN riwayat_pendidikan rp ON rp.santri_id = ps.santri_id
-          AND rp.kelas_id = j.kelas_id
-          AND rp.status_riwayat = 'aktif'
-        WHERE ps.ehb_event_id = j.ehb_event_id
-      ), 0), (
-        SELECT COUNT(DISTINCT rp.santri_id)
-        FROM riwayat_pendidikan rp
-        JOIN santri s ON s.id = rp.santri_id
-        WHERE rp.kelas_id = j.kelas_id
-          AND rp.status_riwayat = 'aktif'
-          AND s.status_global IN ('aktif', 'nonaktif_sementara')
-      )) AS jumlah_santri
+      COALESCE(pc.jumlah_santri, 0) AS jumlah_santri
     FROM ehb_jadwal j
     JOIN ehb_sesi s ON s.id = j.sesi_id
     JOIN kelas k ON k.id = j.kelas_id
     JOIN marhalah m ON m.id = k.marhalah_id
     JOIN mapel mp ON mp.id = j.mapel_id
+    LEFT JOIN participant_counts pc ON pc.kelas_id = j.kelas_id
     WHERE j.ehb_event_id = ?
     ORDER BY j.tanggal, s.nomor_sesi, m.urutan, k.nama_kelas
-  `, [eventId])
+  `, [eventId, eventId])
 
+  if (jadwalRows.length === 0) return []
   const kelasIds = Array.from(new Set(jadwalRows.map(row => String(row.kelas_id)).filter(Boolean)))
   const assignments = await getGuruKitabAssignments(event.tahun_ajaran_id, kelasIds)
   const lookup = buildAssignmentLookup(assignments)

@@ -1,23 +1,20 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { Fragment, useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { useReactToPrint } from '@/lib/pdf/client'
 import {
-  AlertTriangle, ArrowDown, ArrowUp, BookOpen, Calculator, FileText, HandCoins, Loader2, Pencil, Plus, Printer, ReceiptText, Save, Trash2, Users, Wallet, X,
+  AlertTriangle, ArrowDown, ArrowUp, BookOpen, Calculator, Copy, FileText, HandCoins, Loader2, Pencil, Plus, Printer, ReceiptText, RefreshCw, Save, Trash2, Users, X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   getActiveEventForKeuangan,
-  getHonorItems,
-  getHonorMapelConfig,
+  getHonorDetailData,
   getHonorPanitiaData,
-  getHonorTarif,
-  getKeuanganSigners,
-  getRabAutoBasis,
-  getRabItems,
+  getRabData,
+  getPriorRabEvents,
+  getRabTemplate,
   getTransaksiItems,
-  saveRabItems,
   saveHonorMapelConfig,
   saveHonorPanitiaBatch,
   saveTransaksiItems,
@@ -40,10 +37,9 @@ import {
 import { FONT } from '../cetak/_shared'
 import { formatDateKeyWib, shortDateWib } from '../_date-utils'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
-
-type DraftRabItem = RabItemInput & {
-  draft_id: string
-}
+import { createRabEditor, rowsToDrafts, type DraftRabItem, type RabEditor } from './_rab-editor'
+import { isLegacyInspection, planRabTemplate } from './rab-template'
+import { cached, cachedValue, readCached, type CacheEntry } from './_cache'
 
 type DraftTransaksiItem = TransaksiInput & {
   draft_id: string
@@ -119,20 +115,39 @@ function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-function rupiah(value: number) {
-  return new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    maximumFractionDigits: 0,
-  }).format(value || 0)
-}
+const rupiahFormatter = new Intl.NumberFormat('id-ID', {
+  style: 'currency',
+  currency: 'IDR',
+  maximumFractionDigits: 0,
+})
+const angkaRupiahFormatter = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 })
 
-function angkaRupiah(value: number) {
-  return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 }).format(value || 0)
-}
+const rupiah = (value: number) => rupiahFormatter.format(value || 0)
+const angkaRupiah = (value: number) => angkaRupiahFormatter.format(value || 0)
 
 function parseMoney(value: string) {
   return Number(value.replace(/[^\d]/g, '')) || 0
+}
+
+function RabPriceInput({ amount, onChange }: { amount: number; onChange: (amount: number) => void }) {
+  const [focused, setFocused] = useState(false)
+  return (
+    <input
+      inputMode="numeric"
+      aria-label="Harga item RAB dalam Rupiah"
+      value={amount ? (focused ? String(amount) : angkaRupiah(amount)) : ''}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onChange={event => {
+        const value = event.target.value
+        if (!/^\d*$|^\d{1,3}(\.\d{3})+$/.test(value)) return
+        const rupiah = parseMoney(value)
+        if (Number.isSafeInteger(rupiah)) onChange(rupiah)
+      }}
+      placeholder="0"
+      className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
+    />
+  )
 }
 
 function panitiaRoleLabel(row: Pick<HonorPanitiaRow, 'tipe' | 'jabatan_key' | 'seksi_key' | 'peran'>) {
@@ -147,6 +162,7 @@ function todayKey() {
 }
 
 function lineTotal(item: Pick<DraftRabItem, 'qty' | 'harga' | 'system_key'>) {
+  if (item.system_key === 'honor_pemeriksaan_header') return 0
   if (item.system_key === 'honor_panitia') return Number(item.harga || 0)
   return Number(item.qty || 0) * Number(item.harga || 0)
 }
@@ -155,10 +171,9 @@ function displayRabName(item: Pick<DraftRabItem, 'nama_barang' | 'system_key'>) 
   return item.nama_barang
 }
 
-function buildSystemDrafts(basis: RabAutoBasis): DraftRabItem[] {
-  const drafts: DraftRabItem[] = [
+function systemRabRows(basis: RabAutoBasis): RabItemInput[] {
+  return [
     {
-      draft_id: uid(),
       kategori: 'atk_administrasi',
       nama_barang: 'Kertas HVS',
       qty: basis.rekomendasiRim,
@@ -169,7 +184,6 @@ function buildSystemDrafts(basis: RabAutoBasis): DraftRabItem[] {
       urutan: 1,
     },
     {
-      draft_id: uid(),
       kategori: 'atk_administrasi',
       nama_barang: 'Kertas Buram',
       qty: basis.rekomendasiRim,
@@ -180,7 +194,6 @@ function buildSystemDrafts(basis: RabAutoBasis): DraftRabItem[] {
       urutan: 2,
     },
     {
-      draft_id: uid(),
       kategori: 'honorarium',
       nama_barang: 'Insentif Pembuatan Soal',
       qty: basis.pembuatanSoal,
@@ -191,18 +204,16 @@ function buildSystemDrafts(basis: RabAutoBasis): DraftRabItem[] {
       urutan: 1,
     },
     {
-      draft_id: uid(),
       kategori: 'honorarium',
       nama_barang: 'Insentif Pemeriksaan Hasil EHB',
-      qty: basis.totalHasilUjian,
+      qty: basis.totalPemeriksaan,
       harga: 0,
-      keterangan: `Total ${basis.totalHasilUjian.toLocaleString('id-ID')} hasil ujian dari seluruh marhalah.`,
+      keterangan: `Total ${basis.totalPemeriksaan.toLocaleString('id-ID')} hasil ujian untuk diperiksa.`,
       is_system: 1,
       system_key: 'honor_pemeriksaan_hasil',
       urutan: 10,
     },
     {
-      draft_id: uid(),
       kategori: 'honorarium',
       nama_barang: 'Insentif Pengisian Rapor',
       qty: basis.raporSantri,
@@ -213,7 +224,6 @@ function buildSystemDrafts(basis: RabAutoBasis): DraftRabItem[] {
       urutan: 50,
     },
     {
-      draft_id: uid(),
       kategori: 'honorarium',
       nama_barang: 'Insentif Pengawasan',
       qty: basis.totalSesiEhb,
@@ -224,7 +234,6 @@ function buildSystemDrafts(basis: RabAutoBasis): DraftRabItem[] {
       urutan: 60,
     },
     {
-      draft_id: uid(),
       kategori: 'honorarium',
       nama_barang: 'Insentif Panitia',
       qty: basis.jumlahPanitia,
@@ -235,53 +244,26 @@ function buildSystemDrafts(basis: RabAutoBasis): DraftRabItem[] {
       urutan: 70,
     },
   ]
-
-  return drafts
 }
 
-function rowsToDrafts(rows: RabItem[]): DraftRabItem[] {
-  const drafts = rows.map(row => ({
-    draft_id: String(row.id),
-    kategori: row.kategori,
-    nama_barang: row.nama_barang,
-    qty: Number(row.qty || 0),
-    harga: Number(row.harga || 0),
-    keterangan: row.keterangan || '',
-    is_system: row.is_system,
-    system_key: row.system_key,
-    urutan: row.urutan,
-  }))
+function buildSystemDrafts(basis: RabAutoBasis): DraftRabItem[] {
+  return systemRabRows(basis).map(row => ({ ...row, draft_id: uid() }))
+}
 
-  const pemeriksaanRows = drafts.filter(item => item.system_key?.startsWith('honor_pemeriksaan_'))
-  if (pemeriksaanRows.length <= 1 && pemeriksaanRows[0]?.system_key !== 'honor_pemeriksaan_header') return drafts
-
-  const otherRows = drafts.filter(item => !item.system_key?.startsWith('honor_pemeriksaan_'))
-  const detailRows = pemeriksaanRows.filter(item => item.system_key !== 'honor_pemeriksaan_header')
-  const totalQty = detailRows.reduce((sum, item) => sum + Number(item.qty || 0), 0)
-  const totalNominal = detailRows.reduce((sum, item) => sum + lineTotal(item), 0)
-  const samePrice = detailRows.every(item => Number(item.harga || 0) === Number(detailRows[0]?.harga || 0))
-  const harga = samePrice ? Number(detailRows[0]?.harga || 0) : totalQty > 0 ? Math.round(totalNominal / totalQty) : 0
-
-  const combinedPemeriksaan: DraftRabItem = {
-    draft_id: uid(),
-    kategori: 'honorarium',
-    nama_barang: 'Insentif Pemeriksaan Hasil EHB',
-    qty: totalQty,
-    harga,
-    keterangan: `Gabungan ${totalQty.toLocaleString('id-ID')} hasil ujian dari seluruh marhalah.`,
-    is_system: 1,
-    system_key: 'honor_pemeriksaan_hasil',
-    urutan: 10,
+function getSystemRabQuantities(basis: RabAutoBasis) {
+  const quantities = new Map<string, number>()
+  for (const row of systemRabRows(basis)) {
+    if (row.system_key) quantities.set(row.system_key, row.qty)
   }
+  for (const row of basis.pemeriksaan) {
+    if (row.marhalah_id !== null) quantities.set(`honor_pemeriksaan_${row.marhalah_id}`, row.jumlah_hasil)
+  }
+  return quantities
+}
 
-  return [
-    ...otherRows,
-    combinedPemeriksaan,
-  ].sort((a, b) => {
-    const kategoriA = KATEGORI.findIndex(item => item.key === a.kategori)
-    const kategoriB = KATEGORI.findIndex(item => item.key === b.kategori)
-    return kategoriA - kategoriB || Number(a.urutan || 0) - Number(b.urutan || 0)
-  })
+function recommendedQty(systemQty: ReadonlyMap<string, number>, key: string | null | undefined) {
+  if (!key || systemQty.size === 0) return undefined
+  return systemQty.get(key) ?? (isLegacyInspection(key) ? 0 : undefined)
 }
 
 function transactionTotal(item: Pick<DraftTransaksiItem, 'qty' | 'harga' | 'nominal'>) {
@@ -307,7 +289,7 @@ function buildTransactionsFromRab(rows: Array<RabItem | DraftRabItem>, totalRab:
         harga: Number(row.harga || 0),
         nominal: total,
         keterangan: row.keterangan || '',
-        rab_item_id: 'id' in row ? row.id : null,
+        rab_item_id: 'id' in row ? row.id : row.dbId ?? null,
         is_system: row.is_system,
         system_key: row.system_key ? `expense_${row.system_key}` : null,
         urutan: 100 + index,
@@ -994,111 +976,94 @@ function SignatureBox({ title, name }: { title: string; name: string }) {
 
 type KeuanganTab = 'rab' | 'transaksi' | 'honor_detail' | 'honor_panitia'
 
-type LoadedTabData =
-  | {
-      tab: 'rab'
-      autoBasis: RabAutoBasis
-      rabDrafts: DraftRabItem[]
-      signers: KeuanganSigners
-    }
-  | {
-      tab: 'transaksi'
-      autoBasis: RabAutoBasis
-      rabDrafts: DraftRabItem[]
-      transaksiDrafts: DraftTransaksiItem[]
-      signers: KeuanganSigners
-    }
-  | {
-      tab: 'honor_detail'
-      tarifRows: HonorTarif
-      configRows: HonorMapelConfig[]
-      honorRows: HonorItem[]
-    }
-  | {
-      tab: 'honor_panitia'
-      honorPanitiaBudget: number
-      honorPanitiaRows: HonorPanitiaRow[]
-    }
-
-const tabDataCache = new Map<string, Promise<LoadedTabData>>()
-let activeEventCache: Promise<ActiveEvent | null> | null = null
-
-function getCachedActiveEvent() {
-  activeEventCache ??= getActiveEventForKeuangan().catch(error => {
-    activeEventCache = null
-    throw error
-  })
-  return activeEventCache
+type RabTabData = {
+  tab: 'rab'
+  autoBasis: RabAutoBasis
+  rabDrafts: DraftRabItem[]
+  signers: KeuanganSigners
+  revision: string
 }
 
-function tabCacheKey(eventId: number, tab: KeuanganTab) {
-  return `${eventId}:${tab}`
+type LoadedTabData =
+  | RabTabData
+  | { tab: 'transaksi'; rows: TransaksiItem[] }
+  | { tab: 'honor_detail'; tarifRows: HonorTarif; configRows: HonorMapelConfig[]; honorRows: HonorItem[]; setup: { hasClasses: number; hasSchedule: number } | null }
+  | { tab: 'honor_panitia'; honorPanitiaBudget: number; honorPanitiaRows: HonorPanitiaRow[] }
+
+const activeEventCache = new Map<string, CacheEntry<ActiveEvent | null>>()
+const tabDataCache = new Map<string, CacheEntry<LoadedTabData>>()
+const rabEditors = new Map<string, RabEditor>()
+
+function tabCacheKey(scope: string, eventId: number, tab: KeuanganTab) {
+  return `${scope}:${eventId}:${tab}`
 }
 
 async function fetchTabData(eventId: number, tab: KeuanganTab): Promise<LoadedTabData> {
   if (tab === 'rab') {
-    const [savedRows, autoBasis, signers] = await Promise.all([
-      getRabItems(eventId),
-      getRabAutoBasis(eventId),
-      getKeuanganSigners(eventId),
-    ])
+    const { snapshot, autoBasis } = await getRabData(eventId)
     return {
       tab,
       autoBasis,
-      rabDrafts: savedRows.length > 0 ? rowsToDrafts(savedRows) : buildSystemDrafts(autoBasis),
-      signers,
+      rabDrafts: snapshot.rows.length || snapshot.revision ? rowsToDrafts(snapshot.rows) : buildSystemDrafts(autoBasis),
+      signers: snapshot.signers,
+      revision: snapshot.revision,
     }
   }
-
-  if (tab === 'transaksi') {
-    const [savedRows, autoBasis, signers, transaksiRows] = await Promise.all([
-      getRabItems(eventId),
-      getRabAutoBasis(eventId),
-      getKeuanganSigners(eventId),
-      getTransaksiItems(eventId),
-    ])
-    const rabDrafts = savedRows.length > 0 ? rowsToDrafts(savedRows) : buildSystemDrafts(autoBasis)
-    const totalRab = rabDrafts.reduce((sum, item) => sum + lineTotal(item), 0)
-    return {
-      tab,
-      autoBasis,
-      rabDrafts,
-      transaksiDrafts: transaksiRows.length > 0 ? transaksiRowsToDrafts(transaksiRows) : buildDefaultIncomeTransactions(totalRab),
-      signers,
-    }
-  }
+  if (tab === 'transaksi') return { tab, rows: await getTransaksiItems(eventId) }
 
   if (tab === 'honor_panitia') {
     const data = await getHonorPanitiaData(eventId)
-    return {
-      tab,
-      honorPanitiaBudget: data.budget,
-      honorPanitiaRows: data.rows,
+    return { tab, honorPanitiaBudget: data.budget, honorPanitiaRows: data.rows }
+  }
+
+  const data = await getHonorDetailData(eventId)
+  return { tab, tarifRows: data.tarif, configRows: data.configs, honorRows: data.rows, setup: data.setup }
+}
+
+function getCachedTabData(scope: string, eventId: number, tab: KeuanganTab) {
+  const key = tabCacheKey(scope, eventId, tab)
+  return readCached(tabDataCache, key, () => fetchTabData(eventId, tab))
+}
+
+function clearKeuanganCache(scope: string, eventId: number, tabs: KeuanganTab[]) {
+  for (const tab of tabs) tabDataCache.delete(tabCacheKey(scope, eventId, tab))
+}
+
+function getRabEditor(scope: string, eventId: number, data: RabTabData) {
+  const key = tabCacheKey(scope, eventId, 'rab')
+  const initial = { drafts: data.rabDrafts, signers: data.signers, revision: data.revision }
+  const existing = rabEditors.get(key)
+  if (existing) {
+    existing.replace(initial)
+    return existing
+  }
+  const editor = createRabEditor(eventId, scope, initial, result => {
+    const entry = tabDataCache.get(key)
+    const cachedData = entry?.value
+    const next = {
+      ...(cachedData?.tab === 'rab' ? cachedData : data),
+      rabDrafts: rowsToDrafts(result.rows),
+      signers: result.signers,
+      revision: result.revision,
     }
-  }
-
-  const [tarifRows, configRows, honorRows] = await Promise.all([
-    getHonorTarif(eventId),
-    getHonorMapelConfig(eventId),
-    getHonorItems(eventId),
-  ])
-  return { tab, tarifRows, configRows, honorRows }
+    tabDataCache.set(key, { value: next, promise: Promise.resolve(next), expiresAt: entry?.value ? entry.expiresAt : 0 })
+    const priceChanged = (key: string) =>
+      (result.previous.find(row => row.system_key === key)?.harga ?? 0) !==
+      (result.rows.find(row => row.system_key === key)?.harga ?? 0)
+    const affected: KeuanganTab[] = []
+    const legacyKeys = [...result.previous, ...result.rows].flatMap(row => row.system_key && isLegacyInspection(row.system_key) ? [row.system_key] : [])
+    if (['honor_pembuatan_soal', 'honor_pengisian_rapor', 'honor_pengawasan', 'honor_pemeriksaan_hasil', ...legacyKeys].some(priceChanged)) {
+      affected.push('honor_detail')
+    }
+    if (priceChanged('honor_panitia')) affected.push('honor_panitia')
+    clearKeuanganCache(scope, eventId, affected)
+  })
+  rabEditors.set(key, editor)
+  return editor
 }
 
-function getCachedTabData(eventId: number, tab: KeuanganTab) {
-  const key = tabCacheKey(eventId, tab)
-  if (!tabDataCache.has(key)) {
-    tabDataCache.set(key, fetchTabData(eventId, tab).catch(error => {
-      tabDataCache.delete(key)
-      throw error
-    }))
-  }
-  return tabDataCache.get(key)!
-}
-
-function clearKeuanganCache(eventId: number, tabs: KeuanganTab[]) {
-  for (const tab of tabs) tabDataCache.delete(tabCacheKey(eventId, tab))
-}
+const noEditorSubscribe = () => () => {}
+const noEditorState = () => null
 
 function TabLoadingPanel() {
   return (
@@ -1119,22 +1084,35 @@ function TabLoadingPanel() {
   )
 }
 
-export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTab?: KeuanganTab }) {
+export default function KeuanganEhbPageContent({ activeTab = 'rab', cacheScope }: { activeTab?: KeuanganTab; cacheScope: string }) {
   const [event, setEvent] = useState<ActiveEvent | null>(null)
   const [basis, setBasis] = useState<RabAutoBasis | null>(null)
-  const [drafts, setDrafts] = useState<DraftRabItem[]>([])
+  const [transaksiRabDrafts, setTransaksiRabDrafts] = useState<DraftRabItem[]>([])
+  const [rabEditor, setRabEditor] = useState<RabEditor | null>(null)
+  const rabState = useSyncExternalStore(rabEditor?.subscribe ?? noEditorSubscribe, rabEditor?.getSnapshot ?? noEditorState, noEditorState)
+  const drafts = rabState?.drafts ?? transaksiRabDrafts
   const [loading, setLoading] = useState(true)
   const [tabLoading, setTabLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [ketuaPelaksana, setKetuaPelaksana] = useState('')
+  const [syncing, setSyncing] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const [transaksiKetua, setTransaksiKetua] = useState('')
+  const ketuaPelaksana = rabState?.signers.ketua ?? transaksiKetua
   const [bendahara, setBendahara] = useState('')
-  const [wakilAkademik, setWakilAkademik] = useState('')
-  const [wakilKeuangan, setWakilKeuangan] = useState('')
+  const wakilAkademik = rabState?.signers.wakil_akademik ?? ''
+  const wakilKeuangan = rabState?.signers.wakil_keuangan ?? ''
+  const otherTabDirty = useRef(false)
+  const loadSequence = useRef(0)
+  const [templateEvents, setTemplateEvents] = useState<ActiveEvent[] | null>(null)
+  const [templateEventId, setTemplateEventId] = useState<number | null>(null)
+  const [templateRows, setTemplateRows] = useState<Omit<RabItemInput, 'qty'>[] | null>(null)
+  const [templateLoading, setTemplateLoading] = useState(false)
+  const templateSequence = useRef(0)
   const [transaksiDrafts, setTransaksiDrafts] = useState<DraftTransaksiItem[]>([])
   const [savingTransaksi, setSavingTransaksi] = useState(false)
   const [showTransaksiModal, setShowTransaksiModal] = useState(false)
   const [transaksiForm, setTransaksiForm] = useState<TransaksiForm>(() => emptyTransaksiForm())
   const [honorItems, setHonorItems] = useState<HonorItem[]>([])
+  const [honorSetup, setHonorSetup] = useState<{ hasClasses: number; hasSchedule: number } | null>(null)
   const [honorTarif, setHonorTarif] = useState<HonorTarif>({ pembuatan_soal: 0, pengisian_rapor: 0, pemeriksaan_hasil: 0, pengawasan: 0 })
   const [mapelConfigs, setMapelConfigs] = useState<HonorMapelConfig[]>([])
   const [savingHonor, setSavingHonor] = useState(false)
@@ -1209,53 +1187,95 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     `,
   })
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setTabLoading(false)
+  const loadData = useCallback(async (refresh = false) => {
+    const sequence = ++loadSequence.current
     try {
-      const evt = await getCachedActiveEvent()
-      setEvent(evt || null)
-      setLoading(false)
-      if (evt) {
-        setTabLoading(true)
-        const data = await getCachedTabData(evt.id, activeTab)
-        if (data.tab === 'rab') {
-          setBasis(data.autoBasis)
-          setDrafts(data.rabDrafts)
-          setKetuaPelaksana(data.signers.ketua)
-          setBendahara(data.signers.bendahara)
-          setWakilAkademik(data.signers.wakil_akademik)
-          setWakilKeuangan(data.signers.wakil_keuangan)
-        } else if (data.tab === 'transaksi') {
-          setBasis(data.autoBasis)
-          setDrafts(data.rabDrafts)
-          setTransaksiDrafts(data.transaksiDrafts)
-          setKetuaPelaksana(data.signers.ketua)
-          setBendahara(data.signers.bendahara)
-          setWakilAkademik(data.signers.wakil_akademik)
-          setWakilKeuangan(data.signers.wakil_keuangan)
-        } else if (data.tab === 'honor_panitia') {
-          setHonorPanitiaBudget(data.honorPanitiaBudget)
-          setHonorPanitiaRows(data.honorPanitiaRows)
-        } else {
-          setHonorTarif(data.tarifRows)
-          setMapelConfigs(data.configRows)
-          setHonorItems(data.honorRows)
-        }
+      const eventEntry = cached(activeEventCache, cacheScope, getActiveEventForKeuangan)
+      const evt = eventEntry.value !== undefined ? eventEntry.value : await eventEntry.promise
+      if (sequence !== loadSequence.current) return false
+      if (!evt) {
+        setLoadError(false)
+        setEvent(null)
+        setRabEditor(null)
+        return true
       }
+      const warmTab = cachedValue(tabDataCache, tabCacheKey(cacheScope, evt.id, activeTab))
+      const warmRab = activeTab === 'transaksi' ? cachedValue(tabDataCache, tabCacheKey(cacheScope, evt.id, 'rab')) : undefined
+      const warm = warmTab && (activeTab !== 'transaksi' || warmRab)
+      if (!refresh) {
+        setEvent(evt)
+        setLoading(false)
+        setTabLoading(!warm)
+      }
+      const [data, rabData] = warm ? [warmTab, warmRab] : await Promise.all([
+          getCachedTabData(cacheScope, evt.id, activeTab),
+          activeTab === 'transaksi' ? getCachedTabData(cacheScope, evt.id, 'rab') : undefined,
+        ])
+      if (sequence !== loadSequence.current) return false
+      setLoadError(false)
+      setEvent(evt)
+      setRabEditor(null)
+      if (data.tab === 'rab') {
+        setBasis(data.autoBasis)
+        setRabEditor(getRabEditor(cacheScope, evt.id, data))
+      } else if (data.tab === 'transaksi' && rabData?.tab === 'rab') {
+        setTransaksiRabDrafts(rabData.rabDrafts)
+        const total = rabData.rabDrafts.reduce((sum, row) => sum + lineTotal(row), 0)
+        setTransaksiDrafts(data.rows.length ? transaksiRowsToDrafts(data.rows) : buildDefaultIncomeTransactions(total))
+        setTransaksiKetua(rabData.signers.ketua)
+        setBendahara(rabData.signers.bendahara)
+      } else if (data.tab === 'honor_panitia') {
+        setHonorPanitiaBudget(data.honorPanitiaBudget)
+        setHonorPanitiaRows(data.honorPanitiaRows)
+      } else if (data.tab === 'honor_detail') {
+        setHonorTarif(data.tarifRows)
+        setMapelConfigs(data.configRows)
+        setHonorItems(data.honorRows)
+        setHonorSetup(data.setup)
+      }
+      otherTabDirty.current = false
+      return true
     } catch (error) {
+      if (sequence !== loadSequence.current) return false
       console.error(error)
+      if (!refresh) setLoadError(true)
       toast.error('Gagal memuat data Keuangan EHB')
+      return false
     } finally {
-      setLoading(false)
-      setTabLoading(false)
+      if (sequence === loadSequence.current) {
+        setLoading(false)
+        setTabLoading(false)
+      }
     }
-  }, [activeTab])
+  }, [activeTab, cacheScope])
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadData()
-  }, [loadData])
+  const cancelLoad = useCallback(() => { loadSequence.current++ }, [])
+  useLayoutEffect(() => {
+    void loadData()
+    return cancelLoad
+  }, [loadData, cancelLoad])
+
+  const synchronize = async () => {
+    if (syncing) return
+    if ((otherTabDirty.current || showTransaksiModal) && !window.confirm('Draf pada tab ini akan ditutup. Buang perubahan dan sinkronkan?')) return
+    const editor = event ? rabEditors.get(tabCacheKey(cacheScope, event.id, 'rab')) : undefined
+    setSyncing(true)
+    try {
+      if (editor?.dirty() && !(await editor.finish())) {
+        toast.error(editor.getSnapshot().error ?? 'Lengkapi nama item RAB sebelum sinkronisasi.')
+        return
+      }
+      activeEventCache.delete(cacheScope)
+      if (event) clearKeuanganCache(cacheScope, event.id, ['rab', 'transaksi', 'honor_detail', 'honor_panitia'])
+      if (await loadData(true)) {
+        closeTemplates()
+        setShowTransaksiModal(false)
+        toast.success('Data Keuangan EHB disinkronkan')
+      }
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const summary = useMemo(() => {
     const byCategory = new Map<RabKategori, number>()
@@ -1432,12 +1452,11 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
   )
 
   const updateDraft = (draftId: string, patch: Partial<DraftRabItem>) => {
-    setDrafts(prev => prev.map(item => item.draft_id === draftId ? { ...item, ...patch } : item))
+    rabEditor?.editDrafts(prev => prev.map(item => item.draft_id === draftId ? { ...item, ...patch } : item))
   }
 
   const addItem = (kategori: RabKategori) => {
-    const nextOrder = drafts.filter(item => item.kategori === kategori).length + 100
-    setDrafts(prev => [
+    rabEditor?.editDrafts(prev => [
       ...prev,
       {
         draft_id: uid(),
@@ -1448,17 +1467,17 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
         keterangan: '',
         is_system: 0,
         system_key: null,
-        urutan: nextOrder,
+        urutan: Math.max(0, ...prev.filter(item => item.kategori === kategori).map(item => item.urutan ?? 0)) + 1,
       },
     ])
   }
 
   const deleteItem = (draftId: string) => {
-    setDrafts(prev => prev.filter(item => item.draft_id !== draftId))
+    rabEditor?.editDrafts(prev => prev.filter(item => item.draft_id !== draftId))
   }
 
   const moveDraft = (draftId: string, direction: -1 | 1) => {
-    setDrafts(prev => {
+    rabEditor?.editDrafts(prev => {
       const current = prev.find(item => item.draft_id === draftId)
       if (!current) return prev
 
@@ -1489,6 +1508,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
   }
 
   const updateHonorPanitia = (panitiaId: number, patch: Partial<Pick<HonorPanitiaRow, 'nominal' | 'keterangan'>>) => {
+    otherTabDirty.current = true
     setHonorPanitiaRows(prev => prev.map(row => row.panitia_id === panitiaId ? { ...row, ...patch } : row))
   }
 
@@ -1536,7 +1556,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
       const rabDraftId = source.replace('rab:', '')
       const rabItem = rabOptions.find(item => item.draft_id === rabDraftId)
       if (rabItem) {
-        const numericRabId = /^\d+$/.test(rabItem.draft_id) ? Number(rabItem.draft_id) : null
+        const numericRabId = rabItem.dbId ?? null
         updateTransaksiForm({
           source,
           tipe: 'pengeluaran',
@@ -1626,6 +1646,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
         : transaksiDrafts.length + 1,
     }
 
+    otherTabDirty.current = true
     setTransaksiDrafts(prev => (
       transaksiForm.mode === 'edit'
         ? prev.map(item => item.draft_id === payload.draft_id ? payload : item)
@@ -1636,63 +1657,115 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
   }
 
   const deleteTransaksi = (draftId: string) => {
+    otherTabDirty.current = true
     setTransaksiDrafts(prev => prev.filter(item => item.draft_id !== draftId))
   }
 
   const resetTransaksiFromRab = () => {
+    otherTabDirty.current = true
     setTransaksiDrafts(buildTransactionsFromRab(drafts, summary.total))
     toast.success('Transaksi dikembalikan dari daftar RAB')
   }
 
   const resetRecommendation = () => {
-    if (!basis) return
-    setDrafts(buildSystemDrafts(basis))
-    toast.success('RAB dikembalikan ke rekomendasi sistem')
+    if (!basis || !rabEditor || !window.confirm('Kembalikan daftar RAB ke rekomendasi dan kosongkan harga?')) return
+    rabEditor.editDrafts(current => {
+      return buildSystemDrafts(basis).map(item => {
+        const existing = current.find(row => row.system_key === item.system_key)
+        return existing ? { ...item, dbId: existing.dbId, draft_id: existing.draft_id } : item
+      })
+    })
   }
 
   const redetectQtyRecommendation = () => {
-    if (!basis) return
-    const systemQty = new Map(
-      buildSystemDrafts(basis)
-        .filter(item => item.system_key)
-        .map(item => [item.system_key, Number(item.qty || 0)])
-    )
-    let updated = 0
-
-    const nextDrafts = drafts.map(item => {
-      if (!item.system_key || !systemQty.has(item.system_key)) return item
-      const qty = systemQty.get(item.system_key) ?? Number(item.qty || 0)
-      if (Number(item.qty || 0) === qty) return item
-      updated += 1
-      return { ...item, qty }
+    if (!basis || !rabEditor) return
+    rabEditor.editDrafts(current => {
+      let changed = false
+      const next = current.map(item => {
+        const qty = recommendedQty(systemQty, item.system_key)
+        if (qty === undefined || qty === item.qty) return item
+        changed = true
+        return { ...item, qty }
+      })
+      if (!changed) toast.info('QTY RAB sudah sesuai rekomendasi')
+      return changed ? next : current
     })
-
-    setDrafts(nextDrafts)
-
-    toast.success(
-      updated > 0
-        ? `${updated} qty RAB dideteksi ulang`
-        : 'Qty RAB sudah sesuai deteksi terbaru'
-    )
   }
 
-  const submit = async () => {
-    if (!event) return
-    const invalid = drafts.find(item => !item.nama_barang.trim())
-    if (invalid) return toast.error('Nama barang/honor tidak boleh kosong')
+  const systemQty = useMemo(
+    () => basis ? getSystemRabQuantities(basis) : new Map<string, number>(),
+    [basis],
+  )
 
-    setSaving(true)
-    const res = await saveRabItems(event.id, drafts, {
-      ketua: ketuaPelaksana,
-      bendahara,
-      wakil_akademik: wakilAkademik,
-      wakil_keuangan: wakilKeuangan,
+  const copyPreview = useMemo(
+    () => templateRows && basis ? planRabTemplate(drafts, templateRows, systemQty) : null,
+    [drafts, templateRows, basis, systemQty],
+  )
+
+  const openTemplates = async () => {
+    if (!event) return
+    const sequence = ++templateSequence.current
+    setTemplateLoading(true)
+    setTemplateEvents([])
+    setTemplateRows(null)
+    setTemplateEventId(null)
+    try {
+      const events = await getPriorRabEvents(event.id)
+      if (sequence === templateSequence.current) setTemplateEvents(events)
+    } catch {
+      if (sequence === templateSequence.current) {
+        setTemplateEvents(null)
+        toast.error('Daftar event sebelumnya gagal dimuat')
+      }
+    } finally {
+      if (sequence === templateSequence.current) setTemplateLoading(false)
+    }
+  }
+
+  const pickTemplate = async (sourceId: number | null) => {
+    if (!event) return
+    const sequence = ++templateSequence.current
+    setTemplateEventId(sourceId)
+    setTemplateRows(null)
+    setTemplateLoading(sourceId !== null)
+    if (sourceId === null) return
+    try {
+      const rows = await getRabTemplate(event.id, sourceId)
+      if (sequence === templateSequence.current) setTemplateRows(rows)
+    } catch {
+      if (sequence === templateSequence.current) {
+        setTemplateEventId(null)
+        toast.error('Item RAB dari event sumber gagal dimuat')
+      }
+    } finally {
+      if (sequence === templateSequence.current) setTemplateLoading(false)
+    }
+  }
+
+  const closeTemplates = () => {
+    templateSequence.current++
+    setTemplateEvents(null)
+    setTemplateRows(null)
+    setTemplateEventId(null)
+    setTemplateLoading(false)
+  }
+
+  const applyTemplate = () => {
+    if (!copyPreview || !rabEditor || !templateRows || !basis) return
+    rabEditor.editDrafts(current => {
+      const { prices, additions } = planRabTemplate(current, templateRows, systemQty)
+      const priceById = new Map(prices.map(row => [row.id, row.harga]))
+      return [
+        ...current.map(row => priceById.has(row.draft_id) ? { ...row, harga: priceById.get(row.draft_id)! } : row),
+        ...additions.map(row => ({ ...row, draft_id: uid() })),
+      ]
     })
-    setSaving(false)
-    if ('error' in res) return toast.error(res.error)
-    clearKeuanganCache(event.id, ['rab', 'transaksi', 'honor_detail', 'honor_panitia'])
-    toast.success(`${res.saved} item RAB disimpan`)
-    loadData()
+    closeTemplates()
+  }
+
+  const reloadRab = async () => {
+    if (!rabEditor || !window.confirm('Buang draf lokal dan muat versi RAB terbaru?')) return
+    if (rabEditor.discard()) await synchronize()
   }
 
   const submitTransaksi = async () => {
@@ -1704,13 +1777,9 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     const res = await saveTransaksiItems(event.id, transaksiDrafts)
     setSavingTransaksi(false)
     if ('error' in res) return toast.error(res.error)
-    clearKeuanganCache(event.id, ['transaksi'])
+    clearKeuanganCache(cacheScope, event.id, ['transaksi'])
     toast.success(`${res.saved} transaksi disimpan`)
     loadData()
-  }
-
-  const updateMapelConfig = (configId: number, jumlahMapel: number) => {
-    setMapelConfigs(prev => prev.map(item => item.id === configId ? { ...item, jumlah_mapel: jumlahMapel } : item))
   }
 
   const submitHonorSettings = async () => {
@@ -1726,7 +1795,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
       return toast.error(configRes.error)
     }
     setSavingHonor(false)
-    clearKeuanganCache(event.id, ['honor_detail'])
+    clearKeuanganCache(cacheScope, event.id, ['honor_detail'])
     toast.success('Rincian honor diperbarui')
     loadData()
   }
@@ -1741,7 +1810,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     })))
     setSavingHonorPanitia(false)
     if ('error' in res) return toast.error(res.error)
-    clearKeuanganCache(event.id, ['honor_panitia'])
+    clearKeuanganCache(cacheScope, event.id, ['honor_panitia'])
     toast.success(`${res.saved} honor panitia disimpan`)
     loadData()
   }
@@ -1750,12 +1819,25 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     return <div className="flex justify-center p-10"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>
   }
 
+  if (loadError) {
+    return (
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+        <p>Data Keuangan EHB gagal dimuat.</p>
+        <button type="button" onClick={() => void synchronize()} disabled={syncing}
+          className="mt-2 text-sm font-semibold underline disabled:opacity-50">Coba lagi</button>
+      </div>
+    )
+  }
+
   if (!event) {
     return (
       <div className="max-w-4xl mx-auto py-10">
         <div className="bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5" />
           <p className="text-sm font-medium">Belum ada event EHB yang aktif. Silakan aktifkan event dulu di menu Jadwal.</p>
+          <button type="button" onClick={() => void synchronize()} disabled={syncing} className="text-sm font-semibold underline">
+            Sinkronisasi
+          </button>
         </div>
       </div>
     )
@@ -1765,8 +1847,15 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
     <div className="max-w-7xl mx-auto pb-20 space-y-6">
       <DashboardPageHeader
         title="Keuangan EHB"
-        description="Kelola rencana anggaran, transaksi, dan honorarium EHB untuk event aktif."
+        description={`${event.nama} · ${event.tahun_ajaran_nama}`}
         className="border-b pb-5"
+        action={(
+          <button type="button" disabled={syncing} onClick={() => void synchronize()}
+            className="flex items-center gap-2 rounded-xl border bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Menyinkronkan…' : 'Sinkronisasi'}
+          </button>
+        )}
       />
 
       <div className="bg-white border rounded-2xl p-1 flex flex-wrap gap-1 w-fit">
@@ -1794,7 +1883,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
       {tabLoading ? (
         <TabLoadingPanel />
       ) : (
-        <>
+        <fieldset disabled={syncing} className="min-w-0 space-y-6">
       {activeTab === 'rab' ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="bg-white border rounded-2xl p-4">
@@ -1987,6 +2076,10 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
             <div className="px-5 py-4 border-b bg-slate-50">
               <h2 className="font-bold text-slate-800">Daftar Rincian Honor</h2>
               <p className="text-sm text-slate-500">Rekap per penerima dalam format tabel ringkas.</p>
+              {honorSetup && !honorSetup.hasClasses && <p className="mt-1 text-sm text-amber-800">Atur kelas peserta di Jadwal EHB untuk menghitung honor rapor dan pemeriksaan.</p>}
+              {honorSetup?.hasClasses && !honorSetup.hasSchedule ? (
+                <p className="mt-1 text-sm text-amber-800">Atur jadwal mapel EHB untuk menghitung honor pemeriksaan.</p>
+              ) : null}
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs border-collapse">
@@ -2148,7 +2241,10 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
                 <label className="text-xs font-bold text-slate-500 uppercase">Ketua Pelaksana EHB</label>
                 <input
                   value={ketuaPelaksana}
-                  onChange={e => setKetuaPelaksana(e.target.value)}
+                  onChange={e => {
+                    otherTabDirty.current = true
+                    setTransaksiKetua(e.target.value)
+                  }}
                   placeholder="Nama ketua pelaksana"
                   className="mt-1 w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
                 />
@@ -2157,7 +2253,10 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
                 <label className="text-xs font-bold text-slate-500 uppercase">Bendahara</label>
                 <input
                   value={bendahara}
-                  onChange={e => setBendahara(e.target.value)}
+                  onChange={e => {
+                    otherTabDirty.current = true
+                    setBendahara(e.target.value)
+                  }}
                   placeholder="Nama bendahara"
                   className="mt-1 w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
                 />
@@ -2391,21 +2490,83 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
         <div className="space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-indigo-50 border border-indigo-100 rounded-2xl p-4">
             <div>
-              <p className="font-bold text-indigo-900">RAB disimpan batch</p>
-              <p className="text-sm text-indigo-700">Ubah semua item dulu, lalu klik Simpan Semua Perubahan.</p>
+              <p role="status" className="text-sm font-semibold text-indigo-900">
+                {rabState?.status === 'saving' ? 'Menyimpan…'
+                  : rabState?.status === 'pending' ? 'Menunggu simpan…'
+                  : rabState?.status === 'conflict' ? 'RAB berubah di server'
+                  : rabState?.status === 'error' ? 'Gagal disimpan'
+                  : rabState?.status === 'saved' ? 'Tersimpan'
+                  : 'Simpan otomatis aktif'}
+              </p>
+              {rabState?.error && <p className="text-sm text-red-700">{rabState.error}</p>}
+              {drafts.some(item => !item.nama_barang.trim()) && (
+                <p className="text-sm text-indigo-700">Baris tanpa nama masih berupa draf.</p>
+              )}
+              {basis?.jumlahKelasPeserta === 0 && <p className="text-sm text-amber-800">Atur kelas peserta di Jadwal EHB untuk menghitung QTY.</p>}
+              {basis && basis.jumlahKelasPeserta > 0 && basis.totalSesiEhb === 0 && (
+                <p className="text-sm text-amber-800">Atur jadwal mapel EHB untuk menghitung QTY berdasarkan ujian.</p>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
+              {rabState?.status === 'error' && (
+                <button type="button" onClick={() => void rabEditor?.flush()} className="rounded-xl border bg-white px-4 py-2 text-sm font-semibold text-red-700">
+                  Coba lagi
+                </button>
+              )}
+              {(rabState?.status === 'conflict' || rabState?.status === 'error') && (
+                <button type="button" onClick={() => void reloadRab()} className="rounded-xl border bg-white px-4 py-2 text-sm font-semibold text-slate-700">
+                  Muat ulang RAB
+                </button>
+              )}
+              <button type="button" onClick={() => void openTemplates()} disabled={templateEvents !== null || !rabEditor}
+                className="flex items-center gap-2 rounded-xl border bg-white px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50">
+                <Copy className="h-4 w-4" /> Salin dari Event Sebelumnya
+              </button>
               <button onClick={redetectQtyRecommendation} className="bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
                 <Calculator className="w-4 h-4" /> Deteksi Ulang Qty
               </button>
               <button onClick={resetRecommendation} className="bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
                 <Calculator className="w-4 h-4" /> Reset Rekomendasi
               </button>
-              <button onClick={submit} disabled={saving} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2 disabled:opacity-60">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Simpan Semua Perubahan
-              </button>
             </div>
           </div>
+
+          {templateEvents !== null && (
+            <section className="space-y-3 rounded-2xl border bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="rab-template-event" className="font-semibold text-slate-800">Event sumber RAB</label>
+                <button type="button" onClick={closeTemplates} aria-label="Tutup pilihan event" className="rounded-lg p-2 hover:bg-slate-100">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              {templateEvents.length > 0 && (
+                <select id="rab-template-event" value={templateEventId ?? ''} onChange={e => void pickTemplate(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full rounded-xl border px-3 py-2 text-sm sm:w-auto">
+                  <option value="">Pilih event</option>
+                  {templateEvents.map(item => <option key={item.id} value={item.id}>{item.nama} · {item.tahun_ajaran_nama}</option>)}
+                </select>
+              )}
+              {templateLoading ? <p role="status" className="text-sm text-slate-500">Memuat…</p> : templateEvents.length === 0 ? (
+                <p className="text-sm text-slate-500">Belum ada RAB dari event sebelumnya.</p>
+              ) : null}
+              {copyPreview?.skippedInspectionPrice && (
+                <p className="text-sm text-amber-800">Tarif pemeriksaan berbeda antar marhalah di event sumber. Isi harga pemeriksaan event aktif secara manual.</p>
+              )}
+              {copyPreview && (copyPreview.additions.length || copyPreview.prices.length ? (
+                <>
+                  <ul className="max-h-48 space-y-1 overflow-y-auto text-sm text-slate-700">
+                    {copyPreview.additions.map((row, index) => (
+                      <li key={index}>Tambah {row.nama_barang} · QTY {row.qty} · {rupiah(row.harga)}</li>
+                    ))}
+                    {copyPreview.prices.map(row => <li key={row.id}>Isi harga {row.name} · {rupiah(row.harga)}</li>)}
+                  </ul>
+                  <button type="button" onClick={applyTemplate} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+                    Salin item
+                  </button>
+                </>
+              ) : <p className="text-sm text-slate-500">Item dari event ini sudah ada di RAB aktif.</p>)}
+            </section>
+          )}
 
           <div className="bg-white border rounded-2xl p-5 space-y-4">
             <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
@@ -2426,7 +2587,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
                 <label className="text-xs font-bold text-slate-500 uppercase">Ketua Pelaksana EHB</label>
                 <input
                   value={ketuaPelaksana}
-                  onChange={e => setKetuaPelaksana(e.target.value)}
+                  onChange={e => rabEditor?.editSigner('ketua', e.target.value)}
                   placeholder="Nama ketua pelaksana"
                   className="mt-1 w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
                 />
@@ -2435,7 +2596,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
                 <label className="text-xs font-bold text-slate-500 uppercase">Wakil Pimpinan Bid. Akademik</label>
                 <input
                   value={wakilAkademik}
-                  onChange={e => setWakilAkademik(e.target.value)}
+                  onChange={e => rabEditor?.editSigner('wakil_akademik', e.target.value)}
                   placeholder="Nama wakil pimpinan"
                   className="mt-1 w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
                 />
@@ -2444,7 +2605,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
                 <label className="text-xs font-bold text-slate-500 uppercase">Wakil Pimpinan Bid. Administrasi dan Keuangan</label>
                 <input
                   value={wakilKeuangan}
-                  onChange={e => setWakilKeuangan(e.target.value)}
+                  onChange={e => rabEditor?.editSigner('wakil_keuangan', e.target.value)}
                   placeholder="Nama wakil pimpinan"
                   className="mt-1 w-full border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
                 />
@@ -2492,6 +2653,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
                       ) : items.map((item, index) => {
                         const isFirstItem = index === 0
                         const isLastItem = index === items.length - 1
+                        const recommendation = recommendedQty(systemQty, item.system_key)
                         if (item.system_key === 'honor_pemeriksaan_header') {
                           return (
                             <tr key={item.draft_id} className="bg-slate-100">
@@ -2539,16 +2701,14 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
                                 onChange={e => updateDraft(item.draft_id, { qty: Number(e.target.value) })}
                                 className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
                               />
+                              {recommendation !== undefined && recommendation !== item.qty && (
+                                <p className="mt-1 text-xs text-slate-500">Rekomendasi {recommendation.toLocaleString('id-ID')}</p>
+                              )}
                               {item.system_key === 'honor_panitia' ? <p className="text-[11px] text-slate-400 mt-1">orang</p> : null}
                               {item.system_key === 'atk_hvs' || item.system_key === 'atk_buram' ? <p className="text-[11px] text-slate-400 mt-1">rim</p> : null}
                             </td>
                             <td className="px-4 py-3 align-top">
-                              <input
-                                value={item.harga ? item.harga.toLocaleString('id-ID') : ''}
-                                onChange={e => updateDraft(item.draft_id, { harga: parseMoney(e.target.value) })}
-                                placeholder="0"
-                                className="w-full border rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400"
-                              />
+                              <RabPriceInput amount={item.harga} onChange={harga => updateDraft(item.draft_id, { harga })} />
                               {item.system_key === 'honor_panitia' ? <p className="text-[11px] text-slate-400 mt-1">total panitia</p> : null}
                             </td>
                             <td className="px-4 py-3 align-top">
@@ -2597,7 +2757,7 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab' }: { activeTa
           </div>
         </div>
       )}
-        </>
+        </fieldset>
       )}
     </div>
   )

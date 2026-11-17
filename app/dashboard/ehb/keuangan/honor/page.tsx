@@ -11,10 +11,10 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic'
 
 export default async function HonorKeuanganEhbPage() {
-  await guardPage('/dashboard/ehb/keuangan')
+  const session = await guardPage('/dashboard/ehb/keuangan')
   return (
     <Suspense fallback={<KeuanganLoadingSkeleton />}>
-      <PageContent activeTab="honor_detail" />
+      <PageContent activeTab="honor_detail" cacheScope={session.id} />
     </Suspense>
   )
 }

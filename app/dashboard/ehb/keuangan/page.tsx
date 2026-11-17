@@ -11,10 +11,10 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic'
 
 export default async function KeuanganEhbPage() {
-  await guardPage('/dashboard/ehb/keuangan')
+  const session = await guardPage('/dashboard/ehb/keuangan')
   return (
     <Suspense fallback={<KeuanganLoadingSkeleton />}>
-      <PageContent />
+      <PageContent cacheScope={session.id} />
     </Suspense>
   )
 }
