@@ -68,13 +68,12 @@ test('D1 RAB counts, migration, reference integrity, conflicts and retries', asy
       "INSERT INTO marhalah (id,nama,urutan) VALUES (50,'Ibtidaiyyah 1',1),(51,'Mutawassithah',2),(52,'Mutaqaddimah',3)",
       "INSERT INTO data_guru (id,nama_lengkap) VALUES (50,'Guru Rapor'),(51,'Guru Pemeriksa')",
       "INSERT INTO kelas (id,tahun_ajaran_id,marhalah_id,nama_kelas,jenis_kelamin,guru_maghrib_id) VALUES ('a',50,50,'A','L',50),('b',50,51,'B','L',50),('c',50,52,'C','L',50),('d',50,50,'D','L',50),('e',51,50,'E','L',50)",
-      "INSERT INTO ehb_kelas_jam (ehb_event_id,kelas_id,jam_group) VALUES (1,'a','1'),(1,'b','1'),(1,'c','1'),(1,'e','1')",
       "INSERT INTO santri (id,nis,nama_lengkap,jenis_kelamin,status_global,kelas_sekolah) VALUES ('s1','u1','Satu','L','aktif',NULL),('s2','u2','Dua','L','nonaktif_sementara','9'),('s3','u3','Tiga','L','nonaktif_sementara','8'),('s4','u4','Empat','L','arsip',NULL),('s5','u5','Lima','L','aktif',NULL),('s6','u6','Enam','L','aktif',NULL),('s7','u7','Tujuh','L','aktif',NULL),('s8','u8','Delapan','L','aktif',NULL)",
+      "INSERT INTO santri (id,nis,nama_lengkap,jenis_kelamin,status_global) VALUES ('s9','u9','Aktif tanpa kelas','L','aktif')",
       "INSERT INTO riwayat_pendidikan (id,santri_id,kelas_id) VALUES ('r1','s1','a'),('r1b','s1','a'),('r2','s2','a'),('r3','s3','a'),('r4','s4','a'),('r5','s5','b'),('r6','s6','c'),('r7','s7','d'),('r8','s8','e')",
       "INSERT INTO mapel (id,nama) VALUES (50,'Nahwu'),(51,'Sharaf')",
       "INSERT INTO kitab (id,tahun_ajaran_id,mapel_id,marhalah_id,nama_kitab) VALUES (50,50,50,50,'Nahwu'),(51,50,50,50,'Nahwu kedua')",
       "INSERT INTO ehb_sesi (id,ehb_event_id,nomor_sesi,label,jam_group) VALUES (1,1,1,'Maghrib','1')",
-      "INSERT INTO ehb_jadwal (ehb_event_id,tanggal,sesi_id,kelas_id,mapel_id) VALUES (1,'2026-11-07',1,'a',50),(1,'2026-11-08',1,'a',50),(1,'2026-11-09',1,'a',51),(1,'2026-11-07',1,'b',50),(1,'2026-11-07',1,'c',50)",
       "INSERT INTO ehb_ruangan (id,ehb_event_id,nomor_ruangan) VALUES (1,1,1)",
       "INSERT INTO ehb_pengawas (id,ehb_event_id,nama_pengawas) VALUES (1,1,'Pengawas')",
       "INSERT INTO ehb_jadwal_pengawas (id,ehb_event_id,pengawas_id,ruangan_id,tanggal,sesi_id) VALUES (1,1,1,1,'2026-11-07',1)",
@@ -96,23 +95,42 @@ test('D1 RAB counts, migration, reference integrity, conflicts and retries', asy
     const actions = load(keuangan + '/actions.ts')
     await load('lib/akademik/guru-kitab.ts').ensureGuruKitabSchema()
     await execute("INSERT INTO guru_kitab_assignment (tahun_ajaran_id,kelas_id,sesi,guru_id,kitab_id) VALUES (50,'a','maghrib',50,50),(50,'a','maghrib',51,51)")
+    const beforeJadwal = (await actions.getRabData(1)).autoBasis
+    assert.equal(beforeJadwal.jumlahSantriAktif, 6)
+    assert.equal(beforeJadwal.rekomendasiRim, 1)
+    assert.equal(beforeJadwal.pembuatanSoal, 0)
+    assert.equal(beforeJadwal.santriPerMarhalah.find(row => row.marhalah_id === 50).jumlah_santri, 2)
+    await execute(`
+      WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 495)
+      INSERT INTO santri (id,nis,nama_lengkap,jenis_kelamin,status_global)
+      SELECT 'unmapped-' || i,'unmapped-' || i,'Santri Aktif','L','aktif' FROM n
+    `)
+    const overOneRim = (await actions.getRabData(1)).autoBasis
+    assert.equal(overOneRim.jumlahSantriAktif, 501)
+    assert.equal(overOneRim.rekomendasiRim, 2)
+    await execute("DELETE FROM santri WHERE id LIKE 'unmapped-%'")
+    const beforeJadwalHonor = await actions.getHonorDetailData(1)
+    assert.equal(beforeJadwalHonor.rows.find(row => row.jenis === 'pengisian_rapor').qty, 3)
+    assert.equal(beforeJadwalHonor.rows.some(row => row.jenis === 'pemeriksaan_hasil'), false)
+    await execute("INSERT INTO ehb_jadwal (ehb_event_id,tanggal,sesi_id,kelas_id,mapel_id) VALUES (1,'2026-11-07',1,'a',50),(1,'2026-11-08',1,'a',50),(1,'2026-11-09',1,'a',51),(1,'2026-11-07',1,'b',50),(1,'2026-11-07',1,'c',50)")
     const { autoBasis: basis } = await actions.getRabData(1)
-    assert.equal(basis.raporSantri, 2)
-    assert.equal(basis.totalHasilUjian, 5)
-    assert.equal(basis.totalPemeriksaan, 7)
+    assert.equal(basis.jumlahSantriAktif, beforeJadwal.jumlahSantriAktif)
+    assert.equal(basis.rekomendasiRim, beforeJadwal.rekomendasiRim)
     const honor = await actions.getHonorDetailData(1)
-    assert.equal(honor.rows.find(row => row.jenis === 'pengisian_rapor').qty, 2)
+    assert.equal(honor.rows.find(row => row.jenis === 'pengisian_rapor').qty, 3)
     assert.equal(honor.rows.filter(row => row.jenis === 'pemeriksaan_hasil').length, 2)
-    assert.ok(honor.rows.filter(row => row.jenis === 'pemeriksaan_hasil').every(row => row.qty === 2))
+    assert.ok(honor.rows.filter(row => row.jenis === 'pemeriksaan_hasil').every(row => row.qty === 1))
     assert.equal(honor.rows.some(row => row.jenis === 'pengawasan'), false)
+    await execute("INSERT INTO ehb_kelas_jam (ehb_event_id,kelas_id,jam_group) VALUES (1,'a','1'),(1,'b','1'),(1,'c','1'),(1,'e','1')")
+    assert.equal(JSON.stringify((await actions.getRabData(1)).autoBasis), JSON.stringify(basis))
     await execute("INSERT INTO ehb_absensi_pengawas (ehb_event_id,jadwal_pengawas_id,status) VALUES (1,1,'HADIR')")
     assert.equal((await actions.getHonorDetailData(1)).rows.find(row => row.jenis === 'pengawasan').qty, 1)
     for (const [student, seat] of [['s1', 1], ['s2', 2], ['s5', 3]]) {
       await execute("INSERT INTO ehb_plotting_santri (ehb_event_id,ruangan_id,santri_id,nomor_kursi,jam_group) VALUES (1,1,?,?,'1')", [student, seat])
       assert.equal(JSON.stringify((await actions.getRabData(1)).autoBasis), JSON.stringify(basis))
       const afterPlot = await actions.getHonorDetailData(1)
-      assert.equal(afterPlot.rows.find(row => row.jenis === 'pengisian_rapor').qty, 2)
-      assert.ok(afterPlot.rows.filter(row => row.jenis === 'pemeriksaan_hasil').every(row => row.qty === 2))
+      assert.equal(afterPlot.rows.find(row => row.jenis === 'pengisian_rapor').qty, 3)
+      assert.ok(afterPlot.rows.filter(row => row.jenis === 'pemeriksaan_hasil').every(row => row.qty === 1))
     }
     assert.equal((await actions.getPriorRabEvents(1))[0].id, 2)
     assert.equal('qty' in (await actions.getRabTemplate(1, 2))[0], false)
