@@ -23,8 +23,6 @@ jobs:
     name: Validate, test, and build the exact main commit
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    outputs:
-      application_changed: ${{ steps.scope.outputs.application_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,44 +35,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
-      - name: Classify changed files
-        id: scope
-        env:
-          BEFORE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
-            echo 'Release stopped: cannot determine the base commit for change classification.' >&2
-            exit 1
-          fi
-          changed="$(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA")"
-          app_changed=false
-          while IFS= read -r file; do
-            [[ -z "$file" ]] && continue
-            case "$file" in
-              .github/workflows/release.yml|.github/workflows/deploy.yml|.github/workflows/deploy-sandbox.yml|scripts/ci/*|scripts/test-manual-deploy.cjs|scripts/validate-manual-deploy.cjs) ;;
-              *) app_changed=true ;;
-            esac
-          done <<< "$changed"
-          echo "application_changed=$app_changed" >> "$GITHUB_OUTPUT"
-      - name: Block releases that include database migrations
-        shell: bash
-        env:
-          BEFORE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          set -euo pipefail
-          if [[ -z "$BEFORE_SHA" || "$BEFORE_SHA" =~ ^0+$ ]]; then
-            echo 'Release stopped: cannot determine the previous main commit for migration detection.' >&2
-            exit 1
-          fi
-          git fetch --no-tags --depth=1 origin "$BEFORE_SHA"
-          changed="$(git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA" -- migrations)"
-          if [[ -n "$changed" ]]; then
-            echo 'Release stopped: database migration files changed. Apply migrations only through the separately approved procedure.' >&2
-            printf '%s\n' "$changed" >&2
-            exit 1
-          fi
+      - name: Verify reviewed release migrations
+        run: node scripts/ci/release-migrations.cjs --check
       - name: Validate sandbox and production isolation
         run: node scripts/validate-sandbox-config.cjs
       - name: Validate production release target
@@ -90,6 +52,7 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/test-manual-deploy.cjs
+          node --test scripts/test-ehb-rab.cjs
           npm run test:finance:billing
           npm run test:finance:billing:d1
           node scripts/test-finance-remediation.cjs
@@ -115,6 +78,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       - name: Verify deploy credential and HTTP smoke-test URLs exist
+        if: github.event_name == 'push'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           ESKAHADE_SANDBOX_URL: ${{ vars.ESKAHADE_SANDBOX_URL }}
@@ -130,10 +94,12 @@ jobs:
           node scripts/ci/smoke-http.cjs --validate sandbox "$ESKAHADE_SANDBOX_URL"
           node scripts/ci/smoke-http.cjs --validate production "$ESKAHADE_PRODUCTION_URL"
       - name: Read-only smoke test current sandbox
+        if: github.event_name == 'push'
         run: node scripts/ci/smoke-http.cjs sandbox "$ESKAHADE_SANDBOX_URL"
         env:
           ESKAHADE_SANDBOX_URL: ${{ vars.ESKAHADE_SANDBOX_URL }}
       - name: Read-only smoke test current production
+        if: github.event_name == 'push'
         run: node scripts/ci/smoke-http.cjs production "$ESKAHADE_PRODUCTION_URL"
         env:
           ESKAHADE_PRODUCTION_URL: ${{ vars.ESKAHADE_PRODUCTION_URL }}
@@ -141,7 +107,7 @@ jobs:
   deploy-sandbox:
     name: Deploy sandbox and run HTTP smoke test
     needs: validate-build-test
-    if: github.event_name == 'push' && needs.validate-build-test.outputs.application_changed == 'true'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -174,6 +140,10 @@ jobs:
         env:
           ESKAHADE_SANDBOX_URL: ${{ vars.ESKAHADE_SANDBOX_URL }}
         run: node scripts/ci/smoke-http.cjs --validate sandbox "$ESKAHADE_SANDBOX_URL"
+      - name: Apply reviewed sandbox migrations
+        run: node scripts/ci/release-migrations.cjs --apply sandbox
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - name: Deploy existing sandbox Worker only
         run: >-
           node node_modules/@opennextjs/cloudflare/dist/cli/index.js deploy
@@ -190,7 +160,7 @@ jobs:
   deploy-production:
     name: Deploy production and run HTTP smoke test
     needs: deploy-sandbox
-    if: github.event_name == 'push' && needs.validate-build-test.outputs.application_changed == 'true'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -223,6 +193,10 @@ jobs:
         env:
           ESKAHADE_PRODUCTION_URL: ${{ vars.ESKAHADE_PRODUCTION_URL }}
         run: node scripts/ci/smoke-http.cjs --validate production "$ESKAHADE_PRODUCTION_URL"
+      - name: Apply reviewed production migrations
+        run: node scripts/ci/release-migrations.cjs --apply production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - name: Deploy existing production Worker only
         run: >-
           node node_modules/@opennextjs/cloudflare/dist/cli/index.js deploy
