@@ -6,7 +6,8 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 
 export async function signOut() {
-  const session = await getSession()
+  // Logging out must work even while the database cannot verify the session.
+  const session = await getSession().catch(() => null)
   await logActivity({
     actor: actorFromSession(session),
     module: 'auth',

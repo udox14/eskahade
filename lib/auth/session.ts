@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers'
 import { cache } from 'react'
-import { execute, query, queryOne } from '@/lib/db'
+import { execute, isDatabaseUnavailableError, query, queryOne } from '@/lib/db'
 import { environmentAllowsSession, type AppEnvironment } from '@/lib/db/environment'
 import { runtimeEnvironment } from '@/lib/db/runtime-environment'
 import { storedUserRoles } from '@/lib/auth/stored-roles'
@@ -21,6 +21,18 @@ function getJWTSecret(): string {
   const secret = process.env.JWT_SECRET
   if (!secret) throw new Error('JWT_SECRET tidak ditemukan di environment variables')
   return secret
+}
+
+/**
+ * The signed session is valid but its stored permissions could not be read
+ * because the database is temporarily unavailable. Grants nothing; callers
+ * surface an error instead of redirecting to /login.
+ */
+export class SessionUnavailableError extends Error {
+  constructor() {
+    super('Server sedang sibuk sehingga sesi belum dapat diverifikasi. Coba muat ulang beberapa saat lagi.')
+    this.name = 'SessionUnavailableError'
+  }
 }
 
 export type SessionUser = {
@@ -190,7 +202,8 @@ export const getSession = cache(async function getSession(): Promise<SessionUser
     if (!session) return null
     if (!environmentAllowsSession(session, await runtimeEnvironment())) return null
     return await hydrateSessionFromDb(session)
-  } catch {
+  } catch (err) {
+    if (err instanceof SessionUnavailableError) throw err
     return null
   }
 })
@@ -250,7 +263,10 @@ async function hydrateSessionFromDb(session: SessionUser): Promise<SessionUser |
     }
   } catch (err: any) {
     console.error('[session] hydrateSessionFromDb ERROR:', err?.message)
-    // Stored permissions are authoritative, including when the DB is unavailable.
+    // Stored permissions are authoritative: never fall back to the token.
+    // An outage denies this request without pretending the user logged out;
+    // anything else (revoked/corrupt roles, realm mismatch) ends the session.
+    if (isDatabaseUnavailableError(err)) throw new SessionUnavailableError()
     return null
   }
 }

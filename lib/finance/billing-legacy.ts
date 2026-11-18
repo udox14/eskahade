@@ -3,19 +3,54 @@ import { serviceBillingBlock, serviceBillingSql } from './billing-cutover'
 import { nonBillableItemSqlPredicate, nonBillableSantriSqlPredicate } from './non-billable-santri'
 import { FINANCE_CUTOVER_START_ANNUAL, FINANCE_CUTOVER_START_MONTHLY } from './legacy-reader'
 
-/** Authoritative legacy sources. Never infer an annual period from a payment date. */
-export const legacyBillingEvidence = `
+const LEGACY_SPP_REFERENCE_PREFIX = 'LEGACY_SPP_LOG:'
+const LEGACY_ANNUAL_REFERENCE_PREFIX = 'LEGACY_PEMBAYARAN_TAHUNAN:'
+const LEGACY_ANNUAL_ITEMS_SQL = `pt.jenis_biaya IN ('BANGUNAN','EHB','EKSKUL','KESEHATAN')`
+
+const legacySppEvidence = `
  SELECT sl.santri_id,'SPP' AS item_type,printf('%04d-%02d',sl.tahun,sl.bulan) AS period,
-   sl.nominal_bayar AS amount,0 AS voided,('LEGACY_SPP_LOG:'||sl.id) AS reference
- FROM spp_log sl
- UNION ALL
+   sl.nominal_bayar AS amount,0 AS voided,('${LEGACY_SPP_REFERENCE_PREFIX}'||sl.id) AS reference
+ FROM spp_log sl`
+
+const legacyAnnualEvidence = `
  SELECT pt.santri_id,CASE WHEN pt.jenis_biaya='BANGUNAN' THEN 'USPP' ELSE pt.jenis_biaya END,
    CASE WHEN pt.jenis_biaya='BANGUNAN' THEN 'LIFETIME'
      ELSE COALESCE(CAST(pt.tahun_tagihan AS TEXT),substr(ta.nama,1,4)) END,
    pt.nominal_bayar,CASE WHEN pt.status='VOID' THEN 1 ELSE 0 END,
-   ('LEGACY_PEMBAYARAN_TAHUNAN:'||pt.id)
+   ('${LEGACY_ANNUAL_REFERENCE_PREFIX}'||pt.id)
  FROM pembayaran_tahunan pt LEFT JOIN tahun_ajaran ta ON ta.id=pt.tahun_ajaran_id
- WHERE pt.jenis_biaya IN ('BANGUNAN','EHB','EKSKUL','KESEHATAN')`
+ WHERE ${LEGACY_ANNUAL_ITEMS_SQL}`
+
+/** Authoritative legacy sources. Never infer an annual period from a payment date. */
+export const legacyBillingEvidence = `${legacySppEvidence}
+ UNION ALL${legacyAnnualEvidence}`
+
+/**
+ * The same evidence rows, restricted to one student inside each source.
+ * SQLite does not push a correlated outer predicate into a UNION ALL subquery,
+ * so without this every correlated lookup scans all of spp_log and
+ * pembayaran_tahunan (D1 "overloaded" on finance pages). Callers keep their
+ * own santri_id predicate; this only lets the per-source indexes be used.
+ */
+function legacyEvidenceForSantri(santriExpr: string): string {
+  return `${legacySppEvidence} WHERE sl.santri_id=${santriExpr}
+ UNION ALL${legacyAnnualEvidence} AND pt.santri_id=${santriExpr}`
+}
+
+/**
+ * True exactly when some evidence row has reference = refExpr. A reference is
+ * a case-sensitive prefix plus the source primary key, so it resolves by PK
+ * instead of comparing a computed string against every legacy row.
+ */
+function legacyEvidenceReferenceExistsSql(refExpr: string): string {
+  const sppLen = LEGACY_SPP_REFERENCE_PREFIX.length
+  const annualLen = LEGACY_ANNUAL_REFERENCE_PREFIX.length
+  return `(EXISTS(SELECT 1 FROM spp_log sl
+      WHERE substr(${refExpr},1,${sppLen})='${LEGACY_SPP_REFERENCE_PREFIX}' AND sl.id=substr(${refExpr},${sppLen + 1}))
+    OR EXISTS(SELECT 1 FROM pembayaran_tahunan pt
+      WHERE substr(${refExpr},1,${annualLen})='${LEGACY_ANNUAL_REFERENCE_PREFIX}' AND pt.id=substr(${refExpr},${annualLen + 1})
+        AND ${LEGACY_ANNUAL_ITEMS_SQL}))`
+}
 
 /** Read existing legacy waivers; never rewrite them or manufacture a new exemption. */
 export function legacyExemptSql(alias = 'o'): string {
@@ -27,7 +62,7 @@ export function legacyExemptSql(alias = 'o'): string {
 
 /** A missing mirror, changed amount, ambiguous period, or unreversed void blocks collection. */
 export function legacyReviewSql(alias = 'o'): string {
-  return `(EXISTS (SELECT 1 FROM (${legacyBillingEvidence}) be
+  return `(EXISTS (SELECT 1 FROM (${legacyEvidenceForSantri(`${alias}.santri_id`)}) be
     WHERE be.santri_id=${alias}.santri_id AND be.item_type=${alias}.item_type
       AND (be.period=${alias}.period OR be.period IS NULL)
       AND (be.period IS NULL OR (be.voided=0 AND (be.amount<=0 OR
@@ -43,7 +78,7 @@ export function legacyReviewSql(alias = 'o'): string {
       WHERE oa.obligation_id=${alias}.id AND op.source='LEGACY'
         AND oa.amount-COALESCE((SELECT SUM(ci.amount) FROM finance_correction_items ci WHERE ci.target_allocation_id=oa.id),0)>0
         AND (op.external_reference LIKE 'LEGACY_SPP_LOG:%' OR op.external_reference LIKE 'LEGACY_PEMBAYARAN_TAHUNAN:%')
-        AND NOT EXISTS(SELECT 1 FROM (${legacyBillingEvidence}) oe WHERE oe.reference=op.external_reference)))`
+        AND NOT ${legacyEvidenceReferenceExistsSql('op.external_reference')}))`
 }
 
 export function collectibleBillingSql(alias = 'o'): string {
@@ -71,7 +106,7 @@ export async function billingReviewCount(store: BillingStore, santriId?: string)
   const orphan = await store.queryOne<{ count: number }>(`SELECT COUNT(*) count FROM finance_obligations o
     JOIN santri bs ON bs.id=o.santri_id WHERE bs.status_global='aktif'
     AND ${nonBillableSantriSqlPredicate('bs.asrama')} ${santriId ? 'AND o.santri_id=?' : ''}
-    AND ${legacyReviewSql('o')} AND NOT EXISTS(SELECT 1 FROM (${legacyBillingEvidence}) be
+    AND ${legacyReviewSql('o')} AND NOT EXISTS(SELECT 1 FROM (${legacyEvidenceForSantri('o.santri_id')}) be
       WHERE be.santri_id=o.santri_id AND be.item_type=o.item_type AND (be.period=o.period OR be.period IS NULL))`,santriId ? [santriId] : [])
   return (row?.count ?? 0) + (orphan?.count ?? 0)
 }
