@@ -173,6 +173,8 @@ function ReviewDrawer({ id, onClose, onDone }: { id: string; onClose: () => void
 
   const s = detail?.submission
   const reviewable = !!detail?.canMutate && s?.status === 'MENUNGGU_VERIFIKASI'
+  // Waiting for a re-upload that may never come: the verifier can still close it.
+  const closable = !!detail?.canMutate && s?.status === 'PERLU_PERBAIKAN'
   const receivedAmount = Number(received.replace(/\D/g, '')) || 0
 
   const submit = async () => {
@@ -278,7 +280,17 @@ function ReviewDrawer({ id, onClose, onDone }: { id: string; onClose: () => void
                 </ol>
               </div>
 
-              {reviewable && (
+              {closable && mode !== 'reject' && (
+                <div className="border-t border-slate-200 pt-4">
+                  <p className="text-xs text-slate-600 mb-2">Menunggu wali mengunggah ulang bukti. Jika wali tidak menanggapi, Anda dapat menolak agar wali bisa membuat pembayaran baru.</p>
+                  <button type="button" onClick={() => { setMode('reject'); setNotes('') }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-700 border border-red-200 rounded-lg hover:bg-red-50">
+                    <XCircle className="w-4 h-4" /> Tolak
+                  </button>
+                </div>
+              )}
+
+              {(reviewable || (closable && mode === 'reject')) && (
                 <div className="border-t border-slate-200 pt-4 space-y-3">
                   {!mode ? (
                     <div className="grid grid-cols-2 gap-2">

@@ -188,6 +188,17 @@ async function main() {
     assert.throws(() => h.db.exec(`UPDATE finance_transfer_submissions SET status='MENUNGGU_VERIFIKASI' WHERE id='${sub.id}'`), /FINAL|TRANSITION/)
   })
 
+  await test('verifier can close a submission whose parent never re-uploads', async () => {
+    const order = await transferOrder('student', [{ itemType: 'UANG_JAJAN', amount: 40000 }])
+    await upload('student', order.id, 21)
+    const sub = await mt.getTransferSubmissionByOrder(order.id)
+    await mt.requestTransferProofFix(officerA, { submissionId: sub.id, reason: 'Nominal tidak terbaca' })
+    await assert.rejects(() => transferOrder('student', [{ itemType: 'UANG_JAJAN', amount: 10000 }]), /sedang dicek petugas/)
+    await mt.rejectTransferSubmission(officerA, { submissionId: sub.id, reason: 'Tidak ada tanggapan wali' })
+    assert.equal(one('SELECT status FROM finance_payment_orders WHERE id=?', order.id).status, 'CANCELLED')
+    await transferOrder('student', [{ itemType: 'UANG_JAJAN', amount: 10000 }])
+  })
+
   await test('one active online order per santri; proof under review blocks replacement and expiry', async () => {
     const first = await transferOrder('student', [{ itemType: 'UANG_JAJAN', amount: 40000 }])
     const second = await transferOrder('student', [{ itemType: 'UANG_JAJAN', amount: 60000 }])

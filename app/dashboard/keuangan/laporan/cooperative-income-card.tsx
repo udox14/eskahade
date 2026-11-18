@@ -19,8 +19,11 @@ export default function CooperativeIncomeCard() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setStats(null)
-    fetchCooperativeIncomeStats(month).then(setStats).catch(e => setError(e instanceof Error ? e.message : 'Gagal memuat.'))
+    let active = true
+    fetchCooperativeIncomeStats(month)
+      .then(result => { if (active) { setStats(result); setError(null) } })
+      .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Gagal memuat.') })
+    return () => { active = false }
   }, [month])
 
   return (
@@ -30,7 +33,7 @@ export default function CooperativeIncomeCard() {
           <h3 className="text-sm font-semibold text-slate-900">Pendapatan Koperasi</h3>
           <p className="text-xs text-slate-500">Biaya admin dan kode unik transfer, bersih setelah koreksi/refund.</p>
         </div>
-        <input type="month" value={month} onChange={e => setMonth(e.target.value)} aria-label="Bulan"
+        <input type="month" value={month} onChange={e => { setStats(null); setMonth(e.target.value) }} aria-label="Bulan"
           className="text-xs border border-slate-200 rounded-lg px-2 py-1.5" />
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
