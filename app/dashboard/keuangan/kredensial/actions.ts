@@ -1,5 +1,6 @@
 'use server'
 
+import { assertCredentialsModuleEnabled } from '@/lib/finance/credentials-switch'
 import { authorizeFinanceFeature } from '@/lib/finance/authorization'
 
 import { query, queryOne, execute, generateId, now } from '@/lib/db'
@@ -169,6 +170,7 @@ async function authorizeUser(): Promise<{
   if (!session) {
     throw new Error('Sesi telah berakhir. Silakan masuk kembali.')
   }
+  await assertCredentialsModuleEnabled()
 
   const roles = getEffectiveRoles(session)
   const hasViewAccess = roles.some(r => ALLOWED_VIEW_ROLES.includes(r))

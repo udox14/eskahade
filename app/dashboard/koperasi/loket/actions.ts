@@ -1,5 +1,6 @@
 'use server'
 
+import { assertCredentialsModuleEnabled } from '@/lib/finance/credentials-switch'
 import { ensureStudentBilling } from '@/lib/finance/billing'
 import { collectibleBillingSql } from '@/lib/finance/billing-legacy'
 import { billingPhase, dueBillingSql, advanceBillingPeriods } from '@/lib/finance/billing-periods'
@@ -394,6 +395,7 @@ export async function verifyStudentLoketPin(
   remainingLockSeconds?: number
   attemptsLeft: number
 }> {
+  await assertCredentialsModuleEnabled()
   const {userId} = await authorizeLoketOperator(true)
   const token = generateId()
   const result = await verifyStudentPin(santriId, pin, { authorization: {
@@ -431,6 +433,7 @@ export async function changeStudentPinAtLoketAction(
   newPin: string,
   confirmPin: string
 ): Promise<{ success: boolean; message: string }> {
+  await assertCredentialsModuleEnabled()
   const { userId } = await authorizeLoketOperator(true)
 
   const cleanOld = String(oldPin ?? '').trim()
@@ -474,6 +477,7 @@ export async function resetStudentPinAtLoketAction(
   santriId: string,
   reason: string
 ): Promise<{ success: boolean; newPlaintextPin: string; message: string }> {
+  await assertCredentialsModuleEnabled()
   const { userId, operatorName } = await authorizeLoketOperator(true)
 
   const cleanReason = String(reason ?? '').trim()
@@ -593,6 +597,7 @@ export async function getStudentLoketAccountData(
 export async function executeLoketWithdrawal(
   input: LoketWithdrawalInput
 ): Promise<LoketWithdrawalReceipt> {
+  await assertCredentialsModuleEnabled()
   const { userId, operatorName } = await authorizeLoketOperator(true)
 
   const amount = rupiah(input.amount)

@@ -1,5 +1,6 @@
 'use server'
 
+import { isCredentialsModuleEnabled } from '@/lib/finance/credentials-switch'
 import { execute, queryOne } from '@/lib/db'
 import { hashPassword, verifyPassword } from '@/lib/auth/password'
 import { requirePortalSessionAction } from '@/lib/portal/session'
@@ -42,6 +43,7 @@ export async function ubahPinUangJajanPortal(
   konfirmasiPin: string
 ) {
   try {
+    if (!await isCredentialsModuleEnabled()) return { error: 'PIN santri tidak lagi digunakan untuk pencairan uang jajan.' }
     const session = await requirePortalSessionAction()
 
     const pw = String(passwordPortal ?? '').trim()

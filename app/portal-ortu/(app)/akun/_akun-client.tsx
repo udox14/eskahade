@@ -44,6 +44,7 @@ interface AkunClientProps {
     parent_monthly_limit: number | null
   } | null
   globalDailyLimit?: number
+  showPin?: boolean
   pinStatus?: {
     hasPin: boolean
     isLocked: boolean
@@ -58,6 +59,7 @@ export function AkunClient({
   parentLimits,
   globalDailyLimit = 100000,
   pinStatus,
+  showPin = true,
 }: AkunClientProps) {
   const router = useRouter()
   const { theme, resolvedTheme, setTheme } = usePortalTheme()
@@ -308,6 +310,7 @@ export function AkunClient({
           Keamanan &amp; Akses
         </h3>
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden">
+          {showPin && (<>
           {/* PIN Santri */}
           <button
             type="button"
@@ -340,6 +343,7 @@ export function AkunClient({
               <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-500" />
             </div>
           </button>
+          </>)}
 
           {/* Ganti Password Portal */}
           <button

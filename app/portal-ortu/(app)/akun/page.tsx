@@ -3,13 +3,14 @@ import { getParentWalletLimits, getGlobalDailyLimit } from '@/lib/finance/wallet
 import { getStudentPinStatus } from '@/lib/finance/pins'
 import { queryOne } from '@/lib/db'
 import { AkunClient } from './_akun-client'
+import { isCredentialsModuleEnabled } from '@/lib/finance/credentials-switch'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AkunPage() {
   const session = await requirePortalSession()
 
-  const [parentLimits, globalDailyLimit, pinStatus, riwayatKelas] = await Promise.all([
+  const [parentLimits, globalDailyLimit, pinStatus, riwayatKelas, showPin] = await Promise.all([
     getParentWalletLimits(session.santri_id).catch(() => null),
     getGlobalDailyLimit().catch(() => 100000),
     getStudentPinStatus(session.santri_id).catch(() => null),
@@ -20,6 +21,7 @@ export default async function AkunPage() {
       WHERE rp.santri_id = ? AND rp.status_riwayat = 'aktif'
       LIMIT 1
     `, [session.santri_id]).catch(() => null),
+    isCredentialsModuleEnabled(),
   ])
 
   return (
@@ -36,6 +38,7 @@ export default async function AkunPage() {
         parentLimits={parentLimits}
         globalDailyLimit={globalDailyLimit}
         pinStatus={pinStatus}
+        showPin={showPin}
       />
     </div>
   )
