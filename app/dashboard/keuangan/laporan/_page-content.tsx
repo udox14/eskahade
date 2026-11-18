@@ -3,6 +3,7 @@
 // app/dashboard/keuangan/laporan/_page-content.tsx
 // Antarmuka Modul Laporan & Cetak Ekspor Keuangan (Fase 10: PRD Bab 34, 40, 42)
 
+import CooperativeIncomeCard from './cooperative-income-card'
 import React, { useState, useTransition, useId } from 'react'
 import {
   FileSpreadsheet,
@@ -481,6 +482,8 @@ export default function LaporanKeuanganContent({
         </div>
       </div>
 
+      {activeTab === 'PENERIMAAN' && <CooperativeIncomeCard />}
+
       {/* ── KPI SUMMARY CARDS (ADAPTIF PER REPORT) ─────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {activeTab === 'PENERIMAAN' && (
@@ -491,9 +494,9 @@ export default function LaporanKeuanganContent({
               <p className="text-[11px] text-slate-400 mt-1">{receiptsData.kpi.totalTransactions} transaksi</p>
             </div>
             <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
-              <p className="text-xs text-slate-500 font-medium">Fee Payment Gateway</p>
-              <p className="text-xl font-bold text-slate-900 mt-1">{formatRupiah(receiptsData.kpi.totalFee)}</p>
-              <p className="text-[11px] text-slate-400 mt-1">Online BRI</p>
+              <p className="text-xs text-slate-500 font-medium">Pendapatan Koperasi</p>
+              <p className="text-xl font-bold text-slate-900 mt-1">{formatRupiah(receiptsData.kpi.totalFee + receiptsData.kpi.totalUniqueCode)}</p>
+              <p className="text-[11px] text-slate-400 mt-1">Biaya admin {formatRupiah(receiptsData.kpi.totalFee)} · kode unik {formatRupiah(receiptsData.kpi.totalUniqueCode)}</p>
             </div>
             <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
               <p className="text-xs text-slate-500 font-medium">Penerimaan Bersih (Neto)</p>
@@ -503,7 +506,7 @@ export default function LaporanKeuanganContent({
             <div className="p-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
               <p className="text-xs text-slate-500 font-medium">Penerimaan Tunai Loket</p>
               <p className="text-xl font-bold text-blue-700 mt-1">{formatRupiah(receiptsData.kpi.cashGross)}</p>
-              <p className="text-[11px] text-slate-400 mt-1">Online: {formatRupiah(receiptsData.kpi.onlineGross)}</p>
+              <p className="text-[11px] text-slate-400 mt-1">BRIVA: {formatRupiah(receiptsData.kpi.onlineGross - receiptsData.kpi.transferGross)} · Transfer: {formatRupiah(receiptsData.kpi.transferGross)}</p>
             </div>
           </>
         )}
@@ -1541,7 +1544,8 @@ export default function LaporanKeuanganContent({
           filterSummary={`Asrama: ${asrama} | Kelas: ${kelas} | Periode: ${period || 'Semua'}`}
           kpis={[
             { label: 'Total Bruto', value: formatRupiah(receiptsData.kpi.totalGross) },
-            { label: 'Fee Gateway', value: formatRupiah(receiptsData.kpi.totalFee) },
+            { label: 'Biaya Admin Koperasi', value: formatRupiah(receiptsData.kpi.totalFee) },
+            { label: 'Kode Unik Transfer', value: formatRupiah(receiptsData.kpi.totalUniqueCode) },
             { label: 'Penerimaan Bersih', value: formatRupiah(receiptsData.kpi.totalNet) },
             { label: 'Total Transaksi', value: `${receiptsData.kpi.totalTransactions} item` },
           ]}

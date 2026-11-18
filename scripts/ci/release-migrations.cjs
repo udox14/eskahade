@@ -12,6 +12,7 @@ const root = path.resolve(__dirname, '../..');
 const migrationBase = '9539a47118123ea4e28da09ac9b3f525f24c37b9';
 const reviewed = {
   '0197_ehb_rab_autosave.sql': 'b78aaf49f8c843c6a98da8a5bf309f6b91f6010c4516ea015b6fc089613a3a5b',
+  '0198_manual_transfer_and_collective_payout.sql': 'fcafc3acc82e13ee9be3ddcff16b922766f224f901fed1e2deaa0abc1a4e7f2d',
 };
 
 function validateMigrationChanges(changes) {

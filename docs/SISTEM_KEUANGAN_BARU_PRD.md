@@ -1799,3 +1799,30 @@ harus disesuaikan setelah audit codebase existing.
 
 Namun keputusan teknis tersebut tidak boleh melanggar business rule dalam PRD ini.
 
+
+---
+
+# Addendum 2026-11-18 — Transfer Manual & Pencairan Kolektif
+
+Keputusan rapat 2026-11-18 (menambah, tidak menghapus, integrasi BRI):
+
+1. **Jalur pembayaran wali**: BRIVA, Transfer Manual, atau keduanya — dipilih admin di
+   Pengaturan Keuangan → Jalur Pembayaran. Wali hanya melihat jalur yang aktif dan siap.
+2. **Transfer Manual**: wali memilih rekening tujuan (admin dapat mendaftarkan banyak rekening),
+   mentransfer nominal tepat, lalu mengunggah bukti. Petugas memeriksa mutasi dan menerima,
+   menolak, atau meminta unggah ulang. Setiap pembayaran menunggu keputusan petugas.
+3. **Kode unik**: sistem menambahkan Rp1–Rp999 (configurable) agar setiap transfer mudah dikenali,
+   contoh 500.000 → 500.020. Kode unik dicatat sebagai pendapatan Koperasi.
+4. **Biaya admin transfer**: pendapatan Koperasi, configurable, ada statistiknya (Laporan →
+   Penerimaan → Pendapatan Koperasi). Wali memilih *ditambahkan* (transfer 505.000, masuk 500.000)
+   atau *dipotong* (transfer 500.000, masuk 495.000). Opsi potong hanya untuk Uang Jajan atau
+   cicilan; tagihan yang wajib lunas penuh (mis. SPP) tidak dapat dipotong.
+5. **Pembagian kerja petugas**: admin menugaskan petugas per asrama (mis. Ahmad: A & E; Yusuf: B, C, D).
+6. **Kartu santri tidak dipakai** untuk pencairan uang jajan. Modul Kredensial dinonaktifkan,
+   data tidak dihapus.
+7. **Pencairan uang jajan kolektif**: perwakilan asrama (per kamar/lantai/bebas) membawa uang
+   untuk beberapa santri. Santri yang tidak hadir dibatalkan; uangnya wajib kembali ke loket dan
+   saldonya dipulihkan. Tidak ada hak yang hilang atau tercatat ganda.
+
+Aturan teknis rinci: AGENTS.md §47 (Transfer Manual) dan §48 (Pencairan Kolektif).
+Runbook migrasi: docs/MANUAL_TRANSFER_MIGRATION.md.

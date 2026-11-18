@@ -275,10 +275,10 @@ export async function getUangJajanData(
        ) l2 ON l1.santri_id = l2.santri_id AND l1.created_at = l2.max_date
      ) latest ON latest.santri_id = s.id
      LEFT JOIN (
-       SELECT santri_id, SUM(amount) AS withdrawn_today
+       SELECT santri_id, SUM(CASE WHEN movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN' THEN -amount ELSE amount END) AS withdrawn_today
        FROM finance_wallet_ledger
-       WHERE direction = 'OUT' AND movement_type = 'WITHDRAWAL_LOKET'
-         AND date(created_at, 'localtime') = date('now', 'localtime')
+       WHERE movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF', 'WITHDRAWAL_KOLEKTIF_RETURN')
+         AND date(created_at, '+7 hours') = date('now', '+7 hours')
        GROUP BY santri_id
      ) wt ON wt.santri_id = s.id
      ${whereClause}

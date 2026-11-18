@@ -53,6 +53,9 @@ const MOVEMENT_LABELS: Record<string, string> = {
   TOPUP_CASH: 'Setor Tunai (Loket)',
   WITHDRAWAL_LOKET: 'Pencairan Loket',
   REVERSAL: 'Pembalikan / Reversal',
+  TOPUP_TRANSFER: 'Isi via Transfer Bank',
+  WITHDRAWAL_KOLEKTIF: 'Pencairan via Perwakilan',
+  WITHDRAWAL_KOLEKTIF_RETURN: 'Pencairan Dibatalkan (uang kembali)',
 }
 
 export function WalletDetailDrawer({
