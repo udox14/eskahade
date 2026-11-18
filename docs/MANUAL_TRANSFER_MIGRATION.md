@@ -41,8 +41,16 @@ trg_finance_order_money_guard             trg_finance_wallet_verify_balance
 trg_finance_order_snapshot_immutable      trg_finance_wallet_withdrawal_limit
 ```
 
-Sandbox may additionally list `trg_sandbox_recovery_wallet_arithmetic` (dropped; its checks are
-already covered by `trg_finance_wallet_verify_balance`). **If any other name appears, stop** and
+Sandbox additionally lists three sandbox-recovery/0194 triggers
+(`trg_sandbox_recovery_wallet_arithmetic`, `trg_sandbox_recovery_quarantine_dist_insert`,
+`trg_sandbox_recovery_quarantine_dist_update`). 0198 drops them (no-op on production); restore
+them on sandbox afterwards:
+
+```bash
+npx wrangler d1 execute eskahade-demo-db --env sandbox --remote --file=migrations/sandbox-recovery/0198_sandbox_restore_recovery_triggers.sql
+```
+
+Audited 2026-11-18: production has exactly the 14 expected triggers; sandbox has those 14 + the 3 above. **If any other name appears, stop** and
 add it to the migration before applying — otherwise the rename step fails (the transaction rolls
 back, nothing is changed).
 

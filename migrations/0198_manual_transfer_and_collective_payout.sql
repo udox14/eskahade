@@ -35,6 +35,11 @@ DROP TRIGGER IF EXISTS trg_finance_wallet_verify_balance;
 DROP TRIGGER IF EXISTS trg_finance_wallet_withdrawal_limit;
 DROP TRIGGER IF EXISTS trg_finance_wallet_integer_guard;
 DROP TRIGGER IF EXISTS trg_sandbox_recovery_wallet_arithmetic;
+-- Sandbox-only (sandbox-recovery/0194). They reference finance_payments, so they must be
+-- dropped before the rename; recreate them on sandbox with
+-- sandbox-recovery/0198_sandbox_restore_recovery_triggers.sql. No-op on production.
+DROP TRIGGER IF EXISTS trg_sandbox_recovery_quarantine_dist_insert;
+DROP TRIGGER IF EXISTS trg_sandbox_recovery_quarantine_dist_update;
 DROP TRIGGER IF EXISTS trg_finance_billing_order_review;
 DROP TRIGGER IF EXISTS trg_finance_billing_allocation_review;
 
