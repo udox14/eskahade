@@ -8,7 +8,8 @@ import { formatRupiah } from '@/lib/portal/format'
 import { BottomSheet } from '../../_components/bottom-sheet'
 import { WalletLimitCard } from '../akun/_wallet-limit-card'
 import { createPortalCheckoutAction } from '../tagihan/actions'
-import type { PortalCheckoutResponse, PortalStudentBillingData } from '@/lib/portal/finance'
+import { TransferSheet } from '../tagihan/_transfer-panel'
+import type { PortalCheckoutResponse, PortalStudentBillingData, PortalTransferSummary } from '@/lib/portal/finance'
 
 interface ParentLimits {
   parentDailyLimit: number | null
@@ -24,6 +25,8 @@ interface BerandaWalletCardProps {
   parentLimits: ParentLimits
   gatewayInfo?: PortalStudentBillingData['gatewayInfo'] | null
   fixedVa?: PortalStudentBillingData['fixedVa'] | null
+  paymentChannels?: PortalStudentBillingData['paymentChannels'] | null
+  transferInReview?: boolean
 }
 
 export function BerandaWalletCard({
@@ -33,6 +36,8 @@ export function BerandaWalletCard({
   parentLimits,
   gatewayInfo,
   fixedVa,
+  paymentChannels,
+  transferInReview = false,
 }: BerandaWalletCardProps) {
   const router = useRouter()
 
@@ -42,14 +47,27 @@ export function BerandaWalletCard({
 
   // Top Up form states
   const [topUpAmount, setTopUpAmount] = useState<number>(100000)
-  const paymentMethod = 'BRI_VA' as const
+  const availableMethods = [
+    ...(paymentChannels?.transfer.available ? ['MANUAL_TRANSFER' as const] : []),
+    ...(paymentChannels?.briva.available ? ['BRI_VA' as const] : []),
+  ]
+  const [chosenMethod, setChosenMethod] = useState<'BRI_VA' | 'MANUAL_TRANSFER' | null>(null)
+  const paymentMethod = chosenMethod && availableMethods.includes(chosenMethod) ? chosenMethod : availableMethods[0] ?? null
+  const accounts = paymentChannels?.transfer.accounts ?? []
+  const [accountId, setAccountId] = useState<string | null>(null)
+  const destinationAccountId = accountId && accounts.some(a => a.id === accountId) ? accountId : accounts[0]?.id ?? null
+  const [deductFee, setDeductFee] = useState(false)
+  const [transferSheet, setTransferSheet] = useState<PortalTransferSummary | null>(null)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const [checkoutResult, setCheckoutResult] = useState<PortalCheckoutResponse | null>(null)
   const [copied, setCopied] = useState(false)
 
   // Fee calculation
-  const cooperativeFee = gatewayInfo?.defaultVaFee ?? 0
-  const totalCharged = topUpAmount > 0 ? topUpAmount + cooperativeFee : 0
+  const isTransfer = paymentMethod === 'MANUAL_TRANSFER'
+  const cooperativeFee = isTransfer ? paymentChannels?.transfer.fee ?? 0 : paymentChannels?.briva.fee ?? gatewayInfo?.defaultVaFee ?? 0
+  const canDeduct = isTransfer && !!paymentChannels?.transfer.feeDeductEnabled && cooperativeFee > 0 && topUpAmount > cooperativeFee
+  const deducting = canDeduct && deductFee
+  const totalCharged = topUpAmount > 0 ? (deducting ? topUpAmount : topUpAmount + cooperativeFee) : 0
 
   const handleCopyVa = (vaText: string) => {
     navigator.clipboard.writeText(vaText)
@@ -66,9 +84,15 @@ export function BerandaWalletCard({
 
     setIsCheckingOut(true)
     try {
+      if (!paymentMethod) {
+        toast.error('Belum ada cara pembayaran online yang tersedia.')
+        return
+      }
       const res = await createPortalCheckoutAction({
         santriId,
-        paymentMethod: 'BRI_VA',
+        paymentMethod,
+        feeMode: deducting ? 'DEDUCT' : 'ADD',
+        destinationAccountId: isTransfer ? destinationAccountId || undefined : undefined,
         items: [
           {
             obligationId: null,
@@ -84,7 +108,13 @@ export function BerandaWalletCard({
         return
       }
 
-      setCheckoutResult(res)
+      if (isTransfer) {
+        setIsTopUpOpen(false)
+        setTopUpAmount(100000)
+        setTransferSheet(res.checkout.transfer || null)
+      } else {
+        setCheckoutResult(res)
+      }
       router.refresh()
     } catch {
       toast.error('Terjadi kesalahan koneksi saat memproses checkout.')
@@ -193,12 +223,16 @@ export function BerandaWalletCard({
             >
               Selesai
             </button>
-          ) : !gatewayInfo?.isOnlineAvailable ? (
+          ) : transferInReview ? (
+              <div className="w-full rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/40 p-3 text-xs text-amber-800 dark:text-amber-200 text-left">
+                Masih ada bukti transfer yang sedang dicek petugas. Isi saldo baru bisa dibuat setelah hasilnya keluar.
+              </div>
+          ) : !paymentMethod ? (
               <div className="w-full space-y-2">
                 <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/40 p-3 text-xs text-amber-800 dark:text-amber-200 text-left">
                   <p className="font-semibold">Top-Up Online Belum Tersedia</p>
                   <p className="mt-1 text-[11px] leading-relaxed">
-                    Kanal top-up online (BRIVA) belum diaktifkan. Setor titipan uang jajan dilayani secara tunai di loket kasir pesantren.
+                    {gatewayInfo?.unavailableReason || 'Top-up online belum dibuka. Setor titipan uang jajan dilayani secara tunai di loket kasir pesantren.'}
                   </p>
                 </div>
                 <button
@@ -221,6 +255,8 @@ export function BerandaWalletCard({
                     <Loader2 className="w-4 h-4 animate-spin text-[#bef264]" />
                     <span>Memproses pembayaran…</span>
                   </>
+                ) : isTransfer ? (
+                  `Lanjut transfer ${formatRupiah(totalCharged)} + kode unik`
                 ) : (
                   `Buat Pembayaran ${formatRupiah(totalCharged)}`
                 )}
@@ -284,15 +320,42 @@ export function BerandaWalletCard({
               </div>
             </div>
 
-            {/* Metode Pembayaran */}
+            {/* Cara Pembayaran */}
             <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Metode Pembayaran</span>
-              <div className="rounded-xl border border-emerald-700 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/60 p-3 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">Virtual Account BRI (BRIVA)</p>
-                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-0.5">Transfer via BRImo, ATM BRI, AgenBRILink, atau Bank Lain</p>
-                </div>
-              </div>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Cara pembayaran</span>
+              {availableMethods.map(method => {
+                const active = paymentMethod === method
+                return (
+                  <label key={method} className={`flex items-start gap-3 rounded-xl border p-3 ${availableMethods.length > 1 ? 'cursor-pointer' : ''} ${active ? 'border-emerald-700 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/60' : 'border-slate-200 dark:border-slate-700'}`}>
+                    {availableMethods.length > 1 && (
+                      <input type="radio" name="topup-method" className="mt-1 accent-emerald-700" checked={active} onChange={() => setChosenMethod(method)} />
+                    )}
+                    <span>
+                      <span className="block text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                        {method === 'MANUAL_TRANSFER' ? 'Transfer bank + unggah bukti' : 'Virtual Account BRI (BRIVA)'}
+                      </span>
+                      <span className="block text-[11px] text-emerald-700 dark:text-emerald-300 mt-0.5">
+                        {method === 'MANUAL_TRANSFER' ? 'Transfer ke rekening Koperasi lalu kirim foto bukti.' : 'Transfer via BRImo, ATM BRI, AgenBRILink, atau Bank Lain'}
+                      </span>
+                    </span>
+                  </label>
+                )
+              })}
+              {isTransfer && accounts.length > 1 && (
+                <label className="block space-y-1">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Rekening tujuan</span>
+                  <select value={destinationAccountId ?? ''} onChange={e => setAccountId(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm">
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.bankName} · {a.accountNumber}</option>)}
+                  </select>
+                </label>
+              )}
+              {isTransfer && canDeduct && (
+                <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300">
+                  <input type="checkbox" className="mt-0.5 accent-emerald-700" checked={deductFee} onChange={e => setDeductFee(e.target.checked)} />
+                  <span>Potong biaya admin dari nominal (transfer {formatRupiah(topUpAmount)}, saldo masuk {formatRupiah(topUpAmount - cooperativeFee)})</span>
+                </label>
+              )}
             </div>
 
             {/* Rincian Subtotal & Biaya */}
@@ -302,9 +365,15 @@ export function BerandaWalletCard({
                 <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{formatRupiah(topUpAmount)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Biaya Admin Koperasi</span>
-                <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{formatRupiah(cooperativeFee)}</span>
+                <span>Biaya Admin Koperasi{deducting ? ' (dipotong)' : ''}</span>
+                <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{deducting ? '−' : ''}{formatRupiah(cooperativeFee)}</span>
               </div>
+              {isTransfer && (
+                <div className="flex justify-between">
+                  <span>Kode unik</span>
+                  <span className="text-slate-500">ditambahkan sistem (Rp1–Rp999)</span>
+                </div>
+              )}
               <div className="flex justify-between border-t border-slate-100 dark:border-slate-800 pt-2 font-bold text-slate-950 dark:text-slate-100 text-sm">
                 <span>Total Pembayaran</span>
                 <span className="font-mono text-emerald-800 dark:text-emerald-400">{formatRupiah(totalCharged)}</span>
@@ -372,6 +441,7 @@ export function BerandaWalletCard({
           </div>
         )}
       </BottomSheet>
+      <TransferSheet transfer={transferSheet} open={Boolean(transferSheet)} onClose={() => setTransferSheet(null)} />
     </>
   )
 }
