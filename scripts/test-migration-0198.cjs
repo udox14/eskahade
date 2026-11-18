@@ -74,12 +74,12 @@ const triggerNames = db => db.prepare("SELECT name FROM sqlite_master WHERE type
 // 1b. Sandbox shape: sandbox-recovery/0194 triggers reference finance_payments/ledger.
 {
   const db = seeded()
-  const restore = read('sandbox-recovery/0198_sandbox_restore_recovery_triggers.sql').replace(/IF NOT EXISTS /g, '')
+  const restore = read('../scripts/sandbox/0198_restore_recovery_triggers.sql').replace(/IF NOT EXISTS /g, '')
   db.exec(restore) // install the three sandbox-only triggers as they exist on eskahade-demo-db
   db.exec('BEGIN')
   db.exec(read('0198_manual_transfer_and_collective_payout.sql'))
   db.exec('COMMIT')
-  db.exec(read('sandbox-recovery/0198_sandbox_restore_recovery_triggers.sql'))
+  db.exec(read('../scripts/sandbox/0198_restore_recovery_triggers.sql'))
   for (const name of ['trg_sandbox_recovery_wallet_arithmetic', 'trg_sandbox_recovery_quarantine_dist_insert', 'trg_sandbox_recovery_quarantine_dist_update']) {
     assert.ok(triggerNames(db).includes(name), 'sandbox trigger restored: ' + name)
   }

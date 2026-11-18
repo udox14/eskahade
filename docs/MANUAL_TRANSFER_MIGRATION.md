@@ -47,7 +47,7 @@ Sandbox additionally lists three sandbox-recovery/0194 triggers
 them on sandbox afterwards:
 
 ```bash
-npx wrangler d1 execute eskahade-demo-db --env sandbox --remote --file=migrations/sandbox-recovery/0198_sandbox_restore_recovery_triggers.sql
+npx wrangler d1 execute eskahade-demo-db --env sandbox --remote --file=scripts/sandbox/0198_restore_recovery_triggers.sql
 ```
 
 Audited 2026-11-18: production has exactly the 14 expected triggers; sandbox has those 14 + the 3 above. **If any other name appears, stop** and
