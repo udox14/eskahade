@@ -5,6 +5,7 @@ import { authorizeFinanceFeature } from '@/lib/finance/authorization'
 import { previewBillingBackfill, applyBillingBackfill, verifyHistoricalProviderEvidence, type HistoricalProviderEvidence, type ApprovedBillingCandidate } from '@/lib/finance/billing-backfill'
 import { revalidatePath } from 'next/cache'
 import { billingReviewCount } from '@/lib/finance/billing-legacy'
+import { executeBackfillLegacyPayments } from '@/lib/finance/bridge'
 
 const PATH = '/dashboard/keuangan/status-pembayaran'
 
@@ -20,6 +21,25 @@ export async function getBillingMonitorAction() {
     query<{ id: string; nama_jasa: string; jenis: string }>("SELECT id,nama_jasa,jenis FROM master_jasa WHERE jenis IN ('Makan','Cuci') ORDER BY nama_jasa"),
   ])
   return { issues,runs,legacyPending: legacy,providers,canVerifyHistorical:roles.some(r=>r==='admin'||r==='bendahara') }
+}
+
+/**
+ * Sinkronkan satu potong pembayaran modul lama yang belum tercermin di Keuangan Baru.
+ * Memakai jalur idempoten yang sama dengan sinkronisasi per transaksi (external_reference unik).
+ * Dipotong kecil karena tiap baris memerlukan ±10 kueri D1 dan satu invocation Worker
+ * dibatasi jumlah kuerinya; klien memanggil berulang sampai tidak ada kemajuan.
+ */
+const LEGACY_SYNC_CHUNK = 40
+export async function syncLegacyPaymentsChunkAction() {
+  await authorizeFinanceFeature(PATH,true)
+  const report = await executeBackfillLegacyPayments({ limit: LEGACY_SYNC_CHUNK })
+  const remaining = await billingReviewCount({ query,queryOne,execute })
+  revalidatePath(PATH)
+  return {
+    processed: report.processed, synced: report.synced, excluded: report.excluded, failed: report.failed,
+    errors: report.errors.slice(0,5).map(e=>`${e.source}:${e.sourceId} — ${e.error.slice(0,200)}`),
+    remaining,
+  }
 }
 
 export async function verifyHistoricalBillingProviderAction(input: HistoricalProviderEvidence) {

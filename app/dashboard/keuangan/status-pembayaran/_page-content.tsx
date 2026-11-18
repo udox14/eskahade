@@ -1,6 +1,7 @@
 'use client'
 
 import { BillingAuditPanel } from './billing-audit-panel'
+import { LegacySyncNotice } from './legacy-sync-notice'
 import { publicMediaUrl } from '@/lib/r2/references'
 
 import React, { useState, useTransition, useId } from 'react'
@@ -347,7 +348,7 @@ export default function StatusPembayaranContent({
         }
       />
 
-      {data.billingReviewCount>0 && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Perlu Pemeriksaan: {data.billingReviewCount} bukti pembayaran modul lama belum sesuai. Jumlah tersebut ditahan dari tagihan yang dapat dibayar ulang.</p>}
+      <LegacySyncNotice count={data.billingReviewCount} canSync={!!data.userPermissions?.canRecordPayment} onUpdated={()=>fetchData()} />
       <BillingAuditPanel canApply={!!data.userPermissions?.canRecordPayment} onUpdated={()=>fetchData()} />
 
       {/* 2. TABS NAVIGASI */}

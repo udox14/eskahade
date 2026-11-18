@@ -151,6 +151,17 @@ async function main(){
   assert.equal(h.db.prepare("SELECT COUNT(*) n FROM finance_payments WHERE external_reference='LEGACY_SPP_LOG:legacy'").get().n,1);
   const paid=JSON.parse(before).find(o=>o.item_type==='SPP');assert.equal(JSON.stringify(h.db.prepare('SELECT * FROM finance_obligations WHERE id=?').get(paid.id)),JSON.stringify(paid));
  });
+ await test('chunked backfill clears unsynced legacy SPP review once and never double-posts',async()=>{
+  for(let m=7;m<=11;m++)h.db.prepare("INSERT INTO spp_log(id,santri_id,bulan,tahun,nominal_bayar) VALUES(?,'student',?,2026,70000)").run('qp-'+m,m);
+  const {billingReviewCount}=h.load('lib/finance/billing-legacy.ts');const bridge=h.load('lib/finance/bridge.ts');
+  assert.equal(await billingReviewCount(h.adapter,'student'),5);
+  let rounds=0;while(rounds<10){const r=await bridge.executeBackfillLegacyPayments({limit:2});rounds++;assert.equal(r.failed,0);if(r.synced===0)break}
+  assert.equal(await billingReviewCount(h.adapter,'student'),0);
+  const again=await bridge.executeBackfillLegacyPayments({limit:40});assert.equal(again.synced,0);
+  assert.equal(h.db.prepare("SELECT COUNT(*) n FROM finance_payments WHERE external_reference LIKE 'LEGACY_SPP_LOG:qp-%'").get().n,5);
+  assert.equal(h.db.prepare("SELECT COUNT(*) n FROM finance_allocations a JOIN finance_payments p ON p.id=a.payment_id WHERE p.external_reference LIKE 'LEGACY_SPP_LOG:qp-%'").get().n,5);
+  assert.equal(h.db.prepare("SELECT SUM(amount_paid) s FROM finance_obligations WHERE item_type='SPP' AND santri_id='student'").get().s,350000);
+ });
  await test('legacy annual partial payment, unsynced edits and voids cannot look unpaid or settled silently',async()=>{
   h.db.exec("INSERT INTO pembayaran_tahunan(id,santri_id,jenis_biaya,tahun_tagihan,tahun_ajaran_id,nominal_bayar) VALUES('annual','student','EHB',2026,2,10000)");
   const bridge=h.load('lib/finance/bridge.ts');await bridge.syncLegacyPayment('PEMBAYARAN_TAHUNAN','annual');

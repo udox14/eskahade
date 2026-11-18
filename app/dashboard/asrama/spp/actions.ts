@@ -488,11 +488,18 @@ export async function bayarSPPBulanBerjalan(santriId: string, tahun: number, bul
     )
     if (exist.length > 0) return { error: 'Bulan tersebut sudah dibayar sebelumnya.' }
 
+    const quickPayLogId = generateId()
     await execute(
       `INSERT INTO spp_log (id, santri_id, tahun, bulan, nominal_bayar, penerima_id, keterangan, tanggal_bayar, tujuan_setoran)
        VALUES (?, ?, ?, ?, ?, ?, 'Quick Pay', date('now'), ?)`,
-      [generateId(), santriId, tahun, bulan, nominalPerBulan, session?.id ?? null, tujuanSetoran]
+      [quickPayLogId, santriId, tahun, bulan, nominalPerBulan, session?.id ?? null, tujuanSetoran]
     )
+
+    // Sync ke Sistem Keuangan Baru (Bridge). Kegagalan tertangkap oleh
+    // "Sinkronkan pembayaran modul lama" di Status Pembayaran.
+    await syncLegacyPayment('SPP_LOG', quickPayLogId).catch((err) => {
+      console.error('[LegacyBridge] Gagal sinkronisasi Quick Pay SPP:', quickPayLogId, err)
+    })
 
     await logActivity({
       actor: actorFromSession(session),
