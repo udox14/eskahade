@@ -60,11 +60,20 @@ The CI release gate (`scripts/ci/release-migrations.cjs`) lists 0198 as reviewed
 `d1_migrations`). Choose **one** path:
 
 - **Let CI apply it** (recommended): merge to `main`; do not run the file manually.
-- **Apply manually in the D1 console** first: paste the whole file once, then record it so CI skips it:
-  ```sql
-  INSERT INTO d1_migrations(name) VALUES('0198_manual_transfer_and_collective_payout.sql');
+- **Apply manually with wrangler** first (never the Cloudflare dashboard console: it splits input on
+  `;`, breaking `CREATE TRIGGER ... BEGIN ... END` bodies, and can leave earlier statements such as
+  `DROP TRIGGER` already executed). Sandbox first, then production:
+  ```bash
+  npx wrangler d1 execute eskahade-demo-db --env sandbox --remote --file=migrations/0198_manual_transfer_and_collective_payout.sql
+  npx wrangler d1 execute eskahade-db --remote --file=migrations/0198_manual_transfer_and_collective_payout.sql
   ```
-  Without that row CI would try to run it again and fail on `CREATE TABLE finance_transfer_accounts`.
+  `--remote` is required (without it wrangler writes to a local copy). Then record it so the CI
+  release gate skips it on the next push to `main`:
+  ```bash
+  npx wrangler d1 execute eskahade-db --remote --command="INSERT INTO d1_migrations(name) VALUES('0198_manual_transfer_and_collective_payout.sql')"
+  ```
+  (same for `eskahade-demo-db --env sandbox`). Without that row CI would run the file again and fail
+  on `CREATE TABLE finance_transfer_accounts` (the failed run changes nothing).
 
 ## 3. After applying
 
