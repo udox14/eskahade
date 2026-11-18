@@ -4,7 +4,7 @@
 
 import type { FinanceItemType } from '@/lib/finance/types'
 
-export type FinancePaymentMethod = 'BRI_VA' | 'CASH'
+export type FinancePaymentMethod = 'BRI_VA' | 'CASH' | 'MANUAL_TRANSFER'
 
 export type FinancePayerType = 'PORTAL_ORTU' | 'LOKET'
 
@@ -12,7 +12,10 @@ export type FinanceFeePayer = 'CUSTOMER' | 'INSTITUTION'
 
 export type FinanceOrderStatus = 'PENDING' | 'PAID' | 'EXPIRED' | 'CANCELLED' | 'REPLACED'
 
-export type FinancePaymentChannel = 'BRI' | 'CASH'
+export type FinancePaymentChannel = 'BRI' | 'CASH' | 'TRANSFER'
+
+/** How the parent covers the Koperasi admin fee on a manual transfer. */
+export type FinanceTransferFeeMode = 'ADD' | 'DEDUCT'
 
 export type FinancePaymentSource = 'NEW_FINANCE' | 'LEGACY'
 
@@ -74,6 +77,11 @@ export interface FinancePaymentOrder {
   cash_session_id: string | null
   created_at: string
   updated_at: string
+  /** MANUAL_TRANSFER only: last digits added so the transfer amount is unique. */
+  unique_code?: number
+  fee_mode?: FinanceTransferFeeMode | null
+  destination_account_id?: string | null
+  destination_snapshot?: string | null
 }
 
 export interface FinanceOrderItem {
@@ -107,6 +115,7 @@ export interface FinancePayment {
   cash_session_id: string | null
   received_by: string | null
   created_at: string
+  unique_code_amount?: number
 }
 
 export interface FinanceAllocation {
@@ -166,6 +175,11 @@ export interface CreatePaymentOrderInput {
   expiresInHours?: number
   cashSessionId?: string | null
   items: CreatePaymentOrderItemInput[]
+  /** MANUAL_TRANSFER only. */
+  feeMode?: FinanceTransferFeeMode
+  destinationAccountId?: string
+  /** MANUAL_TRANSFER only: who created the order (parent portal session). */
+  createdByKind?: 'PARENT' | 'STAFF'
 }
 
 export interface PaymentOrderWithItems extends FinancePaymentOrder {
@@ -219,7 +233,7 @@ export interface FinanceCooperativeAdminFeeRule {
   name: string
   is_enabled: number
   amount: number
-  applies_to_channel: 'BRI'
+  applies_to_channel: 'BRI' | 'TRANSFER'
   effective_from: string
   effective_until: string | null
   closed_by?: string | null
@@ -241,6 +255,7 @@ export interface FinanceCooperativeIncome {
   amount: number
   rule_id: string | null
   rule_snapshot: string | null
+  income_source?: 'ADMIN_FEE' | 'UNIQUE_CODE'
   reference_note: string | null
   created_by: string | null
   created_at: string

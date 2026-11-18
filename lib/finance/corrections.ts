@@ -74,11 +74,13 @@ export async function recordCorrection(
     channel: string
     gross_amount: number
     cooperative_admin_fee: number
+    unique_code_amount: number
     status: string
     correction_status: string
     cash_session_id: string | null
   }>(
-    `SELECT id, payment_number, santri_id, channel, gross_amount, cooperative_admin_fee, status, correction_status, cash_session_id
+    `SELECT id, payment_number, santri_id, channel, gross_amount, cooperative_admin_fee, COALESCE(unique_code_amount, 0) AS unique_code_amount,
+            status, correction_status, cash_session_id
      FROM finance_payments
      WHERE id = ?`,
     [input.paymentId]
@@ -405,14 +407,21 @@ export async function recordCorrection(
     })
   }
 
-  // F. Append-Only Ledger: Catat pembalikan pendapatan Koperasi jika berlaku
-  if (payment.cooperative_admin_fee > 0) {
+  // F. Append-Only Ledger: Catat pembalikan pendapatan Koperasi jika berlaku.
+  // Manual transfers carry two income rows (admin fee + unique code); each is reversed once.
+  const incomeSources: Array<{ source: 'ADMIN_FEE' | 'UNIQUE_CODE'; amount: number; label: string }> = [
+    { source: 'ADMIN_FEE', amount: payment.cooperative_admin_fee, label: 'Biaya Operasional Koperasi' },
+    { source: 'UNIQUE_CODE', amount: payment.unique_code_amount, label: 'Kode unik transfer' },
+  ]
+  for (const income of incomeSources) {
+    if (income.amount <= 0) continue
     const incEntryType = input.correctionType === 'REFUND' ? 'REFUND' : 'REVERSAL'
     const incomeId = generateId()
     const incomeNumber = `${incEntryType === 'REFUND' ? 'REF' : 'REV'}-KOP-${createdAt.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
     const origIncome = await queryOne<{ id: string; rule_id: string | null; rule_snapshot: string | null }>(
-      `SELECT id, rule_id, rule_snapshot FROM finance_cooperative_income WHERE payment_id = ? AND entry_type = 'INCOME' LIMIT 1`,
-      [payment.id]
+      `SELECT id, rule_id, rule_snapshot FROM finance_cooperative_income
+       WHERE payment_id = ? AND entry_type = 'INCOME' AND COALESCE(income_source, 'ADMIN_FEE') = ? LIMIT 1`,
+      [payment.id, income.source]
     )
 
     if(!origIncome)throw new Error('COOPERATIVE_INCOME_EVIDENCE_MISSING')
@@ -421,10 +430,11 @@ export async function recordCorrection(
         INSERT INTO finance_cooperative_income (
           id, income_number, entry_type, reference_income_id, correction_id,
           payment_id, order_id, amount, rule_id, rule_snapshot,
-          reference_note, created_by, created_at
-        ) SELECT ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?
+          reference_note, created_by, created_at, income_source
+        ) SELECT ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?
         WHERE (SELECT COALESCE(SUM(total_amount),0) FROM finance_corrections WHERE target_payment_id=?) >= ?
-        AND NOT EXISTS(SELECT 1 FROM finance_cooperative_income WHERE payment_id=? AND entry_type IN ('REVERSAL','REFUND'))
+        AND NOT EXISTS(SELECT 1 FROM finance_cooperative_income WHERE payment_id=? AND entry_type IN ('REVERSAL','REFUND')
+          AND COALESCE(income_source, 'ADMIN_FEE') = ?)
       `,
       params: [
         incomeId,
@@ -433,13 +443,14 @@ export async function recordCorrection(
         origIncome?.id || null,
         correctionId,
         payment.id,
-        payment.cooperative_admin_fee,
+        income.amount,
         origIncome?.rule_id || null,
         origIncome?.rule_snapshot || null,
-        `Pembalikan Biaya Operasional Koperasi atas koreksi ${correctionNumber} pada pembayaran ${payment.payment_number}`,
+        `Pembalikan ${income.label} atas koreksi ${correctionNumber} pada pembayaran ${payment.payment_number}`,
         input.createdBy,
         createdAt,
-        payment.id,payment.gross_amount,payment.id,
+        income.source,
+        payment.id,payment.gross_amount,payment.id,income.source,
       ],
     })
   }
