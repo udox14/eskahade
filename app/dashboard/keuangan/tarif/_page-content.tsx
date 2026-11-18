@@ -14,6 +14,7 @@ import TarifTab from './tarif-tab'
 import PembebasanTab from './pembebasan-tab'
 import LimitJajanTab from './limit-jajan-tab'
 import GatewayTab from './gateway-tab'
+import PaymentChannelTab from './payment-channel-tab'
 import KopTab from './kop-tab'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import {
@@ -24,13 +25,14 @@ import {
   Printer,
   ArrowClockwise,
   Eye,
+  Bank,
 } from '@phosphor-icons/react'
 
 interface PengaturanKeuanganContentProps {
   initialData: PengaturanKeuanganData
 }
 
-type TabKey = 'tarif' | 'pembebasan' | 'limit' | 'gateway' | 'kop'
+type TabKey = 'tarif' | 'pembebasan' | 'limit' | 'jalur' | 'gateway' | 'kop'
 
 export default function PengaturanKeuanganContent({
   initialData,
@@ -57,6 +59,7 @@ export default function PengaturanKeuanganContent({
     { key: 'tarif', label: 'Tarif & Cicilan', icon: Tag, badge: data.tariffs.length },
     { key: 'pembebasan', label: 'Pembebasan Biaya', icon: ShieldCheck, badge: data.exemptions.filter(e => e.status === 'ACTIVE').length },
     { key: 'limit', label: 'Limit Uang Jajan', icon: Wallet },
+    { key: 'jalur', label: 'Jalur Pembayaran', icon: Bank },
     { key: 'gateway', label: 'BRIVA & Koperasi', icon: CreditCard },
     { key: 'kop', label: 'Kop & Cetak', icon: Printer },
   ]
@@ -159,6 +162,8 @@ export default function PengaturanKeuanganContent({
             onRefresh={refreshData}
           />
         )}
+
+        {activeTab === 'jalur' && <PaymentChannelTab canMutate={canMutate} />}
 
         {activeTab === 'gateway' && (
           <GatewayTab

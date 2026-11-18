@@ -21,6 +21,8 @@ import type {
 } from '@/lib/portal/finance'
 import { createPortalCheckoutAction, selectPortalAdvancePeriodAction } from './actions'
 import { BottomSheet } from '../../_components/bottom-sheet'
+import { TransferSheet, TransferStatusCard, visibleTransfers, isTransferOpen } from './_transfer-panel'
+import type { PortalTransferSummary } from '@/lib/portal/finance'
 
 function formatRupiah(amount: number): string {
   if (!Number.isFinite(amount) || amount <= 0) return 'Rp0'
@@ -77,7 +79,19 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
 
   // Checkout state
   const [isCheckingOut, setIsCheckingOut] = useState<boolean>(false)
-  const paymentMethod = 'BRI_VA' as const
+  const channels = billingData.paymentChannels
+  const availableMethods = [
+    ...(channels.transfer.available ? ['MANUAL_TRANSFER' as const] : []),
+    ...(channels.briva.available ? ['BRI_VA' as const] : []),
+  ]
+  const [chosenMethod, setChosenMethod] = useState<'BRI_VA' | 'MANUAL_TRANSFER' | null>(null)
+  const paymentMethod = chosenMethod && availableMethods.includes(chosenMethod) ? chosenMethod : availableMethods[0] ?? null
+  const [accountId, setAccountId] = useState<string | null>(null)
+  const destinationAccountId = accountId && channels.transfer.accounts.some(a => a.id === accountId) ? accountId : channels.transfer.accounts[0]?.id ?? null
+  const [feeMode, setFeeMode] = useState<'ADD' | 'DEDUCT'>('ADD')
+  const [transferSheet, setTransferSheet] = useState<PortalTransferSummary | null>(null)
+  const openTransfers = visibleTransfers(billingData.transfers || [])
+  const transferInReview = (billingData.transfers || []).some(t => isTransferOpen(t) && t.status !== 'MENUNGGU_BUKTI')
   const [checkoutResult, setCheckoutResult] = useState<PortalCheckoutResponse | null>(null)
   const [isReviewOpen, setIsReviewOpen] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
@@ -159,8 +173,14 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
     }
 
     const grossAmount = items.reduce((sum, it) => sum + it.amount, 0)
-    const cooperativeFee = billingData.cooperativeFee || 0
-    const totalCharged = grossAmount > 0 ? grossAmount + cooperativeFee : 0
+    const isTransfer = paymentMethod === 'MANUAL_TRANSFER'
+    const cooperativeFee = isTransfer ? channels.transfer.fee : paymentMethod === 'BRI_VA' ? channels.briva.fee : 0
+    // DEDUCT: the fee comes out of one flexible item (Uang Jajan / cicilan) larger than the fee.
+    const canDeduct = isTransfer && channels.transfer.feeDeductEnabled && cooperativeFee > 0 &&
+      items.some(it => (it.itemType === 'UANG_JAJAN' || it.itemType === 'USPP') && it.amount > cooperativeFee)
+    const deducting = canDeduct && feeMode === 'DEDUCT'
+    const totalCharged = grossAmount > 0 ? (deducting ? grossAmount : grossAmount + cooperativeFee) : 0
+    const credited = deducting ? grossAmount - cooperativeFee : grossAmount
 
     return {
       items,
@@ -168,6 +188,10 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
       grossAmount,
       cooperativeFee,
       totalCharged,
+      credited,
+      canDeduct,
+      deducting,
+      isTransfer,
     }
   }, [
     activeObligations,
@@ -179,7 +203,11 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
     billingData.obligations.uspp,
     isTopUpSelected,
     topUpAmount,
-    billingData.cooperativeFee,
+    paymentMethod,
+    channels.transfer.fee,
+    channels.transfer.feeDeductEnabled,
+    channels.briva.fee,
+    feeMode,
   ])
 
   const handleCopyVa = (vaText: string) => {
@@ -205,9 +233,15 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
         amount: it.amount,
       }))
 
+      if (!paymentMethod) {
+        toast.error('Belum ada cara pembayaran online yang tersedia.')
+        return
+      }
       const res = await createPortalCheckoutAction({
         santriId: billingData.santri.id,
-        paymentMethod: 'BRI_VA',
+        paymentMethod,
+        feeMode: selectedItemsSummary.deducting ? 'DEDUCT' : 'ADD',
+        destinationAccountId: paymentMethod === 'MANUAL_TRANSFER' ? destinationAccountId || undefined : undefined,
         items: payloadItems,
       })
 
@@ -216,10 +250,14 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
         return
       }
 
-      setCheckoutResult(res)
       setBillingOverride(null)
       setIsReviewOpen(false)
-      setIsModalOpen(true)
+      if (paymentMethod === 'MANUAL_TRANSFER') {
+        setTransferSheet(res.checkout.transfer || null)
+      } else {
+        setCheckoutResult(res)
+        setIsModalOpen(true)
+      }
       setSelectedIds(new Set())
       setIsUsppSelected(false)
       setIsTopUpSelected(false)
@@ -339,11 +377,15 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
         </label>)}
       </details>
 
+      {openTransfers.map(transfer => (
+        <TransferStatusCard key={transfer.submissionId} transfer={transfer} onOpen={() => setTransferSheet(transfer)} />
+      ))}
+
       {/* 2. SPLIT CARD: MENUNGGU PEMBAYARAN VA (NOMOR VA TIDAK BOLEH WRAPPED, CORNER BADGE SUDUT KANAN ATAS) */}
       {billingData.pendingOrders.length > 0 && (() => {
         const po = billingData.pendingOrders[0]
         const expiryLabel = formatExpiryShort(po.expiresAt)
-        const vaNumber = billingData.fixedVa?.vaNumber || po.orderNumber
+        const vaNumber = billingData.fixedVa?.vaNumber || 'Nomor VA belum tersedia'
         const bankLabel = billingData.fixedVa?.bankCode
           ? `Virtual Account ${billingData.fixedVa.bankCode}`
           : formatPaymentMethodLabel(po.paymentMethod)
@@ -732,12 +774,16 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
         title="Tinjau pembayaran"
         subtitle="Periksa item dan total sebelum membuat pembayaran"
         footer={
-          !billingData.gatewayInfo?.isOnlineAvailable ? (
+          transferInReview ? (
+            <div className="w-full rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/40 p-3 text-xs text-amber-800 dark:text-amber-200">
+              Masih ada bukti transfer yang sedang dicek petugas. Pembayaran baru bisa dibuat setelah hasilnya keluar.
+            </div>
+          ) : !paymentMethod ? (
             <div className="w-full space-y-2">
               <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/40 p-3 text-xs text-amber-800 dark:text-amber-200 text-left">
                 <p className="font-semibold">Pembayaran Online Belum Tersedia</p>
                 <p className="mt-1 text-[11px] leading-relaxed">
-                  {billingData.gatewayInfo?.unavailableReason || 'Kanal pembayaran online (BRIVA) belum diaktifkan. Silakan lakukan pembayaran tagihan secara tunai di loket pesantren.'}
+                  {billingData.gatewayInfo?.unavailableReason || 'Pembayaran online belum dibuka. Silakan bayar tunai di loket pesantren.'}
                 </p>
               </div>
               <button
@@ -751,11 +797,13 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
           ) : (
             <button
               type="button"
-              disabled={isCheckingOut}
+              disabled={isCheckingOut || (paymentMethod === 'MANUAL_TRANSFER' && !destinationAccountId)}
               onClick={handleProceedCheckout}
               className="w-full min-h-12 rounded-xl bg-[#064e3b] px-4 py-3 text-sm font-bold text-[#bef264] disabled:opacity-50"
             >
-              {isCheckingOut ? 'Membuat pembayaran…' : `Buat pembayaran ${formatRupiah(selectedItemsSummary.totalCharged)}`}
+              {isCheckingOut ? 'Membuat pembayaran…' : paymentMethod === 'MANUAL_TRANSFER'
+                ? `Lanjut transfer ±${formatRupiah(selectedItemsSummary.totalCharged)}`
+                : `Buat pembayaran ${formatRupiah(selectedItemsSummary.totalCharged)}`}
             </button>
           )
         }
@@ -776,22 +824,118 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
             </div>
           </div>
           <div className="space-y-2">
-            <h4 className="font-bold text-slate-900 dark:text-slate-100">Metode Pembayaran</h4>
-            <div className="rounded-xl border border-emerald-700 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/60 p-3 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">Virtual Account BRI (BRIVA)</p>
-                <p className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-0.5">Transfer via BRImo, ATM BRI, AgenBRILink, atau Bank Lain</p>
+            <h4 className="font-bold text-slate-900 dark:text-slate-100">Cara pembayaran</h4>
+            {availableMethods.length === 0 && (
+              <p className="text-xs text-slate-600 dark:text-slate-400">Belum ada cara pembayaran online yang tersedia.</p>
+            )}
+            {availableMethods.length > 1 && (
+              <div className="grid gap-2" role="radiogroup" aria-label="Cara pembayaran">
+                {availableMethods.map(method => {
+                  const active = paymentMethod === method
+                  return (
+                    <label key={method} className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer ${active ? 'border-emerald-700 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/60' : 'border-slate-200 dark:border-slate-700'}`}>
+                      <input type="radio" name="payment-method" className="mt-1 accent-emerald-700" checked={active} onChange={() => setChosenMethod(method)} />
+                      <span>
+                        <span className="block text-xs font-bold text-slate-900 dark:text-slate-100">
+                          {method === 'MANUAL_TRANSFER' ? 'Transfer bank + unggah bukti' : 'Virtual Account BRI (BRIVA)'}
+                        </span>
+                        <span className="block text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                          {method === 'MANUAL_TRANSFER'
+                            ? 'Transfer dari bank mana saja, lalu kirim foto bukti. Dicek petugas.'
+                            : 'Bayar lewat BRImo/ATM/bank lain. Terkonfirmasi otomatis.'}
+                        </span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+            {availableMethods.length === 1 && (
+              <div className="rounded-xl border border-emerald-700 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/60 p-3">
+                <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                  {paymentMethod === 'MANUAL_TRANSFER' ? 'Transfer bank + unggah bukti' : 'Virtual Account BRI (BRIVA)'}
+                </p>
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-0.5">
+                  {paymentMethod === 'MANUAL_TRANSFER'
+                    ? 'Transfer dari bank mana saja ke rekening Koperasi, lalu kirim foto bukti untuk dicek petugas.'
+                    : 'Transfer via BRImo, ATM BRI, AgenBRILink, atau Bank Lain'}
+                </p>
+              </div>
+            )}
+          </div>
+          {paymentMethod === 'MANUAL_TRANSFER' && (
+            <div className="space-y-2">
+              <h4 className="font-bold text-slate-900 dark:text-slate-100">Rekening tujuan</h4>
+              <div className="grid gap-2" role="radiogroup" aria-label="Rekening tujuan">
+                {channels.transfer.accounts.map(account => {
+                  const active = destinationAccountId === account.id
+                  return (
+                    <label key={account.id} className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer ${active ? 'border-emerald-700 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/60' : 'border-slate-200 dark:border-slate-700'}`}>
+                      <input type="radio" name="destination-account" className="mt-1 accent-emerald-700" checked={active} onChange={() => setAccountId(account.id)} />
+                      <span className="min-w-0">
+                        <span className="block text-xs font-bold text-slate-900 dark:text-slate-100">{account.bankName} · <span className="font-mono">{account.accountNumber}</span></span>
+                        <span className="block text-[11px] text-slate-600 dark:text-slate-400">a.n. {account.accountHolder}{account.notes ? ` — ${account.notes}` : ''}</span>
+                      </span>
+                    </label>
+                  )
+                })}
               </div>
             </div>
-          </div>
+          )}
+          {paymentMethod === 'MANUAL_TRANSFER' && selectedItemsSummary.cooperativeFee > 0 && channels.transfer.feeDeductEnabled && (
+            <div className="space-y-2">
+              <h4 className="font-bold text-slate-900 dark:text-slate-100">Biaya admin {formatRupiah(selectedItemsSummary.cooperativeFee)}</h4>
+              <div className="grid gap-2" role="radiogroup" aria-label="Pembebanan biaya admin">
+                <label className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer ${!selectedItemsSummary.deducting ? 'border-emerald-700 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/60' : 'border-slate-200 dark:border-slate-700'}`}>
+                  <input type="radio" name="fee-mode" className="mt-1 accent-emerald-700" checked={!selectedItemsSummary.deducting} onChange={() => setFeeMode('ADD')} />
+                  <span>
+                    <span className="block text-xs font-bold text-slate-900 dark:text-slate-100">Tambahkan ke transfer</span>
+                    <span className="block text-[11px] text-slate-600 dark:text-slate-400">
+                      Transfer {formatRupiah(selectedItemsSummary.grossAmount + selectedItemsSummary.cooperativeFee)}, masuk utuh {formatRupiah(selectedItemsSummary.grossAmount)}.
+                    </span>
+                  </span>
+                </label>
+                <label className={`flex items-start gap-3 rounded-xl border p-3 ${selectedItemsSummary.canDeduct ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'} ${selectedItemsSummary.deducting ? 'border-emerald-700 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/60' : 'border-slate-200 dark:border-slate-700'}`}>
+                  <input type="radio" name="fee-mode" className="mt-1 accent-emerald-700" disabled={!selectedItemsSummary.canDeduct}
+                    checked={selectedItemsSummary.deducting} onChange={() => setFeeMode('DEDUCT')} />
+                  <span>
+                    <span className="block text-xs font-bold text-slate-900 dark:text-slate-100">Potong dari nominal</span>
+                    <span className="block text-[11px] text-slate-600 dark:text-slate-400">
+                      {selectedItemsSummary.canDeduct
+                        ? `Transfer ${formatRupiah(selectedItemsSummary.grossAmount)}, masuk ${formatRupiah(selectedItemsSummary.grossAmount - selectedItemsSummary.cooperativeFee)} (dari Uang Jajan/cicilan).`
+                        : 'Hanya bisa jika ada Uang Jajan atau cicilan USPP di atas biaya admin. Tagihan seperti SPP harus dibayar penuh.'}
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          )}
           <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-3">
             <div className="flex justify-between text-slate-700 dark:text-slate-300"><span>Subtotal</span><span className="font-mono">{formatRupiah(selectedItemsSummary.grossAmount)}</span></div>
-            <div className="flex justify-between text-slate-700 dark:text-slate-300"><span>Biaya admin Koperasi</span><span className="font-mono">{formatRupiah(selectedItemsSummary.cooperativeFee)}</span></div>
-            <div className="flex justify-between border-t border-slate-200 dark:border-slate-800 pt-2 font-bold text-slate-950 dark:text-slate-100"><span>Total dibayar</span><span className="font-mono">{formatRupiah(selectedItemsSummary.totalCharged)}</span></div>
-            <p className="text-xs text-slate-600 dark:text-slate-400">Nominal final dikonfirmasi oleh server sebelum instruksi pembayaran diterbitkan.</p>
+            <div className="flex justify-between text-slate-700 dark:text-slate-300">
+              <span>Biaya admin Koperasi{selectedItemsSummary.deducting ? ' (dipotong dari nominal)' : ''}</span>
+              <span className="font-mono">{selectedItemsSummary.deducting ? '−' : ''}{formatRupiah(selectedItemsSummary.cooperativeFee)}</span>
+            </div>
+            {selectedItemsSummary.isTransfer && (
+              <div className="flex justify-between text-slate-700 dark:text-slate-300"><span>Kode unik</span><span className="text-xs">ditambahkan sistem (Rp1–Rp999)</span></div>
+            )}
+            <div className="flex justify-between border-t border-slate-200 dark:border-slate-800 pt-2 font-bold text-slate-950 dark:text-slate-100">
+              <span>{selectedItemsSummary.isTransfer ? 'Perkiraan transfer' : 'Total dibayar'}</span>
+              <span className="font-mono">{formatRupiah(selectedItemsSummary.totalCharged)}{selectedItemsSummary.isTransfer ? ' + kode unik' : ''}</span>
+            </div>
+            {selectedItemsSummary.deducting && (
+              <p className="text-xs text-slate-600 dark:text-slate-400">Yang masuk ke tagihan/saldo: {formatRupiah(selectedItemsSummary.credited)}.</p>
+            )}
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              {selectedItemsSummary.isTransfer
+                ? 'Nominal transfer pasti (dengan kode unik) muncul di langkah berikutnya.'
+                : 'Nominal final dikonfirmasi oleh server sebelum instruksi pembayaran diterbitkan.'}
+            </p>
           </div>
         </div>
       </BottomSheet>
+
+      <TransferSheet transfer={transferSheet} open={Boolean(transferSheet)} onClose={() => setTransferSheet(null)} />
 
       {/* 8. MODAL INSTRUKSI PEMBAYARAN BRIVA */}
       <BottomSheet

@@ -46,10 +46,10 @@ export default function PosCardScanner({
             className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700"
           >
             <QrCode className="w-4 h-4 text-emerald-600" />
-            <span>Pindai Kartu Santri (QR Barcode Scanner)</span>
+            <span>Cari Santri</span>
           </label>
           <span className="text-[11px] text-slate-400 hidden sm:inline">
-            Arahkan scanner ke kartu atau ketik Token / NIS
+            Ketik NIS santri lalu tekan Enter
           </span>
         </div>
 

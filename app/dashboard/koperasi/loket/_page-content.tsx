@@ -101,13 +101,11 @@ export default function LoketContent({ initialData }: LoketContentProps) {
         toast.warning(`Santri ${profile.namaLengkap} berstatus "${profile.statusGlobal}".`)
       }
 
-      if (profile.card && profile.card.status !== 'ACTIVE') {
-        toast.error(`Kartu fisik santri tidak aktif (${profile.card.status}).`)
-      }
-
-      // Jika kartu aktif dan memiliki PIN, langsung buka pinpad untuk kelancaran kasir
-      if (profile.card?.status === 'ACTIVE' && profile.pinStatus.hasPin && !profile.pinStatus.isLocked) {
-        setIsPinPadOpen(true)
+      // Kartu & PIN tidak lagi dipakai: petugas mencocokkan foto/identitas, lalu menu setor/bayar terbuka.
+      try {
+        setFinancials(await getStudentLoketAccountData(profile.id))
+      } catch {
+        toast.error('Gagal memuat saldo dan tagihan santri.')
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err))
@@ -314,12 +312,12 @@ export default function LoketContent({ initialData }: LoketContentProps) {
               student={currentStudent}
               onReset={handleResetForNewTransaction}
               onPromptPin={() => setIsPinPadOpen(true)}
-              onOpenPinModal={() => setIsPinModalOpen(true)}
               isPinVerified={isPinVerified}
+              showCredentials={false}
             />
 
             {/* Step 3: Action Panel POS (Tampil setelah PIN Terverifikasi) */}
-            {isPinVerified && financials ? (
+            {financials ? (
               <div className="animate-in fade-in duration-200">
                 <PosActionPanel
                   financials={financials}
@@ -328,7 +326,6 @@ export default function LoketContent({ initialData }: LoketContentProps) {
                     setFinancials(await getStudentLoketAccountData(currentStudent.id,period || undefined))
                   }}
                   isSubmitting={isSubmittingTx}
-                  onWithdraw={handleWithdrawal}
                   onDepositOrPay={handleDepositOrPay}
                 />
               </div>
@@ -339,20 +336,12 @@ export default function LoketContent({ initialData }: LoketContentProps) {
                   <KeyRound className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800">Menunggu Verifikasi PIN Santri</h3>
+                  <h3 className="text-sm font-bold text-slate-800">Memuat data santri…</h3>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-                    Cocokkan foto wajah santri di atas, lalu minta santri memasukkan PIN rahasia untuk membuka menu transaksi.
+                    Cocokkan foto wajah santri di atas sebelum menerima setoran atau pembayaran.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsPinPadOpen(true)}
-                  disabled={currentStudent.card?.status !== 'ACTIVE' || currentStudent.pinStatus.isLocked}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors shadow-xs disabled:opacity-50"
-                >
-                  <KeyRound className="w-4 h-4" />
-                  <span>Masukkan PIN Santri</span>
-                </button>
+
               </div>
             )}
           </div>

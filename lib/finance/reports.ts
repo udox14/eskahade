@@ -88,6 +88,8 @@ export interface ReceiptsReportResponse {
     totalNet: number
     totalTransactions: number
     onlineGross: number
+    transferGross: number
+    totalUniqueCode: number
     cashGross: number
     preKoperasiGross: number
     koperasiGross: number
@@ -642,6 +644,8 @@ export async function getReceiptsReport(
     total_net: number
     total_count: number
     online_gross: number
+    transfer_gross: number
+    total_unique_code: number
     cash_gross: number
     pre_koperasi_gross: number
     koperasi_gross: number
@@ -651,7 +655,9 @@ export async function getReceiptsReport(
        COALESCE(SUM(fp.cooperative_admin_fee), 0) AS total_fee,
        COALESCE(SUM(fp.net_amount), 0) AS total_net,
        COUNT(*) AS total_count,
-       COALESCE(SUM(CASE WHEN fp.channel = 'BRI' THEN fp.gross_amount ELSE 0 END), 0) AS online_gross,
+       COALESCE(SUM(CASE WHEN fp.channel IN ('BRI', 'TRANSFER') THEN fp.gross_amount ELSE 0 END), 0) AS online_gross,
+       COALESCE(SUM(CASE WHEN fp.channel = 'TRANSFER' THEN fp.gross_amount ELSE 0 END), 0) AS transfer_gross,
+       COALESCE(SUM(fp.unique_code_amount), 0) AS total_unique_code,
        COALESCE(SUM(CASE WHEN fp.channel = 'CASH' THEN fp.gross_amount ELSE 0 END), 0) AS cash_gross,
        COALESCE(SUM(CASE WHEN fp.fund_management = 'PRE_KOPERASI' THEN fp.gross_amount ELSE 0 END), 0) AS pre_koperasi_gross,
        COALESCE(SUM(CASE WHEN fp.fund_management = 'KOPERASI' THEN fp.gross_amount ELSE 0 END), 0) AS koperasi_gross
@@ -758,6 +764,8 @@ export async function getReceiptsReport(
       totalNet: kpiRow?.total_net || 0,
       totalTransactions: totalRecords,
       onlineGross: kpiRow?.online_gross || 0,
+      transferGross: kpiRow?.transfer_gross || 0,
+      totalUniqueCode: kpiRow?.total_unique_code || 0,
       cashGross: kpiRow?.cash_gross || 0,
       preKoperasiGross: kpiRow?.pre_koperasi_gross || 0,
       koperasiGross: kpiRow?.koperasi_gross || 0,
@@ -1919,9 +1927,10 @@ export async function getCashSessionsReport(
       GROUP BY cash_session_id
     ) c_top ON c_top.cash_session_id = fcs.id
     LEFT JOIN (
-      SELECT cash_session_id, COUNT(*) AS count, SUM(amount) AS amount
+      SELECT cash_session_id, COUNT(CASE WHEN direction = 'OUT' THEN 1 END) AS count,
+             SUM(CASE WHEN direction = 'OUT' THEN amount ELSE -amount END) AS amount
       FROM finance_wallet_ledger
-      WHERE direction = 'OUT' AND movement_type = 'WITHDRAWAL_LOKET' AND cash_session_id IS NOT NULL
+      WHERE movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF', 'WITHDRAWAL_KOLEKTIF_RETURN') AND cash_session_id IS NOT NULL
       GROUP BY cash_session_id
     ) c_wit ON c_wit.cash_session_id = fcs.id
     LEFT JOIN (
@@ -2180,11 +2189,11 @@ export async function getCashSessionDetailReport(
        fwl.created_at,
        COALESCE(s.nama_lengkap, '-') AS santri_name,
        COALESCE(s.nis, '-') AS nis,
-       fwl.amount,
+       CASE WHEN fwl.direction = 'OUT' THEN fwl.amount ELSE -fwl.amount END AS amount,
        fwl.notes
      FROM finance_wallet_ledger fwl
      LEFT JOIN santri s ON s.id = fwl.santri_id
-     WHERE fwl.cash_session_id = ? AND fwl.direction = 'OUT' AND fwl.movement_type = 'WITHDRAWAL_LOKET'
+     WHERE fwl.cash_session_id = ? AND fwl.movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF', 'WITHDRAWAL_KOLEKTIF_RETURN')
      ORDER BY fwl.created_at ASC`,
     [sessionId]
   )

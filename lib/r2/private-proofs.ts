@@ -130,21 +130,31 @@ export async function receiptReferenceForSave(reference: string | null | undefin
   return authorizeReceiptDraft(storedObjectKey(reference, 'operasional-receipts'), unitId)
 }
 
-export async function uploadPrivateImage(file: File, prefix: 'bukti-portal'|'operasional-receipts', metadata: Record<string,string>) {
-  const limit = prefix === 'bukti-portal' ? 2 * 1024 * 1024 : 3 * 1024 * 1024
-  if (!file.size || file.size > limit || !imageTypes.includes(file.type)) throw new Error('Format atau ukuran gambar tidak valid.')
-  const bytes = new Uint8Array(await file.arrayBuffer())
-  const valid = file.type === 'image/jpeg' ? bytes[0]===255 && bytes[1]===216 && bytes[2]===255 :
-    file.type === 'image/png' ? [137,80,78,71,13,10,26,10].every((v,i)=>bytes[i]===v) :
-    file.type === 'image/gif' ? ['GIF87a','GIF89a'].includes(new TextDecoder().decode(bytes.slice(0,6))) :
+/** Magic-byte check shared by every private image upload. */
+export function assertPrivateImageBytes(bytes: Uint8Array, type: string) {
+  if (!imageTypes.includes(type)) throw new Error('Format atau ukuran gambar tidak valid.')
+  const valid = type === 'image/jpeg' ? bytes[0]===255 && bytes[1]===216 && bytes[2]===255 :
+    type === 'image/png' ? [137,80,78,71,13,10,26,10].every((v,i)=>bytes[i]===v) :
+    type === 'image/gif' ? ['GIF87a','GIF89a'].includes(new TextDecoder().decode(bytes.slice(0,6))) :
     new TextDecoder().decode(bytes.slice(0,4))==='RIFF' && new TextDecoder().decode(bytes.slice(8,12))==='WEBP'
   if (!valid) throw new Error('Isi gambar tidak valid.')
-  const extension = { 'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp', 'image/gif':'gif' }[file.type]
+}
+
+export async function putPrivateImageBytes(bytes: Uint8Array, type: string, prefix: 'bukti-portal'|'operasional-receipts'|'bukti-transfer', metadata: Record<string,string>) {
+  assertPrivateImageBytes(bytes, type)
+  const extension = { 'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp', 'image/gif':'gif' }[type]
   const key = `${prefix}/${crypto.randomUUID()}.${extension}`
   const stored = await (await privateBucket()).put(key, bytes, {
-    httpMetadata: {contentType:file.type, cacheControl:'private, no-store'},
+    httpMetadata: {contentType:type, cacheControl:'private, no-store'},
     customMetadata: {...metadata, dataset:await proofDataset()},
   })
   if (!stored) throw new Error('Penyimpanan bukti gagal.')
   return key
+}
+
+export async function uploadPrivateImage(file: File, prefix: 'bukti-portal'|'operasional-receipts', metadata: Record<string,string>) {
+  const limit = prefix === 'bukti-portal' ? 2 * 1024 * 1024 : 3 * 1024 * 1024
+  if (!file.size || file.size > limit || !imageTypes.includes(file.type)) throw new Error('Format atau ukuran gambar tidak valid.')
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  return putPrivateImageBytes(bytes, file.type, prefix, metadata)
 }

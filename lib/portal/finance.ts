@@ -13,7 +13,9 @@ import { cache } from 'react'
 import { query, queryOne, execute } from '@/lib/db'
 import { createPaymentOrder, getPaymentOrderById } from '@/lib/finance/orders'
 import { getStudentFixedVa } from '@/lib/finance/va'
-import { getEffectiveCooperativeAdminFee } from '@/lib/finance/cooperative-admin'
+import { getEffectiveCooperativeAdminFee, COOPERATIVE_FEE_CODES } from '@/lib/finance/cooperative-admin'
+import { getTransferSettings, listTransferAccounts, parseAccountSnapshot, type PaymentChannelMode } from '@/lib/finance/transfer-config'
+import { listTransferSubmissionsForStudent, type TransferSubmissionStatus } from '@/lib/finance/manual-transfer'
 import {
   getStudentWalletBalance,
   getParentWalletLimits,
@@ -87,19 +89,68 @@ export interface PortalStudentBillingData {
     items: Array<{ itemType: string; amount: number }>
   }>
   cooperativeFee: number
+  paymentChannels: PortalPaymentChannels
+  transfers: PortalTransferSummary[]
   gatewayInfo?: {
     isOnlineAvailable?: boolean
     unavailableReason?: string
-    enabledChannels: Array<'BRI_VA'>
+    enabledChannels: Array<'BRI_VA' | 'MANUAL_TRANSFER'>
     feePayer: 'CUSTOMER' | 'INSTITUTION'
     defaultVaFee: number
     defaultQrisFeePercent: number
   }
 }
 
+export interface PortalTransferAccount {
+  id: string
+  bankName: string
+  accountNumber: string
+  accountHolder: string
+  notes: string | null
+}
+
+export interface PortalPaymentChannels {
+  mode: PaymentChannelMode
+  briva: { enabled: boolean; available: boolean; reason: string; fee: number }
+  transfer: {
+    enabled: boolean
+    available: boolean
+    reason: string
+    fee: number
+    feeDeductEnabled: boolean
+    proofDeadlineHours: number
+    accounts: PortalTransferAccount[]
+  }
+}
+
+/** A manual transfer as the parent sees it (status card + history). */
+export interface PortalTransferSummary {
+  submissionId: string
+  submissionNumber: string
+  orderId: string
+  status: TransferSubmissionStatus
+  expectedAmount: number
+  uniqueCode: number
+  cooperativeAdminFee: number
+  grossAmount: number
+  feeMode: 'ADD' | 'DEDUCT'
+  destination: { bankName: string; accountNumber: string; accountHolder: string } | null
+  expiresAt: string
+  submittedAt: string | null
+  reviewedAt: string | null
+  reviewNotes: string | null
+  receivedAmount: number | null
+  resolution: 'EXACT' | 'UNALLOCATED' | null
+  createdAt: string
+  hasProof: boolean
+  items: Array<{ itemType: string; amount: number }>
+}
+
 export interface PortalCheckoutInput {
   santriId: string
-  paymentMethod?: 'BRI_VA'
+  paymentMethod?: 'BRI_VA' | 'MANUAL_TRANSFER'
+  feeMode?: 'ADD' | 'DEDUCT'
+  destinationAccountId?: string
   topUpAmount?: number
   items: Array<{
     obligationId?: string | null
@@ -126,6 +177,7 @@ export interface PortalCheckoutResponse {
     vaNumber?: string | null
     bankCode?: string
     instructions?: string[]
+    transfer?: PortalTransferSummary | null
   }
 }
 
@@ -320,7 +372,7 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
   }>(
     `SELECT id, order_number, gross_amount, cooperative_admin_fee, total_charged, payment_method, expires_at, created_at
      FROM finance_payment_orders
-     WHERE santri_id = ? AND status = 'PENDING' AND datetime(expires_at) > datetime('now')
+     WHERE santri_id = ? AND status = 'PENDING' AND payment_method = 'BRI_VA' AND datetime(expires_at) > datetime('now')
      ORDER BY created_at DESC LIMIT 5`,
     [santriId]
   )
@@ -369,6 +421,8 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
   const effectiveCoopFee = await getEffectiveCooperativeAdminFee()
 
     const brivaGate = await isOnlineBrivaAvailable(santriId)
+    const paymentChannels = await getPortalPaymentChannels(santriId, brivaGate, santriBebasTagihan)
+    const transfers = await getPortalTransferSummaries(santriId)
 
     return {
       billingWarnings: issuance.warnings.length ? ['Sebagian tagihan perlu diperiksa petugas. Hubungi bagian keuangan untuk memastikan jumlah yang harus dibayar.'] : [],
@@ -407,10 +461,15 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
       },
       pendingOrders: pendingWithItems,
       cooperativeFee: effectiveCoopFee,
+      paymentChannels,
+      transfers,
       gatewayInfo: {
-        isOnlineAvailable: brivaGate.available,
-        unavailableReason: brivaGate.reason,
-        enabledChannels: brivaGate.available ? ['BRI_VA'] : [],
+        isOnlineAvailable: paymentChannels.briva.available || paymentChannels.transfer.available,
+        unavailableReason: paymentChannels.briva.available || paymentChannels.transfer.available ? '' : (paymentChannels.transfer.enabled ? paymentChannels.transfer.reason : paymentChannels.briva.reason),
+        enabledChannels: [
+          ...(paymentChannels.briva.available ? ['BRI_VA' as const] : []),
+          ...(paymentChannels.transfer.available ? ['MANUAL_TRANSFER' as const] : []),
+        ],
         feePayer: 'CUSTOMER',
         defaultVaFee: effectiveCoopFee,
         defaultQrisFeePercent: 0,
@@ -418,6 +477,85 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
     }
   }
 )
+
+const OFFLINE_REASON = 'Pembayaran online belum dibuka. Pembayaran tagihan dan titipan uang jajan saat ini dilayani secara tunai di loket pesantren.'
+
+/**
+ * Jalur pembayaran yang terlihat oleh wali: gabungan pengaturan admin (BRIVA/Transfer/Keduanya)
+ * dan gate teknis masing-masing jalur. Fail-closed: jalur yang tidak siap tidak ditawarkan.
+ */
+export async function getPortalPaymentChannels(
+  santriId: string,
+  brivaGate?: { available: boolean; reason: string },
+  bebasTagihan = false
+): Promise<PortalPaymentChannels> {
+  const [settings, accounts, transferFee, brivaFee, gate] = await Promise.all([
+    getTransferSettings(),
+    listTransferAccounts({ activeOnly: true }),
+    getEffectiveCooperativeAdminFee(COOPERATIVE_FEE_CODES.TRANSFER, new Date().toISOString(), 'TRANSFER'),
+    getEffectiveCooperativeAdminFee(),
+    brivaGate ? Promise.resolve(brivaGate) : isOnlineBrivaAvailable(santriId),
+  ])
+  const brivaEnabled = settings.channelMode === 'BRIVA' || settings.channelMode === 'BOTH'
+  const transferEnabled = settings.channelMode === 'TRANSFER' || settings.channelMode === 'BOTH'
+  const blocked = bebasTagihan ? 'Santri ini tidak memiliki layanan pembayaran online.' : ''
+  const transferReason = blocked || (!transferEnabled ? '' : accounts.length ? '' : 'Rekening tujuan transfer belum disiapkan Koperasi. Silakan bayar di loket.')
+  return {
+    mode: settings.channelMode,
+    briva: {
+      enabled: brivaEnabled,
+      available: !blocked && brivaEnabled && gate.available,
+      reason: blocked || (!brivaEnabled ? '' : gate.available ? '' : gate.reason || OFFLINE_REASON),
+      fee: brivaFee,
+    },
+    transfer: {
+      enabled: transferEnabled,
+      available: !blocked && transferEnabled && accounts.length > 0,
+      reason: transferReason,
+      fee: transferFee,
+      feeDeductEnabled: settings.feeDeductEnabled,
+      proofDeadlineHours: settings.proofDeadlineHours,
+      accounts: accounts.map(account => ({
+        id: account.id, bankName: account.bank_name, accountNumber: account.account_number,
+        accountHolder: account.account_holder, notes: account.notes,
+      })),
+    },
+  }
+}
+
+/** Recent manual transfers for status cards; open ones first. */
+export async function getPortalTransferSummaries(santriId: string, limit = 10): Promise<PortalTransferSummary[]> {
+  const rows = await listTransferSubmissionsForStudent(santriId, limit).catch(() => [])
+  if (!rows.length) return []
+  const items = await query<{ order_id: string; item_type: string; amount: number }>(
+    `SELECT order_id, item_type, amount FROM finance_order_items WHERE order_id IN (${rows.map(() => '?').join(',')}) ORDER BY rowid`,
+    rows.map(r => r.order_id)
+  )
+  return rows.map(row => {
+    const destination = parseAccountSnapshot(row.destination_snapshot)
+    return {
+      submissionId: row.id,
+      submissionNumber: row.submission_number,
+      orderId: row.order_id,
+      status: row.status,
+      expectedAmount: row.expected_amount,
+      uniqueCode: row.unique_code,
+      cooperativeAdminFee: row.cooperative_admin_fee,
+      grossAmount: row.gross_amount,
+      feeMode: row.fee_mode,
+      destination: destination ? { bankName: destination.bank_name, accountNumber: destination.account_number, accountHolder: destination.account_holder } : null,
+      expiresAt: row.expires_at,
+      submittedAt: row.submitted_at,
+      reviewedAt: row.reviewed_at,
+      reviewNotes: row.status === 'DITOLAK' || row.status === 'PERLU_PERBAIKAN' ? row.review_notes : null,
+      receivedAmount: row.received_amount,
+      resolution: row.resolution,
+      createdAt: row.created_at,
+      hasProof: !!row.proof_object_key,
+      items: items.filter(i => i.order_id === row.order_id).map(i => ({ itemType: i.item_type, amount: i.amount })),
+    }
+  })
+}
 
 /**
  * Evaluasi ketersediaan kanal pembayaran online (BRIVA) - FAIL-CLOSED FEATURE GATE.
@@ -473,9 +611,16 @@ export async function createPortalPaymentOrder(
   santriId: string,
   input: PortalCheckoutInput
 ): Promise<PortalCheckoutResponse> {
-  const gate = await isOnlineBrivaAvailable(santriId)
-  if (!gate.available) {
-    throw new Error(gate.reason)
+  const method = input.paymentMethod === 'MANUAL_TRANSFER' ? 'MANUAL_TRANSFER' : 'BRI_VA'
+  const channels = await getPortalPaymentChannels(santriId)
+  if (method === 'BRI_VA' && !channels.briva.available) {
+    throw new Error(channels.briva.reason || 'Pembayaran BRIVA sedang tidak tersedia.')
+  }
+  if (method === 'MANUAL_TRANSFER' && !channels.transfer.available) {
+    throw new Error(channels.transfer.reason || 'Pembayaran transfer sedang tidak tersedia.')
+  }
+  if (method === 'MANUAL_TRANSFER' && !channels.transfer.accounts.some(a => a.id === input.destinationAccountId)) {
+    throw new Error('Pilih rekening tujuan transfer.')
   }
 
   if (!input.items || input.items.length === 0) {
@@ -594,19 +739,49 @@ export async function createPortalPaymentOrder(
     }
   }
 
-  // 2. Tentukan metode pembayaran & biaya administrasi koperasi
-  const method = 'BRI_VA'
-  const cooperativeAdminFee = await getEffectiveCooperativeAdminFee()
+  // 2-3. Buat Payment Order via engine. Biaya admin & kode unik dihitung server dari snapshot rule.
+  let orderWithItems: Awaited<ReturnType<typeof createPaymentOrder>> | null = null
+  for (let attempt = 0; attempt < 3 && !orderWithItems; attempt++) {
+    try {
+      orderWithItems = await createPaymentOrder({
+        santriId,
+        payerType: 'PORTAL_ORTU',
+        items: orderItems,
+        paymentMethod: method,
+        expiresInHours: 24,
+        feeMode: method === 'MANUAL_TRANSFER' ? (input.feeMode === 'DEDUCT' ? 'DEDUCT' : 'ADD') : undefined,
+        destinationAccountId: method === 'MANUAL_TRANSFER' ? input.destinationAccountId : undefined,
+        createdByKind: 'PARENT',
+      })
+    } catch (error) {
+      // Two parents may race for the same unique code; the partial unique index rejects one. Retry.
+      const message = error instanceof Error ? error.message : ''
+      if (method === 'MANUAL_TRANSFER' && message.includes('UNIQUE') && message.includes('total_charged') && attempt < 2) continue
+      if (message.includes('uq_finance_payment_orders_single_active_online') || message.includes('TRANSFER_IN_REVIEW')) {
+        throw new Error('Masih ada pembayaran yang sedang diproses. Muat ulang halaman.')
+      }
+      throw error
+    }
+  }
+  if (!orderWithItems) throw new Error('Gagal membuat pembayaran. Coba lagi.')
 
-  // 3. Buat Payment Order via Engine Locked
-  const orderWithItems = await createPaymentOrder({
-    santriId,
-    payerType: 'PORTAL_ORTU',
-    items: orderItems,
-    paymentMethod: method,
-    cooperativeAdminFee,
-    expiresInHours: 24,
-  })
+  if (method === 'MANUAL_TRANSFER') {
+    const transfer = (await getPortalTransferSummaries(santriId, 3)).find(t => t.orderId === orderWithItems!.id) || null
+    return {
+      success: true,
+      order: {
+        id: orderWithItems.id,
+        orderNumber: orderWithItems.order_number,
+        grossAmount: orderWithItems.gross_amount,
+        cooperativeAdminFee: orderWithItems.cooperative_admin_fee,
+        totalCharged: orderWithItems.total_charged,
+        paymentMethod: orderWithItems.payment_method,
+        expiresAt: orderWithItems.expires_at,
+        fixedVaNumber: null,
+      },
+      checkout: { transfer },
+    }
+  }
 
   // 4. Instruksi pembayaran Virtual Account BRI (BRIVA)
   const fixedVa = orderWithItems.fixed_va_number || (await getStudentFixedVa(santriId).catch(() => null))?.va_number || null
@@ -795,6 +970,9 @@ export async function getPortalFinancialHistory(
       else if (m.movement_type === 'TOPUP_CASH') title = 'Setor Uang Jajan (Tunai Loket)'
       else if (m.movement_type === 'WITHDRAWAL_LOKET') title = 'Pencairan Uang Jajan (Loket)'
       else if (m.movement_type === 'REVERSAL') title = 'Koreksi Saldo Uang Jajan'
+      else if (m.movement_type === 'TOPUP_TRANSFER') title = 'Isi Uang Jajan (Transfer Bank)'
+      else if (m.movement_type === 'WITHDRAWAL_KOLEKTIF') title = 'Pencairan Uang Jajan (via Perwakilan)'
+      else if (m.movement_type === 'WITHDRAWAL_KOLEKTIF_RETURN') title = 'Pencairan Dibatalkan — Saldo Dikembalikan'
 
       history.push({
         id: m.id,
@@ -825,20 +1003,29 @@ export async function getPortalFinancialHistory(
     payment_method: string | null
     expires_at: string
     created_at: string
+    transfer_status: string | null
   }>(
-    `SELECT id, order_number, gross_amount, cooperative_admin_fee, total_charged, payment_method, expires_at, created_at
-     FROM finance_payment_orders
-     WHERE santri_id = ? AND status = 'PENDING' AND datetime(expires_at) > datetime('now')
-     ORDER BY created_at DESC LIMIT 5`,
+    `SELECT o.id, o.order_number, o.gross_amount, o.cooperative_admin_fee, o.total_charged, o.payment_method, o.expires_at, o.created_at,
+            s.status AS transfer_status
+     FROM finance_payment_orders o
+     LEFT JOIN finance_transfer_submissions s ON s.order_id = o.id
+     WHERE o.santri_id = ? AND o.status = 'PENDING'
+       AND (datetime(o.expires_at) > datetime('now') OR s.status IN ('MENUNGGU_VERIFIKASI', 'PERLU_PERBAIKAN'))
+     ORDER BY o.created_at DESC LIMIT 5`,
     [santriId]
   )
 
+  const pendingTitle: Record<string, string> = {
+    MENUNGGU_BUKTI: 'Menunggu Bukti Transfer',
+    MENUNGGU_VERIFIKASI: 'Sedang Dicek Petugas',
+    PERLU_PERBAIKAN: 'Perlu Unggah Ulang Bukti',
+  }
   for (const po of pendingOrders) {
     history.push({
       id: po.id,
       type: 'ORDER_PENDING',
       category: 'TAGIHAN',
-      title: 'Menunggu Pembayaran',
+      title: (po.transfer_status && pendingTitle[po.transfer_status]) || 'Menunggu Pembayaran',
       referenceNumber: po.order_number,
       amount: po.total_charged,
       grossAmount: po.gross_amount,

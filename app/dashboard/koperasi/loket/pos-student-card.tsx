@@ -20,6 +20,8 @@ interface PosStudentCardProps {
   onPromptPin: () => void
   onOpenPinModal?: () => void
   isPinVerified: boolean
+  /** false: kartu & PIN tidak dipakai lagi (modul Kredensial nonaktif). */
+  showCredentials?: boolean
 }
 
 export default function PosStudentCard({
@@ -28,6 +30,7 @@ export default function PosStudentCard({
   onPromptPin,
   onOpenPinModal,
   isPinVerified,
+  showCredentials = true,
 }: PosStudentCardProps) {
 
   const isCardActive = student.card?.status === 'ACTIVE'
@@ -48,7 +51,7 @@ export default function PosStudentCard({
         </div>
       )}
 
-      {student.card && !isCardActive && (
+      {showCredentials && student.card && !isCardActive && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center gap-2 text-xs font-semibold text-amber-800">
           <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
           <span>
@@ -123,6 +126,7 @@ export default function PosStudentCard({
               {student.kamar ? ` / Kamar ${student.kamar}` : ''}
             </span>
 
+            {showCredentials && (<>
             {/* Status Kartu */}
             <span
               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border font-semibold ${
@@ -170,10 +174,11 @@ export default function PosStudentCard({
                   : 'PIN Belum Diatur'}
               </span>
             </span>
+            </>)}
           </div>
 
           {/* Action Bar PIN Verifikasi & Manajemen PIN */}
-          <div className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-2.5 border-t border-slate-100">
+          {showCredentials && <div className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-2.5 border-t border-slate-100">
             {isPinVerified ? (
               <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium bg-emerald-50/70 px-3 py-1.5 rounded-lg border border-emerald-200">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -209,7 +214,7 @@ export default function PosStudentCard({
                 <span>Ubah / Reset PIN</span>
               </button>
             )}
-          </div>
+          </div>}
         </div>
       </div>
     </div>

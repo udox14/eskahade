@@ -1,5 +1,6 @@
 'use server'
 
+import { legacyJajanWritesEnabled, LEGACY_JAJAN_DISABLED_MESSAGE } from '@/lib/uang-jajan/legacy-guard'
 import { query, queryOne, batch, generateId, getDB } from '@/lib/db'
 import { getSession, hasRole } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
@@ -316,6 +317,7 @@ export async function simpanTransaksiDompet(
 ): Promise<ActionResult> {
   const nominalValid = normalizePositiveNominal(nominal)
   if (!nominalValid) return { error: 'Nominal tidak valid' }
+  if (dompet === 'JAJAN' && !await legacyJajanWritesEnabled()) return { error: LEGACY_JAJAN_DISABLED_MESSAGE }
 
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
@@ -372,6 +374,7 @@ export async function transferSaldo(
 ): Promise<ActionResult> {
   const nominalValid = normalizePositiveNominal(nominal)
   if (!nominalValid) return { error: 'Nominal tidak valid' }
+  if (!await legacyJajanWritesEnabled()) return { error: LEGACY_JAJAN_DISABLED_MESSAGE }
 
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
@@ -430,6 +433,7 @@ export async function simpanJajanMassal(
   listTransaksi: { santriId: string; nominal: number }[]
 ): Promise<{ success: boolean; count: number } | { error: string }> {
   if (!listTransaksi.length) return { error: 'Tidak ada data.' }
+  if (!await legacyJajanWritesEnabled()) return { error: LEGACY_JAJAN_DISABLED_MESSAGE }
 
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
@@ -510,6 +514,8 @@ export async function hapusTransaksi(id: string) {
   const santriMap = await getAllowedSantriRows([rows[0].santri_id])
   const santri = santriMap.get(rows[0].santri_id)
   if (!santri) return { error: 'Santri transaksi tidak ditemukan atau tidak boleh diakses.' }
+
+  if (rows.some(row => (row.dompet ?? 'JAJAN') === 'JAJAN') && !await legacyJajanWritesEnabled()) return { error: LEGACY_JAJAN_DISABLED_MESSAGE }
 
   let saldoJajan = santri.saldo_jajan
   let saldoTabungan = santri.saldo_tabungan
@@ -794,6 +800,7 @@ export async function skipAutoPotongToday(santriId: string, reason: string): Pro
 export async function runAutoPotongNow() {
   const session = await getSession()
   if (!session) return { error: 'Unauthorized' }
+  if (!await legacyJajanWritesEnabled()) return { error: LEGACY_JAJAN_DISABLED_MESSAGE }
   const isAdmin = hasRole(session, 'admin')
   const isPengurusAsrama = hasRole(session, 'pengurus_asrama')
   if (!isAdmin && !isPengurusAsrama) return { error: 'Hanya admin atau pengurus asrama yang dapat menjalankan auto-potong manual.' }

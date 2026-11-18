@@ -235,8 +235,8 @@ async function loadWidget(key: DashboardWidgetKey, ctx: Context): Promise<Dashbo
   if (key === 'wallet') {
     const row = await cached(ctx, `wallet:${ctx.monthStart}`, () => queryOne<{ topup: number; withdrawal: number }>(
       `SELECT
-         COALESCE(SUM(CASE WHEN direction = 'IN' AND movement_type IN ('TOPUP_ONLINE', 'TOPUP_CASH') THEN amount ELSE 0 END), 0) AS topup,
-         COALESCE(SUM(CASE WHEN direction = 'OUT' AND movement_type = 'WITHDRAWAL_LOKET' THEN amount ELSE 0 END), 0) AS withdrawal
+         COALESCE(SUM(CASE WHEN direction = 'IN' AND movement_type IN ('TOPUP_ONLINE', 'TOPUP_CASH', 'TOPUP_TRANSFER') THEN amount ELSE 0 END), 0) AS topup,
+         COALESCE(SUM(CASE WHEN direction = 'OUT' AND movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF') THEN amount WHEN movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN' THEN -amount ELSE 0 END), 0) AS withdrawal
        FROM finance_wallet_ledger WHERE created_at >= ? AND created_at < ?`,
       [ctx.monthStart, ctx.nextMonthStart]
     ))

@@ -209,6 +209,47 @@ export async function matchStatementTransaction(
     }
   }
 
+  // 2b. Manual transfer candidate: the unique code makes the amount distinctive. Candidate
+  // evidence only — an operator still resolves it (MANUAL_RESOLVED) in Rekonsiliasi, so a
+  // verified transfer is never recorded a second time as unallocated money.
+  const transferCandidates = await query<CandidatePaymentSummary>(
+    `SELECT p.id, p.payment_number, p.santri_id, p.order_id, p.status,
+            p.gross_amount, p.cooperative_admin_fee,
+            (p.gross_amount + p.cooperative_admin_fee + p.unique_code_amount) AS total_charged,
+            p.paid_at, p.bri_trx_id, p.bri_payment_request_id
+     FROM finance_payments p
+     WHERE p.channel = 'TRANSFER'
+       AND (p.gross_amount + p.cooperative_admin_fee + p.unique_code_amount) = ?
+       AND julianday(p.paid_at) >= julianday('now') - 45
+     ORDER BY p.paid_at DESC LIMIT 3`,
+    [statementTx.amount]
+  )
+  if (transferCandidates.length === 1) {
+    const cand = transferCandidates[0]
+    return {
+      classification: cand.status === 'SETTLED' ? 'ALREADY_SETTLED' : 'EXACT_MATCH',
+      matchingStrength: 'CANDIDATE',
+      statementTransactionId: statementTx.id,
+      matchedPaymentId: cand.id,
+      matchedOrderId: cand.order_id || undefined,
+      candidatePaymentsCount: 1,
+      details: {
+        statementAmount: statementTx.amount,
+        paymentAmount: cand.total_charged,
+        notes: `Kandidat transfer manual ${cand.payment_number} (nominal dengan kode unik sama). Verifikasi lalu hubungkan.`,
+      },
+    }
+  }
+  if (transferCandidates.length > 1) {
+    return {
+      classification: 'AMBIGUOUS',
+      matchingStrength: 'AMBIGUOUS',
+      statementTransactionId: statementTx.id,
+      candidatePaymentsCount: transferCandidates.length,
+      details: { statementAmount: statementTx.amount, notes: 'Beberapa transfer manual memiliki nominal sama. Periksa manual.' },
+    }
+  }
+
   // 3. Fallback: No candidate match found
   return {
     classification: 'NO_MATCH',

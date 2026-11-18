@@ -239,8 +239,8 @@ export async function getGlobalTransactionHistory(
         'WALLET' AS source_table,
         COALESCE(wl.reference_id, 'WLT-' || SUBSTR(wl.id, 1, 8)) AS transaction_number,
         CASE
-          WHEN wl.movement_type = 'WITHDRAWAL_LOKET' THEN 'WITHDRAWAL'
-          WHEN wl.movement_type = 'REVERSAL' THEN 'CORRECTION'
+          WHEN wl.movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF') THEN 'WITHDRAWAL'
+          WHEN wl.movement_type IN ('REVERSAL', 'WITHDRAWAL_KOLEKTIF_RETURN') THEN 'CORRECTION'
           ELSE 'TOPUP'
         END AS category,
         'TITIPAN_SANTRI' AS fund_type,
@@ -274,7 +274,9 @@ export async function getGlobalTransactionHistory(
       WHERE
         ${nonBillableSantriSqlPredicate('s.asrama')}
         AND (
-          (wl.direction = 'OUT' AND wl.movement_type = 'WITHDRAWAL_LOKET')
+          (wl.direction = 'OUT' AND wl.movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF'))
+          OR
+          (wl.direction = 'IN' AND wl.movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN')
           OR
           (wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_CASH', 'TOPUP_ONLINE')
            AND NOT EXISTS (SELECT 1 FROM finance_payments p WHERE p.id = wl.reference_id OR p.payment_number = wl.reference_id))
@@ -687,8 +689,10 @@ export async function getTransactionDetail(
 
     let category: TransactionCategory
     let status = 'COMPLETED'
-    if (wl.movement_type === 'WITHDRAWAL_LOKET') {
+    if (wl.movement_type === 'WITHDRAWAL_LOKET' || wl.movement_type === 'WITHDRAWAL_KOLEKTIF') {
       category = 'WITHDRAWAL'
+    } else if (wl.movement_type === 'WITHDRAWAL_KOLEKTIF_RETURN') {
+      category = 'CORRECTION'
     } else if (wl.movement_type === 'REVERSAL') {
       category = 'CORRECTION'
       status = 'REVERSAL'
@@ -700,6 +704,10 @@ export async function getTransactionDetail(
     const itemLabel =
       wl.movement_type === 'REVERSAL'
         ? `Pembalikan Mutasi Dompet (Saldo: Rp${wl.balance_before.toLocaleString('id-ID')} -> Rp${wl.balance_after.toLocaleString('id-ID')})`
+        : wl.movement_type === 'WITHDRAWAL_KOLEKTIF'
+        ? `Pencairan Uang Jajan via Perwakilan (Saldo: Rp${wl.balance_before.toLocaleString('id-ID')} -> Rp${wl.balance_after.toLocaleString('id-ID')})`
+        : wl.movement_type === 'WITHDRAWAL_KOLEKTIF_RETURN'
+        ? `Pencairan Dibatalkan, Uang Kembali ke Loket (Saldo: Rp${wl.balance_before.toLocaleString('id-ID')} -> Rp${wl.balance_after.toLocaleString('id-ID')})`
         : wl.movement_type === 'WITHDRAWAL_LOKET'
         ? `Penarikan Uang Jajan Tunai (Saldo: Rp${wl.balance_before.toLocaleString('id-ID')} -> Rp${wl.balance_after.toLocaleString('id-ID')})`
         : `Top-Up Uang Jajan Tunai (Saldo: Rp${wl.balance_before.toLocaleString('id-ID')} -> Rp${wl.balance_after.toLocaleString('id-ID')})`

@@ -42,6 +42,10 @@ export type NonSppDetailItem = {
 // Kunci item dari client:
 //   SPP     → 'B:<tahun>-<bulan>' (berjalan) | 'H:<historis_id>'
 //   NON_SPP → '<jenis_biaya>'
+function legacySubmissionsClosed(): boolean {
+  return true
+}
+
 export async function createSubmission(input: {
   kategori: 'SPP' | 'NON_SPP'
   itemKeys: string[]
@@ -51,6 +55,9 @@ export async function createSubmission(input: {
 }): Promise<{ success: true; submissionId: string; jumlah: number } | { error: string }> {
   try {
     const session = await requirePortalSessionAction()
+    // Legacy manual submissions (portal_payment_submission) are closed for new requests.
+    // New transfers go through the Sistem Keuangan Baru (finance_transfer_submissions).
+    if (legacySubmissionsClosed()) return { error: 'Pengajuan lama sudah ditutup. Gunakan menu Tagihan untuk membayar via transfer bank.' }
 
     const kategori = input.kategori === 'NON_SPP' ? 'NON_SPP' : 'SPP'
     const metode = input.metode === 'QRIS' ? 'QRIS' : 'TRANSFER'
@@ -315,3 +322,57 @@ export async function updateParentLimitsAction(limits: {
   }
 }
 
+
+// ============================================================
+// TRANSFER MANUAL (Sistem Keuangan Baru)
+// ============================================================
+
+import { submitTransferProof, cancelTransferByParent, PROOF_MAX_BYTES } from '@/lib/finance/manual-transfer'
+
+export async function uploadTransferProofAction(formData: FormData): Promise<{ success: true } | { error: string }> {
+  try {
+    const session = await requirePortalSessionAction()
+    if (session.must_change_password) return { error: 'Ganti password sebelum mengunggah bukti.' }
+    const submissionId = String(formData.get('submissionId') || '')
+    const file = formData.get('bukti')
+    if (!submissionId) return { error: 'Pembayaran tidak valid.' }
+    if (!(file instanceof File) || file.size === 0) return { error: 'Pilih foto bukti transfer.' }
+    if (file.size > PROOF_MAX_BYTES) return { error: 'Ukuran foto bukti maksimal 2 MB.' }
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    await submitTransferProof({
+      santriId: session.santri_id,
+      submissionId,
+      bytes,
+      mimeType: file.type,
+      senderName: String(formData.get('senderName') || ''),
+      senderBank: String(formData.get('senderBank') || ''),
+      transferredAt: String(formData.get('transferredAt') || ''),
+      notes: String(formData.get('notes') || ''),
+    })
+    await logActivity({
+      actor: { name: `Ortu ${session.nama}` },
+      module: 'portal_ortu',
+      action: 'upload_bukti_transfer',
+      entityType: 'finance_transfer_submissions',
+      entityId: submissionId,
+      entityLabel: session.nama,
+      summary: `Ortu mengunggah bukti transfer (${session.nama})`,
+      details: { santri_id: session.santri_id },
+    })
+    PORTAL_PATHS.forEach(p => revalidatePath(p))
+    return { success: true }
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Gagal mengunggah bukti.' }
+  }
+}
+
+export async function cancelTransferAction(submissionId: string): Promise<{ success: true } | { error: string }> {
+  try {
+    const session = await requirePortalSessionAction()
+    await cancelTransferByParent(session.santri_id, String(submissionId || ''))
+    PORTAL_PATHS.forEach(p => revalidatePath(p))
+    return { success: true }
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'Gagal membatalkan pembayaran.' }
+  }
+}

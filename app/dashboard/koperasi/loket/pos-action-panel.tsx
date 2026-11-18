@@ -17,7 +17,8 @@ interface PosActionPanelProps {
   financials: StudentLoketFinancials
   onSelectBillingPeriod: (period: string) => Promise<void>
   isSubmitting: boolean
-  onWithdraw: (amount: number, notes?: string) => Promise<void>
+  /** Undefined: tarik tunai individual dinonaktifkan (pencairan via perwakilan). */
+  onWithdraw?: (amount: number, notes?: string) => Promise<void>
   onDepositOrPay: (items: LoketPaymentItemInput[], notes?: string) => Promise<void>
 }
 
@@ -34,7 +35,7 @@ export default function PosActionPanel({
   const [billingPeriod,setBillingPeriod] = useState('')
   const [billingError,setBillingError] = useState('')
   const [loadingBilling,setLoadingBilling] = useState(false)
-  const [activeTab, setActiveTab] = useState<'WITHDRAW' | 'DEPOSIT_PAY'>('WITHDRAW')
+  const [activeTab, setActiveTab] = useState<'WITHDRAW' | 'DEPOSIT_PAY'>(onWithdraw ? 'WITHDRAW' : 'DEPOSIT_PAY')
 
   // State Penarikan Uang Jajan
   const [withdrawAmount, setWithdrawAmount] = useState<number>(20000)
@@ -69,6 +70,7 @@ export default function PosActionPanel({
   const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!isWithdrawValid) return
+    if (!onWithdraw) return
     await onWithdraw(withdrawAmount, withdrawNotes)
   }
 
@@ -140,8 +142,14 @@ export default function PosActionPanel({
       </div>}
 
       {/* Tab Switcher POS */}
+      {!onWithdraw && (
+        <div className="border-b border-slate-200 bg-slate-50/70 px-4 py-2 text-xs text-slate-600">
+          Pencairan uang jajan dilakukan lewat perwakilan asrama di menu{' '}
+          <a href="/dashboard/koperasi/pencairan-uang-jajan" className="font-semibold text-emerald-700 underline">Pencairan Uang Jajan</a>.
+        </div>
+      )}
       <div className="flex border-b border-slate-200 bg-slate-50/70 p-1.5 gap-1.5">
-        <button
+        {onWithdraw && <button
           type="button"
           onClick={() => setActiveTab('WITHDRAW')}
           className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
@@ -152,7 +160,7 @@ export default function PosActionPanel({
         >
           <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
           <span>Tarik Uang Jajan</span>
-        </button>
+        </button>}
 
         <button
           type="button"
@@ -174,7 +182,7 @@ export default function PosActionPanel({
       </div>
 
       {/* ─── TAB 1: TARIK UANG JAJAN ─── */}
-      {activeTab === 'WITHDRAW' && (
+      {activeTab === 'WITHDRAW' && onWithdraw && (
         <form onSubmit={handleWithdrawSubmit} className="p-4 sm:p-6 space-y-5">
           {/* 4 Cards Saldo & Limit Santri */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

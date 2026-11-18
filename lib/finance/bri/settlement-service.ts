@@ -96,9 +96,11 @@ export async function executeSettlementTransition(
     status: 'PAID' | 'SETTLED'
     gross_amount: number
     cooperative_admin_fee: number
+    unique_code_amount: number
     santri_id: string
   }>(
-    `SELECT id, payment_number, channel, status, gross_amount, cooperative_admin_fee, santri_id
+    `SELECT id, payment_number, channel, status, gross_amount, cooperative_admin_fee,
+            COALESCE(unique_code_amount, 0) AS unique_code_amount, santri_id
      FROM finance_payments
      WHERE id = ?
      LIMIT 1`,
@@ -109,11 +111,12 @@ export async function executeSettlementTransition(
     throw new Error(`Payment ${paymentId} not found.`)
   }
 
-  if (payment.channel !== 'BRI') {
-    throw new Error(`Payment ${paymentId} is not a BRI payment (channel: ${payment.channel}).`)
+  // Manual transfers into the BRI collection account settle against the same statement.
+  if (payment.channel !== 'BRI' && payment.channel !== 'TRANSFER') {
+    throw new Error(`Payment ${paymentId} is not a bank payment (channel: ${payment.channel}).`)
   }
 
-  const totalCharged = payment.gross_amount + payment.cooperative_admin_fee
+  const totalCharged = payment.gross_amount + payment.cooperative_admin_fee + payment.unique_code_amount
   if (totalCharged !== statementTx.amount) {
     throw new Error(
       `Amount mismatch between payment ${payment.id} (total ${totalCharged}) and statement ${statementTx.id} (${statementTx.amount}).`

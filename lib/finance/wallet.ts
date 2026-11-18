@@ -10,6 +10,9 @@ import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
 export type WalletDirection = 'IN' | 'OUT'
 export type WalletMovementType =
   | 'TOPUP_ONLINE'
+  | 'TOPUP_TRANSFER'
+  | 'WITHDRAWAL_KOLEKTIF'
+  | 'WITHDRAWAL_KOLEKTIF_RETURN'
   | 'TOPUP_CASH'
   | 'WITHDRAWAL_LOKET'
   | 'REVERSAL'
@@ -383,11 +386,10 @@ export async function evaluateWalletLimit(
 
   // Hitung total penarikan tunai santri hari ini (zona waktu lokal)
   const todayRow = await queryOne<{ total_today: number }>(
-    `SELECT COALESCE(SUM(amount), 0) AS total_today
+    `SELECT COALESCE(SUM(CASE WHEN movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN' THEN -amount ELSE amount END), 0) AS total_today
      FROM finance_wallet_ledger
      WHERE santri_id = ?
-       AND direction = 'OUT'
-       AND movement_type = 'WITHDRAWAL_LOKET'
+       AND movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF', 'WITHDRAWAL_KOLEKTIF_RETURN')
        AND date(created_at, '+7 hours') = date('now', '+7 hours')`,
     [santriId]
   )

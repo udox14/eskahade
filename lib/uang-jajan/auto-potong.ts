@@ -1,3 +1,4 @@
+import { legacyJajanWritesEnabledWith } from './legacy-guard'
 export type AutoPotongResult = {
   date: string
   checkedRules: number
@@ -96,6 +97,10 @@ async function runBatch(db: D1Database, statements: Statement[]) {
 
 export async function runUangJajanAutoPotong(db: D1Database, now = new Date(), options: AutoPotongOptions = {}): Promise<AutoPotongResult> {
   const wib = getWibSnapshot(now)
+  // Legacy direct-balance deduction bypasses the finance ledger; disabled unless explicitly re-enabled.
+  if (!await legacyJajanWritesEnabledWith(db)) {
+    return { date: wib.date, checkedRules: 0, eligibleSantri: 0, skipped: 0, deducted: 0, totalNominal: 0 }
+  }
   const asramaFilter = Array.isArray(options.asrama)
     ? options.asrama.filter(Boolean)
     : options.asrama

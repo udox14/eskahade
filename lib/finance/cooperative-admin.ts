@@ -22,22 +22,31 @@ function generateIncomeNumber(entryType: FinanceCooperativeIncomeEntryType): str
  * Mengambil aturan biaya administrasi Koperasi yang efektif pada tanggal tertentu.
  * Berdasarkan aturan di finance_cooperative_admin_fee_rules yang enabled dan masih berlaku.
  */
+export type CooperativeFeeChannel = 'BRI' | 'TRANSFER'
+
+/** Rule code per channel: BRIVA checkout vs manual transfer checkout. */
+export const COOPERATIVE_FEE_CODES: Record<CooperativeFeeChannel, string> = {
+  BRI: 'ONLINE_CHECKOUT_FEE',
+  TRANSFER: 'TRANSFER_CHECKOUT_FEE',
+}
+
 export async function getEffectiveCooperativeAdminFeeRule(
   code = 'ONLINE_CHECKOUT_FEE',
-  atDate = new Date().toISOString()
+  atDate = new Date().toISOString(),
+  channel: CooperativeFeeChannel = 'BRI'
 ): Promise<FinanceCooperativeAdminFeeRule | null> {
   const rule = await queryOne<FinanceCooperativeAdminFeeRule>(
     `SELECT id, code, name, is_enabled, amount, applies_to_channel,
             effective_from, effective_until, closed_by, closed_at, created_by, created_at
      FROM finance_cooperative_admin_fee_rules
      WHERE code = ?
-       AND applies_to_channel = 'BRI'
+       AND applies_to_channel = ?
        AND is_enabled = 1
        AND effective_from <= ?
        AND (effective_until IS NULL OR effective_until > ?)
      ORDER BY effective_from DESC, created_at DESC
      LIMIT 1`,
-    [code, atDate, atDate]
+    [code, channel, atDate, atDate]
   )
   return rule || null
 }
@@ -48,9 +57,10 @@ export async function getEffectiveCooperativeAdminFeeRule(
  */
 export async function getEffectiveCooperativeAdminFee(
   code = 'ONLINE_CHECKOUT_FEE',
-  atDate = new Date().toISOString()
+  atDate = new Date().toISOString(),
+  channel: CooperativeFeeChannel = 'BRI'
 ): Promise<number> {
-  const rule = await getEffectiveCooperativeAdminFeeRule(code, atDate)
+  const rule = await getEffectiveCooperativeAdminFeeRule(code, atDate, channel)
   return rule ? rupiah(rule.amount,'Biaya Koperasi',true) : 0
 }
 
@@ -76,8 +86,10 @@ export async function setCooperativeAdminFeeRule(input: {
   amount: number
   isEnabled?: boolean
   createdBy?: string | null
+  channel?: CooperativeFeeChannel
 },plan?:FinanceWritePlan): Promise<FinanceCooperativeAdminFeeRule> {
-  const cleanCode = (input.code || 'ONLINE_CHECKOUT_FEE').trim().toUpperCase()
+  const channel: CooperativeFeeChannel = input.channel === 'TRANSFER' ? 'TRANSFER' : 'BRI'
+  const cleanCode = (input.code || COOPERATIVE_FEE_CODES[channel]).trim().toUpperCase()
   const cleanName = (input.name || 'Biaya Operasional Koperasi Transaksi Online').trim()
   const amount = rupiah(input.amount,'Biaya Koperasi',true)
   const isEnabled = input.isEnabled !== false ? 1 : 0
@@ -90,19 +102,19 @@ export async function setCooperativeAdminFeeRule(input: {
       sql: `UPDATE finance_cooperative_admin_fee_rules
             SET effective_until = ?, closed_by = ?, closed_at = ?
             WHERE code = ?
-              AND applies_to_channel = 'BRI'
+              AND applies_to_channel = ?
               AND (effective_until IS NULL OR effective_until > ?)`,
-      params: [timestamp, input.createdBy || null, timestamp, cleanCode, timestamp],
+      params: [timestamp, input.createdBy || null, timestamp, cleanCode, channel, timestamp],
     },
     {
       sql: `INSERT INTO finance_cooperative_admin_fee_rules (
               id, code, name, is_enabled, amount, applies_to_channel,
               effective_from, effective_until, closed_by, closed_at, created_by, created_at
-            ) VALUES (?, ?, ?, ?, ?, 'BRI', ?, NULL, NULL, NULL, ?, ?)`,
-      params: [id, cleanCode, cleanName, isEnabled, amount, timestamp, input.createdBy || null, timestamp],
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?)`,
+      params: [id, cleanCode, cleanName, isEnabled, amount, channel, timestamp, input.createdBy || null, timestamp],
     },
   ]
-  if(plan){plan.statements.push(...statements);return {id,code:cleanCode,name:cleanName,is_enabled:isEnabled,amount,applies_to_channel:'BRI',effective_from:timestamp,effective_until:null,created_by:input.createdBy||null,created_at:timestamp}}
+  if(plan){plan.statements.push(...statements);return {id,code:cleanCode,name:cleanName,is_enabled:isEnabled,amount,applies_to_channel:channel,effective_from:timestamp,effective_until:null,created_by:input.createdBy||null,created_at:timestamp}}
   await batch(statements)
 
   const created = await queryOne<FinanceCooperativeAdminFeeRule>(
@@ -241,4 +253,51 @@ export async function getCooperativeIncomeSummary(): Promise<{
   const netIncome = Math.max(0, totalIncome - totalReversal - totalRefund)
 
   return { totalIncome, totalReversal, totalRefund, netIncome }
+}
+
+export interface CooperativeIncomeBreakdownRow {
+  channel: string
+  income_source: 'ADMIN_FEE' | 'UNIQUE_CODE'
+  income: number
+  reversal: number
+  net: number
+  transactions: number
+}
+
+/**
+ * Koperasi income split by payment channel and source (admin fee vs unique code).
+ * Net = INCOME - REVERSAL - REFUND, append-only ledger is never edited.
+ * Dates are ISO bounds on finance_cooperative_income.created_at (inclusive from, exclusive to).
+ */
+export async function getCooperativeIncomeBreakdown(range?: { from?: string; to?: string }): Promise<{
+  rows: CooperativeIncomeBreakdownRow[]
+  daily: Array<{ day: string; net: number }>
+  totalNet: number
+}> {
+  const where: string[] = []
+  const params: unknown[] = []
+  if (range?.from) { where.push('ci.created_at >= ?'); params.push(range.from) }
+  if (range?.to) { where.push('ci.created_at < ?'); params.push(range.to) }
+  const clause = where.length ? 'WHERE ' + where.join(' AND ') : ''
+  const signed = `CASE WHEN ci.entry_type = 'INCOME' THEN ci.amount ELSE -ci.amount END`
+  const rows = await query<CooperativeIncomeBreakdownRow>(
+    `SELECT p.channel AS channel, COALESCE(ci.income_source, 'ADMIN_FEE') AS income_source,
+            COALESCE(SUM(CASE WHEN ci.entry_type = 'INCOME' THEN ci.amount ELSE 0 END), 0) AS income,
+            COALESCE(SUM(CASE WHEN ci.entry_type != 'INCOME' THEN ci.amount ELSE 0 END), 0) AS reversal,
+            COALESCE(SUM(${signed}), 0) AS net,
+            COUNT(DISTINCT CASE WHEN ci.entry_type = 'INCOME' THEN ci.payment_id END) AS transactions
+     FROM finance_cooperative_income ci
+     JOIN finance_payments p ON p.id = ci.payment_id
+     ${clause}
+     GROUP BY p.channel, COALESCE(ci.income_source, 'ADMIN_FEE')
+     ORDER BY p.channel, income_source`,
+    params
+  )
+  const daily = await query<{ day: string; net: number }>(
+    `SELECT date(ci.created_at, '+7 hours') AS day, COALESCE(SUM(${signed}), 0) AS net
+     FROM finance_cooperative_income ci ${clause}
+     GROUP BY date(ci.created_at, '+7 hours') ORDER BY day DESC LIMIT 62`,
+    params
+  )
+  return { rows, daily, totalNet: rows.reduce((sum, row) => sum + row.net, 0) }
 }

@@ -44,6 +44,10 @@ export async function recordOrderPayment(
   }
 
   const externalRef = input.externalReference ? input.externalReference.trim() : null
+  if (input.channel === 'TRANSFER' && (!plan || order.payment_method !== 'MANUAL_TRANSFER')) {
+    throw new Error('Pembayaran transfer manual hanya dicatat melalui verifikasi bukti transfer.')
+  }
+  const uniqueCodeAmount = input.channel === 'TRANSFER' ? (order.unique_code ?? 0) : 0
 
   // 1b. Guard bebas tagihan: santri AL-BAGHORY / kategori SADESA tidak boleh menerima pembayaran
   const orderSantri = await queryOne<{ asrama: string | null; nama_lengkap: string; kategori_santri: string | null }>(
@@ -303,8 +307,8 @@ export async function recordOrderPayment(
         gross_amount, cooperative_admin_fee, bri_fee_amount, net_amount,
         status, correction_status, allocation_status, paid_at,
         bri_payment_request_id, bri_trx_id, external_reference, cash_session_id,
-        received_by, source, fund_management, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        received_by, source, fund_management, created_at, unique_code_amount
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'NONE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     params: [
       paymentId,
@@ -327,6 +331,7 @@ export async function recordOrderPayment(
       paymentSource,
       fundManagement,
       paidAt,
+      uniqueCodeAmount,
     ],
   })
 
@@ -353,6 +358,29 @@ export async function recordOrderPayment(
         order.cooperative_fee_rule_id || null,
         ruleSnapshot,
         `Pendapatan Biaya Operasional Koperasi atas pembayaran ${paymentNumber}`,
+        receivedBy,
+        paidAt,
+      ],
+    })
+  }
+
+  // 5c. Kode unik transfer manual = pendapatan Koperasi, dicatat terpisah dari biaya admin.
+  if (uniqueCodeAmount > 0) {
+    statements.push({
+      sql: `
+        INSERT INTO finance_cooperative_income (
+          id, income_number, entry_type, reference_income_id, correction_id,
+          payment_id, order_id, amount, rule_id, rule_snapshot,
+          reference_note, created_by, created_at, income_source
+        ) VALUES (?, ?, 'INCOME', NULL, NULL, ?, ?, ?, NULL, NULL, ?, ?, ?, 'UNIQUE_CODE')
+      `,
+      params: [
+        generateId(),
+        `INC-KOP-${paidAt.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+        paymentId,
+        order.id,
+        uniqueCodeAmount,
+        `Kode unik transfer atas pembayaran ${paymentNumber}`,
         receivedBy,
         paidAt,
       ],
@@ -486,13 +514,18 @@ export async function recordOrderPayment(
 
   // 8. Eksekusi batch dengan penanganan race condition
   if (plan) {
-    if (input.channel !== 'CASH' || order.status !== 'PENDING' || unallocatedExcess !== 0) throw new Error('Staged cash payment harus exact dan payable.')
+    if ((input.channel !== 'CASH' && input.channel !== 'TRANSFER') || order.status !== 'PENDING' || unallocatedExcess !== 0) {
+      throw new Error(input.channel === 'TRANSFER'
+        ? 'TRANSFER_NOT_PAYABLE: Sebagian tagihan pada pembayaran ini sudah tidak dapat dialokasikan (mungkin sudah dibayar lewat jalur lain).'
+        : 'Staged cash payment harus exact dan payable.')
+    }
     plan.statements.push(...statements)
     return {
       id:paymentId,payment_number:paymentNumber,order_id:order.id,santri_id:order.santri_id,channel:input.channel,method:input.method,
       gross_amount:grossAmount,cooperative_admin_fee:cooperativeAdminFee,bri_fee_amount:briFeeAmount,net_amount:netAmount,status:'PAID',
       correction_status:'NONE',allocation_status:allocationStatus,paid_at:paidAt,bri_payment_request_id:briPaymentRequestId,bri_trx_id:briTrxId,
       external_reference:externalRef,cash_session_id:cashSessionId,received_by:receivedBy,source:paymentSource,fund_management:fundManagement,created_at:paidAt,
+      unique_code_amount:uniqueCodeAmount,
       allocations:allocatableItems.map(a=>({id:a.id,payment_id:paymentId,obligation_id:a.obligationId||null,
         target_type:a.obligationId?'OBLIGATION':'UANG_JAJAN',item_type:a.itemType,provider_id:null,amount:a.amount,
         disbursed_amount:0,distribution_status:'UNDISBURSED',created_at:paidAt})),

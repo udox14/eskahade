@@ -59,7 +59,15 @@ const LEGACY_STATUS_META = {
   },
 } as const
 
-function formatPortalStatus(status: string): string {
+const METHOD_LABEL: Record<string, string> = {
+  BRI_VA: 'BRIVA', BRI: 'BRIVA', MANUAL_TRANSFER: 'Transfer bank', TRANSFER: 'Transfer bank', CASH: 'Tunai loket',
+}
+function formatMethod(value: string | null | undefined): string {
+  return value ? METHOD_LABEL[value] || value : ''
+}
+
+function formatPortalStatus(status: string, method?: string | null): string {
+  if (status === 'PENDING' && method === 'MANUAL_TRANSFER') return 'Diproses'
   switch (status) {
     case 'PAID':
     case 'COMPLETED':
@@ -296,7 +304,7 @@ export function RiwayatClient({
                               </p>
                               <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5 font-medium font-mono">
                                 {dateStr}
-                                {item.method ? ` · ${item.method}` : item.channel ? ` · ${item.channel}` : ''}
+                                {item.method || item.channel ? ` · ${formatMethod(item.method || item.channel)}` : ''}
                               </p>
                             </div>
                           </div>
@@ -339,7 +347,7 @@ export function RiwayatClient({
                                 </Link>
                               ) : (
                                 <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
-                                  {formatPortalStatus(item.status)}
+                                  {formatPortalStatus(item.status, item.method)}
                                 </span>
                               )}
                             </div>

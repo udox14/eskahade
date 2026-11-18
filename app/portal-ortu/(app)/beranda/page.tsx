@@ -112,6 +112,8 @@ export default async function PortalBerandaPage() {
         }}
         gatewayInfo={billing?.gatewayInfo ?? null}
         fixedVa={billing?.fixedVa ?? null}
+        paymentChannels={billing?.paymentChannels ?? null}
+        transferInReview={(billing?.transfers ?? []).some(t => t.status === 'MENUNGGU_VERIFIKASI' || t.status === 'PERLU_PERBAIKAN')}
       />
 
       {/* 3. TOMBOL SHORTCUT DI BAWAH HERO */}
@@ -186,6 +188,23 @@ export default async function PortalBerandaPage() {
           </Link>
         </div>
 
+        {(() => {
+          const open = (billing?.transfers ?? []).find(t => t.status === 'MENUNGGU_VERIFIKASI' || t.status === 'PERLU_PERBAIKAN' ||
+            (t.status === 'MENUNGGU_BUKTI' && new Date(t.expiresAt).getTime() > Date.now()))
+          if (!open) return null
+          const label = open.status === 'MENUNGGU_VERIFIKASI' ? 'Sedang dicek petugas'
+            : open.status === 'PERLU_PERBAIKAN' ? 'Perlu unggah ulang bukti' : 'Menunggu bukti transfer'
+          return (
+            <Link href="/portal-ortu/tagihan" className="flex items-center justify-between gap-3 rounded-[18px] border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/40 p-4">
+              <span className="min-w-0">
+                <span className="block text-xs font-bold text-amber-900 dark:text-amber-300">Transfer · {label}</span>
+                <span className="block font-mono text-lg font-black text-slate-950 dark:text-white">{formatRupiah(open.expectedAmount)}</span>
+              </span>
+              <CaretRight className="w-4 h-4 text-amber-700 shrink-0" />
+            </Link>
+          )
+        })()}
+
         {!billing ? (
           <div className="rounded-[18px] bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-4 space-y-1 text-slate-600 dark:text-slate-400">
             <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">Informasi Tagihan Belum Dapat Dimuat</p>
@@ -200,7 +219,7 @@ export default async function PortalBerandaPage() {
 
             {(() => {
               const po = pendingOrders[0]
-              const vaNumber = billing.fixedVa?.vaNumber || po.orderNumber
+              const vaNumber = billing.fixedVa?.vaNumber || 'Nomor VA belum tersedia'
               const bankLabel = billing.fixedVa?.bankCode ? `Virtual Account ${billing.fixedVa.bankCode}` : 'Virtual Account'
 
               return (

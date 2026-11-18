@@ -241,3 +241,20 @@ export async function fetchReconciliationsForExport(
     getReconciliationsReport({ ...filters, page, pageSize })
   )
 }
+
+// ── Statistik Pendapatan Koperasi (biaya admin BRIVA/Transfer + kode unik) ──
+import { getCooperativeIncomeBreakdown } from '@/lib/finance/cooperative-admin'
+
+export async function fetchCooperativeIncomeStats(month: string) {
+  await authorizeFinanceFeature('/dashboard/keuangan/laporan', false)
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('Bulan tidak valid.')
+  const [year, mon] = month.split('-').map(Number)
+  // WIB month bounds expressed in UTC ISO (created_at is stored as ISO UTC).
+  const from = new Date(Date.UTC(year, mon - 1, 1) - 7 * 3600 * 1000).toISOString()
+  const to = new Date(Date.UTC(year, mon, 1) - 7 * 3600 * 1000).toISOString()
+  const [period, allTime] = await Promise.all([
+    getCooperativeIncomeBreakdown({ from, to }),
+    getCooperativeIncomeBreakdown(),
+  ])
+  return { month, period, allTimeNet: allTime.totalNet }
+}

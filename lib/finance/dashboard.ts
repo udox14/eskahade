@@ -192,7 +192,7 @@ export async function getExecutiveFinanceKpi(periodInput?: string): Promise<Fina
     }>(
       `SELECT
          COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' THEN a.amount ELSE 0 END), 0) AS total_penerimaan,
-         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'BRI' THEN a.amount ELSE 0 END), 0) AS online_penerimaan,
+         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel IN ('BRI', 'TRANSFER') THEN a.amount ELSE 0 END), 0) AS online_penerimaan,
          COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'CASH' THEN a.amount ELSE 0 END), 0) AS cash_penerimaan,
          COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'BRI' AND EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN a.amount ELSE 0 END), 0) AS settled_amount,
          COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'BRI' AND NOT EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN a.amount ELSE 0 END), 0) AS pending_settlement_amount,
@@ -273,10 +273,10 @@ export async function getExecutiveFinanceKpi(periodInput?: string): Promise<Fina
       withdrawal_period: number
     }>(
       `SELECT
-         COALESCE(SUM(CASE WHEN wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_ONLINE', 'TOPUP_CASH') THEN wl.amount ELSE 0 END), 0) AS topup_period,
-         COALESCE(SUM(CASE WHEN wl.direction = 'IN' AND wl.movement_type = 'TOPUP_ONLINE' THEN wl.amount ELSE 0 END), 0) AS topup_online,
+         COALESCE(SUM(CASE WHEN wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_ONLINE', 'TOPUP_CASH', 'TOPUP_TRANSFER') THEN wl.amount ELSE 0 END), 0) AS topup_period,
+         COALESCE(SUM(CASE WHEN wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_ONLINE', 'TOPUP_TRANSFER') THEN wl.amount ELSE 0 END), 0) AS topup_online,
          COALESCE(SUM(CASE WHEN wl.direction = 'IN' AND wl.movement_type = 'TOPUP_CASH' THEN wl.amount ELSE 0 END), 0) AS topup_cash,
-         COALESCE(SUM(CASE WHEN wl.direction = 'OUT' AND wl.movement_type = 'WITHDRAWAL_LOKET' THEN wl.amount ELSE 0 END), 0) AS withdrawal_period
+         COALESCE(SUM(CASE WHEN wl.direction = 'OUT' AND wl.movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF') THEN wl.amount WHEN wl.movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN' THEN -wl.amount ELSE 0 END), 0) AS withdrawal_period
        FROM finance_wallet_ledger wl
        JOIN santri s ON s.id = wl.santri_id
        WHERE wl.created_at LIKE ?
@@ -324,7 +324,9 @@ export async function getExecutiveFinanceKpi(periodInput?: string): Promise<Fina
              (wl.direction = 'IN' AND wl.movement_type = 'TOPUP_CASH'
               AND NOT EXISTS (SELECT 1 FROM finance_payments p WHERE p.id = wl.reference_id OR p.payment_number = wl.reference_id))
              OR
-             (wl.direction = 'OUT' AND wl.movement_type = 'WITHDRAWAL_LOKET')
+             (wl.direction = 'OUT' AND wl.movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF'))
+             OR
+             (wl.direction = 'IN' AND wl.movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN')
            )
        )`,
       [todayPrefix, todayPrefix]
@@ -452,7 +454,7 @@ export async function getDashboardChartsData(periodInput?: string): Promise<{
           (SELECT COALESCE(SUM(amount), 0)
            FROM finance_wallet_ledger
            WHERE direction = 'IN'
-             AND movement_type IN ('TOPUP_ONLINE', 'TOPUP_CASH')
+             AND movement_type IN ('TOPUP_ONLINE', 'TOPUP_CASH', 'TOPUP_TRANSFER')
              AND created_at LIKE ?) AS uang_jajan_in`,
       [mPrefix, mPrefix, mPrefix]
     )
@@ -471,7 +473,7 @@ export async function getDashboardChartsData(periodInput?: string): Promise<{
     cash_sum: number
   }>(
     `SELECT
-       COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'BRI' THEN a.amount ELSE 0 END), 0) AS online_sum,
+       COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel IN ('BRI', 'TRANSFER') THEN a.amount ELSE 0 END), 0) AS online_sum,
        COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'CASH' THEN a.amount ELSE 0 END), 0) AS cash_sum
      FROM finance_allocations a
      JOIN finance_payments p ON a.payment_id = p.id
@@ -590,8 +592,8 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
       wl.id,
       COALESCE(wl.reference_id, 'WLT-' || SUBSTR(wl.id, 1, 8)) AS transaction_number,
       CASE
-        WHEN wl.movement_type = 'WITHDRAWAL_LOKET' THEN 'WITHDRAWAL'
-        WHEN wl.movement_type = 'REVERSAL' THEN 'CORRECTION'
+        WHEN wl.movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF') THEN 'WITHDRAWAL'
+        WHEN wl.movement_type IN ('REVERSAL', 'WITHDRAWAL_KOLEKTIF_RETURN') THEN 'CORRECTION'
         ELSE 'TOPUP'
       END AS category,
       'TITIPAN_SANTRI' AS fund_type,
@@ -614,7 +616,9 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
     LEFT JOIN users u ON u.id = wl.operator_id
     WHERE ${nonBillableSantriSqlPredicate('s.asrama')}
       AND (
-        (wl.direction = 'OUT' AND wl.movement_type = 'WITHDRAWAL_LOKET')
+        (wl.direction = 'OUT' AND wl.movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF'))
+        OR
+        (wl.direction = 'IN' AND wl.movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN')
         OR
         (wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_CASH', 'TOPUP_ONLINE')
          AND NOT EXISTS (SELECT 1 FROM finance_payments p WHERE p.id = wl.reference_id OR p.payment_number = wl.reference_id))

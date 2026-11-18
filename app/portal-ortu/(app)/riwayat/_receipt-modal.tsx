@@ -35,7 +35,8 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
   const dateFormatted = formatTanggalDmy(item.createdAt)
   const paymentNumber = item.referenceNumber || '-'
   const receiptNumber = `KW-${item.referenceNumber.replace(/[^a-zA-Z0-9]/g, '').slice(-8) || '001'}`
-  const paymentMethod = item.channel || item.method || 'Online'
+  const methodLabels: Record<string, string> = { BRI: 'BRIVA', BRI_VA: 'BRIVA', TRANSFER: 'Transfer bank', MANUAL_TRANSFER: 'Transfer bank', CASH: 'Tunai loket' }
+  const paymentMethod = methodLabels[item.channel || item.method || ''] || item.channel || item.method || 'Online'
 
   // Identitas Lembaga (Dinamis dari Pengaturan Kop Keuangan)
   const instansiName = letterheadProfile?.institutionName || 'Pondok Pesantren Sukahideng'

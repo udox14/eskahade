@@ -202,7 +202,7 @@ export async function recalculateCashSession(
   const topupRes = await queryOne<{ total_topup_in: number }>(
     `SELECT COALESCE(SUM(amount), 0) AS total_topup_in
      FROM finance_wallet_ledger
-     WHERE cash_session_id = ? AND direction = 'IN' AND movement_type = 'TOPUP_CASH'`,
+     WHERE cash_session_id = ? AND direction = 'IN' AND movement_type IN ('TOPUP_CASH', 'WITHDRAWAL_KOLEKTIF_RETURN')`,
     [sessionId]
   )
   const topupCashIn = topupRes?.total_topup_in ?? 0
@@ -213,7 +213,7 @@ export async function recalculateCashSession(
   const cashOutRes = await queryOne<{ total_cash_out: number }>(
     `SELECT COALESCE(SUM(amount), 0) AS total_cash_out
      FROM finance_wallet_ledger
-     WHERE cash_session_id = ? AND direction = 'OUT' AND movement_type = 'WITHDRAWAL_LOKET'`,
+     WHERE cash_session_id = ? AND direction = 'OUT' AND movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF')`,
     [sessionId]
   )
   const walletCashOut = cashOutRes?.total_cash_out ?? 0
@@ -401,9 +401,10 @@ export async function getCashSessionSummary(
 
   // Agregasi penarikan uang jajan
   const withRes = await queryOne<{ count: number; total: number }>(
-    `SELECT COUNT(*) AS count, COALESCE(SUM(amount), 0) AS total
+    `SELECT COUNT(CASE WHEN direction = 'OUT' THEN 1 END) AS count,
+            COALESCE(SUM(CASE WHEN direction = 'OUT' THEN amount ELSE -amount END), 0) AS total
      FROM finance_wallet_ledger
-     WHERE cash_session_id = ? AND direction = 'OUT' AND movement_type = 'WITHDRAWAL_LOKET'`,
+     WHERE cash_session_id = ? AND movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF', 'WITHDRAWAL_KOLEKTIF_RETURN')`,
     [sessionId]
   )
 

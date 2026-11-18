@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),Module=require('node:module'),crypto=require('node:crypto');
 const {DatabaseSync}=require('node:sqlite'); const ts=require('typescript');
 const root=path.resolve(__dirname,'..');
-function createDatabase(through=189,seed=true){
+function createDatabase(through=189,seed=true,with0198=true){
  const db=new DatabaseSync(':memory:');
  db.exec(`PRAGMA foreign_keys=ON;
  CREATE TABLE users(id TEXT PRIMARY KEY,full_name TEXT,username TEXT,role TEXT,roles TEXT,email TEXT,password_hash TEXT);
@@ -37,6 +37,13 @@ function createDatabase(through=189,seed=true){
  for(const n of numbers.filter(n=>n<=through)) {
   const name=fs.readdirSync(path.join(root,'migrations')).find(f=>f.startsWith(String(n).padStart(4,'0')+'_'));
   try{db.exec(fs.readFileSync(path.join(root,'migrations',name),'utf8'))}catch(e){throw new Error(`Migration ${name}: ${e.message}`,{cause:e})}
+ }
+ // The application code requires the 0198 schema (manual transfer + collective payout).
+ // Billing review triggers are left to tests that apply 0196 themselves.
+ if(with0198&&through>=189){
+  const sql=fs.readFileSync(path.join(root,'migrations','0198_manual_transfer_and_collective_payout.sql'),'utf8').split('\r\n').join('\n');
+  const stripped=sql.replace(/-- BEGIN 0196 billing review triggers[\s\S]*?-- END 0196 billing review triggers/,'');
+  try{db.exec(stripped)}catch(e){throw new Error('Migration 0198: '+e.message,{cause:e})}
  }
  db.exec('PRAGMA foreign_keys=ON');return db;
 }

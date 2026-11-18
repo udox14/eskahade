@@ -74,7 +74,13 @@ Jangan diam-diam mengubah requirement agar cocok dengan code lama.
 
 Jangan membuka kembali keputusan ini tanpa instruksi eksplisit user.
 
-- Provider online aktif: **BRI saja**.
+- Provider online bank terintegrasi: **BRI saja** (BRIVA).
+- Jalur pembayaran wali (keputusan rapat 2026-11-18): **BRIVA** dan/atau **Transfer Manual**
+  (transfer biasa + unggah bukti + verifikasi petugas). Admin memilih mode
+  `BRIVA` / `TRANSFER` / `BOTH` di Pengaturan Keuangan → Jalur Pembayaran. Lihat §47.
+- Kartu santri (QR + PIN) **tidak lagi dipakai** untuk pencairan uang jajan. Modul Kredensial
+  dinonaktifkan (`app_settings.finance_credentials_enabled`), data tidak dihapus. Pencairan
+  melalui perwakilan asrama (Pencairan Kolektif). Lihat §48.
 - Duitku: **retired/dihapus dari sistem aktif**.
 - QRIS Duitku: **dihapus**.
 - Setiap santri billable: **1 Fixed BRIVA permanen**.
@@ -1088,6 +1094,46 @@ Tidak boleh dilanggar:
 15. Uang Jajan is titipan;
 16. AL-BAGHORY remains fully non-billable;
 17. SADESA remains exempt only from makan/nyuci automatically;
-18. Duitku is not reintroduced as active provider.
+18. Duitku is not reintroduced as active provider;
+19. manual transfer is never PAID without a verifier approval of the exact amount;
+20. one proof image (content hash) is used at most once;
+21. every collective payout item ends DITERIMA or DIBATALKAN; cancelled money returns to the drawer.
 
 Jika solusi yang diminta akan melanggar invariant di atas, berhenti, jelaskan konflik, dan usulkan solusi aman.
+
+
+---
+
+# 47. Transfer Manual (Jalur Pembayaran Kedua)
+
+Model: `Order (MANUAL_TRANSFER) → Submission (bukti) → Verifikasi → Payment (channel TRANSFER) → Allocation`.
+
+- `total_charged = gross_amount + cooperative_admin_fee + unique_code` (server-side, integer).
+- Biaya admin transfer = **pendapatan Koperasi** (rule `TRANSFER_CHECKOUT_FEE`, channel `TRANSFER`).
+- Kode unik (Rp1..`transfer_unique_code_max`) = **pendapatan Koperasi**, dicatat terpisah
+  (`finance_cooperative_income.income_source = 'UNIQUE_CODE'`). Unik di antara order transfer PENDING.
+- Mode biaya: `ADD` (ditambahkan) atau `DEDUCT` (dipotong dari SATU item fleksibel: Uang Jajan /
+  cicilan seperti USPP). Tagihan penuh (SPP, dll.) tidak pernah dipotong.
+- Satu order online aktif per santri (BRIVA atau transfer). Order yang buktinya sedang diperiksa
+  tidak boleh expired/replaced (trigger `TRANSFER_IN_REVIEW`).
+- Approve = satu batch: idempotency + payment + allocation + income (fee + kode unik) +
+  wallet `TOPUP_TRANSFER` + status submission + event. Nominal mutasi harus sama persis.
+- Nominal berbeda → "Terima sebagai dana belum teralokasi" (UNALLOCATED + reconciliation item).
+  Dilarang mengalokasikan otomatis.
+- Petugas verifikasi dibatasi per asrama (`finance_transfer_verifier_scopes`); Admin, Bendahara,
+  Admin Koperasi melihat semua.
+- `PAID != SETTLED` tetap berlaku. Transfer ke rekening BRI collection dapat di-settle lewat
+  Rekonsiliasi (kandidat dari nominal unik, resolusi manual).
+- Riwayat submission/event/proof append-only; tidak ada hard delete.
+
+# 48. Pencairan Uang Jajan Kolektif
+
+- Petugas membuat batch untuk perwakilan (kamar/lantai bebas): per santri ledger OUT
+  `WITHDRAWAL_KOLEKTIF` dari sesi kas OPEN + item `DIBAWA`, dalam satu batch.
+- Penyelesaian: item `DITERIMA` atau `DIBATALKAN`. Dibatalkan → ledger IN
+  `WITHDRAWAL_KOLEKTIF_RETURN` dan uang fisik kembali ke laci; jumlah uang kembali wajib sama.
+- Satu pencairan hidup per santri per hari WIB. Limit harian/mingguan/bulanan dihitung bersih
+  (loket + kolektif − pengembalian). Sesi kas tidak bisa ditutup selama ada batch `DIBAWA`.
+- Penarikan individual loket (kartu + PIN) dinonaktifkan di server.
+- Modul lama `tabungan_log` (dompet JAJAN) dan auto-potong menulis saldo di luar ledger, sehingga
+  dimatikan (`legacy_uang_jajan_writes_enabled`). Dompet Tabungan tidak terpengaruh.
