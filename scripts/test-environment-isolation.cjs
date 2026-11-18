@@ -105,6 +105,19 @@ async function main() {
     await run('production', { eskahade_session: primaryCookie }, async () => { assert.equal(await session.getSession(), null); await assert.rejects(() => db.getDB(), /memverifikasi/); });
     primary.sql.exec(`UPDATE users SET roles='["bendahara"]' WHERE id='normal'`);
   });
+  await test('D1 overload denies the request without treating a valid session as logged out', async () => {
+    const overloaded = { ...primary, prepare(text) { const s = { bind() { return s; }, async first() { throw new Error('D1_ERROR: D1 DB is overloaded. Too many resources consumed within a 10 second window.'); }, async all() { return s.first(); }, async run() { return s.first(); } }; return s; }, async batch() { throw new Error('D1_ERROR: D1 DB is overloaded.'); } };
+    const before = primary.writes;
+    await run('production', { eskahade_session: primaryCookie }, async () => {
+      await assert.rejects(() => session.getSession(), err => err.name === 'SessionUnavailableError');
+      await assert.rejects(() => guard.guardPage('/dashboard/keuangan'), err => err.name === 'SessionUnavailableError' && !/NEXT_REDIRECT/.test(err.message));
+      await assert.rejects(() => finance.authorizeFinanceFeature('/dashboard/keuangan', true), err => err.name === 'SessionUnavailableError');
+      assert.equal(context.getStore().cookies.eskahade_session, primaryCookie);
+    }, { ...environments.production, DB: overloaded });
+    assert.equal(primary.writes, before);
+    // Recovery: the same untouched cookie works again once D1 answers.
+    await run('production', { eskahade_session: primaryCookie }, async () => assert.equal((await session.getSession()).full_name, 'PRIMARY'));
+  });
   await test('Revoked or corrupt stored roles never recover authority from an old signed token', async () => {
     for (const [mode, binding, token] of [['production', primary, primaryCookie], ['sandbox', sandbox, sandboxCookie]]) {
       for (const [role, roles] of [[null, null], ['', null], ['bendahara', '[]'], ['bendahara', '{broken'], ['bendahara', '["bendahara",null]'], ['bendahara', '["admin"]']]) {

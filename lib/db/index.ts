@@ -52,10 +52,30 @@ const isTesterRequest = cache(async (db: any): Promise<boolean> => {
     const environment = await runtimeEnvironment()
     if (user && !environmentAllowsSession({ role: user.role, roles, environment }, environment)) throw new Error('Sesi demo tidak tersedia di production.')
     return roles.includes('tester') && !roles.includes('admin') && !roles.includes('demo')
-  } catch {
-    throw new Error('Tidak dapat memverifikasi hak akses database.')
+  } catch (err) {
+    // Keep the cause so session hydration can tell an outage from a revocation.
+    throw new Error('Tidak dapat memverifikasi hak akses database.', { cause: err })
   }
 })
+
+const DATABASE_UNAVAILABLE_RE = /D1_ERROR|D1 DB is overloaded|Network connection lost|storage caused object to be reset/i
+
+/**
+ * True when an error (or any error it wraps) came from the database layer
+ * itself — overload, network, D1 internal — rather than from an access
+ * decision such as revoked or corrupt stored roles.
+ */
+export function isDatabaseUnavailableError(err: unknown): boolean {
+  for (let current = err, depth = 0; current && depth < 5; depth++) {
+    if (current instanceof Error) {
+      if (DATABASE_UNAVAILABLE_RE.test(current.message)) return true
+      current = current.cause
+    } else {
+      return DATABASE_UNAVAILABLE_RE.test(String(current))
+    }
+  }
+  return false
+}
 
 function isWriteSql(sql: unknown): boolean {
   if (typeof sql !== 'string') return true

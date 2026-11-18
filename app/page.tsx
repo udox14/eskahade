@@ -27,7 +27,8 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic'
 
 export default async function LandingPage() {
-  const staffSession = await getSession()
+  // Public page: a database outage must not take the landing page down.
+  const staffSession = await getSession().catch(() => null)
   const portalSession = await getPortalSession()
 
   const isStaff = Boolean(staffSession)
