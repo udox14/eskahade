@@ -12,7 +12,7 @@ import type {
   CreateSettlementBatchInput,
   SettlementDetailWithItems,
 } from '@/lib/finance/reconciliation-types'
-import { executeSettlementTransition } from './bri/settlement-service'
+import { executeSettlementTransition } from './bank-statement/settlement-service'
 
 /**
  * Mengambil daftar pembayaran online BRI yang berstatus PAID dan menunggu settlement terhadap Rekening Koran BRI.
@@ -21,7 +21,7 @@ export async function getCandidatePaymentsForSettlement(
   period?: string
 ): Promise<SettlementPaymentCandidate[]> {
   const conditions: string[] = [
-    `p.channel = 'BRI'`,
+    `p.channel IN ('BRI', 'TRANSFER')`,
     `p.status = 'PAID'`,
     `p.correction_status != 'FULLY_CORRECTED'`,
     nonBillableSantriSqlPredicate('san.asrama'),

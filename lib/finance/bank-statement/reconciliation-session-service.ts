@@ -1,9 +1,9 @@
-// lib/finance/bri/reconciliation-session-service.ts
+// lib/finance/bank-statement/reconciliation-session-service.ts
 // Reconciliation Session Management: Tracking Period Runs & Balance Verification
 
 import crypto from 'node:crypto'
 import { query, queryOne, generateId, now } from '@/lib/db'
-import { briLog } from './logging'
+import { briLog } from '../finance-log'
 import type {
   BriReconciliationSessionStatus,
   FinanceBriReconciliationSession,

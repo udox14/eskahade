@@ -1,8 +1,8 @@
 import { assertStoredFinanceRole } from '../authorization'
 import crypto from 'node:crypto'
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
-import { loadBriConfig } from './config'
-import { briLog } from './logging'
+import { briLog } from '../finance-log'
+import { getCollectionAccountNo } from '../collection-account'
 import type { FinanceBriStatementTransaction, BriSettlementItemMatchStrength } from './statement-types'
 
 export interface SettlePaymentInput {
@@ -80,7 +80,7 @@ export async function executeSettlementTransition(
   }
 
   // Collection Account Binding Guard
-  const collectionAccount=process.env.BRI_COLLECTION_ACCOUNT_NO?.trim()
+  const collectionAccount=getCollectionAccountNo()
   if(!collectionAccount || statementTx.account_no.trim()!==collectionAccount)throw new Error('STATEMENT_COLLECTION_ACCOUNT_MISMATCH')
   if(matchStrength==='MANUAL_RESOLVED') {
     await assertStoredFinanceRole(verifiedBy||'',['admin','bendahara'])

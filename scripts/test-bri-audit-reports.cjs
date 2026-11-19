@@ -89,7 +89,7 @@ async function runTests() {
     QLOLA_REAL_SUBMISSION_STATE,
   } = require('../lib/finance/bri/feature-flags.ts')
 
-  const { proofStorageService } = require('../lib/finance/bri/proof-storage-service.ts')
+  const { proofStorageService } = require('../lib/finance/proof-storage.ts')
   const { auditReportService } = require('../lib/finance/bri/audit-report-service.ts')
   const { seedUatFixtures } = require('./seed-uat-fixtures.cjs')
 
@@ -238,7 +238,7 @@ async function runTests() {
 
   // TEST 15: Operational Entrypoint Feature Flag Enforcement
   console.log('Test 15: Operational Entrypoint Feature Flag Enforcement')
-  const { cashManualDistributionService } = require('../lib/finance/bri/cash-manual-distribution-service.ts')
+  const { cashManualDistributionService } = require('../lib/finance/distribution-cash-manual-service.ts')
   const { assertBankStatementSyncEnabled } = require('../lib/finance/bri/feature-flags.ts')
 
   // 15.1 CASH entrypoint disabled

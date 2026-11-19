@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { authorizeFinanceFeature } from '@/lib/finance/authorization'
-import { ProofStorageService } from '@/lib/finance/bri/proof-storage-service'
+import { ProofStorageService } from '@/lib/finance/proof-storage'
 import { execute, now } from '@/lib/db'
 
 export async function POST(request:Request) {

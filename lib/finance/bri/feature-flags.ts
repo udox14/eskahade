@@ -5,6 +5,7 @@
 import { BriError } from './errors'
 import { QLOLA_H2H_CONTRACT_STATE } from './qlola-types'
 import type { FinanceDistributionMethod } from '../distribution-types'
+import { assertDistributionMethodEnabled as assertNeutralDistributionMethodEnabled, getDistributionFlags } from '../distribution-flags'
 
 export { QLOLA_H2H_CONTRACT_STATE }
 export const QLOLA_REAL_SUBMISSION_STATE = 'DISABLED' as const
@@ -70,11 +71,10 @@ export function getBriFeatureFlags(customEnv?: Record<string, string | undefined
   const bankStatementSyncEnabled = parseBooleanFlag(stmtSyncRaw, false)
 
   // Gate 5: Distribution Methods
-  const distCashRaw = getEnvValue('BRI_DIST_CASH_ENABLED', customEnv)
-  const distributionCashEnabled = parseBooleanFlag(distCashRaw, true)
-
-  const distManualRaw = getEnvValue('BRI_DIST_MANUAL_ENABLED', customEnv)
-  const distributionManualTransferEnabled = parseBooleanFlag(distManualRaw, true)
+  // Gerbang CASH/MANUAL_TRANSFER kini dimiliki modul netral (lib/finance/distribution-flags.ts).
+  const distFlags = getDistributionFlags(customEnv)
+  const distributionCashEnabled = distFlags.cashEnabled
+  const distributionManualTransferEnabled = distFlags.manualTransferEnabled
 
   // Gate 6: QLola Real Submission (WAJIB FALSE / DISABLED)
   // Tidak dapat di-override menjadi true tanpa revisi kontrak resmi
@@ -138,16 +138,11 @@ export function assertDistributionMethodEnabled(
   method: FinanceDistributionMethod,
   customEnv?: Record<string, string | undefined>
 ): void {
-  if(!['CASH','MANUAL_TRANSFER','BRI_QLOLA'].includes(method))throw new Error('Metode penyaluran tidak didukung.')
+  if (method !== 'BRI_QLOLA') {
+    assertNeutralDistributionMethodEnabled(method, customEnv)
+    return
+  }
   const flags = getBriFeatureFlags(customEnv)
-
-  if (method === 'CASH' && !flags.distributionCashEnabled) {
-    throw new Error('Metode penyaluran tunai (CASH) sedang dinonaktifkan.')
-  }
-
-  if (method === 'MANUAL_TRANSFER' && !flags.distributionManualTransferEnabled) {
-    throw new Error('Metode penyaluran transfer manual (MANUAL_TRANSFER) sedang dinonaktifkan.')
-  }
 
   if (method === 'BRI_QLOLA') {
     if (!flags.distributionQlolaEnabled) {

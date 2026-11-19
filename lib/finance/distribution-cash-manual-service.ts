@@ -1,15 +1,15 @@
-import { storedFinanceRoles } from '../authorization'
-import { validateFinancialProof } from '../proofs'
-import { rupiah } from '../money'
-// lib/finance/bri/cash-manual-distribution-service.ts
+import { storedFinanceRoles } from './authorization'
+import { validateFinancialProof } from './proofs'
+import { rupiah } from './money'
+// lib/finance/distribution-cash-manual-service.ts
 // Domain Service Penyaluran Kas (CASH) & Transfer Bank Manual (MANUAL_TRANSFER)
 // Memenuhi seluruh aturan integritas finansial, bukti append-only, sesi kas, dan RBAC Fase BRI-6
 
 import crypto from 'node:crypto'
 import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
-import { loadBriConfig } from './config'
-import { maskAccount } from './logging'
-import { assertDistributionMethodEnabled } from './feature-flags'
+import { getCollectionAccountNo } from './collection-account'
+import { maskAccount } from './finance-log'
+import { assertDistributionMethodEnabled } from './distribution-flags'
 import type {
   PrepareCashDistributionInput,
   FinalizeCashDistributionInput,
@@ -24,9 +24,9 @@ import type {
   FinanceCashManualEvidence,
   CashManualEvidenceStrength,
   CashManualEvidenceSource,
-} from './cash-manual-distribution-types'
-import type { FinanceDistribution } from '../distribution-types'
-import type { FinanceCashSession } from '../cash-session'
+} from './distribution-cash-manual-types'
+import type { FinanceDistribution } from './distribution-types'
+import type { FinanceCashSession } from './cash-session'
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
@@ -209,15 +209,7 @@ export class CashManualDistributionService {
     accountNumber: string
     accountHolder: string
   } {
-    let collectionAccountNo = ''
-    try {
-      const config = loadBriConfig()
-      collectionAccountNo = (config.collectionAccountNo || '').trim()
-    } catch {
-      if (typeof process !== 'undefined' && process.env) {
-        collectionAccountNo = (process.env.BRI_COLLECTION_ACCOUNT_NO || '').trim()
-      }
-    }
+    const collectionAccountNo = getCollectionAccountNo()
     if (!collectionAccountNo) {
       throw new Error(
         'CONFIG_ERROR: Nomor rekening operasional Koperasi (BRI_COLLECTION_ACCOUNT_NO) belum dikonfigurasi. Gagal memuat akun sumber transfer manual.'

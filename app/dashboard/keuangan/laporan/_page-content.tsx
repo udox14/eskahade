@@ -931,9 +931,13 @@ export default function LaporanKeuanganContent({
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          row.channel === 'BRI' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'
+                          row.channel === 'BRI'
+                            ? 'bg-blue-50 text-blue-700'
+                            : row.channel === 'TRANSFER'
+                              ? 'bg-violet-50 text-violet-700'
+                              : 'bg-emerald-50 text-emerald-700'
                         }`}>
-                          {row.channel}
+                          {row.channel === 'BRI' ? 'BRIVA' : row.channel === 'TRANSFER' ? 'Transfer' : 'Tunai'}
                         </span>
                       </td>
                       <td className="py-3 px-3 text-slate-600 max-w-xs truncate">{row.allocationsSummary}</td>
@@ -1553,7 +1557,7 @@ export default function LaporanKeuanganContent({
             { header: 'No. Bayar', accessor: (r) => r.paymentNumber, align: 'center' },
             { header: 'Tanggal', accessor: (r) => r.paidAt.slice(0, 16), align: 'center' },
             { header: 'Nama Santri', accessor: (r) => `${r.santriName} (${r.santriNis})` },
-            { header: 'Saluran', accessor: (r) => r.channel, align: 'center' },
+            { header: 'Saluran', accessor: (r) => (r.channel === 'BRI' ? 'BRIVA' : r.channel === 'TRANSFER' ? 'Transfer' : 'Tunai'), align: 'center' },
             { header: 'Alokasi Tagihan', accessor: (r) => r.allocationsSummary },
             { header: 'Bruto', accessor: (r) => formatRupiah(r.grossAmount), align: 'right' },
             { header: 'Bersih', accessor: (r) => formatRupiah(r.netAmount), align: 'right' },

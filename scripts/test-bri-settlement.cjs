@@ -981,4 +981,4 @@ async function recoverReviewedFixture(input){
  return require('../lib/finance/bri/recovery-service.ts').recoverMissedPaymentFromStatement({...input,recoveredBy:'usr-op',recoveryNotes:'Official bank statement reviewed by operator',reconciliationItemId:review})
 }
 
-async function recordUnallocatedReviewedFixture(input){return require('../lib/finance/bri/unallocated-service.ts').recordUnallocatedStatementPayment({...input,recordedBy:'usr-op',reason:'Official statement reviewed for student identification'})}
+async function recordUnallocatedReviewedFixture(input){return require('../lib/finance/bank-statement/unallocated-service.ts').recordUnallocatedStatementPayment({...input,recordedBy:'usr-op',reason:'Official statement reviewed for student identification'})}

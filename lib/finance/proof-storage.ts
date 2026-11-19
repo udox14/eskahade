@@ -1,14 +1,13 @@
-// lib/finance/bri/proof-storage-service.ts
+// lib/finance/proof-storage.ts
 // Layanan Penyimpanan Bukti Transaksi Finansial Terisolasi (Private R2 Bucket & Reference Fallback)
 // Memenuhi aturan integritas finansial, MIME/Magic-Bytes, SHA-256 hash, dan Role-Based Access Control (RBAC)
 
 import crypto from 'node:crypto'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { getBriFeatureFlags } from './feature-flags'
 import type {
   ProofUploadValidationInput,
   ProofUploadValidationResult,
-} from './cash-manual-distribution-types'
+} from './distribution-cash-manual-types'
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg',
@@ -239,8 +238,9 @@ export class ProofStorageService {
       }
     }
 
-    const flags = getBriFeatureFlags()
-    if (flags.environment === 'production') {
+    // Paritas dengan getBriFeatureFlags().environment: produksi hanya bila BRI_ENV=production (fail-safe: selain itu sandbox).
+    const isProduction = (process.env.BRI_ENV || '').trim().toLowerCase() === 'production'
+    if (isProduction) {
       return {
         success: false,
         proofId: validation.proofId,

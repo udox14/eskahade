@@ -92,7 +92,8 @@ function runD1CommandExpectError(sql, expectedSubstr) {
 }
 
 function loadCashManualService(mockDb) {
-  const briDir = path.resolve(__dirname, '..', 'lib', 'finance', 'bri')
+  const financeDir = path.resolve(__dirname, '..', 'lib', 'finance')
+  process.env.BRI_COLLECTION_ACCOUNT_NO = process.env.BRI_COLLECTION_ACCOUNT_NO || '001901000888301'
   const cache = {}
 
   function loadTsFile(filePath) {
@@ -152,7 +153,7 @@ function loadCashManualService(mockDb) {
     return m.exports
   }
 
-  return loadTsFile(path.join(briDir, 'cash-manual-distribution-service.ts'))
+  return loadTsFile(path.join(financeDir, 'distribution-cash-manual-service.ts'))
 }
 
 async function main() {

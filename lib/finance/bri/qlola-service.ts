@@ -14,7 +14,7 @@ import crypto from 'node:crypto'
 import { operationIdentity, operationReplay, operationStatement } from '../operation'
 import { rupiah } from '../money'
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
-import { briLog } from '@/lib/finance/bri/logging'
+import { briLog } from '@/lib/finance/finance-log'
 import {
   isStatusReserving,
   isIntentReserving,

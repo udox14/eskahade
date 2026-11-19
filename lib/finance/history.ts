@@ -210,7 +210,7 @@ export async function getGlobalTransactionHistory(
         p.channel,
         p.method,
         CASE
-          WHEN p.channel = 'BRI' AND EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN 'SETTLED'
+          WHEN p.channel IN ('BRI', 'TRANSFER') AND p.status = 'SETTLED' THEN 'SETTLED'
           ELSE p.status
         END AS status,
         (SELECT GROUP_CONCAT(DISTINCT a.item_type) FROM finance_allocations a WHERE a.payment_id = p.id) AS item_type,
@@ -249,8 +249,8 @@ export async function getGlobalTransactionHistory(
         wl.amount AS gross_amount,
         0 AS gateway_fee,
         wl.amount AS net_amount,
-        CASE WHEN wl.movement_type = 'TOPUP_ONLINE' THEN 'BRI' ELSE 'CASH' END AS channel,
-        CASE WHEN wl.movement_type = 'TOPUP_ONLINE' THEN 'BRI_VA' ELSE 'CASH' END AS method,
+        CASE wl.movement_type WHEN 'TOPUP_ONLINE' THEN 'BRI' WHEN 'TOPUP_TRANSFER' THEN 'TRANSFER' ELSE 'CASH' END AS channel,
+        CASE wl.movement_type WHEN 'TOPUP_ONLINE' THEN 'BRI_VA' WHEN 'TOPUP_TRANSFER' THEN 'MANUAL_TRANSFER' ELSE 'CASH' END AS method,
         CASE
           WHEN wl.movement_type = 'REVERSAL' THEN 'REVERSAL'
           ELSE 'COMPLETED'
@@ -278,7 +278,7 @@ export async function getGlobalTransactionHistory(
           OR
           (wl.direction = 'IN' AND wl.movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN')
           OR
-          (wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_CASH', 'TOPUP_ONLINE')
+          (wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_CASH', 'TOPUP_ONLINE', 'TOPUP_TRANSFER')
            AND NOT EXISTS (SELECT 1 FROM finance_payments p WHERE p.id = wl.reference_id OR p.payment_number = wl.reference_id))
           OR
           (wl.movement_type = 'REVERSAL'
@@ -552,12 +552,8 @@ export async function getTransactionDetail(
 
     if (!p) return null
 
-    const hasSettlement = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(*) AS cnt FROM finance_settlement_items WHERE payment_id = ?`,
-      [id]
-    )
-    const paymentStatus =
-      p.channel === 'BRI' && (hasSettlement?.cnt ?? 0) > 0 ? 'SETTLED' : p.status
+    // SETTLED ditetapkan oleh settlement-service (bukti rekening koran); cukup baca status payment.
+    const paymentStatus = p.status
 
     const allocations = await query<{
       id: string
@@ -700,7 +696,8 @@ export async function getTransactionDetail(
       category = 'TOPUP'
     }
 
-    const channel = wl.movement_type === 'TOPUP_ONLINE' ? 'BRI' : 'CASH'
+    const channel =
+      wl.movement_type === 'TOPUP_ONLINE' ? 'BRI' : wl.movement_type === 'TOPUP_TRANSFER' ? 'TRANSFER' : 'CASH'
     const itemLabel =
       wl.movement_type === 'REVERSAL'
         ? `Pembalikan Mutasi Dompet (Saldo: Rp${wl.balance_before.toLocaleString('id-ID')} -> Rp${wl.balance_after.toLocaleString('id-ID')})`
@@ -1007,7 +1004,7 @@ export async function getHistoryFilterOptions(): Promise<FilterOptionsData> {
     ],
     channelList: [
       { value: 'ALL', label: 'Semua Kanal & Metode' },
-      { value: 'BRI', label: 'Online BRI' },
+      { value: 'BRI', label: 'BRIVA' },
       { value: 'CASH', label: 'Tunai Loket' },
       { value: 'TRANSFER', label: 'Transfer Bank' },
     ],

@@ -50,7 +50,7 @@ export interface BaseReportFilter {
 
 // 1. Penerimaan Types
 export interface ReceiptsReportFilter extends BaseReportFilter {
-  channel?: 'ALL' | 'BRI' | 'CASH'
+  channel?: 'ALL' | 'BRI' | 'TRANSFER' | 'CASH'
   method?: string
   itemType?: string
   source?: 'ALL' | 'LEGACY' | 'NEW_FINANCE'
@@ -67,7 +67,7 @@ export interface ReceiptItemRow {
   santriNis: string
   santriAsrama: string | null
   santriKelas: string | null
-  channel: 'BRI' | 'CASH'
+  channel: 'BRI' | 'TRANSFER' | 'CASH'
   method: string
   grossAmount: number
   gatewayFee: number
@@ -680,7 +680,7 @@ export async function getReceiptsReport(
     santri_nis: string
     santri_asrama: string | null
     santri_kelas: string | null
-    channel: 'BRI' | 'CASH'
+    channel: 'BRI' | 'TRANSFER' | 'CASH'
     method: string
     gross_amount: number
     gateway_fee: number

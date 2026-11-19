@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import { BriError } from './errors'
 import { generateBriBusinessSignature, getBriTimestamp, minifyJsonBody } from './crypto'
 import { BriTokenClient } from './token'
-import { briLog } from './logging'
+import { briLog } from '../finance-log'
 import { isKnownTokenAuthError, resolveBriOutcome } from './outcome'
 import type {
   BriClientResult,

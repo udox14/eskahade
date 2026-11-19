@@ -936,9 +936,9 @@ export async function getEligibleAllocationsForDistribution(params: {
 export async function executeDistribution(
   input: CreateDistributionInput
 ): Promise<FinanceDistribution> {
-  const { assertDistributionMethodEnabled } = await import('./bri/feature-flags')
+  const { assertDistributionMethodEnabled } = await import('./distribution-flags')
   const { briQlolaDistributionService } = await import('./bri/qlola-service')
-  const { cashManualDistributionService } = await import('./bri/cash-manual-distribution-service')
+  const { cashManualDistributionService } = await import('./distribution-cash-manual-service')
   const { validateFinancialProof } = await import('./proofs')
   const method=input.method==='TRANSFER'?'MANUAL_TRANSFER':input.method
   assertDistributionMethodEnabled(method)
@@ -1014,7 +1014,7 @@ export async function cancelDistribution(
   const dist=await queryOne<{method:string;status:string}>('SELECT method,status FROM finance_distributions WHERE id=?',[distributionId])
   if(!dist)return {success:false,error:'Penyaluran tidak ditemukan.'}
   const operator={role:await assertStoredFinanceRole(cancelledBy,['admin','bendahara','petugas_koperasi'])}
-  const {cashManualDistributionService}=await import('./bri/cash-manual-distribution-service')
+  const {cashManualDistributionService}=await import('./distribution-cash-manual-service')
   const input={distributionId,operatorId:cancelledBy,operatorRole:operator.role,reason}
   if(dist.method==='CASH')await cashManualDistributionService.cancelCashDistribution(input)
   else if(dist.method==='MANUAL_TRANSFER')await cashManualDistributionService.cancelManualTransfer(input)
@@ -1880,5 +1880,5 @@ export async function importProviderAccounts(
   }
 }
 
-export * from './bri/cash-manual-distribution-types'
-export * from './bri/cash-manual-distribution-service'
+export * from './distribution-cash-manual-types'
+export * from './distribution-cash-manual-service'

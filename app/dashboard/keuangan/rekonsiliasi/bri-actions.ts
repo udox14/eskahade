@@ -3,12 +3,14 @@
 import { authorizeFinanceFeature } from '@/lib/finance/authorization'
 import { query,queryOne,execute,now } from '@/lib/db'
 import { getBriFeatureFlags,assertBankStatementSyncEnabled } from '@/lib/finance/bri/feature-flags'
-import { fetchBankStatement,persistBankStatementTransactions } from '@/lib/finance/bri/statement-service'
-import { matchStatementTransaction } from '@/lib/finance/bri/matching-engine'
-import { executeSettlementTransition } from '@/lib/finance/bri/settlement-service'
+import { fetchBankStatement } from '@/lib/finance/bri/statement-service'
+import { persistBankStatementTransactions } from '@/lib/finance/bank-statement/statement-ingest'
+import { getCollectionAccountNo } from '@/lib/finance/collection-account'
+import { matchStatementTransaction } from '@/lib/finance/bank-statement/matching-engine'
+import { executeSettlementTransition } from '@/lib/finance/bank-statement/settlement-service'
 import { recoverMissedPaymentFromStatement } from '@/lib/finance/bri/recovery-service'
-import { recordUnallocatedStatementPayment } from '@/lib/finance/bri/unallocated-service'
-import type { FinanceBriStatementTransaction } from '@/lib/finance/bri/statement-types'
+import { recordUnallocatedStatementPayment } from '@/lib/finance/bank-statement/unallocated-service'
+import type { FinanceBriStatementTransaction } from '@/lib/finance/bank-statement/statement-types'
 
 async function operator(){
  const auth=await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi',true)
@@ -26,7 +28,7 @@ export async function getBriReconciliationWorkbench(){
 
 export async function syncBriStatementAction(input:{fromDateTime:string;toDateTime:string}){
  await operator();assertBankStatementSyncEnabled()
- const accountNo=process.env.BRI_COLLECTION_ACCOUNT_NO?.trim()
+ const accountNo=getCollectionAccountNo()
  if(!accountNo)throw new Error('Rekening collection belum dikonfigurasi.')
  const result=await fetchBankStatement({...input,accountNo})
  return persistBankStatementTransactions({...input,accountNo,response:result.data,rawResponseJson:JSON.stringify(result.data)})

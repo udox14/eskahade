@@ -1,4 +1,4 @@
-// lib/finance/bri/logging.ts
+// lib/finance/finance-log.ts
 // Secure redaction and audit logging helpers for BRIAPI operations
 
 export function redactSecrets(text: string): string {

@@ -133,7 +133,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
       {/* 1. Header & Controls */}
       <DashboardPageHeader
         title="Rekonsiliasi & Koreksi"
-        description="Pencocokan tiga arah BRI ↔ Rekening Koran, rekonsiliasi kas loket, resolusi transfer ambigu, dan histori koreksi non-destruktif."
+        description="Pencocokan tiga arah pembayaran online (BRIVA/Transfer) ↔ Rekening Koran, rekonsiliasi kas loket, resolusi transfer ambigu, dan histori koreksi non-destruktif."
         action={
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium text-slate-500">Periode:</label>
@@ -157,7 +157,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
         {/* Card 1: Belum Settlement */}
         <div className="rounded-2xl border border-amber-100 bg-linear-to-b from-amber-50/50 to-white p-4 shadow-2xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-amber-800">Belum Settlement (BRI)</span>
+            <span className="text-xs font-medium text-amber-800">Belum Settlement (BRIVA/Transfer)</span>
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
               <Bank size={16} weight="bold" />
             </div>
@@ -308,7 +308,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
                 <h4 className="text-xs font-bold text-amber-900">Settlement berdasarkan bukti rekening koran</h4>
                 <p className="mt-0.5 text-xs text-amber-700 leading-relaxed">
                   Pencocokan dan pemeriksaan bukti tersedia di atas; sinkronisasi bank mengikuti kesiapan integrasi. Invariant: <code className="font-semibold text-amber-800">PAID != SETTLED</code> ditegakkan. Data riwayat batch di bawah merupakan arsip historis yang dapat ditinjau untuk audit.
-                  {' '}Penerimaan BRI termasuk admin Koperasi; dana titipan dan admin bukan hak penyaluran Pesantren/Katering/Laundry. Hak siap salur mengikuti alokasi dan reservasi.
+                  {' '}Penerimaan online (BRIVA/Transfer) termasuk admin Koperasi; dana titipan dan admin bukan hak penyaluran Pesantren/Katering/Laundry. Hak siap salur mengikuti alokasi dan reservasi.
                 </p>
               </div>
             </div>

@@ -194,9 +194,9 @@ export async function getExecutiveFinanceKpi(periodInput?: string): Promise<Fina
          COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' THEN a.amount ELSE 0 END), 0) AS total_penerimaan,
          COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel IN ('BRI', 'TRANSFER') THEN a.amount ELSE 0 END), 0) AS online_penerimaan,
          COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'CASH' THEN a.amount ELSE 0 END), 0) AS cash_penerimaan,
-         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'BRI' AND EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN a.amount ELSE 0 END), 0) AS settled_amount,
-         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'BRI' AND NOT EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN a.amount ELSE 0 END), 0) AS pending_settlement_amount,
-         COALESCE(COUNT(DISTINCT CASE WHEN p.fund_management = 'KOPERASI' AND p.channel = 'BRI' AND NOT EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN p.id ELSE NULL END), 0) AS pending_settlement_count
+         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel IN ('BRI', 'TRANSFER') AND p.status = 'SETTLED' THEN a.amount ELSE 0 END), 0) AS settled_amount,
+         COALESCE(SUM(CASE WHEN p.fund_management = 'KOPERASI' AND p.channel IN ('BRI', 'TRANSFER') AND p.status = 'PAID' THEN a.amount ELSE 0 END), 0) AS pending_settlement_amount,
+         COALESCE(COUNT(DISTINCT CASE WHEN p.fund_management = 'KOPERASI' AND p.channel IN ('BRI', 'TRANSFER') AND p.status = 'PAID' THEN p.id ELSE NULL END), 0) AS pending_settlement_count
        FROM finance_allocations a
        JOIN finance_payments p ON a.payment_id = p.id
        WHERE a.target_type = 'OBLIGATION'
@@ -572,7 +572,7 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
       p.channel,
       p.method,
       CASE
-        WHEN p.channel = 'BRI' AND EXISTS (SELECT 1 FROM finance_settlement_items si WHERE si.payment_id = p.id) THEN 'SETTLED'
+        WHEN p.channel IN ('BRI', 'TRANSFER') AND p.status = 'SETTLED' THEN 'SETTLED'
         ELSE p.status
       END AS status,
       (SELECT GROUP_CONCAT(DISTINCT a.item_type) FROM finance_allocations a WHERE a.payment_id = p.id) AS item_type,
@@ -599,8 +599,8 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
       'TITIPAN_SANTRI' AS fund_type,
       wl.direction,
       wl.amount,
-      CASE WHEN wl.movement_type = 'TOPUP_ONLINE' THEN 'BRI' ELSE 'CASH' END AS channel,
-      CASE WHEN wl.movement_type = 'TOPUP_ONLINE' THEN 'BRI_VA' ELSE 'CASH' END AS method,
+      CASE wl.movement_type WHEN 'TOPUP_ONLINE' THEN 'BRI' WHEN 'TOPUP_TRANSFER' THEN 'TRANSFER' ELSE 'CASH' END AS channel,
+      CASE wl.movement_type WHEN 'TOPUP_ONLINE' THEN 'BRI_VA' WHEN 'TOPUP_TRANSFER' THEN 'MANUAL_TRANSFER' ELSE 'CASH' END AS method,
       CASE
         WHEN wl.movement_type = 'REVERSAL' THEN 'REVERSAL'
         ELSE 'COMPLETED'
@@ -620,7 +620,7 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
         OR
         (wl.direction = 'IN' AND wl.movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN')
         OR
-        (wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_CASH', 'TOPUP_ONLINE')
+        (wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_CASH', 'TOPUP_ONLINE', 'TOPUP_TRANSFER')
          AND NOT EXISTS (SELECT 1 FROM finance_payments p WHERE p.id = wl.reference_id OR p.payment_number = wl.reference_id))
         OR
         (wl.movement_type = 'REVERSAL'

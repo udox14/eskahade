@@ -530,8 +530,8 @@ function normalizePaymentMethod(channel?: string | null, method?: string | null)
   if (ch === 'CASH' || m === 'CASH') return 'Tunai'
   if (m.includes('QRIS')) return 'QRIS'
   if (m.includes('VA') || m.includes('VIRTUAL_ACCOUNT')) return 'Virtual Account'
-  if (ch === 'BRI') return 'Online BRI'
-  if (m === 'TRANSFER') return 'Transfer'
+  if (ch === 'BRI') return 'BRIVA'
+  if (ch === 'TRANSFER' || m === 'TRANSFER' || m === 'MANUAL_TRANSFER') return 'Transfer Bank'
   return m || ch || '-'
 }
 

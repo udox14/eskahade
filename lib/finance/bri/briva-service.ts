@@ -1,7 +1,7 @@
 import { configuredBrivaPartnerServiceId } from './briva-config'
 import { orderBillingConflictSql } from '../billing-legacy'
 import { walletMutationStatements } from '../wallet-statements'
-import { isValidIsoDateTimeWithOffset } from './statement-service'
+import { isValidIsoDateTimeWithOffset } from '../bank-statement/statement-ingest'
 // lib/finance/bri/briva-service.ts
 // Core business service for SNAP BI Virtual Account (BRIVA Online) Inbound Inquiry & Payment Notification
 // Hardened with strict headers, exact money parsing, canonical path, DB compare-and-set guards, and correlation.
@@ -10,8 +10,8 @@ import crypto from 'node:crypto'
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
 import { loadBriConfig } from './config'
 import { verifyBriInboundNotificationSignature, hashBodySha256 } from './crypto'
-import { briLog, sanitizePayload } from './logging'
-import { parseBrivaMoney } from './money'
+import { briLog, sanitizePayload } from '../finance-log'
+import { parseBrivaMoney } from '../statement-money'
 import { isAsramaBebasTagihan, isSantriBebasItem } from '@/lib/finance/non-billable-santri'
 import {
   BRI_VA_INQUIRY_CODES,

@@ -1,4 +1,4 @@
-// lib/finance/bri/money.ts
+// lib/finance/statement-money.ts
 // Strict decimal money parser for SNAP BI BRIVA contracts without floating point arithmetic
 
 export interface BrivaMoneyParseResult {

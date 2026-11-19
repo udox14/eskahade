@@ -2,7 +2,7 @@
 // Abstraksi Layanan Inquiry Rekening Tujuan Penyaluran (Fase BRI-5)
 // Berdasarkan SNAP BI v1.0 Account Inquiry & PRD Bab 24 s.d. 29
 
-import { briLog } from '@/lib/finance/bri/logging'
+import { briLog } from '@/lib/finance/finance-log'
 import { maskBeneficiaryAccount } from '@/lib/finance/bri/qlola-policy'
 import type { AccountInquiryInput, AccountInquiryResult } from '@/lib/finance/bri/qlola-types'
 

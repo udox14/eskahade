@@ -2,6 +2,7 @@
 
 import {useEffect,useState} from 'react'
 import {getBriReconciliationWorkbench,resolveBriStatementAction,syncBriStatementAction} from './bri-actions'
+import StatementImportPanel from './statement-import-panel'
 
 export default function BriWorkbench({canMutate}:{canMutate:boolean}){
  const [data,setData]=useState<Awaited<ReturnType<typeof getBriReconciliationWorkbench>>|null>(null)
@@ -21,9 +22,10 @@ export default function BriWorkbench({canMutate}:{canMutate:boolean}){
   finally{setBusy(false)}
  }
  return <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4 text-xs">
-  <h3 className="font-semibold text-slate-800">Rekonsiliasi Rekening Koran BRI</h3>
+  <h3 className="font-semibold text-slate-800">Rekonsiliasi Rekening Koran (BRIVA &amp; Transfer Manual)</h3>
   <p className="text-slate-600">Pembayaran diterima tetap menunggu rekonsiliasi. Kesamaan nominal hanya menghasilkan kandidat; operator harus memeriksa identitas dan bukti bank.</p>
   {message&&<p role="status" className="text-amber-800">{message}</p>}
+  {canMutate&&<StatementImportPanel onImported={()=>{void refresh()}}/>}
   {canMutate&&<div className="flex flex-wrap items-end gap-2">
    <label>Dari (ISO8601 dengan zona waktu)<input className="block border rounded p-2" value={from} onChange={e=>setFrom(e.target.value)} placeholder="2026-10-18T00:00:00+07:00"/></label>
    <label>Sampai<input className="block border rounded p-2" value={to} onChange={e=>setTo(e.target.value)} placeholder="2026-10-18T23:59:59+07:00"/></label>

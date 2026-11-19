@@ -3,7 +3,7 @@
 
 import { BriError } from './errors'
 import { generateBriTokenSignature, getBriTimestamp } from './crypto'
-import { briLog } from './logging'
+import { briLog } from '../finance-log'
 import type { BriConfig, BriTokenRequest, BriTokenResponse, CachedBriToken } from './types'
 
 export interface TokenClientOptions {

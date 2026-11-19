@@ -484,10 +484,11 @@ export async function recordOrderPayment(
     })
   }
 
-  // 7b. Invariant Cash vs Active BRI Order:
-  // Ketika pembayaran non-BRI (misal CASH di loket) melunasi kewajiban yang sedang direferensikan
-  // oleh active BRI order (status = 'PENDING', payment_method = 'BRI_VA'),
-  // order BRI tersebut harus di-invalidasi ('CANCELLED') secara atomik agar tidak ada tagihan stale yang terbayar lewat VA.
+  // 7b. Invariant Cash vs Active Online Order:
+  // Ketika pembayaran lain (CASH di loket / order online berbeda) melunasi kewajiban yang sedang direferensikan
+  // oleh order online aktif (PENDING; BRI_VA atau MANUAL_TRANSFER tanpa bukti yang sedang diperiksa),
+  // order tersebut di-invalidasi ('CANCELLED') secara atomik agar tidak ada tagihan stale yang terbayar dua kali.
+  // Order yang sedang dibayar (order.id) tidak pernah dibatalkan oleh langkah ini.
   const paidObligationIds = allocatableItems
     .map((a) => a.obligationId)
     .filter((id): id is string => Boolean(id))
@@ -501,14 +502,27 @@ export async function recordOrderPayment(
             updated_at = ?
         WHERE santri_id = ?
           AND status = 'PENDING'
-          AND payment_method = 'BRI_VA'
+          AND id != ?
+          AND (
+            payment_method = 'BRI_VA'
+            OR (
+              payment_method = 'MANUAL_TRANSFER'
+              -- Bukti yang sedang diperiksa tidak boleh dibatalkan (trigger TRANSFER_IN_REVIEW);
+              -- bila nanti di-approve, nominal tak lagi teralokasi masuk jalur UNALLOCATED.
+              AND NOT EXISTS (
+                SELECT 1 FROM finance_transfer_submissions ts
+                WHERE ts.order_id = finance_payment_orders.id
+                  AND ts.status IN ('MENUNGGU_VERIFIKASI', 'PERLU_PERBAIKAN')
+              )
+            )
+          )
           AND id IN (
             SELECT DISTINCT oi.order_id
             FROM finance_order_items oi
             WHERE oi.obligation_id IN (${placeholders})
           )
       `,
-      params: [paidAt, order.santri_id, ...paidObligationIds],
+      params: [paidAt, order.santri_id, order.id, ...paidObligationIds],
     })
   }
 

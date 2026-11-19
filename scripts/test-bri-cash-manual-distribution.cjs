@@ -87,8 +87,8 @@ const {
   BANK_STATEMENT_AUTO_CORRELATION_CONTRACT_STATE,
   checkAuthoritativeBankStatementCrossReference,
   matchStatementDebitToCandidates,
-} = require('@/lib/finance/bri/cash-manual-distribution-service')
-const { maskAccount, sanitizePayload } = require('@/lib/finance/bri/logging')
+} = require('@/lib/finance/distribution-cash-manual-service')
+const { maskAccount, sanitizePayload } = require('@/lib/finance/finance-log')
 const { recalculateCashSession, closeCashSession } = require('@/lib/finance/cash-session')
 const { recordCorrection } = require('@/lib/finance/corrections')
 

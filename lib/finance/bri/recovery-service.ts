@@ -7,14 +7,15 @@ import { walletMutationStatements } from '../wallet-statements'
 
 import crypto from 'node:crypto'
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
-import { briLog } from './logging'
+import { briLog } from '../finance-log'
+import { getCollectionAccountNo } from '../collection-account'
 import {
   BRIVA_STATUS_INQUIRY_CONTRACT_STATE,
   type BriTransactionStatusInquiryRequest,
   type BriTransactionStatusInquiryResponse,
   type FinanceBriRecoveryQueueItem,
   type FinanceBriStatementTransaction,
-} from './statement-types'
+} from '../bank-statement/statement-types'
 
 export interface RecoverMissedWebhookInput {
   statementTransactionId: string
@@ -83,7 +84,7 @@ export async function recoverMissedPaymentFromStatement(
 
   if(recoveredBy)await assertStoredFinanceRole(recoveredBy,['admin','bendahara'])
   if(!recoveredBy || !recoveryNotes?.trim() || !input.reconciliationItemId)throw new Error('MANUAL_RESOLUTION_REQUIRED: Recovery membutuhkan operator, catatan dan kasus rekonsiliasi resmi.')
-  const collectionAccount=process.env.BRI_COLLECTION_ACCOUNT_NO?.trim()
+  const collectionAccount=getCollectionAccountNo()
   if(!collectionAccount)throw new Error('COLLECTION_ACCOUNT_REQUIRED')
   // 1. Fetch statement transaction
   const statementTx = await queryOne<FinanceBriStatementTransaction>(

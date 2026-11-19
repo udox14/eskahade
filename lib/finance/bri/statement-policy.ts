@@ -2,7 +2,7 @@
 // SNAP BI Bank Statement Response Policy (Official Service Code 14)
 
 import type { BriEndpointResponsePolicy } from './types'
-import type { BriBankStatementResponse } from './statement-types'
+import type { BriBankStatementResponse } from '../bank-statement/statement-types'
 
 /**
  * Official BRI Bank Statement SNAP BI v2.1 Response Codes (Service Code 14)

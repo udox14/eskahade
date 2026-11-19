@@ -1,4 +1,4 @@
-// lib/finance/bri/statement-types.ts
+// lib/finance/bank-statement/statement-types.ts
 // SNAP BI v2.1 Bank Statement, Settlement, and Transaction Recovery Type Definitions
 
 export interface BriAmount {

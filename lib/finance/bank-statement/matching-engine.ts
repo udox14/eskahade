@@ -1,4 +1,4 @@
-// lib/finance/bri/matching-engine.ts
+// lib/finance/bank-statement/matching-engine.ts
 // Deterministic Matching Engine for Bank Statement Transactions vs Internal Ledger
 
 import { query, queryOne } from '@/lib/db'

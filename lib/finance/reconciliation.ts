@@ -32,10 +32,10 @@ export async function getReconciliationOverview(
     `SELECT
        COALESCE(SUM(p.gross_amount), 0) AS total_gross,
        COALESCE(SUM(CASE WHEN p.status = 'SETTLED' THEN p.gross_amount ELSE 0 END), 0) AS settled_gross,
-       COALESCE(SUM(CASE WHEN p.status = 'PAID' AND p.channel = 'BRI' AND p.correction_status != 'FULLY_CORRECTED' THEN p.net_amount ELSE 0 END), 0) AS pending_net,
-       COALESCE(SUM(CASE WHEN p.status = 'PAID' AND p.channel = 'BRI' AND p.correction_status != 'FULLY_CORRECTED' THEN 1 ELSE 0 END), 0) AS pending_count
+       COALESCE(SUM(CASE WHEN p.status = 'PAID' AND p.channel IN ('BRI', 'TRANSFER') AND p.correction_status != 'FULLY_CORRECTED' THEN p.net_amount ELSE 0 END), 0) AS pending_net,
+       COALESCE(SUM(CASE WHEN p.status = 'PAID' AND p.channel IN ('BRI', 'TRANSFER') AND p.correction_status != 'FULLY_CORRECTED' THEN 1 ELSE 0 END), 0) AS pending_count
      FROM finance_payments p
-     WHERE p.channel = 'BRI' AND p.paid_at LIKE ?`,
+     WHERE p.channel IN ('BRI', 'TRANSFER') AND p.paid_at LIKE ?`,
     [periodPrefix]
   )
 
@@ -443,13 +443,15 @@ export async function resolveUnallocatedManualAllocation(
   // 4. Mutasikan Uang Jajan jika ada pos UANG_JAJAN melalui wallet ledger yang authoritative
   for (const a of preparedAllocs) {
     if (a.targetType === 'UANG_JAJAN') {
-      const movementType = payment.channel === 'CASH' ? 'TOPUP_CASH' : 'TOPUP_ONLINE'
+      const movementType =
+        payment.channel === 'CASH' ? 'TOPUP_CASH' : payment.channel === 'TRANSFER' ? 'TOPUP_TRANSFER' : 'TOPUP_ONLINE'
       await recordWalletMutation({
         santriId: targetSantriId,
         direction: 'IN',
         movementType,
         amount: a.amount,
-        referenceId: payment.payment_number,
+        // Trigger trg_finance_wallet_transfer_topup_guard mewajibkan reference_id = payment.id untuk TOPUP_TRANSFER.
+        referenceId: payment.channel === 'TRANSFER' ? payment.id : payment.payment_number,
         operatorId: input.resolvedBy,
         notes: `Resolusi manual transaksi unallocated (${payment.payment_number}): ${resolutionNotes}`,
       })

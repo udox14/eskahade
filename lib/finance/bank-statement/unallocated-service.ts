@@ -1,10 +1,11 @@
 import { assertStoredFinanceRole } from '../authorization'
-// lib/finance/bri/unallocated-service.ts
+// lib/finance/bank-statement/unallocated-service.ts
 // Service for handling Unmatched / Ambiguous Bank Payments (UNALLOCATED Flow)
 
 import crypto from 'node:crypto'
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
-import { briLog } from './logging'
+import { briLog } from '../finance-log'
+import { getCollectionAccountNo } from '../collection-account'
 import type { FinanceBriStatementTransaction } from './statement-types'
 
 export interface RecordUnallocatedStatementInput {
@@ -86,7 +87,8 @@ export async function recordUnallocatedStatementPayment(
   if(input.santriId){
     await assertStoredFinanceRole(recordedBy||'',['admin','bendahara'])
     if(!reason?.trim())throw new Error('MANUAL_IDENTIFICATION_REQUIRED')
-    if(!process.env.BRI_COLLECTION_ACCOUNT_NO || statementTx.account_no!==process.env.BRI_COLLECTION_ACCOUNT_NO.trim())throw new Error('COLLECTION_ACCOUNT_MISMATCH')
+    const collectionAccountNo=getCollectionAccountNo()
+    if(!collectionAccountNo || statementTx.account_no!==collectionAccountNo)throw new Error('COLLECTION_ACCOUNT_MISMATCH')
 
     const student = await queryOne<{ id: string }>(
       `SELECT id FROM santri WHERE id = ? LIMIT 1`,

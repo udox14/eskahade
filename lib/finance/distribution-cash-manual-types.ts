@@ -1,4 +1,4 @@
-// lib/finance/bri/cash-manual-distribution-types.ts
+// lib/finance/distribution-cash-manual-types.ts
 // Tipe Data Distribusi Kas (CASH) & Transfer Manual (MANUAL_TRANSFER)
 // Fase BRI-6: Cash & Manual Distribution Hardening
 
