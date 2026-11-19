@@ -22,6 +22,7 @@ import { createPaymentOrder } from '@/lib/finance/orders'
 import { recordOrderPayment } from '@/lib/finance/payments'
 import {
   getActiveCashSession,
+  getLastClosedCashSession,
   openCashSession,
   recordCashInToSession,
 } from '@/lib/finance/cash-session'
@@ -2908,6 +2909,19 @@ export async function getCurrentCashSessionInfo(): Promise<{
     totalCashIn: session.total_cash_in,
     expectedClosingBalance: session.expected_closing_balance,
   }
+}
+
+/**
+ * Sisa fisik sesi kas terakhir operator: acuan kas awal (beda → catatan wajib).
+ */
+export async function getLastCashClosingInfo(): Promise<{ sessionCode: string; actualClosingBalance: number } | null> {
+  await authorizeFinanceFeature('/dashboard/keuangan/status-pembayaran', false)
+  const { userId, permissions } = await authorizeUser()
+  if (!permissions.canRecordPayment) return null
+  const last = await getLastClosedCashSession(userId)
+  return last && last.actual_closing_balance !== null
+    ? { sessionCode: last.session_code, actualClosingBalance: last.actual_closing_balance }
+    : null
 }
 
 /**

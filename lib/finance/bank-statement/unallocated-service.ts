@@ -6,6 +6,7 @@ import crypto from 'node:crypto'
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
 import { briLog } from '../finance-log'
 import { getCollectionAccountNo } from '../collection-account'
+import { findPendingCashDeposits, isStatementLinkedToCashTransfer } from '../cash-transfers'
 import type { FinanceBriStatementTransaction } from './statement-types'
 
 export interface RecordUnallocatedStatementInput {
@@ -92,6 +93,20 @@ export async function recordUnallocatedStatementPayment(
     throw new Error(
       `TRANSFER_PENDING_VERIFICATION: Ada pengajuan transfer manual ${pendingSubmission.submission_number} bernominal sama yang belum diverifikasi. Verifikasi (atau tolak) pengajuan itu lebih dulu sebelum mencatat mutasi ini sebagai dana belum teralokasi.`
     )
+  }
+
+  // 1c. Guard Mutasi Kas: kredit yang sudah/kemungkinan setoran tunai petugas bukan uang wali.
+  const linkedCashTransfer = await isStatementLinkedToCashTransfer(statementTx.id)
+  if (linkedCashTransfer) {
+    throw new Error(`CASH_DEPOSIT_PENDING: Mutasi ini sudah dicocokkan sebagai setoran tunai ${linkedCashTransfer}.`)
+  }
+  if (statementTx.type_normalized === 'CREDIT') {
+    const deposits = await findPendingCashDeposits({ amount: statementTx.amount, account_no: statementTx.account_no })
+    if (deposits.length > 0) {
+      throw new Error(
+        `CASH_DEPOSIT_PENDING: Ada setoran tunai petugas ${deposits.map((d) => d.transfer_number).join(', ')} bernominal sama yang belum dicocokkan. Cocokkan di panel Mutasi Kas Bank ↔ Tunai, atau batalkan setoran itu bila keliru, sebelum mencatat mutasi ini sebagai dana belum teralokasi.`
+      )
+    }
   }
 
   // 2. Resolve target student authoritatively

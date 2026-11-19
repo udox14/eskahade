@@ -17,6 +17,8 @@ interface CashSessionModalProps {
   onClose: () => void
   onOpenSessionSubmit: (openingBalance: number, notes?: string) => Promise<void>
   onCloseSessionSubmit: (sessionId: string, actualClosingBalance: number, notes?: string) => Promise<void>
+  /** Sisa fisik sesi terakhir operator: acuan kas awal (beda → catatan wajib). */
+  lastClosedSession?: { sessionCode: string; actualClosingBalance: number } | null
 }
 
 const QUICK_OPENING_BALANCES = [50000, 100000, 200000, 500000]
@@ -28,8 +30,9 @@ export default function CashSessionModal({
   onClose,
   onOpenSessionSubmit,
   onCloseSessionSubmit,
+  lastClosedSession,
 }: CashSessionModalProps) {
-  const [openingBalance, setOpeningBalance] = useState<number>(100000)
+  const [openingBalance, setOpeningBalance] = useState<number>(lastClosedSession?.actualClosingBalance ?? 100000)
   const [openingNotes, setOpeningNotes] = useState<string>('')
 
   const [actualClosingBalance, setActualClosingBalance] = useState<number>(
@@ -47,12 +50,17 @@ export default function CashSessionModal({
   const expectedClosing = activeSession ? activeSession.expected_closing_balance : 0
   const difference = actualClosingBalance - expectedClosing
   const hasDifference = difference !== 0
+  const openingGap = !!lastClosedSession && openingBalance !== lastClosedSession.actualClosingBalance
 
   const handleOpenSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMessage(null)
     if (openingBalance < 0) {
       setErrorMessage('Saldo awal kas fisik tidak boleh bernilai negatif.')
+      return
+    }
+    if (openingGap && openingNotes.trim().length < 5) {
+      setErrorMessage('Kas awal berbeda dari sisa fisik sesi terakhir. Isi catatan asal/selisih uang (minimal 5 huruf). Uang yang diambil dari rekening dicatat lewat tombol "Kas Bank" setelah sesi dibuka.')
       return
     }
 
@@ -161,6 +169,12 @@ export default function CashSessionModal({
                   />
                 </div>
 
+                {lastClosedSession && (
+                  <p className="mt-2 text-[11px] text-slate-600">
+                    Sisa fisik sesi terakhir ({lastClosedSession.sessionCode}): <strong>{formatRupiah(lastClosedSession.actualClosingBalance)}</strong>.
+                    {openingGap ? ' Kas awal berbeda — catatan wajib diisi.' : ' Kas awal sama dengan sisa sesi terakhir.'}
+                  </p>
+                )}
                 {/* Quick Chips Saldo Awal */}
                 <div className="flex flex-wrap gap-1.5 mt-2.5">
                   {QUICK_OPENING_BALANCES.map((amt) => (
@@ -193,7 +207,7 @@ export default function CashSessionModal({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Catatan Sesi (Opsional)
+                  {openingGap ? 'Catatan asal/selisih kas awal (wajib)' : 'Catatan Sesi (Opsional)'}
                 </label>
                 <textarea
                   rows={2}
@@ -234,13 +248,13 @@ export default function CashSessionModal({
                     </span>
                   </div>
                   <div className="flex justify-between text-slate-600">
-                    <span>Total Kas Masuk (Penerimaan Tunai):</span>
+                    <span>Total Kas Masuk (tunai &amp; ambil dari rekening):</span>
                     <span className="font-semibold text-emerald-700">
                       +{formatRupiah(activeSession.total_cash_in)}
                     </span>
                   </div>
                   <div className="flex justify-between text-slate-600">
-                    <span>Total Kas Keluar (Pencairan Uang Jajan):</span>
+                    <span>Total Kas Keluar (pencairan, setor ke rekening, dll.):</span>
                     <span className="font-semibold text-rose-700">
                       -{formatRupiah(activeSession.total_cash_out)}
                     </span>

@@ -1908,8 +1908,9 @@ export async function getCashSessionsReport(
   //              + Refund / Koreksi Kasir (finance_corrections method='CASH')
   // 3. Expected Closing = Opening Balance + Cash In - Cash Out
   // 4. Difference = Actual Closing - Expected Closing (bila actual_closing_balance IS NOT NULL)
-  const authCashInExpr = `(COALESCE(c_pay.amount, 0) + COALESCE(c_top.amount, 0))`
-  const authCashOutExpr = `(COALESCE(c_wit.amount, 0) + COALESCE(c_ref.amount, 0))`
+  // 5. Mutasi Kas Bank ↔ Tunai (migrasi 0200): ambil dari rekening = kas masuk, setor ke rekening = kas keluar.
+  const authCashInExpr = `(COALESCE(c_pay.amount, 0) + COALESCE(c_top.amount, 0) + COALESCE(c_kas.bank_in, 0))`
+  const authCashOutExpr = `(COALESCE(c_wit.amount, 0) + COALESCE(c_ref.amount, 0) + COALESCE(c_kas.bank_out, 0))`
   const authExpectedExpr = `(fcs.opening_balance + ${authCashInExpr} - ${authCashOutExpr})`
   const authDiffExpr = `(CASE WHEN fcs.actual_closing_balance IS NOT NULL THEN (fcs.actual_closing_balance - ${authExpectedExpr}) ELSE NULL END)`
 
@@ -1939,6 +1940,14 @@ export async function getCashSessionsReport(
       WHERE method = 'CASH' AND cash_session_id IS NOT NULL
       GROUP BY cash_session_id
     ) c_ref ON c_ref.cash_session_id = fcs.id
+    LEFT JOIN (
+      SELECT cash_session_id,
+             SUM(CASE WHEN direction = 'BANK_TO_CASH' THEN amount ELSE 0 END) AS bank_in,
+             SUM(CASE WHEN direction = 'CASH_TO_BANK' THEN amount ELSE 0 END) AS bank_out
+      FROM finance_cash_transfers
+      WHERE status = 'POSTED'
+      GROUP BY cash_session_id
+    ) c_kas ON c_kas.cash_session_id = fcs.id
   `
 
   const conditions: string[] = ['1 = 1']

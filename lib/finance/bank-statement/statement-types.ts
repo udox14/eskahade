@@ -162,6 +162,7 @@ export type BriMatchClassification =
   | 'NO_MATCH'
   | 'IGNORED_DEBIT'
   | 'PENDING_VERIFICATION'
+  | 'CASH_DEPOSIT'
 
 export interface BriMatchResult {
   classification: BriMatchClassification

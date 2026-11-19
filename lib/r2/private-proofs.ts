@@ -140,7 +140,7 @@ export function assertPrivateImageBytes(bytes: Uint8Array, type: string) {
   if (!valid) throw new Error('Isi gambar tidak valid.')
 }
 
-export async function putPrivateImageBytes(bytes: Uint8Array, type: string, prefix: 'bukti-portal'|'operasional-receipts'|'bukti-transfer', metadata: Record<string,string>) {
+export async function putPrivateImageBytes(bytes: Uint8Array, type: string, prefix: 'bukti-portal'|'operasional-receipts'|'bukti-transfer'|'bukti-mutasi-kas', metadata: Record<string,string>) {
   assertPrivateImageBytes(bytes, type)
   const extension = { 'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp', 'image/gif':'gif' }[type]
   const key = `${prefix}/${crypto.randomUUID()}.${extension}`

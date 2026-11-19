@@ -20,6 +20,7 @@ import {
 import { toast } from 'sonner'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import BriWorkbench from './bri-workbench'
+import CashTransferPanel from './cash-transfer-panel'
 import InputSettlementModal from './input-settlement-modal'
 import ManualAllocationModal from './manual-allocation-modal'
 import RecordCorrectionModal from './record-correction-modal'
@@ -301,6 +302,7 @@ export default function RekonsiliasiContent({ initialData }: RekonsiliasiContent
         {activeTab === 'SETTLEMENT' && (
           <div className="space-y-6">
             <BriWorkbench canMutate={data.userPermissions.canMutate} />
+            <CashTransferPanel canMutate={data.userPermissions.canMutate} />
             {/* Arsip settlement */}
             <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
               <Info size={20} className="shrink-0 text-amber-700 mt-0.5" weight="bold" />

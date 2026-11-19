@@ -20,6 +20,7 @@ import {
   getUnpaidObligationsForCashPayment,
   recordCashPayment,
   getCurrentCashSessionInfo,
+  getLastCashClosingInfo,
   openCashSessionAction,
   type StudentSearchResultItem,
   type PayableObligationItem,
@@ -84,6 +85,7 @@ export function CatatPembayaranModal({
   const [isOpeningSession, setIsOpeningSession] = useState(false)
   const [openingBalanceInput, setOpeningBalanceInput] = useState<string>('')
   const [openingNotesInput, setOpeningNotesInput] = useState<string>('')
+  const [lastClosing, setLastClosing] = useState<{ sessionCode: string; actualClosingBalance: number } | null>(null)
   const [sessionActionError, setSessionActionError] = useState<string | null>(null)
 
   // Modal View Stages:
@@ -154,6 +156,7 @@ export function CatatPembayaranModal({
 
     // Cek keberadaan sesi kas aktif milik operator
     setIsLoadingSession(true)
+    getLastCashClosingInfo().then(setLastClosing).catch(() => setLastClosing(null))
     getCurrentCashSessionInfo()
       .then((session) => {
         setCashSession(session)
@@ -411,6 +414,13 @@ export function CatatPembayaranModal({
       return
     }
 
+    if (lastClosing && num !== lastClosing.actualClosingBalance && openingNotesInput.trim().length < 5) {
+      setSessionActionError(
+        `Kas awal berbeda dari sisa fisik sesi terakhir ${lastClosing.sessionCode} (Rp${lastClosing.actualClosingBalance.toLocaleString('id-ID')}). Isi catatan asal/selisih uang (minimal 5 huruf). Uang yang diambil dari rekening dicatat lewat Loket Kasir → Kas Bank.`
+      )
+      return
+    }
+
     setIsOpeningSession(true)
     try {
       const created = await openCashSessionAction(num, openingNotesInput.trim() || undefined)
@@ -548,11 +558,17 @@ export function CatatPembayaranModal({
                   <p className="text-[11px] text-slate-500 mt-1">
                     Isi Rp0 jika loket dimulai tanpa uang kas fisik awal.
                   </p>
+                  {lastClosing && (
+                    <p className="text-[11px] text-slate-600 mt-1">
+                      Sisa fisik sesi terakhir ({lastClosing.sessionCode}): <strong>Rp{lastClosing.actualClosingBalance.toLocaleString('id-ID')}</strong>.
+                      Bila berbeda, catatan wajib diisi.
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label htmlFor="opening-notes-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-                    Catatan Pembukaan (Opsional)
+                    Catatan Pembukaan {lastClosing && openingBalanceInput !== '' && parseInt(openingBalanceInput, 10) !== lastClosing.actualClosingBalance ? '(Wajib — kas awal berbeda)' : '(Opsional)'}
                   </label>
                   <input
                     id="opening-notes-input"

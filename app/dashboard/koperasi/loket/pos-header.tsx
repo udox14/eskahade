@@ -8,6 +8,7 @@ import {
   Lock,
   PlusCircle,
   Receipt,
+  Landmark,
 } from 'lucide-react'
 import type { FinanceCashSession, CashSessionTransactionSummary } from '@/lib/finance/cash-session'
 
@@ -19,6 +20,7 @@ interface PosHeaderProps {
   onOpenSessionClick: () => void
   onCloseSessionClick: () => void
   onOpenHistoryClick: () => void
+  onCashTransferClick: () => void
 }
 
 export default function PosHeader({
@@ -29,6 +31,7 @@ export default function PosHeader({
   onOpenSessionClick,
   onCloseSessionClick,
   onOpenHistoryClick,
+  onCashTransferClick,
 }: PosHeaderProps) {
   const formatRupiah = (val: number) => `Rp${Math.max(0, val).toLocaleString('id-ID')}`
 
@@ -114,6 +117,18 @@ export default function PosHeader({
                 <span className="hidden sm:inline">Riwayat Sesi</span>
               </button>
 
+              {/* Tombol Mutasi Kas Bank ↔ Tunai */}
+              {!isViewOnly && (
+                <button
+                  type="button"
+                  onClick={onCashTransferClick}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-sky-800 bg-sky-50 border border-sky-200 rounded-xl hover:bg-sky-100 transition-colors shadow-2xs"
+                  title="Catat uang yang diambil dari / disetor ke rekening Koperasi"
+                >
+                  <Landmark className="w-3.5 h-3.5" />
+                  <span>Kas Bank</span>
+                </button>
+              )}
               {/* Tombol Tutup Sesi */}
               {!isViewOnly && (
                 <button

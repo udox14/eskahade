@@ -30,6 +30,10 @@ export interface FinanceCashSession {
   status: 'OPEN' | 'CLOSED'
   created_at: string
   updated_at: string
+  /** Sesi CLOSED terakhir milik operator yang sama saat sesi ini dibuka (kas awal bersambung, migrasi 0200). */
+  previous_session_id?: string | null
+  previous_closing_balance?: number | null
+  opening_notes?: string | null
 }
 
 export interface CashSessionTransactionSummary {
@@ -85,8 +89,27 @@ export async function getCashSessionById(
 }
 
 /**
+ * Sesi kas terakhir yang sudah ditutup milik operator: acuan kas awal sesi berikutnya.
+ */
+export async function getLastClosedCashSession(
+  operatorId: string
+): Promise<Pick<FinanceCashSession, 'id' | 'session_code' | 'actual_closing_balance' | 'closed_at'> | null> {
+  return queryOne<Pick<FinanceCashSession, 'id' | 'session_code' | 'actual_closing_balance' | 'closed_at'>>(
+    `SELECT id, session_code, actual_closing_balance, closed_at
+     FROM finance_cash_sessions
+     WHERE operator_id = ? AND status = 'CLOSED' AND actual_closing_balance IS NOT NULL
+     ORDER BY closed_at DESC
+     LIMIT 1`,
+    [operatorId]
+  )
+}
+
+/**
  * Membuka sesi kas baru dengan saldo kas fisik awal (opening balance) yang valid.
  * Saldo awal harus merepresentasikan uang kas riil di laci loket, bukan asumsi sistem Rp0.
+ * Kas awal dibandingkan dengan sisa fisik sesi terakhir operator yang sama; bila berbeda,
+ * catatan asal/selisih wajib diisi (dijaga juga oleh trigger migrasi 0200). Uang yang diambil
+ * dari rekening dicatat sebagai Mutasi Kas di dalam sesi, bukan disembunyikan di kas awal.
  */
 export async function openCashSession(
   operatorId: string,
@@ -103,6 +126,16 @@ export async function openCashSession(
     throw new Error('Saldo kas fisik awal (opening balance) tidak boleh bernilai negatif.')
   }
 
+  const previous = await getLastClosedCashSession(operatorId)
+  const cleanNotes = notes?.trim() || null
+  if (previous && previous.actual_closing_balance !== validBalance && (cleanNotes?.length ?? 0) < 5) {
+    throw new Error(
+      `Kas awal Rp${validBalance.toLocaleString('id-ID')} berbeda dari sisa fisik sesi terakhir ${previous.session_code} ` +
+      `(Rp${(previous.actual_closing_balance ?? 0).toLocaleString('id-ID')}). Isi catatan asal/selisih uang (minimal 5 huruf). ` +
+      `Uang yang diambil dari rekening dicatat lewat "Kas Bank" setelah sesi dibuka.`
+    )
+  }
+
   const id = generateId()
   const sessionCode = generateSessionCode()
   const timestamp = now()
@@ -111,9 +144,11 @@ export async function openCashSession(
     `INSERT INTO finance_cash_sessions (
        id, session_code, operator_id, opened_at, opening_balance,
        total_cash_in, total_cash_out, expected_closing_balance,
-       difference_notes, status, created_at, updated_at
-     ) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, 'OPEN', ?, ?)`,
-    [id, sessionCode, operatorId, timestamp, validBalance, validBalance, notes || null, timestamp, timestamp]
+       difference_notes, status, created_at, updated_at,
+       previous_session_id, previous_closing_balance, opening_notes
+     ) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, 'OPEN', ?, ?, ?, ?, ?)`,
+    [id, sessionCode, operatorId, timestamp, validBalance, validBalance, cleanNotes, timestamp, timestamp,
+      previous?.id ?? null, previous?.actual_closing_balance ?? null, cleanNotes]
   )
 
   const created = await queryOne<FinanceCashSession>(
@@ -207,7 +242,18 @@ export async function recalculateCashSession(
   )
   const topupCashIn = topupRes?.total_topup_in ?? 0
 
-  const authoritativeCashIn = paymentCashIn + topupCashIn
+  // 2b. Mutasi kas bank ↔ tunai (migrasi 0200): uang diambil dari rekening masuk laci, setoran keluar laci.
+  const bankRes = await queryOne<{ bank_in: number; bank_out: number }>(
+    `SELECT COALESCE(SUM(CASE WHEN direction = 'BANK_TO_CASH' THEN amount ELSE 0 END), 0) AS bank_in,
+            COALESCE(SUM(CASE WHEN direction = 'CASH_TO_BANK' THEN amount ELSE 0 END), 0) AS bank_out
+     FROM finance_cash_transfers
+     WHERE cash_session_id = ? AND status = 'POSTED'`,
+    [sessionId]
+  )
+  const bankCashIn = bankRes?.bank_in ?? 0
+  const bankCashOut = bankRes?.bank_out ?? 0
+
+  const authoritativeCashIn = paymentCashIn + topupCashIn + bankCashIn
 
   // 3a. Hitung akumulasi tunai keluar authoritatif dari pencairan uang jajan loket (finance_wallet_ledger WITHDRAWAL_LOKET)
   const cashOutRes = await queryOne<{ total_cash_out: number }>(
@@ -260,7 +306,7 @@ export async function recalculateCashSession(
     reservedCashOut = reservedOutRes?.total_reserved ?? 0
   }
 
-  const authoritativeCashOut = walletCashOut + correctionCashOut + distributionCashOut
+  const authoritativeCashOut = walletCashOut + correctionCashOut + distributionCashOut + bankCashOut
 
   const expectedClosing = session.opening_balance + authoritativeCashIn - authoritativeCashOut
 

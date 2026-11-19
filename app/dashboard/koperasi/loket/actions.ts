@@ -13,6 +13,17 @@ import {
   isDemoSandboxRequest,
 } from '@/lib/auth/session'
 import { canAccessFeatureForSession } from '@/lib/auth/feature'
+import { getLastClosedCashSession } from '@/lib/finance/cash-session'
+import { listTransferAccounts } from '@/lib/finance/transfer-config'
+import {
+  CASH_TRANSFER_LABEL,
+  CASH_TRANSFER_PROOF_MAX_BYTES,
+  listCashTransfersForSession,
+  recordCashTransfer,
+  voidCashTransfer,
+  type CashTransferDirection,
+  type CashTransferRow,
+} from '@/lib/finance/cash-transfers'
 import {
   getActiveCashSession,
   openCashSession,
@@ -160,7 +171,7 @@ export interface LoketPaymentReceipt {
 
 export interface LoketSessionTransactionItem {
   id: string
-  type: 'WITHDRAWAL' | 'PAYMENT' | 'TOPUP_CASH'
+  type: 'WITHDRAWAL' | 'PAYMENT' | 'TOPUP_CASH' | 'BANK_TO_CASH' | 'CASH_TO_BANK'
   typeLabel: string
   amount: number
   santriNama: string
@@ -243,15 +254,28 @@ export async function authorizeLoketOperator(requireMutate = false): Promise<{
  * Mengambil initial state untuk halaman Loket Kasir:
  * Status sesi kas operator, saldo kas fisik di laci, dan izin user.
  */
+export interface LoketCashAccountOption {
+  id: string
+  label: string
+}
+
 export async function getLoketInitialData(): Promise<{
   activeSession: FinanceCashSession | null
   summary: CashSessionTransactionSummary | null
   isViewOnly: boolean
   operator: { id: string; name: string; roles: string[] }
+  /** Sisa fisik sesi terakhir: acuan kas awal sesi berikutnya. */
+  lastClosedSession: { sessionCode: string; actualClosingBalance: number; closedAt: string | null } | null
+  /** Rekening Koperasi aktif untuk Mutasi Kas Bank ↔ Tunai. */
+  cashAccounts: LoketCashAccountOption[]
 }> {
   const { userId, roles, operatorName, isViewOnly } = await authorizeLoketOperator()
 
-  const activeSession = await getActiveCashSession(userId)
+  const [activeSession, lastClosed, accounts] = await Promise.all([
+    getActiveCashSession(userId),
+    getLastClosedCashSession(userId),
+    listTransferAccounts({ activeOnly: true }),
+  ])
   let summary: CashSessionTransactionSummary | null = null
 
   if (activeSession) {
@@ -262,6 +286,13 @@ export async function getLoketInitialData(): Promise<{
     activeSession,
     summary,
     isViewOnly,
+    lastClosedSession: lastClosed && lastClosed.actual_closing_balance !== null
+      ? { sessionCode: lastClosed.session_code, actualClosingBalance: lastClosed.actual_closing_balance, closedAt: lastClosed.closed_at }
+      : null,
+    cashAccounts: accounts.map(account => ({
+      id: account.id,
+      label: `${account.bank_name} · ${account.account_number} · a.n. ${account.account_holder}`,
+    })),
     operator: {
       id: userId,
       name: operatorName,
@@ -995,6 +1026,22 @@ export async function getLoketCurrentSessionTransactions(
     })
   }
 
+  // 3. Mutasi kas bank ↔ tunai (bukan transaksi santri)
+  for (const t of await listCashTransfersForSession(sessionId)) {
+    if (t.status !== 'POSTED') continue
+    items.push({
+      id: t.id,
+      type: t.direction,
+      typeLabel: CASH_TRANSFER_LABEL[t.direction],
+      amount: t.amount,
+      santriNama: `Kas Bank · ${t.handled_by_name}`,
+      santriNis: '',
+      referenceId: t.transfer_number,
+      createdAt: t.created_at,
+      operatorName: t.operator_name,
+    })
+  }
+
   // Sort by date DESC
   items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
@@ -1010,4 +1057,55 @@ export async function getPastCashSessions(options?: {
 }): Promise<{ items: FinanceCashSession[]; total: number }> {
   const {userId,roles}=await authorizeLoketOperator()
   return getCashSessionHistory({...options,operatorId:roles.some(r=>['admin','bendahara','pimpinan'].includes(r))?undefined:userId})
+}
+
+// ─── MUTASI KAS BANK ↔ TUNAI ──────────────────────────────────────────────
+// Server action mengembalikan {success,error} agar pesan validasi tetap terbaca di produksi.
+
+type LoketResult<T = undefined> = { success: true; data?: T } | { success: false; error: string }
+
+function loketFail(error: unknown): { success: false; error: string } {
+  const message = error instanceof Error ? error.message : 'Terjadi kesalahan.'
+  return { success: false, error: message.replace(/^(FORBIDDEN|UNAUTHORIZED):\s*/, '') }
+}
+
+export async function listLoketCashTransfersAction(sessionId: string): Promise<LoketResult<CashTransferRow[]>> {
+  try {
+    const { userId, roles } = await authorizeLoketOperator()
+    const owner = await queryOne<{ operator_id: string }>('SELECT operator_id FROM finance_cash_sessions WHERE id = ?', [sessionId])
+    if (!owner || (owner.operator_id !== userId && !roles.some(r => ['admin', 'bendahara', 'pimpinan'].includes(r)))) {
+      throw new Error('FORBIDDEN: Sesi kas bukan milik Anda.')
+    }
+    return { success: true, data: await listCashTransfersForSession(sessionId) }
+  } catch (error) { return loketFail(error) }
+}
+
+export async function recordLoketCashTransferAction(formData: FormData): Promise<LoketResult<{ transferNumber: string }>> {
+  try {
+    const { userId } = await authorizeLoketOperator(true)
+    const file = formData.get('bukti')
+    if (!(file instanceof File) || file.size === 0) throw new Error('Foto bukti (struk/slip bank) wajib diunggah.')
+    if (file.size > CASH_TRANSFER_PROOF_MAX_BYTES) throw new Error('Ukuran foto bukti maksimal 3 MB.')
+    const result = await recordCashTransfer(userId, {
+      idempotencyKey: String(formData.get('idempotencyKey') || ''),
+      direction: String(formData.get('direction') || '') as CashTransferDirection,
+      amount: Number(formData.get('amount')),
+      accountId: String(formData.get('accountId') || ''),
+      handledByName: String(formData.get('handledByName') || ''),
+      bankTransactedAt: String(formData.get('bankTransactedAt') || ''),
+      bankReference: String(formData.get('bankReference') || ''),
+      notes: String(formData.get('notes') || ''),
+      proofBytes: new Uint8Array(await file.arrayBuffer()),
+      proofMimeType: file.type,
+    })
+    return { success: true, data: { transferNumber: result.transferNumber } }
+  } catch (error) { return loketFail(error) }
+}
+
+export async function voidLoketCashTransferAction(input: { id: string; reason: string }): Promise<LoketResult> {
+  try {
+    const { userId, roles } = await authorizeLoketOperator(true)
+    await voidCashTransfer({ userId, roles }, input)
+    return { success: true }
+  } catch (error) { return loketFail(error) }
 }

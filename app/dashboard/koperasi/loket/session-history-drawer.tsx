@@ -138,7 +138,7 @@ export default function SessionHistoryDrawer({
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
-                          {tx.type === 'WITHDRAWAL' ? (
+                          {tx.type === 'WITHDRAWAL' || tx.type === 'CASH_TO_BANK' ? (
                             <span className="p-1 rounded-md bg-rose-50 text-rose-600">
                               <ArrowDownLeft className="w-3.5 h-3.5" />
                             </span>
@@ -151,17 +151,17 @@ export default function SessionHistoryDrawer({
                         </div>
                         <strong
                           className={`text-xs font-bold ${
-                            tx.type === 'WITHDRAWAL' ? 'text-rose-700' : 'text-emerald-700'
+                            tx.type === 'WITHDRAWAL' || tx.type === 'CASH_TO_BANK' ? 'text-rose-700' : 'text-emerald-700'
                           }`}
                         >
-                          {tx.type === 'WITHDRAWAL' ? '-' : '+'}
+                          {tx.type === 'WITHDRAWAL' || tx.type === 'CASH_TO_BANK' ? '-' : '+'}
                           {formatRupiah(tx.amount)}
                         </strong>
                       </div>
 
                       <div className="flex justify-between text-[11px] text-slate-500">
                         <span>
-                          {tx.santriNama} ({tx.santriNis})
+                          {tx.santriNis ? `${tx.santriNama} (${tx.santriNis})` : `${tx.santriNama}${tx.referenceId ? ` · ${tx.referenceId}` : ''}`}
                         </span>
                         <span>{tx.createdAt.slice(11, 16)}</span>
                       </div>

@@ -1,6 +1,6 @@
 // This origin is public metadata, not a credential. Never accept arbitrary r2.dev hosts.
 export const LEGACY_R2_ORIGIN = 'https://pub-1209482eb6d6461389443ee22c5764f5.r2.dev'
-const privatePrefixes = ['proofs', 'penyaluran-proofs', 'bukti-portal', 'bukti-transfer', 'operasional-receipts', 'pengajian-evidence']
+const privatePrefixes = ['proofs', 'penyaluran-proofs', 'bukti-portal', 'bukti-transfer', 'bukti-mutasi-kas', 'operasional-receipts', 'pengajian-evidence']
 const publicPhotoPrefixes = ['foto-santri/', 'avatar-profil/', 'dashboard/']
 
 export function canonicalObjectKey(value: string): string {

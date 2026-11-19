@@ -44,6 +44,8 @@ function createDatabase(through=189,seed=true,with0198=true){
   const sql=fs.readFileSync(path.join(root,'migrations','0198_manual_transfer_and_collective_payout.sql'),'utf8').split('\r\n').join('\n');
   const stripped=sql.replace(/-- BEGIN 0196 billing review triggers[\s\S]*?-- END 0196 billing review triggers/,'');
   try{db.exec(stripped)}catch(e){throw new Error('Migration 0198: '+e.message,{cause:e})}
+  // 0200: Mutasi Kas Bank ↔ Tunai (cash session totals read finance_cash_transfers).
+  try{db.exec(fs.readFileSync(path.join(root,'migrations','0200_finance_cash_transfers.sql'),'utf8'))}catch(e){throw new Error('Migration 0200: '+e.message,{cause:e})}
  }
  db.exec('PRAGMA foreign_keys=ON');return db;
 }

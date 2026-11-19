@@ -355,6 +355,7 @@ details summary{cursor:pointer;font-weight:600}
       <h4>Laci kas (dipakai bersama simulasi pencairan kolektif di bagian 10)</h4>
       <div class="row"><label>Kas awal <input type="number" id="csOpen" value="2000000"></label> <button id="csOpenBtn">Buka sesi kas</button></div>
       <div class="row"><button id="csPay">+ Terima SPP tunai Rp200.000</button> <button id="csTop">+ Setor uang jajan tunai Rp50.000 (Ahmad)</button></div>
+      <div class="row"><button id="csBankIn">Kas Bank: ambil dari rekening Rp1.000.000</button> <button id="csBankOut">Kas Bank: setor ke rekening Rp300.000</button></div>
       <div class="row"><label>Kas fisik dihitung <input type="number" id="csCount"></label> <button id="csClose" class="warn">Tutup sesi</button></div>
       <div id="csMsg"></div>
     </div>
@@ -366,11 +367,13 @@ details summary{cursor:pointer;font-weight:600}
   <ul class="tight">
     <li><b>Catat Pembayaran Tunai</b> (menu Status Pembayaran) dan <b>Loket Kasir</b> sama-sama mewajibkan sesi kas terbuka. Pembayaran tunai <b>tanpa</b> biaya admin.</li>
     <li>Setor uang jajan tunai → ledger <code>TOPUP_CASH</code>.</li>
+    <li><b>Kas Bank (Mutasi Kas Bank ↔ Tunai)</b>: uang yang diambil petugas dari rekening Koperasi untuk laci dicatat sebagai <i>Ambil dari rekening</i> (kas masuk sesi); uang tunai yang disetor balik dicatat <i>Setor ke rekening</i> (kas keluar, tidak boleh melebihi isi laci). Wajib: rekening Koperasi, nama petugas yang ke bank, waktu transaksi, foto struk/slip (satu foto hanya sekali). Bukan pembayaran, bukan pendapatan, tidak menyentuh saldo santri. Pembatalan hanya selama sesi masih buka dan belum dicocokkan dengan rekening koran, dengan alasan.</li>
+    <li><b>Kas awal bersambung</b>: saat membuka sesi, sistem menampilkan sisa fisik sesi terakhir petugas itu. Bila kas awal berbeda, catatan asal/selisih wajib diisi.</li>
     <li><b>Penarikan individual di loket (kartu + PIN) dinonaktifkan di server</b>; pencairan lewat menu Pencairan Uang Jajan (kolektif).</li>
     <li>Sesi kas tidak bisa ditutup selama masih ada pencairan kolektif berstatus <i>Sedang dibawa</i>.</li>
     <li>Bila tagihan dilunasi tunai sementara ada order online yang menunggu, order itu dibatalkan otomatis beserta pengajuan transfernya yang belum berbukti — <b>kecuali</b> order transfer yang buktinya sedang dicek.</li>
   </ul>
-  <div class="src">Sumber: <code>lib/finance/cash-session.ts</code>, <code>app/dashboard/koperasi/loket/actions.ts</code> (executeLoketWithdrawal → assertCredentialsModuleEnabled, executeLoketDepositOrPayment), <code>lib/finance/credentials-switch.ts</code>, <code>app/dashboard/keuangan/status-pembayaran/catat-bayar-modal.tsx</code>, <code>lib/finance/payments.ts</code> langkah 7b.</div>
+  <div class="src">Sumber: <code>lib/finance/cash-session.ts</code>, <code>lib/finance/cash-transfers.ts</code>, <code>migrations/0200_finance_cash_transfers.sql</code>, <code>app/dashboard/koperasi/loket/cash-transfer-modal.tsx</code>, <code>app/dashboard/koperasi/loket/actions.ts</code> (executeLoketWithdrawal → assertCredentialsModuleEnabled, executeLoketDepositOrPayment), <code>lib/finance/credentials-switch.ts</code>, <code>app/dashboard/keuangan/status-pembayaran/catat-bayar-modal.tsx</code>, <code>lib/finance/payments.ts</code> langkah 7b.</div>
 </section>
 
 <!-- ============================================================ -->
@@ -401,6 +404,9 @@ details summary{cursor:pointer;font-weight:600}
     </div>
   </div>
   <p class="small">Urutan pemeriksaan untuk transfer manual (setelah pencocokan BRIVA): ① payment transfer berstatus PAID ≤45 hari dengan total (pembayaran+admin+kode unik) sama → 1 kandidat = <i>EXACT_MATCH (kandidat)</i>, >1 = <i>AMBIGUOUS</i>; ② bila tidak ada, pengajuan wali yang belum selesai bernominal sama → <i>PENDING_VERIFICATION</i> (dilarang dicatat sebagai dana belum teralokasi); ③ selain itu <i>NO_MATCH</i>. Payment yang sudah SETTLED bukan kandidat.</p>
+
+  <h3>Mutasi Kas Bank ↔ Tunai di rekening koran</h3>
+  <p>Panel <i>Mutasi Kas Bank ↔ Tunai</i> (tab Rekonsiliasi Bank) mencocokkan setiap pengambilan tunai dengan satu baris <b>debit</b>, dan setiap setoran dengan satu baris <b>kredit</b> — arah, nominal, dan rekening harus sama, oleh Admin/Bendahara dengan catatan. Panel juga menampilkan debit yang belum dijelaskan (penarikan yang lupa dicatat, penyaluran via transfer, biaya bank). Kredit yang bernominal sama dengan setoran tunai yang belum dicocokkan ditandai <i>Kemungkinan setoran tunai petugas</i> dan <b>dilarang</b> dicatat sebagai dana belum teralokasi.</p>
 
   <h3>Tab di halaman Rekonsiliasi</h3>
   <p>Rekonsiliasi Bank · Kas Loket &amp; Fisik (selisih kas per sesi) · Perlu Resolusi (dana belum teralokasi/selisih) · Riwayat Koreksi · Sinkronisasi Modul Lama. Ubah data hanya Admin/Bendahara; Pimpinan melihat.</p>
@@ -582,6 +588,9 @@ details summary{cursor:pointer;font-weight:600}
     <tr><td>Transaksi kas tanpa sesi kas terbuka</td><td><code>trg_finance_operation_session_guard</code></td></tr>
     <tr><td>SETTLED tanpa bukti mutasi</td><td><code>trg_finance_payments_prevent_invalid_settled</code>, <code>trg_finance_bri_settlement_items_guard</code></td></tr>
     <tr><td>Penyaluran melebihi dana teralokasi</td><td><code>trg_finance_dist_items_prevent_overdraw</code></td></tr>
+    <tr><td>Mutasi kas tanpa sesi terbuka, setoran melebihi laci, foto bukti dobel, riwayat diubah/dihapus</td><td><code>trg_finance_cash_transfer_insert_guard</code>, <code>…_immutable</code>, <code>…_void_guard</code>, <code>…_no_delete</code>, unik <code>proof_hash</code></td></tr>
+    <tr><td>Satu baris rekening koran dipakai dua kali / setoran tunai dianggap uang wali</td><td>indeks <code>uq_finance_cash_transfers_statement</code>, <code>trg_finance_cash_transfer_match_guard</code>, <code>trg_finance_statement_cash_transfer_guard</code></td></tr>
+    <tr><td>Kas awal beda dari sisa sesi terakhir tanpa penjelasan</td><td><code>trg_finance_cash_session_opening_gap_note</code></td></tr>
     <tr><td>Klik ganda / kirim ulang</td><td>kunci idempotensi per operasi (<code>finance_idempotency_keys</code>)</td></tr>
   </table>
   <div class="src">Sumber: <code>migrations/0198_manual_transfer_and_collective_payout.sql</code> (indeks baris 117–401, trigger 407–780), <code>lib/finance/operation.ts</code>.</div>
@@ -900,6 +909,8 @@ function drawCS(){
 }
 $('csOpenBtn').onclick=()=>{if(CS.open)return msg($('csMsg'),'Sesi kas sudah terbuka.','bad');const v=int($('csOpen').value);if(!(v>=0))return msg($('csMsg'),'Saldo kas fisik awal harus berupa angka valid non-negatif.','bad');Object.assign(CS,{open:true,start:v,inn:0,out:0,closed:null});$('csMsg').innerHTML='';csLog('Sesi dibuka, kas awal '+rp(v))};
 $('csPay').onclick=()=>{if(!CS.open)return msg($('csMsg'),'Tidak ada sesi kas yang aktif. Buka sesi kas terlebih dahulu sebelum menerima pembayaran.','bad');CS.inn+=200000;csLog('+ SPP tunai Rp200.000 (tanpa biaya admin)')};
+$('csBankIn').onclick=()=>{if(!CS.open)return msg($('csMsg'),'Buka sesi kas terlebih dahulu sebelum mencatat mutasi kas.','bad');CS.inn+=1000000;csLog('+ Kas Bank: ambil dari rekening Rp1.000.000 (struk ATM, bukan pendapatan)')};
+$('csBankOut').onclick=()=>{if(!CS.open)return msg($('csMsg'),'Buka sesi kas terlebih dahulu sebelum mencatat mutasi kas.','bad');if(avail()<300000)return msg($('csMsg'),'Uang di laci tidak cukup untuk disetor (tersedia '+rp(avail())+').','bad');CS.out+=300000;csLog('− Kas Bank: setor ke rekening Rp300.000 (slip teller)')};
 $('csTop').onclick=()=>{if(!CS.open)return msg($('csMsg'),'Tidak ada sesi kas yang aktif. Buka sesi kas terlebih dahulu sebelum menerima pembayaran.','bad');CS.inn+=50000;STU[0].saldo+=50000;csLog('+ Setor uang jajan Ahmad Rp50.000 (TOPUP_CASH)');drawPy()};
 $('csClose').onclick=()=>{
   if(!CS.open)return msg($('csMsg'),'Sesi kas belum dibuka.','bad');

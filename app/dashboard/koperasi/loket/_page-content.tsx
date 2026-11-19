@@ -11,6 +11,7 @@ import PosActionPanel from './pos-action-panel'
 import PosReceiptModal from './pos-receipt-modal'
 import PosPinModal from './pos-pin-modal'
 import CashSessionModal from './cash-session-modal'
+import CashTransferModal from './cash-transfer-modal'
 
 import SessionHistoryDrawer from './session-history-drawer'
 import {
@@ -27,6 +28,7 @@ import {
   type LoketWithdrawalReceipt,
   type LoketPaymentReceipt,
   type LoketPaymentItemInput,
+  type LoketCashAccountOption,
 } from './actions'
 import type { FinanceCashSession, CashSessionTransactionSummary } from '@/lib/finance/cash-session'
 
@@ -36,6 +38,8 @@ interface LoketContentProps {
     summary: CashSessionTransactionSummary | null
     isViewOnly: boolean
     operator: { id: string; name: string; roles: string[] }
+    lastClosedSession: { sessionCode: string; actualClosingBalance: number; closedAt: string | null } | null
+    cashAccounts: LoketCashAccountOption[]
   }
 }
 
@@ -52,6 +56,9 @@ export default function LoketContent({ initialData }: LoketContentProps) {
   // Modal Sesi Kas
   const [sessionModalMode, setSessionModalMode] = useState<'OPEN' | 'CLOSE' | null>(null)
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false)
+  const [isCashTransferOpen, setIsCashTransferOpen] = useState(false)
+  const [lastClosedSession, setLastClosedSession] = useState(initialData.lastClosedSession)
+  const [cashAccounts, setCashAccounts] = useState<LoketCashAccountOption[]>(initialData.cashAccounts)
 
   // State Santri & Transaksi Kasir
   const [isSearchingStudent, setIsSearchingStudent] = useState(false)
@@ -76,6 +83,8 @@ export default function LoketContent({ initialData }: LoketContentProps) {
       const fresh = await getLoketInitialData()
       setActiveSession(fresh.activeSession)
       setSummary(fresh.summary)
+      setLastClosedSession(fresh.lastClosedSession)
+      setCashAccounts(fresh.cashAccounts)
     } catch (err) {
       console.error('Gagal merefresh sesi kas:', err)
     }
@@ -271,6 +280,7 @@ export default function LoketContent({ initialData }: LoketContentProps) {
         onOpenSessionClick={() => setSessionModalMode('OPEN')}
         onCloseSessionClick={() => setSessionModalMode('CLOSE')}
         onOpenHistoryClick={() => setIsHistoryDrawerOpen(true)}
+        onCashTransferClick={() => setIsCashTransferOpen(true)}
       />
 
       {/* 2. Banner Perhatian jika belum ada Sesi Kas Aktif */}
@@ -374,12 +384,25 @@ export default function LoketContent({ initialData }: LoketContentProps) {
       {/* 5. Modal Buka / Tutup Sesi Kas */}
 
       <CashSessionModal
+        key={`${sessionModalMode}-${lastClosedSession?.sessionCode ?? 'none'}`}
+        lastClosedSession={lastClosedSession}
         mode={sessionModalMode || 'OPEN'}
         isOpen={sessionModalMode !== null}
         activeSession={activeSession}
         onClose={() => setSessionModalMode(null)}
         onOpenSessionSubmit={handleOpenSessionSubmit}
         onCloseSessionSubmit={handleCloseSessionSubmit}
+      />
+
+      {/* 5b. Mutasi Kas Bank ↔ Tunai */}
+      <CashTransferModal
+        isOpen={isCashTransferOpen}
+        sessionId={activeSession?.id ?? null}
+        drawerBalance={activeSession ? (activeSession.available_balance ?? activeSession.expected_closing_balance) : 0}
+        operatorName={operator.name}
+        accounts={cashAccounts}
+        onClose={() => setIsCashTransferOpen(false)}
+        onChanged={refreshSessionData}
       />
 
       {/* 6. Modal Struk Transaksi */}

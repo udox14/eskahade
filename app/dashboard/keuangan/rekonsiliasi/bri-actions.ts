@@ -20,7 +20,7 @@ async function operator(){
 
 export async function getBriReconciliationWorkbench(){
  await authorizeFinanceFeature('/dashboard/keuangan/rekonsiliasi')
- const statements=await query<FinanceBriStatementTransaction>(`SELECT st.* FROM finance_bri_statement_transactions st JOIN finance_bri_statement_fetches f ON f.id=st.fetch_id WHERE f.status='SUCCESS' AND st.type_normalized='CREDIT' AND st.matched_payment_id IS NULL ORDER BY st.created_at DESC LIMIT 100`)
+ const statements=await query<FinanceBriStatementTransaction>(`SELECT st.* FROM finance_bri_statement_transactions st JOIN finance_bri_statement_fetches f ON f.id=st.fetch_id WHERE f.status='SUCCESS' AND st.type_normalized='CREDIT' AND st.matched_payment_id IS NULL AND NOT EXISTS(SELECT 1 FROM finance_cash_transfers ct WHERE ct.statement_transaction_id=st.id) ORDER BY st.created_at DESC LIMIT 100`)
  const matches=await Promise.all(statements.map(st=>matchStatementTransaction(st)))
  const targets=await query<{id:string;label:string;kind:'PAYMENT'|'ORDER'}>(`SELECT p.id,p.payment_number||' · '||s.nama_lengkap||' · Rp'||(p.gross_amount+p.cooperative_admin_fee+p.unique_code_amount)||CASE WHEN p.channel='TRANSFER' THEN ' · transfer manual' ELSE '' END label,'PAYMENT' kind FROM finance_payments p JOIN santri s ON s.id=p.santri_id WHERE p.channel IN ('BRI','TRANSFER') AND p.status='PAID' UNION ALL SELECT o.id,o.order_number||' · '||s.nama_lengkap||' · Rp'||o.total_charged,'ORDER' FROM finance_payment_orders o JOIN santri s ON s.id=o.santri_id WHERE o.payment_method='BRI_VA' AND o.status='PENDING' AND NOT EXISTS(SELECT 1 FROM finance_payments p WHERE p.order_id=o.id) LIMIT 200`)
  return {statements:statements.map((st,i)=>({id:st.id,amount:st.amount,date:st.transaction_date_raw,reference:st.transaction_id,remark:st.remark,classification:matches[i].classification,note:matches[i].details?.notes||''})),targets,syncEnabled:getBriFeatureFlags().bankStatementSyncEnabled}
@@ -44,7 +44,7 @@ export async function resolveBriStatementAction(input:{statementId:string;target
   catch(e){
    // Pesan error server action disamarkan di produksi: kembalikan sebagai hasil agar operator melihat alasannya.
    const m=e instanceof Error?e.message:''
-   if(m.startsWith('TRANSFER_PENDING_VERIFICATION'))return{blocked:m.slice(m.indexOf(': ')+2)}
+   if(m.startsWith('TRANSFER_PENDING_VERIFICATION')||m.startsWith('CASH_DEPOSIT_PENDING'))return{blocked:m.slice(m.indexOf(': ')+2)}
    throw e
   }
  }

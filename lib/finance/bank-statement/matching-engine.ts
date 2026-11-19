@@ -2,6 +2,7 @@
 // Deterministic Matching Engine for Bank Statement Transactions vs Internal Ledger
 
 import { query, queryOne } from '@/lib/db'
+import { findPendingCashDeposits } from '../cash-transfers'
 import type {
   BriMatchResult,
   BriMatchingStrength,
@@ -269,6 +270,24 @@ export async function matchStatementTransaction(
         statementAmount: statementTx.amount,
         notes: `Ada pengajuan transfer manual bernominal sama yang belum selesai diverifikasi (${pending.map((p) => p.submission_number).join(', ')}). Verifikasi pengajuan itu lebih dulu; jangan dicatat sebagai dana belum teralokasi.`,
       },
+    }
+  }
+
+  // 2d. Kredit yang kemungkinan setoran tunai petugas (Mutasi Kas CASH_TO_BANK belum dicocokkan):
+  // bukan uang wali — cocokkan di panel Mutasi Kas, jangan dicatat sebagai dana belum teralokasi.
+  if (statementTx.type_normalized === 'CREDIT') {
+    const deposits = await findPendingCashDeposits({ amount: statementTx.amount, account_no: statementTx.account_no })
+    if (deposits.length > 0) {
+      return {
+        classification: 'CASH_DEPOSIT',
+        matchingStrength: 'NO_MATCH',
+        statementTransactionId: statementTx.id,
+        candidatePaymentsCount: 0,
+        details: {
+          statementAmount: statementTx.amount,
+          notes: `Kemungkinan setoran tunai petugas (${deposits.map((d) => d.transfer_number).join(', ')}). Cocokkan di panel Mutasi Kas Bank ↔ Tunai.`,
+        },
+      }
     }
   }
 
