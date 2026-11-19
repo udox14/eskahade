@@ -420,14 +420,13 @@ function RabPrint({
   return (
     <div style={{
       width: '210mm',
-      height: '330mm',
+      minHeight: '330mm',
       padding: '4mm 8mm 8mm',
       boxSizing: 'border-box',
       fontFamily: FONT,
       backgroundColor: '#fff',
       color: '#000',
-      overflow: 'hidden',
-      breakAfter: 'page',
+      // Tinggi bebas (tidak dipotong) agar tanda tangan tidak hilang bila item banyak; mengalir ke halaman berikutnya.
       display: 'flex',
       flexDirection: 'column',
     }}>
@@ -517,6 +516,8 @@ function RabPrint({
 
       <div style={{
         marginTop: '8mm',
+        breakInside: 'avoid',
+        pageBreakInside: 'avoid',
         display: 'grid',
         gridTemplateColumns: 'repeat(3, 1fr)',
         gap: '6mm',
@@ -935,6 +936,7 @@ function EnvelopeHonorLine({ label, tarif, qty, total }: { label: string; tarif:
 }
 
 const printTd: CSSProperties = {
+  breakInside: 'avoid',
   border: '0.8pt solid #000',
   padding: '1mm 1.2mm',
   verticalAlign: 'top',
@@ -1136,6 +1138,38 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab', cacheScope }
       }
     `,
   })
+  const handleExportRabExcel = async () => {
+    if (!event || drafts.length === 0) return
+    try {
+      const { exportRabExcel } = await import('./_rab-export')
+      const categories = KATEGORI.map(kategori => {
+        const items = drafts.filter(item => item.kategori === kategori.key)
+        return {
+          title: kategori.title,
+          subtotal: items.reduce((sum, item) => sum + lineTotal(item), 0),
+          lines: items.map(item => ({
+            nama: displayRabName(item),
+            qty: Number(item.qty || 0),
+            harga: Number(item.harga || 0),
+            total: lineTotal(item),
+            keterangan: item.keterangan || '',
+            isHeader: item.system_key === 'honor_pemeriksaan_header',
+          })),
+        }
+      })
+      await exportRabExcel({
+        semester: event.semester,
+        tahunAjaran: event.tahun_ajaran_nama,
+        categories,
+        grandTotal: categories.reduce((sum, category) => sum + category.subtotal, 0),
+        ketuaPelaksana,
+        wakilAkademik,
+        wakilKeuangan,
+      })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Gagal membuat file Excel.')
+    }
+  }
   const handlePrintHonorTable = useReactToPrint({
     contentRef: honorTablePrintRef,
     documentTitle: 'Rincian Honor EHB',
@@ -2574,13 +2608,22 @@ export default function KeuanganEhbPageContent({ activeTab = 'rab', cacheScope }
                 <h2 className="font-bold text-slate-800">Cetak RAB</h2>
                 <p className="text-sm text-slate-500">Format F4 Portrait, margin narrow, dengan kop dan tanda tangan.</p>
               </div>
-              <button
-                onClick={() => handlePrintRab()}
-                disabled={drafts.length === 0}
-                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-5 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-sm transition-all"
-              >
-                <Printer className="w-4 h-4" /> Cetak RAB
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => void handleExportRabExcel()}
+                  disabled={drafts.length === 0}
+                  className="bg-white hover:bg-slate-50 border border-emerald-600 text-emerald-700 disabled:border-slate-300 disabled:text-slate-400 disabled:cursor-not-allowed font-bold px-5 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-sm transition-all"
+                >
+                  <FileText className="w-4 h-4" /> Unduh Excel
+                </button>
+                <button
+                  onClick={() => handlePrintRab()}
+                  disabled={drafts.length === 0}
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold px-5 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-sm transition-all"
+                >
+                  <Printer className="w-4 h-4" /> Cetak RAB
+                </button>
+              </div>
             </div>
             <div className="grid md:grid-cols-3 gap-3">
               <div>
