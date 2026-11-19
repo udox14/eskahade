@@ -129,7 +129,7 @@ details summary{cursor:pointer;font-weight:600}
     <a href="#laporan">14. Dashboard, riwayat, laporan</a>
     <a href="#penjaga">15. Penjaga sistem (guard)</a>
     <a href="#briva">16. BRIVA (opsional)</a>
-    <a href="#temuan">17. Temuan untuk dicek</a>
+    <a href="#temuan">17. Temuan &amp; status</a>
   </nav>
 </aside>
 
@@ -162,7 +162,7 @@ details summary{cursor:pointer;font-weight:600}
   <h2>2. Peran &amp; menu</h2>
   <p class="lead">Akses menu diambil dari seed <code>fitur_akses</code> (migrasi 0166 &amp; 0198). Hak ubah diambil dari pemeriksaan di server action. Bila akses menu pernah diubah lewat pengaturan akses di aplikasi, isi tabel bisa berbeda.</p>
   <div style="overflow-x:auto"><table id="roleTable"></table></div>
-  <p class="small">● = bisa membuka &amp; mengubah · ◐ = hanya melihat · ○ = tidak ada di menu · ⚠ = ada ketidakcocokan menu vs kode (lihat bagian 17).</p>
+  <p class="small">● = bisa membuka &amp; mengubah · ◐ = hanya melihat · ○ = tidak ada di menu · * = berlaku setelah migrasi <code>0199_finance_koperasi_menu_access.sql</code> diterapkan (temuan #2–#4).</p>
   <div class="src">Sumber: <code>lib/cache/fitur-akses.ts</code>, <code>migrations/0166_finance_navigation_and_settings.sql</code>, <code>migrations/0198…sql</code> baris 884–896, <code>lib/finance/authorization.ts</code>, <code>lib/finance/manual-transfer.ts</code> (getVerifierScope), <code>app/dashboard/keuangan/penyaluran/actions.ts</code>, <code>app/dashboard/keuangan/tarif/payment-channel-actions.ts</code>.</div>
 </section>
 
@@ -231,7 +231,7 @@ details summary{cursor:pointer;font-weight:600}
     <li><b>Dipotong</b>: biaya diambil dari <b>satu</b> item fleksibel — Uang Jajan lebih dulu, kalau tidak ada maka cicilan terbesar (mis. USPP) — dan item itu harus lebih besar dari biaya. SPP dan tagihan wajib-penuh tidak pernah dipotong.</li>
     <li>Satu santri hanya boleh punya <b>satu pembayaran online aktif</b>. Checkout baru mengganti order lama yang belum ada buktinya; ditolak bila ada bukti yang <b>sedang dicek</b>.</li>
     <li>Rekening tujuan disalin (snapshot) ke order; mengubah rekening di pengaturan tidak mengubah order lama.</li>
-    <li>Batas unggah bukti = pengaturan <i>Batas unggah bukti (jam)</i>, bawaan 24 jam.</li>
+    <li>Batas unggah bukti = pengaturan <i>Batas unggah bukti (jam)</i>, bawaan 24 jam. Order tanpa bukti yang lewat batas ditandai <i>Kedaluwarsa</i> saat portal wali atau antrian verifikasi dibuka.</li>
   </ul>
   <div class="src">Sumber: <code>lib/finance/orders.ts</code> (createPaymentOrder, pickUniqueTransferCode, langkah 2b DEDUCT), <code>lib/portal/finance.ts</code> (createPortalPaymentOrder), <code>app/portal-ortu/(app)/tagihan/_transfer-panel.tsx</code>, <code>_tagihan-client.tsx</code>.</div>
 </section>
@@ -334,7 +334,7 @@ details summary{cursor:pointer;font-weight:600}
     </div>
     <div>
       <ul class="tight">
-        <li>Hanya <b>Admin</b> atau <b>Admin Koperasi</b> yang dapat menyimpan.</li>
+        <li>Hanya <b>Admin</b> atau <b>Admin Koperasi</b> yang dapat menyimpan Jalur Pembayaran dan tab BRIVA &amp; Koperasi. Tab Tarif, Pembebasan, Limit, dan Kop hanya dapat diubah <b>Admin</b> atau <b>Bendahara</b> (dijaga di server).</li>
         <li>Mode Transfer/Keduanya tidak bisa disimpan sebelum ada <b>minimal satu rekening aktif</b>; rekening terakhir tidak bisa dinonaktifkan selama transfer aktif.</li>
         <li>Mengubah biaya admin membuat <b>versi aturan baru</b> (berlaku sejak disimpan); order lama tetap memakai biaya yang tersalin saat order dibuat.</li>
         <li>Mengubah rekening tidak mengubah pembayaran yang sudah dibuat.</li>
@@ -494,7 +494,7 @@ details summary{cursor:pointer;font-weight:600}
     <div>
       <ul class="tight">
         <li>Metode di layar: <b>Transfer Bank</b> (manual, wajib nomor referensi + bukti + rekening dari master, hanya Admin/Bendahara) dan <b>Tunai</b> (wajib nama penerima).</li>
-        <li><b>Admin Koperasi dilarang</b> mencatat penyaluran; Pimpinan hanya melihat.</li>
+        <li><b>Petugas Koperasi</b> hanya bisa mencatat <b>Tunai</b> (tombol Transfer Bank nonaktif). <b>Admin Koperasi</b> tidak boleh mencatat penyaluran, tetapi boleh mengelola/impor rekening penerima. Pimpinan hanya melihat.</li>
         <li>Rekening penerima disalin (snapshot) ke penyaluran; edit master tidak mengubah riwayat. Rekening bisa diimpor dari template.</li>
         <li>Database menolak penyaluran yang melebihi dana teralokasi (anti-dobel).</li>
         <li><b>Tidak ikut disalurkan:</b> Uang Jajan (titipan) dan pendapatan Koperasi (biaya admin + kode unik).</li>
@@ -596,17 +596,17 @@ details summary{cursor:pointer;font-weight:600}
 
 <!-- ============================================================ -->
 <section id="temuan">
-  <h2>17. Temuan untuk dicek</h2>
-  <p class="lead">Hal-hal yang saya temukan saat membaca kode dan menurut saya perlu Bos putuskan atau periksa. Ini hasil membaca kode, <b>belum diuji di aplikasi</b>.</p>
+  <h2>17. Temuan &amp; status perbaikan</h2>
+  <p class="lead">Temuan audit kode 19 Nov 2026 beserta statusnya. Perbaikan diuji otomatis (<code>test-finance-manual-transfer.cjs</code>, <code>test-finance-koperasi-access.cjs</code>), belum dicoba langsung di aplikasi. Perubahan menu (#2–#4) aktif setelah migrasi <code>0199</code> diterapkan.</p>
   <ol>
     <li><span class="pill p-green">Diperbaiki 19 Nov 2026</span> <b>Tagihan dilunasi tunai saat transfer masih "Menunggu Bukti".</b> Dulu order transfer dibatalkan tetapi pengajuan wali tetap <i>Menunggu Bukti</i>, sehingga wali masih bisa mengunggah bukti untuk tagihan yang sudah lunas. Sekarang <code>payments.ts</code> langkah 7c ikut menutup pengajuan itu menjadi <i>Dibatalkan</i> (jejak audit: SYSTEM, "Tagihan sudah dilunasi melalui pembayaran …") dalam batch yang sama. Bukti yang sedang diperiksa tetap tidak disentuh. Diuji di <code>scripts/test-finance-manual-transfer.cjs</code>.</li>
-    <li><b>Admin Koperasi &amp; menu Pengaturan Keuangan.</b> Kode mengizinkan Admin Koperasi menyimpan Jalur Pembayaran, tetapi seed menu <code>/dashboard/keuangan/tarif</code> hanya untuk admin, bendahara, pimpinan. Sebaliknya Bendahara melihat tab Jalur Pembayaran tetapi tidak bisa menyimpan. Perlu dicek isi <code>fitur_akses</code> di produksi.</li>
-    <li><b>Admin Koperasi &amp; Laporan Pendapatan Koperasi.</b> Seed menu Laporan &amp; Ekspor tidak memuat admin_koperasi, padahal statistik pendapatan Koperasi ada di sana.</li>
-    <li><b>Petugas Koperasi &amp; penyaluran tunai.</b> Kode membolehkan petugas_koperasi mencatat penyaluran tunai, tetapi seed menu Penyaluran Dana hanya untuk admin, bendahara, pimpinan.</li>
-    <li><b>Biaya admin transfer bawaan Rp0.</b> Aturan <code>TRANSFER_CHECKOUT_FEE</code> dibuat nonaktif oleh migrasi 0198; harus diisi di Jalur Pembayaran bila ingin ada biaya.</li>
-    <li><b>Kedaluwarsa order transfer berjalan "malas".</b> Penyapu kedaluwarsa hanya dipanggil saat ada checkout transfer baru (<code>pickUniqueTransferCode</code>); fungsi <code>expirePendingOrders</code> tidak dipanggil di mana pun. Wali tetap tidak bisa unggah setelah batas waktu (dicek saat unggah), tetapi di database order bisa tetap <i>PENDING / Menunggu Bukti</i> sampai ada checkout transfer berikutnya.</li>
-    <li><b>Settlement transfer selalu manual.</b> Kandidat dari kode unik hanya saran; setiap transfer harus dihubungkan manual di Rekonsiliasi untuk menjadi SETTLED. Ini sesuai aturan "PAID ≠ SETTLED", tetapi berarti ada pekerjaan rutin rekonsiliasi.</li>
-    <li><b>Petugas tanpa penugasan asrama</b> melihat antrian kosong — pastikan semua asrama sudah dibagi.</li>
+    <li><span class="pill p-green">Diperbaiki 19 Nov 2026</span> <b>Admin Koperasi &amp; menu Pengaturan Keuangan.</b> Migrasi <code>0199</code> menambahkan admin_koperasi ke menu. Di server, tab Tarif/Pembebasan/Limit/Kop kini hanya bisa diubah Admin &amp; Bendahara (sebelumnya peran Koperasi pun lolos bila diberi menu); Admin Koperasi langsung dibuka di tab Jalur Pembayaran. Bendahara tetap hanya melihat Jalur Pembayaran (sesuai AGENTS §47: admin yang memilih mode).</li>
+    <li><span class="pill p-green">Diperbaiki 19 Nov 2026</span> <b>Admin Koperasi &amp; Laporan.</b> Migrasi <code>0199</code> membuka Laporan &amp; Ekspor (baca saja) untuk admin_koperasi.</li>
+    <li><span class="pill p-green">Diperbaiki 19 Nov 2026</span> <b>Peran Koperasi &amp; Penyaluran.</b> Migrasi <code>0199</code> membuka menu untuk petugas_koperasi (catat Tunai) dan admin_koperasi (lihat + kelola rekening penerima). Layar kini menyembunyikan/menonaktifkan tombol yang pasti ditolak server.</li>
+    <li><span class="pill p-gray">Keputusan Bos</span> <b>Biaya admin transfer bawaan Rp0.</b> Bukan bug; isi nominalnya di Jalur Pembayaran bila ingin ada biaya (layar sudah menjelaskan "Rp0 berarti tanpa biaya admin").</li>
+    <li><span class="pill p-green">Diperbaiki 19 Nov 2026</span> <b>Kedaluwarsa order transfer.</b> Penyapu kini juga dijalankan saat portal wali dan antrian Verifikasi Transfer dibuka (bukan hanya saat checkout transfer baru). Bila gagal (mis. akun baca-saja) hanya dicatat di log, halaman tetap tampil.</li>
+    <li><span class="pill p-gray">Sesuai desain</span> <b>Settlement transfer selalu manual.</b> Sesuai aturan PAID ≠ SETTLED; kandidat kode unik tetap butuh keputusan petugas.</li>
+    <li><span class="pill p-gray">Pengaturan</span> <b>Petugas tanpa penugasan asrama</b> melihat antrian kosong. Layar Jalur Pembayaran sudah menampilkan "Belum ada petugas untuk: …"; cukup bagikan asramanya.</li>
   </ol>
 </section>
 
@@ -660,12 +660,12 @@ const MENU=[
  ['Dashboard Keuangan','●','●','○','○','◐'],
  ['Status Pembayaran (+ Catat Pembayaran Tunai)','●','●','○','○','◐'],
  ['Verifikasi Transfer','● semua asrama','● semua asrama','● semua asrama','● asrama tugasnya','○ (baca via URL)'],
- ['Penyaluran Dana','● transfer &amp; tunai','● transfer &amp; tunai','○ dilarang','○ ⚠ kode izinkan tunai','◐'],
+ ['Penyaluran Dana','● transfer &amp; tunai','● transfer &amp; tunai','◐ + kelola rekening penerima*','● tunai saja*','◐'],
  ['Rekonsiliasi','●','●','○','○','◐'],
  ['Uang Jajan Santri','●','●','●','●','◐'],
  ['Riwayat Transaksi','●','●','○','○','◐'],
- ['Laporan &amp; Ekspor','●','●','○ ⚠','○','◐'],
- ['Pengaturan Keuangan','● semua tab','● (Jalur Pembayaran ◐)','○ ⚠ kode izinkan Jalur','○','◐'],
+ ['Laporan &amp; Ekspor','●','●','◐*','○','◐'],
+ ['Pengaturan Keuangan','● semua tab','● Tarif, Pembebasan, Limit, Kop (Jalur &amp; BRIVA ◐)','● Jalur &amp; BRIVA-Koperasi* (tab lain ◐)','○','◐'],
  ['Loket Kasir (sesi kas, bayar/setor tunai)','●','●','●','●','○'],
  ['Pencairan Uang Jajan (kolektif)','●','●','●','●','○'],
  ['Kredensial &amp; Kartu','<span class="tag off">nonaktif</span>','<span class="tag off">nonaktif</span>','<span class="tag off">nonaktif</span>','<span class="tag off">nonaktif</span>','<span class="tag off">nonaktif</span>']
@@ -818,7 +818,7 @@ $('smNew').onclick=()=>{
 $('smExpire').onclick=()=>{
   if(SM.status!=='MENUNGGU_BUKTI')return fail(['MENUNGGU_VERIFIKASI','PERLU_PERBAIKAN'].includes(SM.status)?'Tidak berlaku: order yang buktinya sedang diperiksa tidak pernah kedaluwarsa (uang wali mungkin sudah terkirim).':'Status sudah final.');
   setStatus('KEDALUWARSA');if(SM.order==='PENDING')SM.order='EXPIRED';addEvt('EXPIRED','MENUNGGU_BUKTI','KEDALUWARSA','SYSTEM','Bukti transfer tidak diunggah sampai batas waktu');
-  ok('Kedaluwarsa. Catatan: di kode, penandaan ini dijalankan saat ada checkout transfer berikutnya (lihat temuan #6); wali sudah tidak bisa mengunggah sejak batas waktu lewat.');
+  ok('Kedaluwarsa. Penandaan dijalankan saat halaman Tagihan wali, antrian Verifikasi Transfer, atau checkout transfer berikutnya dibuka; wali sudah tidak bisa mengunggah sejak batas waktu lewat.');
 };
 $('smCash').onclick=()=>{
   if(SM.order!=='PENDING')return fail('Order sudah tidak menunggu.');

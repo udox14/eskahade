@@ -76,9 +76,23 @@ import {
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ TYPES Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export interface UserFinancePermissions {
+  /** Tarif, pembebasan, limit, kop & cutover: hanya Admin/Bendahara (PRD §4.1). */
   canMutate: boolean
+  /** Tab BRIVA & Koperasi (biaya admin Koperasi): Admin/Admin Koperasi (PRD BRI §22). */
+  canConfigureKoperasi: boolean
   role: string
   fullName: string
+}
+
+/**
+ * Pengaturan umum keuangan (tarif, pembebasan, limit, kop, cutover) adalah wewenang Bendahara.
+ * Admin/Petugas Koperasi tetap boleh membuka menu (untuk tab Jalur Pembayaran / BRIVA & Koperasi),
+ * tetapi tidak boleh mengubah tab-tab ini.
+ */
+function canEditGeneralFinanceSettings(roles: readonly string[], demoRunsInSandbox: boolean): boolean {
+  if (roles.includes('pimpinan')) return false
+  if (roles.some(role => role === 'admin' || role === 'bendahara')) return true
+  return roles.includes('demo') && hasFinanceMutateRole(roles, demoRunsInSandbox)
 }
 
 export interface AcademicYearOption {
@@ -205,10 +219,10 @@ async function assertMutationPermission(): Promise<{ userId: string; role: strin
   const roles = getEffectiveRoles(session)
   // Role 'demo' hanya boleh menulis bila request benar-benar dilayani DEMO_DB.
   const demoRunsInSandbox = isDemoSandboxRequest(session)
-  const canMutate = hasFinanceMutateRole(roles, demoRunsInSandbox)
+  const canMutate = canEditGeneralFinanceSettings(roles, demoRunsInSandbox)
 
   if (!canMutate) {
-    throw new Error('Akses ditolak: role Anda (misal Pimpinan) hanya memiliki izin view-only untuk pengaturan keuangan.')
+    throw new Error('Akses ditolak: tarif, pembebasan, limit, dan kop hanya dapat diubah oleh Admin atau Bendahara.')
   }
 
   return {
@@ -225,7 +239,8 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
   const session = await getSession()
   const roles = session ? getEffectiveRoles(session) : []
   const demoRunsInSandbox = isDemoSandboxRequest(session)
-  const canMutate = hasFinanceMutateRole(roles, demoRunsInSandbox)
+  const canMutate = canEditGeneralFinanceSettings(roles, demoRunsInSandbox)
+  const canConfigureKoperasi = !roles.includes('pimpinan') && roles.some(role => role === 'admin' || role === 'admin_koperasi')
   const userRole = getPrimaryFinanceRole(roles)
   const fullName = session?.full_name || 'Pengguna'
 
@@ -345,6 +360,7 @@ export async function getPengaturanKeuanganData(): Promise<PengaturanKeuanganDat
     legacySppCount: legacySppRow?.count || 0,
     userPermissions: {
       canMutate,
+      canConfigureKoperasi,
       role: userRole,
       fullName,
     },

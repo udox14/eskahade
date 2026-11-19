@@ -45,7 +45,12 @@ import type {
 } from '@/lib/finance/distribution-types'
 export interface UserPenyaluranPermissions {
   canView: boolean
+  /** Boleh mencatat penyaluran (Admin, Bendahara, Petugas Koperasi). Admin Koperasi & Pimpinan tidak. */
   canDisburse: boolean
+  /** Boleh memilih metode Transfer Bank manual (Admin, Bendahara). */
+  canTransfer: boolean
+  /** Boleh mengelola/impor rekening penerima (Admin, Admin Koperasi, Bendahara). */
+  canManageAccounts: boolean
   role: string
 }
 
@@ -147,7 +152,12 @@ export async function authorizeUser(): Promise<{
   // Role 'demo' hanya boleh menulis bila request benar-benar dilayani DEMO_DB.
   const demoRunsInSandbox = isDemoSandboxRequest(session)
   const isViewOnly = roles.includes('pimpinan')
-  const canDisburse = !isViewOnly && hasFinanceMutateRole(roles, demoRunsInSandbox)
+  const canMutate = !isViewOnly && hasFinanceMutateRole(roles, demoRunsInSandbox)
+  const demoSandbox = roles.includes('demo') && canMutate
+  // Sama dengan pemeriksaan di recordDistributionAction / executeDistribution & aksi rekening.
+  const canDisburse = canMutate && (demoSandbox || roles.some(r => ['admin', 'bendahara', 'petugas_koperasi'].includes(r)))
+  const canTransfer = canMutate && (demoSandbox || roles.some(r => r === 'admin' || r === 'bendahara'))
+  const canManageAccounts = canMutate && (demoSandbox || roles.some(r => ['admin', 'admin_koperasi', 'bendahara'].includes(r)))
 
   return {
     userId: session.id,
@@ -155,6 +165,8 @@ export async function authorizeUser(): Promise<{
     permissions: {
       canView: true,
       canDisburse,
+      canTransfer,
+      canManageAccounts,
       role: roles[0] || 'bendahara',
     },
   }
@@ -345,7 +357,7 @@ export async function saveProviderAccountAction(
 
   const { roles, permissions } = await authorizeUser()
 
-  if (!permissions.canDisburse) {
+  if (!permissions.canManageAccounts) {
     throw new Error('Akses ditolak: Anda tidak memiliki izin untuk mengelola rekening penyedia.')
   }
 
@@ -368,7 +380,7 @@ export async function updateProviderAccountAction(
 
   const { roles, permissions } = await authorizeUser()
 
-  if (!permissions.canDisburse) {
+  if (!permissions.canManageAccounts) {
     throw new Error('Akses ditolak: Anda tidak memiliki izin untuk mengelola rekening penyedia.')
   }
 
@@ -391,7 +403,7 @@ export async function deleteProviderAccountAction(
 
   const { roles, permissions } = await authorizeUser()
 
-  if (!permissions.canDisburse) {
+  if (!permissions.canManageAccounts) {
     throw new Error('Akses ditolak: Anda tidak memiliki izin untuk mengelola rekening penyedia.')
   }
 
@@ -454,7 +466,7 @@ export async function importProviderAccountsAction(
 
   const { roles, permissions } = await authorizeUser()
 
-  if (!permissions.canDisburse) {
+  if (!permissions.canManageAccounts) {
     throw new Error(
       'Akses ditolak: Pimpinan dan akun peninjau hanya memiliki hak baca (view-only) dan dilarang mengimpor rekening penyedia.'
     )

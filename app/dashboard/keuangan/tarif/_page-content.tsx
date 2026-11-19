@@ -38,7 +38,10 @@ export default function PengaturanKeuanganContent({
   initialData,
 }: PengaturanKeuanganContentProps) {
   const [data, setData] = useState<PengaturanKeuanganData>(initialData)
-  const [activeTab, setActiveTab] = useState<TabKey>('tarif')
+  // Peran Koperasi hanya mengelola Jalur Pembayaran & biaya admin Koperasi; buka tab itu lebih dulu.
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    !initialData.userPermissions.canMutate && initialData.userPermissions.canConfigureKoperasi ? 'jalur' : 'tarif'
+  )
   const [isPending, startTransition] = useTransition()
 
   const refreshData = () => {
@@ -53,6 +56,7 @@ export default function PengaturanKeuanganContent({
   }
 
   const canMutate = data.userPermissions.canMutate
+  const canConfigureKoperasi = data.userPermissions.canConfigureKoperasi
   const userRole = data.userPermissions.role
 
   const tabs: Array<{ key: TabKey; label: string; icon: typeof Tag; badge?: number }> = [
@@ -75,7 +79,7 @@ export default function PengaturanKeuanganContent({
             {!canMutate && (
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
                 <Eye className="w-4 h-4 text-amber-600" />
-                <span>Mode Lihat Saja ({userRole.toUpperCase()})</span>
+                <span>{canConfigureKoperasi ? 'Tarif, pembebasan, limit & kop: lihat saja' : 'Mode Lihat Saja'} ({userRole.toUpperCase()})</span>
               </div>
             )}
 
@@ -163,12 +167,12 @@ export default function PengaturanKeuanganContent({
           />
         )}
 
-        {activeTab === 'jalur' && <PaymentChannelTab canMutate={canMutate} />}
+        {activeTab === 'jalur' && <PaymentChannelTab canMutate={canConfigureKoperasi} />}
 
         {activeTab === 'gateway' && (
           <GatewayTab
             gatewayConfig={data.gatewayConfig}
-            canMutate={canMutate}
+            canMutate={canConfigureKoperasi}
             onRefresh={refreshData}
           />
         )}

@@ -13,6 +13,7 @@ const migrationBase = '9539a47118123ea4e28da09ac9b3f525f24c37b9';
 const reviewed = {
   '0197_ehb_rab_autosave.sql': 'b78aaf49f8c843c6a98da8a5bf309f6b91f6010c4516ea015b6fc089613a3a5b',
   '0198_manual_transfer_and_collective_payout.sql': '1d208ac9b74a00ec0e8203b98de30f07427de509ad00a2854108d9d1115e3b36',
+  '0199_finance_koperasi_menu_access.sql': '888ec2cbd4d51d1a6bfb95093c156ac9e31a8e55867ff62efe2416043b6a6168',
 };
 
 function validateMigrationChanges(changes) {

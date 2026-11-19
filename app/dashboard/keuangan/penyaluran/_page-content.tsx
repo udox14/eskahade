@@ -70,6 +70,8 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
   const [bendaharaDetailTarget, setBendaharaDetailTarget] = useState<BendaharaDetailTarget | null>(null)
 
   const canDisburse = data.userPermissions.canDisburse
+  const canTransfer = data.userPermissions.canTransfer
+  const canManageAccounts = data.userPermissions.canManageAccounts
 
   const refreshData = (
     tab = activeTab,
@@ -407,7 +409,7 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {canDisburse && (
+              {canManageAccounts && (
                 <button
                   type="button"
                   onClick={() => setIsImportModalOpen(true)}
@@ -690,6 +692,7 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
           }
         }}
         target={disburseModalTarget}
+        canTransfer={canTransfer}
       />
 
       <RekeningModal
@@ -697,7 +700,7 @@ export default function PenyaluranContent({ initialData }: PenyaluranContentProp
         onClose={() => setRekeningModalProvider(null)}
         onUpdated={() => refreshData()}
         provider={rekeningModalProvider}
-        canManage={canDisburse}
+        canManage={canManageAccounts}
       />
 
       <BuktiPenyaluranModal

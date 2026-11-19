@@ -59,7 +59,7 @@ function harness(){
  const original=Module._load;
  Module._load=function(request,parent,main){
   if(request==='@/lib/db')return adapter;
-  if(request==='@/lib/auth/session')return{getSession:async()=>state.session,getEffectiveRoles:s=>s?.roles||[],isDemoSandboxRequest:s=>s?.role==='demo',hasFinanceMutateRole:(roles,demo)=>roles.some(r=>['admin','bendahara','admin_koperasi','petugas_koperasi'].includes(r))||(demo&&roles.includes('demo'))};
+  if(request==='@/lib/auth/session')return{getSession:async()=>state.session,getEffectiveRoles:s=>s?.roles||[],isDemoSandboxRequest:s=>s?.role==='demo',getPrimaryFinanceRole:roles=>roles?.[0]||'',hasFinanceMutateRole:(roles,demo)=>roles.some(r=>['admin','bendahara','admin_koperasi','petugas_koperasi'].includes(r))||(demo&&roles.includes('demo'))};
   if(request==='@/lib/auth/feature')return{canAccessFeatureForSession:async()=>state.feature};
   if(request==='next/headers')return{cookies:async()=>({get:()=>state.cookieToken?{value:state.cookieToken}:undefined})};
   if(request==='@opennextjs/cloudflare')return{getCloudflareContext:async()=>({env:state.environment==='sandbox'?{ESKAHADE_ENV:'sandbox',R2_BUCKET:state.bucket,DB:state.demoDB,DEMO_DB:state.demoDB}:{ESKAHADE_ENV:'production',R2_BUCKET:state.bucket,DB:state.productionDB}})};

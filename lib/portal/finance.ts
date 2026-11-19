@@ -11,7 +11,7 @@ import { rupiah } from '@/lib/finance/money'
 
 import { cache } from 'react'
 import { query, queryOne, execute } from '@/lib/db'
-import { createPaymentOrder, getPaymentOrderById } from '@/lib/finance/orders'
+import { createPaymentOrder, getPaymentOrderById, sweepExpiredTransferOrders } from '@/lib/finance/orders'
 import { getStudentFixedVa } from '@/lib/finance/va'
 import { getEffectiveCooperativeAdminFee, COOPERATIVE_FEE_CODES } from '@/lib/finance/cooperative-admin'
 import { getTransferSettings, listTransferAccounts, parseAccountSnapshot, type PaymentChannelMode } from '@/lib/finance/transfer-config'
@@ -525,6 +525,7 @@ export async function getPortalPaymentChannels(
 
 /** Recent manual transfers for status cards; open ones first. */
 export async function getPortalTransferSummaries(santriId: string, limit = 10): Promise<PortalTransferSummary[]> {
+  await sweepExpiredTransferOrders('portal-ortu')
   const rows = await listTransferSubmissionsForStudent(santriId, limit).catch(() => [])
   if (!rows.length) return []
   const items = await query<{ order_id: string; item_type: string; amount: number }>(

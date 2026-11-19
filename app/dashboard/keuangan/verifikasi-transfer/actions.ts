@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { authorizeFinanceFeature } from '@/lib/finance/authorization'
+import { sweepExpiredTransferOrders } from '@/lib/finance/orders'
 import {
   TRANSFER_FEATURE_PATH,
   approveTransferAsUnallocated,
@@ -40,6 +41,7 @@ export interface TransferQueueData {
 
 export async function getTransferQueueAction(filter: TransferQueueFilter = {}): Promise<TransferQueueData> {
   const { session, scope } = await actor(false)
+  await sweepExpiredTransferOrders('verifikasi-transfer')
   const [items, pendingCount] = await Promise.all([
     listTransferQueue(scope, filter),
     countPendingTransfersForScope(scope),

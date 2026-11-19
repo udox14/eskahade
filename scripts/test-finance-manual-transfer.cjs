@@ -219,6 +219,26 @@ async function main() {
     assert.equal((await mt.getTransferSubmissionByOrder(order.id)).status, 'KEDALUWARSA')
   })
 
+  await test('opening the portal or verifier queue sweeps expired transfers without a new checkout', async () => {
+    const order = await transferOrder('student', [{ itemType: 'UANG_JAJAN', amount: 40000 }])
+    const live = await transferOrder('other', [{ itemType: 'UANG_JAJAN', amount: 40000 }])
+    h.db.exec(`DROP TRIGGER trg_finance_order_terms_immutable`)
+    h.db.prepare(`UPDATE finance_payment_orders SET expires_at='2020-01-01T00:00:00Z' WHERE id=?`).run(order.id)
+    const summaries = await h.load('lib/portal/finance.ts').getPortalTransferSummaries('student')
+    assert.equal(summaries.find(t => t.orderId === order.id).status, 'KEDALUWARSA')
+    assert.equal(one('SELECT status FROM finance_payment_orders WHERE id=?', order.id).status, 'EXPIRED')
+    assert.equal(one('SELECT status FROM finance_payment_orders WHERE id=?', live.id).status, 'PENDING')
+    const ev = one(`SELECT actor_kind FROM finance_transfer_submission_events WHERE action='EXPIRED'`)
+    assert.equal(ev.actor_kind, 'SYSTEM')
+    // A failing sweep is logged and never blocks the page.
+    const orders = h.load('lib/finance/orders.ts')
+    const original = h.adapter.batch
+    h.adapter.batch = async () => { throw new Error('read-only') }
+    h.db.prepare(`UPDATE finance_payment_orders SET expires_at='2020-01-01T00:00:00Z' WHERE id=?`).run(live.id)
+    try { await orders.sweepExpiredTransferOrders('test') } finally { h.adapter.batch = original }
+    assert.equal(one('SELECT status FROM finance_payment_orders WHERE id=?', live.id).status, 'PENDING')
+  })
+
   await test('cash payment of the same bill closes a transfer that is still waiting for proof', async () => {
     const order = await transferOrder('student', [{ obligationId: 'uspp', itemType: 'USPP', amount: 500000 }])
     const cash = await createPaymentOrder({ santriId: 'student', payerType: 'LOKET', paymentMethod: 'CASH', items: [{ obligationId: 'uspp', itemType: 'USPP', amount: 500000 }] })

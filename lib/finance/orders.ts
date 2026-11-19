@@ -93,6 +93,24 @@ export async function expireStaleTransferOrders(): Promise<void> {
   ])
 }
 
+/**
+ * Penyapu kedaluwarsa yang dipanggil saat halaman dibaca (antrian verifikasi, portal wali), agar
+ * order transfer tanpa bukti tidak tertahan PENDING sampai ada checkout transfer berikutnya.
+ * Idempoten. Kegagalan (mis. akun baca-saja) dicatat ke log dan tidak menghalangi tampilan;
+ * tidak ada nilai finansial yang berubah selain status PENDING → EXPIRED/KEDALUWARSA.
+ */
+export async function sweepExpiredTransferOrders(context: string): Promise<void> {
+  try {
+    await expireStaleTransferOrders()
+  } catch (error) {
+    console.warn(JSON.stringify({
+      event: 'transfer_expiry_sweep_failed',
+      context,
+      message: error instanceof Error ? error.message : String(error),
+    }))
+  }
+}
+
 function generateOrderNumber(): string {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
   const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase()

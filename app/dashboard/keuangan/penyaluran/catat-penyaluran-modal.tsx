@@ -40,23 +40,27 @@ interface CatatPenyaluranModalProps {
   onClose: () => void
   onSuccess: (newDistributionId?: string) => void
   target: CatatPenyaluranTarget | null
+  /** Transfer Bank manual hanya untuk Admin/Bendahara; peran lain hanya Tunai. */
+  canTransfer: boolean
 }
 
 function CatatPenyaluranForm({
   onClose,
   onSuccess,
   target,
+  canTransfer,
 }: {
   onClose: () => void
   onSuccess: (newDistributionId?: string) => void
   target: CatatPenyaluranTarget
+  canTransfer: boolean
 }) {
   const [isPending, startTransition] = useTransition()
   const [step, setStep] = useState<'FORM' | 'CONFIRM'>('FORM')
 
   // Form states diinisialisasi langsung dari target props
   const [amountStr, setAmountStr] = useState<string>(() => String(target.availableAmount))
-  const [method, setMethod] = useState<'TRANSFER' | 'CASH'>('TRANSFER')
+  const [method, setMethod] = useState<'TRANSFER' | 'CASH'>(canTransfer ? 'TRANSFER' : 'CASH')
   const [providerAccounts, setProviderAccounts] = useState<FinanceProviderAccount[]>([])
   const [selectedAccountId, setSelectedAccountId] = useState<string>('')
   const [destinationBank, setDestinationBank] = useState<string>('')
@@ -284,7 +288,9 @@ function CatatPenyaluranForm({
                   <button
                     type="button"
                     onClick={() => setMethod('TRANSFER')}
-                    className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border font-semibold text-sm transition ${
+                    disabled={!canTransfer}
+                    title={canTransfer ? undefined : 'Transfer Bank manual hanya dapat dicatat oleh Admin atau Bendahara.'}
+                    className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border font-semibold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed ${
                       method === 'TRANSFER'
                         ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 shadow-xs'
                         : 'border-slate-200 hover:bg-slate-50 text-slate-600'
@@ -591,6 +597,7 @@ export default function CatatPenyaluranModal({
   onClose,
   onSuccess,
   target,
+  canTransfer,
 }: CatatPenyaluranModalProps) {
   if (!isOpen || !target) return null
 
@@ -600,6 +607,7 @@ export default function CatatPenyaluranModal({
       onClose={onClose}
       onSuccess={onSuccess}
       target={target}
+      canTransfer={canTransfer}
     />
   )
 }
