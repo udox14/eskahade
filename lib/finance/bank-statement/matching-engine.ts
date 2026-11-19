@@ -219,6 +219,7 @@ export async function matchStatementTransaction(
             p.paid_at, p.bri_trx_id, p.bri_payment_request_id
      FROM finance_payments p
      WHERE p.channel = 'TRANSFER'
+       AND p.status = 'PAID' -- transfer yang sudah SETTLED bukan kandidat untuk mutasi baru
        AND (p.gross_amount + p.cooperative_admin_fee + p.unique_code_amount) = ?
        AND julianday(p.paid_at) >= julianday('now') - 45
      ORDER BY p.paid_at DESC LIMIT 3`,
@@ -227,7 +228,7 @@ export async function matchStatementTransaction(
   if (transferCandidates.length === 1) {
     const cand = transferCandidates[0]
     return {
-      classification: cand.status === 'SETTLED' ? 'ALREADY_SETTLED' : 'EXACT_MATCH',
+      classification: 'EXACT_MATCH',
       matchingStrength: 'CANDIDATE',
       statementTransactionId: statementTx.id,
       matchedPaymentId: cand.id,
@@ -247,6 +248,27 @@ export async function matchStatementTransaction(
       statementTransactionId: statementTx.id,
       candidatePaymentsCount: transferCandidates.length,
       details: { statementAmount: statementTx.amount, notes: 'Beberapa transfer manual memiliki nominal sama. Periksa manual.' },
+    }
+  }
+
+  // 2c. Mutasi sudah masuk tetapi pengajuan transfer wali belum selesai diverifikasi: belum ada payment untuk
+  // dicocokkan. Jangan dicatat sebagai "belum teralokasi" (lihat guard di unallocated-service) — verifikasi dulu.
+  const pending = await query<{ submission_number: string }>(
+    `SELECT submission_number FROM finance_transfer_submissions
+     WHERE status IN ('MENUNGGU_BUKTI', 'MENUNGGU_VERIFIKASI', 'PERLU_PERBAIKAN') AND expected_amount = ?
+     ORDER BY submission_number DESC LIMIT 3`,
+    [statementTx.amount]
+  )
+  if (pending.length > 0) {
+    return {
+      classification: 'PENDING_VERIFICATION',
+      matchingStrength: 'NO_MATCH',
+      statementTransactionId: statementTx.id,
+      candidatePaymentsCount: 0,
+      details: {
+        statementAmount: statementTx.amount,
+        notes: `Ada pengajuan transfer manual bernominal sama yang belum selesai diverifikasi (${pending.map((p) => p.submission_number).join(', ')}). Verifikasi pengajuan itu lebih dulu; jangan dicatat sebagai dana belum teralokasi.`,
+      },
     }
   }
 

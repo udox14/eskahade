@@ -246,6 +246,59 @@ async function main() {
     assert.equal(one('SELECT COUNT(*) n FROM finance_bri_statement_transactions').n, 5)
   })
 
+  // â”€â”€ sinkronisasi Verifikasi Transfer â†” Rekonsiliasi â”€â”€
+  const { recordUnallocatedStatementPayment } = h.load('lib/finance/bank-statement/unallocated-service.ts')
+  const mkOrder = async () => {
+    const o = await createPaymentOrder({ santriId: 'student', payerType: 'PORTAL_ORTU', paymentMethod: 'MANUAL_TRANSFER', destinationAccountId: 'acc', items: [{ obligationId: 'uspp', itemType: 'USPP', amount: 500000 }] })
+    const sub = await mt.getTransferSubmissionByOrder(o.id)
+    await mt.submitTransferProof({ santriId: 'student', submissionId: sub.id, bytes: jpeg(7), mimeType: 'image/jpeg', senderName: 'Bapak', senderBank: 'BRI', transferredAt: new Date().toISOString() })
+    return { o, sub }
+  }
+  const stmtCsv = (amt, dt, start) => `Tanggal,Keterangan,Debet,Kredit,Saldo awal,Saldo akhir\n${dt},TRF,,${amt},${start},${start + amt}\n`
+  const reviewItem = (id, st) => h.db.prepare(`INSERT INTO finance_reconciliation_items(id,external_reference,external_amount,match_status,created_at) VALUES(?,?,?,'UNMATCHED_EXTERNAL',?)`).run(id, st.id, st.amount, new Date().toISOString())
+
+  await test('sinkron: mutasi baru bernominal sama dengan transfer yang SUDAH settled bukan "ALREADY_SETTLED"', async () => {
+    const { o, sub } = await mkOrder()
+    await mt.approveTransferSubmission(officer, { submissionId: sub.id, receivedAmount: sub.expected_amount })
+    const pay = one("SELECT * FROM finance_payments WHERE channel='TRANSFER'")
+    await imp.importManualBankStatement({ csvText: stmtCsv(o.total_charged, dmy(day()) + ' 10:00:00', 1000000), filename: 'a.csv', importedBy: 'admin' })
+    const s1 = one('SELECT * FROM finance_bri_statement_transactions')
+    reviewItem('rv1', s1)
+    await executeSettlementTransition({ statementTransactionId: s1.id, paymentId: pay.id, matchStrength: 'MANUAL_RESOLVED', matchMethod: 'X', reconciliationItemId: 'rv1', verifiedBy: 'admin', resolutionNotes: 'cocok kode unik' })
+    await imp.importManualBankStatement({ csvText: stmtCsv(o.total_charged, dmy(day()) + ' 15:00:00', 1000000 + o.total_charged), filename: 'b.csv', importedBy: 'admin' })
+    const s2 = one("SELECT * FROM finance_bri_statement_transactions WHERE matched_payment_id IS NULL AND type_normalized='CREDIT'")
+    const m = await matchStatementTransaction(s2)
+    assert.equal(m.classification, 'NO_MATCH') // bukan kandidat transfer lama yang sudah settled
+  })
+
+  await test('sinkron: mutasi tiba sebelum pengajuan diverifikasi â†’ PENDING_VERIFICATION, dicatat "belum teralokasi" DIBLOKIR', async () => {
+    const { o, sub } = await mkOrder()
+    await imp.importManualBankStatement({ csvText: stmtCsv(o.total_charged, dmy(day()) + ' 10:00:00', 1000000), filename: 'c.csv', importedBy: 'admin' })
+    const st = one('SELECT * FROM finance_bri_statement_transactions')
+    const m = await matchStatementTransaction(st)
+    assert.equal(m.classification, 'PENDING_VERIFICATION'); assert.match(m.details.notes, new RegExp(sub.submission_number))
+    await assert.rejects(() => recordUnallocatedStatementPayment({ statementTransactionId: st.id, recordedBy: 'admin', reason: 'belum jelas pengirimnya' }), /TRANSFER_PENDING_VERIFICATION/)
+    assert.equal(one('SELECT match_status m FROM finance_bri_statement_transactions').m, 'UNMATCHED') // tidak jadi AMBIGUOUS
+    // Setelah verifikator approve: mutasi yang sama kini menjadi kandidat & bisa di-settle.
+    await mt.approveTransferSubmission(officer, { submissionId: sub.id, receivedAmount: sub.expected_amount })
+    const pay = one("SELECT * FROM finance_payments WHERE channel='TRANSFER'")
+    const m2 = await matchStatementTransaction(one('SELECT * FROM finance_bri_statement_transactions'))
+    assert.equal(m2.classification, 'EXACT_MATCH'); assert.equal(m2.matchedPaymentId, pay.id)
+    reviewItem('rv2', st)
+    await executeSettlementTransition({ statementTransactionId: st.id, paymentId: pay.id, matchStrength: 'MANUAL_RESOLVED', matchMethod: 'X', reconciliationItemId: 'rv2', verifiedBy: 'admin', resolutionNotes: 'cocok kode unik' })
+    assert.equal(one('SELECT status FROM finance_payments WHERE id=?', pay.id).status, 'SETTLED')
+  })
+
+  await test('sinkron: bila pengajuan ditolak verifikator, mutasi itu boleh dicatat sebagai dana belum teralokasi', async () => {
+    const { o, sub } = await mkOrder()
+    await imp.importManualBankStatement({ csvText: stmtCsv(o.total_charged, dmy(day()) + ' 10:00:00', 1000000), filename: 'd.csv', importedBy: 'admin' })
+    const st = one('SELECT * FROM finance_bri_statement_transactions')
+    await mt.rejectTransferSubmission(officer, { submissionId: sub.id, reason: 'Bukan transfer pesantren' })
+    assert.equal((await matchStatementTransaction(st)).classification, 'NO_MATCH')
+    await recordUnallocatedStatementPayment({ statementTransactionId: st.id, recordedBy: 'admin', reason: 'pengirim tak dikenal' })
+    assert.equal(one('SELECT match_status m FROM finance_bri_statement_transactions').m, 'AMBIGUOUS')
+  })
+
   console.log(`\n${count} tests passed`)
 }
 main().catch(e => { console.error(e); process.exit(1) })

@@ -80,6 +80,20 @@ export async function recordUnallocatedStatementPayment(
     }
   }
 
+  // 1b. Guard sinkronisasi dengan Verifikasi Transfer: bila ada pengajuan transfer wali bernominal sama yang belum
+  // selesai diverifikasi, mutasi ini hampir pasti uang yang sama. Mencatatnya sebagai dana belum teralokasi akan
+  // menandai mutasi AMBIGUOUS (tak bisa di-settle) dan/atau menggandakan uang saat pengajuan di-approve.
+  const pendingSubmission = await queryOne<{ submission_number: string }>(
+    `SELECT submission_number FROM finance_transfer_submissions
+     WHERE status IN ('MENUNGGU_BUKTI', 'MENUNGGU_VERIFIKASI', 'PERLU_PERBAIKAN') AND expected_amount = ? LIMIT 1`,
+    [statementTx.amount]
+  )
+  if (pendingSubmission) {
+    throw new Error(
+      `TRANSFER_PENDING_VERIFICATION: Ada pengajuan transfer manual ${pendingSubmission.submission_number} bernominal sama yang belum diverifikasi. Verifikasi (atau tolak) pengajuan itu lebih dulu sebelum mencatat mutasi ini sebagai dana belum teralokasi.`
+    )
+  }
+
   // 2. Resolve target student authoritatively
   // Per BRI-4 contract invariant: BANK_STATEMENT -> STUDENT AUTO IDENTITY = CONTRACT_TBD.
   // Student identity cannot be inferred from statement remark regex; strictly requires operator input.

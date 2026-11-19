@@ -86,6 +86,7 @@ export type BriStatementMatchStatus =
   | 'MATCHED'
   | 'AMBIGUOUS'
   | 'IGNORED_DEBIT'
+  | 'PENDING_VERIFICATION'
   | 'UNALLOCATED_RECORDED'
 
 export interface FinanceBriStatementTransaction {
@@ -160,6 +161,7 @@ export type BriMatchClassification =
   | 'AMOUNT_MISMATCH'
   | 'NO_MATCH'
   | 'IGNORED_DEBIT'
+  | 'PENDING_VERIFICATION'
 
 export interface BriMatchResult {
   classification: BriMatchClassification

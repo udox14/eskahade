@@ -16,7 +16,8 @@ export default function BriWorkbench({canMutate}:{canMutate:boolean}){
   setBusy(true);setMessage('')
   try{
    const choice=data?.targets.find(t=>t.id===target)
-   await resolveBriStatementAction({statementId:selected,targetId:choice?.id,kind:choice?.kind||'UNALLOCATED',notes})
+   const result=await resolveBriStatementAction({statementId:selected,targetId:choice?.id,kind:choice?.kind||'UNALLOCATED',notes}) as {blocked?:string}|undefined
+   if(result&&typeof result==='object'&&'blocked' in result&&result.blocked){setConfirm(false);setMessage(result.blocked);return}
    setConfirm(false);setSelected('');setTarget('');setNotes('');setMessage('Hasil pemeriksaan telah dicatat.');await refresh()
   }catch{setMessage('Pemeriksaan belum dapat diselesaikan. Pastikan identitas, nominal, periode dan bukti bank sesuai.')}
   finally{setBusy(false)}
@@ -33,7 +34,7 @@ export default function BriWorkbench({canMutate}:{canMutate:boolean}){
    {!data?.syncEnabled&&<span className="text-slate-500">Sinkronisasi bank dinonaktifkan.</span>}
   </div>}
   <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr><th className="p-2">Tanggal / Referensi</th><th>Nominal</th><th>Hasil pencocokan</th><th/></tr></thead><tbody>
-   {data?.statements.map(st=><tr key={st.id} className="border-t"><td className="p-2">{st.date}<br/>{st.reference||'Tanpa ID transaksi'}</td><td>Rp{st.amount.toLocaleString('id-ID')}</td><td>{({EXACT_MATCH:'Kandidat — perlu pemeriksaan',AMBIGUOUS:'Beberapa kandidat',NO_MATCH:'Belum ditemukan',AMOUNT_MISMATCH:'Nominal berbeda',ALREADY_SETTLED:'Sudah direkonsiliasi',IGNORED_DEBIT:'Mutasi keluar'} as Record<string,string>)[st.classification]||'Perlu pemeriksaan'}</td><td>{canMutate&&<button className="border rounded p-2" onClick={()=>{setSelected(st.id);setConfirm(false)}}>Periksa Bukti</button>}</td></tr>)}
+   {data?.statements.map(st=><tr key={st.id} className="border-t"><td className="p-2">{st.date}<br/>{st.reference||'Tanpa ID transaksi'}</td><td>Rp{st.amount.toLocaleString('id-ID')}</td><td>{({EXACT_MATCH:'Kandidat — perlu pemeriksaan',AMBIGUOUS:'Beberapa kandidat',NO_MATCH:'Belum ditemukan',AMOUNT_MISMATCH:'Nominal berbeda',ALREADY_SETTLED:'Sudah direkonsiliasi',IGNORED_DEBIT:'Mutasi keluar',PENDING_VERIFICATION:'Menunggu verifikasi transfer'} as Record<string,string>)[st.classification]||'Perlu pemeriksaan'}{st.classification==='PENDING_VERIFICATION'&&st.note&&<span className="block text-amber-800">{st.note}</span>}</td><td>{canMutate&&<button className="border rounded p-2" onClick={()=>{setSelected(st.id);setConfirm(false)}}>Periksa Bukti</button>}</td></tr>)}
   </tbody></table>{data&&!data.statements.length&&<p className="py-3 text-slate-500">Tidak ada kredit bank yang menunggu pemeriksaan.</p>}</div>
   {selected&&canMutate&&<div className="border-t pt-4 space-y-3">
    <label className="block">Pembayaran / order yang telah diverifikasi<select className="block border rounded p-2 w-full" value={target} onChange={e=>{setTarget(e.target.value);setConfirm(false)}}><option value="">Belum dapat dialokasikan — buka kasus rekonsiliasi</option>{data?.targets.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</select></label>
