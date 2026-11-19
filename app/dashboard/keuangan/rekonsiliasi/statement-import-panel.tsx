@@ -16,7 +16,8 @@ const FIELDS: Array<{ key: keyof StatementColumnMapping; label: string; hint?: s
   { key: 'debit', label: 'Debit (uang keluar)', hint: 'Mode dua kolom' },
   { key: 'amount', label: 'Nominal', hint: 'Mode satu kolom' },
   { key: 'type', label: 'Tipe (CR/DB)', hint: 'Untuk mode satu kolom' },
-  { key: 'balance', label: 'Saldo' },
+  { key: 'balanceBefore', label: 'Saldo awal', hint: 'Untuk verifikasi otomatis' },
+  { key: 'balance', label: 'Saldo akhir' },
   { key: 'reference', label: 'No. referensi' },
 ]
 
@@ -85,10 +86,11 @@ export default function StatementImportPanel({ onImported }: { onImported: () =>
 
   const canConfirm =
     preview?.ok &&
-    expectedCount.trim() !== '' &&
-    expectedTotal.trim() !== '' &&
-    Number(expectedCount) === preview.creditCount &&
-    Number(expectedTotal) === preview.creditTotal
+    (preview.balanceVerified ||
+      (expectedCount.trim() !== '' &&
+        expectedTotal.trim() !== '' &&
+        Number(expectedCount) === preview.creditCount &&
+        Number(expectedTotal) === preview.creditTotal))
 
   async function confirm() {
     if (!preview) return
@@ -101,8 +103,8 @@ export default function StatementImportPanel({ onImported }: { onImported: () =>
         mapping: mapping as StatementColumnMapping,
         headerRowIndex,
         dateOrder,
-        expectedCreditCount: Number(expectedCount),
-        expectedCreditTotal: Number(expectedTotal),
+        expectedCreditCount: preview.balanceVerified ? undefined : Number(expectedCount),
+        expectedCreditTotal: preview.balanceVerified ? undefined : Number(expectedTotal),
       })
       setMessage(`Mutasi diimpor: ${r.newTransactionsCount} baris baru, ${r.dedupedCount} sudah pernah diimpor.`)
       setCsvText('')
@@ -209,23 +211,34 @@ export default function StatementImportPanel({ onImported }: { onImported: () =>
                 </table>
               </div>
 
-              <div className="rounded border border-amber-300 bg-amber-50 p-3">
-                <p className="mb-2">
-                  Pemeriksaan keutuhan berkas: ketik <strong>jumlah mutasi kredit</strong> dan <strong>total kredit</strong> persis seperti tampil di internet banking
-                  untuk rentang yang sama. Jika tidak cocok dengan hasil bacaan berkas, impor tidak dapat dilanjutkan.
-                </p>
-                <div className="flex flex-wrap items-end gap-2">
-                  <label>Jumlah kredit
-                    <input className="block rounded border p-2" inputMode="numeric" value={expectedCount} onChange={(e) => setExpectedCount(e.target.value.replace(/\D/g, ''))} />
-                  </label>
-                  <label>Total kredit (Rp)
-                    <input className="block rounded border p-2" inputMode="numeric" value={expectedTotal} onChange={(e) => setExpectedTotal(e.target.value.replace(/\D/g, ''))} />
-                  </label>
+              {preview.balanceVerified ? (
+                <div className="rounded border border-emerald-300 bg-emerald-50 p-3">
+                  <p className="mb-2">
+                    Keutuhan berkas terverifikasi otomatis: setiap baris dan antar-baris cocok dengan kolom saldo awal/akhir (tidak ada baris hilang atau ganda).
+                  </p>
                   <button className="rounded border bg-white p-2 disabled:opacity-50" disabled={busy || !canConfirm} onClick={confirm}>
                     Impor Mutasi
                   </button>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded border border-amber-300 bg-amber-50 p-3">
+                  <p className="mb-2">
+                    Berkas tidak memiliki kolom saldo awal/akhir untuk verifikasi otomatis. Pemeriksaan keutuhan: ketik <strong>jumlah mutasi kredit</strong> dan{' '}
+                    <strong>total kredit</strong> persis seperti tampil di internet banking untuk rentang yang sama. Jika tidak cocok, impor tidak dapat dilanjutkan.
+                  </p>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label>Jumlah kredit
+                      <input className="block rounded border p-2" inputMode="numeric" value={expectedCount} onChange={(e) => setExpectedCount(e.target.value.replace(/\D/g, ''))} />
+                    </label>
+                    <label>Total kredit (Rp)
+                      <input className="block rounded border p-2" inputMode="numeric" value={expectedTotal} onChange={(e) => setExpectedTotal(e.target.value.replace(/\D/g, ''))} />
+                    </label>
+                    <button className="rounded border bg-white p-2 disabled:opacity-50" disabled={busy || !canConfirm} onClick={confirm}>
+                      Impor Mutasi
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

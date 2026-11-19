@@ -21,7 +21,10 @@ export interface StatementColumnMapping {
   /** Mode satu kolom nominal (+ kolom tipe opsional; tanpa tipe, tanda minus = debit). */
   amount?: number
   type?: number
+  /** Saldo setelah mutasi. */
   balance?: number
+  /** Saldo sebelum mutasi (opsional; bersama `balance` memungkinkan verifikasi rantai saldo). */
+  balanceBefore?: number
   reference?: number
 }
 
@@ -38,6 +41,7 @@ export interface ParsedStatementLine {
   amount: number // integer Rupiah
   remark: string
   balance: number | null
+  balanceBefore: number | null
   reference: string | null
   /** ID deterministik hasil hash isi baris: impor ulang berkas yang tumpang-tindih tidak menggandakan baris. */
   transactionId: string
@@ -58,6 +62,8 @@ export interface StatementParseResult {
   debitTotal: number
   fromDateTime: string | null
   toDateTime: string | null
+  /** VERIFIED: tiap baris (saldo awal ± mutasi = saldo akhir) dan antar-baris berkesinambungan, tanpa baris hilang. */
+  balanceChain: 'VERIFIED' | 'UNAVAILABLE'
 }
 
 // ───────────────────────────── CSV tokenizer ─────────────────────────────
@@ -187,6 +193,7 @@ export function parseRupiahCell(raw: string): RupiahCell {
     if (!re.test(intPart)) return { ok: false, error: `nominal "${raw}" memiliki pemisah ribuan tidak valid` }
     intPart = intPart.split(thousandSep).join('')
   }
+  if (intPart === '' && frac !== '') intPart = '0' // bentuk ".00" (nol tanpa angka depan)
   if (!/^\d+$/.test(intPart)) return { ok: false, error: `nominal "${raw}" tidak valid` }
   if (frac !== '' && !/^0+$/.test(frac)) {
     return { ok: false, error: `nominal "${raw}" memiliki pecahan sen; hanya Rupiah bulat yang didukung` }
@@ -251,10 +258,11 @@ export function parseStatementDateTime(raw: string, order: StatementDateOrder): 
 const HEADER_HINTS: Array<[keyof StatementColumnMapping, RegExp]> = [
   ['credit', /^(kredit|credit|cr|uang masuk|mutasi kredit|masuk)$/],
   ['debit', /^(debet|debit|db|uang keluar|mutasi debet|mutasi debit|keluar)$/],
-  ['balance', /^(saldo|balance|saldo akhir)/],
+  ['balanceBefore', /^(saldo awal|saldo sebelum|opening balance)/],
+  ['balance', /^(saldo|balance)/],
   ['type', /^(tipe|jenis|type|d\/k|dk|cr\/db|db\/cr)$/],
   ['amount', /^(nominal|jumlah|amount|mutasi)$/],
-  ['reference', /(ref|teller|trx id|id transaksi|no\.? transaksi|nomor transaksi)/],
+  ['reference', /(ref|trx id|id transaksi|no\.? transaksi|nomor transaksi)/],
   ['description', /(keterangan|uraian|remark|deskripsi|description|berita|narasi|transaksi)/],
   ['time', /^(jam|time|pukul)$/],
   ['date', /(tanggal|tgl|date|waktu)/],
@@ -273,7 +281,7 @@ export function detectStatementLayout(table: string[][]): DetectedLayout {
     const headers = table[r]
     const mapping: Partial<StatementColumnMapping> = {}
     headers.forEach((h, idx) => {
-      const name = h.toLowerCase().replace(/\s+/g, ' ').trim()
+      const name = h.toLowerCase().replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ').trim()
       if (!name) return
       for (const [key, re] of HEADER_HINTS) {
         if (mapping[key] === undefined && re.test(name)) {
@@ -330,7 +338,7 @@ export function parseStatementRows(
   const result: StatementParseResult = {
     lines: [], errors: [], ignoredRows: 0,
     creditCount: 0, creditTotal: 0, debitCount: 0, debitTotal: 0,
-    fromDateTime: null, toDateTime: null,
+    fromDateTime: null, toDateTime: null, balanceChain: 'UNAVAILABLE',
   }
   const width = table.reduce((w, r) => Math.max(w, r.length), 0)
   const mappingError = validateMapping(mapping, width)
@@ -403,22 +411,24 @@ export function parseStatementRows(
       amount = a.value
     }
 
-    let balance: number | null = null
-    const balRaw = cell(row, mapping.balance)
-    if (balRaw !== '') {
-      const b = parseRupiahCell(balRaw)
-      if (b.ok && !b.negative) balance = b.value
+    const readBalance = (idx: number | undefined): number | null => {
+      const raw = cell(row, idx)
+      if (raw === '') return null
+      const b = parseRupiahCell(raw)
+      return b.ok && !b.negative ? b.value : null
     }
+    const balance = readBalance(mapping.balance)
+    const balanceBefore = readBalance(mapping.balanceBefore)
     const remark = cell(row, mapping.description)
     const reference = cell(row, mapping.reference) || null
 
-    const base = [accountNo, iso, type, amount, remark.toLowerCase(), balance ?? '', reference ?? ''].join('|')
+    const base = [accountNo, iso, type, amount, remark.toLowerCase(), balanceBefore ?? '', balance ?? '', reference ?? ''].join('|')
     const seen = occurrences.get(base) ?? 0
     occurrences.set(base, seen + 1)
     const transactionId =
       'CSV-' + crypto.createHash('sha256').update(`${base}|${seen}`, 'utf8').digest('hex').slice(0, 32)
 
-    result.lines.push({ rowNumber, transactionDate: iso, type, amount, remark, balance, reference, transactionId })
+    result.lines.push({ rowNumber, transactionDate: iso, type, amount, remark, balance, balanceBefore, reference, transactionId })
     if (type === 'CREDIT') {
       result.creditCount++
       result.creditTotal += amount
@@ -428,6 +438,8 @@ export function parseStatementRows(
     }
   })
 
+  verifyBalanceChain(result)
+
   if (result.lines.length > 0) {
     const sorted = result.lines.map((l) => l.transactionDate).sort()
     result.fromDateTime = `${sorted[0].slice(0, 10)}T00:00:00+07:00`
@@ -436,4 +448,38 @@ export function parseStatementRows(
     result.errors.push({ row: 0, message: 'Tidak ada baris mutasi yang dapat dibaca.' })
   }
   return result
+}
+
+/**
+ * Verifikasi keutuhan berkas dari kolom saldo: setiap baris (saldo awal ± mutasi = saldo akhir) dan antar-baris
+ * (saldo akhir baris sebelumnya = saldo awal baris berikutnya; urutan lama→baru atau baru→lama). Baris hilang,
+ * terduplikasi, atau terubah akan memutus rantai → impor ditolak. Tanpa kolom saldo → UNAVAILABLE (operator
+ * wajib mengonfirmasi total kredit secara manual).
+ */
+function verifyBalanceChain(result: StatementParseResult): void {
+  const lines = result.lines
+  if (lines.length === 0 || result.errors.length > 0) return
+  if (!lines.every((l) => l.balance !== null && l.balanceBefore !== null)) return
+
+  for (const l of lines) {
+    const expected = (l.balanceBefore as number) + (l.type === 'CREDIT' ? l.amount : -l.amount)
+    if (expected !== l.balance) {
+      result.errors.push({ row: l.rowNumber, message: 'saldo tidak konsisten (saldo awal ± mutasi ≠ saldo akhir)' })
+      return
+    }
+  }
+  const ascendingBreak = lines.findIndex((l, i) => i > 0 && lines[i - 1].balance !== l.balanceBefore)
+  if (ascendingBreak === -1) {
+    result.balanceChain = 'VERIFIED'
+    return
+  }
+  const descendingBreak = lines.findIndex((l, i) => i > 0 && l.balance !== lines[i - 1].balanceBefore)
+  if (descendingBreak === -1) {
+    result.balanceChain = 'VERIFIED'
+    return
+  }
+  result.errors.push({
+    row: lines[ascendingBreak].rowNumber,
+    message: 'rantai saldo terputus: ada baris hilang, ganda, atau urutan berubah',
+  })
 }

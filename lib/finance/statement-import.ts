@@ -7,8 +7,10 @@
 //   • settlement dari baris impor selalu MANUAL_RESOLVED (admin/bendahara + catatan + reconciliation item);
 //   • PAID != SETTLED tetap berlaku; impor TIDAK mengubah status payment.
 //
-// Integritas berkas: operator wajib mengetik jumlah baris kredit & total kredit sesuai tampilan internet banking.
-// Tidak cocok → seluruh impor ditolak, tidak ada yang tersimpan.
+// Integritas berkas (salah satu wajib):
+//   • rantai saldo terverifikasi dari kolom saldo awal/akhir per baris (format IBIZ BRI) — otomatis; atau
+//   • operator mengetik jumlah baris kredit & total kredit sesuai tampilan internet banking.
+// Tidak lolos → seluruh impor ditolak, tidak ada yang tersimpan.
 import crypto from 'node:crypto'
 import { query } from '@/lib/db'
 import { persistBankStatementTransactions } from './bank-statement/statement-ingest'
@@ -54,6 +56,8 @@ export interface StatementImportPreview {
   fromDate: string | null
   toDate: string | null
   alreadyImportedCount: number
+  /** true bila rantai saldo berkas terverifikasi sehingga total manual tidak diperlukan. */
+  balanceVerified: boolean
   preview: Array<{ row: number; date: string; type: 'CREDIT' | 'DEBIT'; amount: number; remark: string }>
 }
 
@@ -117,7 +121,7 @@ export async function previewStatementImport(input: StatementImportInput): Promi
       ...base, ok: false,
       errors: [{ row: 0, message: 'Kolom belum dikenali otomatis. Pilih kolom Tanggal dan Kredit/Debit (atau Nominal).' }],
       ignoredRows: 0, creditCount: 0, creditTotal: 0, debitCount: 0, debitTotal: 0,
-      fromDate: null, toDate: null, alreadyImportedCount: 0, preview: [],
+      fromDate: null, toDate: null, alreadyImportedCount: 0, balanceVerified: false, preview: [],
     }
   }
 
@@ -137,6 +141,7 @@ export async function previewStatementImport(input: StatementImportInput): Promi
     fromDate: parsed.fromDateTime?.slice(0, 10) ?? null,
     toDate: parsed.toDateTime?.slice(0, 10) ?? null,
     alreadyImportedCount: ok ? await countAlreadyImported(accountNo, parsed.lines) : 0,
+    balanceVerified: ok && parsed.balanceChain === 'VERIFIED',
     preview: parsed.lines.slice(0, 8).map((l) => ({ row: l.rowNumber, date: l.transactionDate, type: l.type, amount: l.amount, remark: l.remark })),
   }
 }
@@ -156,10 +161,10 @@ function toDetail(line: ParsedStatementLine): BriBankStatementDetailData {
 }
 
 export interface StatementImportConfirm extends StatementImportInput {
-  /** Diketik operator dari tampilan internet banking: jumlah mutasi KREDIT pada rentang berkas. */
-  expectedCreditCount: number
-  /** Diketik operator: total nominal mutasi KREDIT (Rupiah bulat). */
-  expectedCreditTotal: number
+  /** Diketik operator dari tampilan internet banking: jumlah mutasi KREDIT. Wajib bila rantai saldo tidak tersedia. */
+  expectedCreditCount?: number
+  /** Diketik operator: total nominal mutasi KREDIT (Rupiah bulat). Wajib bila rantai saldo tidak tersedia. */
+  expectedCreditTotal?: number
   importedBy: string
 }
 
@@ -167,11 +172,6 @@ export async function importManualBankStatement(input: StatementImportConfirm): 
   assertCsvSize(input.csvText)
   const accountNo = collectionAccountNo()
   if (!input.importedBy) throw new Error('Operator tidak dikenali.')
-  if (!Number.isSafeInteger(input.expectedCreditCount) || input.expectedCreditCount < 0 ||
-      !Number.isSafeInteger(input.expectedCreditTotal) || input.expectedCreditTotal < 0) {
-    throw new Error('Jumlah dan total kredit dari internet banking wajib diisi dengan angka bulat.')
-  }
-
   const { rows, headerRowIndex, mapping } = resolveLayout(input)
   const parsed = parseStatementRows(rows, mapping as StatementColumnMapping, {
     headerRowIndex, dateOrder: input.dateOrder ?? 'DMY',
@@ -179,11 +179,20 @@ export async function importManualBankStatement(input: StatementImportConfirm): 
   if (parsed.errors.length > 0) {
     throw new Error(`Berkas tidak dapat diimpor: ${parsed.errors[0].row > 0 ? `baris ${parsed.errors[0].row}: ` : ''}${parsed.errors[0].message}`)
   }
-  if (parsed.creditCount !== input.expectedCreditCount || parsed.creditTotal !== input.expectedCreditTotal) {
-    throw new Error(
-      `Total kredit tidak cocok dengan internet banking (berkas: ${parsed.creditCount} baris / Rp${parsed.creditTotal.toLocaleString('id-ID')}; ` +
-      `Anda mengisi: ${input.expectedCreditCount} baris / Rp${input.expectedCreditTotal.toLocaleString('id-ID')}). Tidak ada data yang disimpan.`
-    )
+  const balanceVerified = parsed.balanceChain === 'VERIFIED'
+  const typed = input.expectedCreditCount !== undefined || input.expectedCreditTotal !== undefined
+  if (!balanceVerified || typed) {
+    const count = input.expectedCreditCount
+    const total = input.expectedCreditTotal
+    if (count === undefined || total === undefined || !Number.isSafeInteger(count) || count < 0 || !Number.isSafeInteger(total) || total < 0) {
+      throw new Error('Jumlah dan total kredit dari internet banking wajib diisi dengan angka bulat.')
+    }
+    if (parsed.creditCount !== count || parsed.creditTotal !== total) {
+      throw new Error(
+        `Total kredit tidak cocok dengan internet banking (berkas: ${parsed.creditCount} baris / Rp${parsed.creditTotal.toLocaleString('id-ID')}; ` +
+        `Anda mengisi: ${count} baris / Rp${total.toLocaleString('id-ID')}). Tidak ada data yang disimpan.`
+      )
+    }
   }
   const nowMs = Date.now()
   if (parsed.lines.some((l) => Date.parse(l.transactionDate) > nowMs + 24 * 3600 * 1000)) {
@@ -195,7 +204,7 @@ export async function importManualBankStatement(input: StatementImportConfirm): 
   const safeName = input.filename.replace(/[^\w.\- ]/g, '_').slice(0, 80)
   const response: BriBankStatementResponse = {
     responseCode: MANUAL_IMPORT_RESPONSE_CODE,
-    responseMessage: `${MANUAL_IMPORT_MESSAGE_PREFIX} user=${input.importedBy} file=${safeName} sha256=${fileHash.slice(0, 16)}`,
+    responseMessage: `${MANUAL_IMPORT_MESSAGE_PREFIX} user=${input.importedBy} file=${safeName} sha256=${fileHash.slice(0, 16)} integrity=${balanceVerified ? 'BALANCE_CHAIN' : 'OPERATOR_TOTALS'}`,
     accountNo,
     totalCreditEntries: { numberOfEntries: String(parsed.creditCount), amount: { value: `${parsed.creditTotal}.00`, currency: 'IDR' } },
     totalDebitEntries: { numberOfEntries: String(parsed.debitCount), amount: { value: `${parsed.debitTotal}.00`, currency: 'IDR' } },

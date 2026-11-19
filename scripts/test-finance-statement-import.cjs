@@ -114,7 +114,7 @@ async function main() {
     assert.equal(s.newTransactionsCount, 3); assert.equal(s.cursorAdvanced, true)
     const f = one('SELECT * FROM finance_bri_statement_fetches')
     assert.equal(f.status, 'SUCCESS'); assert.equal(f.cursor_advanced, 1)
-    assert.match(f.response_message, /^MANUAL_IMPORT user=admin file=mutasi\.csv sha256=[0-9a-f]{16}$/)
+    assert.match(f.response_message, /^MANUAL_IMPORT user=admin file=mutasi\.csv sha256=[0-9a-f]{16} integrity=OPERATOR_TOTALS$/)
     const rows = all('SELECT type_normalized t, amount, match_status m, identity_strength i FROM finance_bri_statement_transactions ORDER BY amount')
     assert.deepEqual(rows.map(r => [r.t, r.amount, r.m, r.i]), [['DEBIT', 6500, 'IGNORED_DEBIT', 'STRONG'], ['CREDIT', 100000, 'UNMATCHED', 'STRONG'], ['CREDIT', 250000, 'UNMATCHED', 'STRONG']])
   })
@@ -174,6 +174,76 @@ async function main() {
     assert.equal(one('SELECT matched_payment_id m FROM finance_bri_statement_transactions WHERE id=?', st.id).m, payment.id)
     // Kasir (non admin/bendahara) tidak bisa menyelesaikan.
     assert.ok(approved)
+  })
+
+  // â”€â”€ format IBIZ (internet banking BRI): kolom bergaris-bawah, ".00", saldo awal/akhir per baris â”€â”€
+  const IBIZ_HEADER = ['ID','NOREK','TGL_TRAN','TGL_EFEKTIF','JAM_TRAN','SEQ','DESK_TRAN','SALDO_AWAL_MUTASI','MUTASI_DEBET','MUTASI_KREDIT','SALDO_AKHIR_MUTASI','GLSIGN','TRUSER','KODE_TRAN','KODE_TRAN_TELLER','TRREMK','TLBDS1','TLBDS2','REMARK_CUSTOM']
+  function ibiz(entries, { start = 10000000, reverse = false, drop = -1, tamper = -1 } = {}) {
+    let bal = start
+    let rows = entries.map(([dt, type, amt, remark], i) => {
+      const before = bal
+      bal += type === 'CR' ? amt : -amt
+      const k = type === 'CR' ? `${amt}.00` : '.00'
+      const d = type === 'DB' ? `${amt}.00` : '.00'
+      return [String(i + 1), '16101001914305', dt, dt, '70008', String(4000000 + i), 'DESK ' + remark + ' ESB:NBMB:' + (200000 + i),
+        `${before}.00`, d, k, `${bal}.00`, type === 'CR' ? 'Cr' : 'Db', '8888597', '1', '8508', remark, 'ESB', '', remark]
+    })
+    if (tamper >= 0) rows[tamper][9] = '999.00'
+    if (drop >= 0) rows = rows.filter((_, i) => i !== drop)
+    if (reverse) rows = rows.slice().reverse()
+    const q = r => r.map(c => `"${c}"`).join(',')
+    return [q(IBIZ_HEADER), ...rows.map(q)].join('\n') + '\n'
+  }
+  const fixture = [
+    ['2026-11-01 07:00:08', 'CR', 200000, 'NBMB WALI SATU TO KOPERASI'],
+    ['2026-11-01 08:52:04', 'CR', 72000, 'NBMB WALI DUA TO KOPERASI'],
+    ['2026-11-03 11:04:42', 'DB', 3405000, 'BFST KE VENDOR'],
+    ['2026-11-03 11:04:42', 'DB', 2500, 'BFST KE VENDOR'],
+    ['2026-11-04 17:35:19', 'CR', 39000, 'Transfer BI-Fast dari Bank Lain - 901 - Wali Tiga'],
+  ]
+
+  await test('IBIZ: deteksi kolom otomatis, ".00" terbaca nol, rantai saldo terverifikasi', async () => {
+    const { rows } = csv.parseCsv(ibiz(fixture))
+    const det = csv.detectStatementLayout(rows)
+    assert.equal(det.headerRowIndex, 0)
+    assert.deepEqual(
+      [det.mapping.date, det.mapping.balanceBefore, det.mapping.debit, det.mapping.credit, det.mapping.balance, det.mapping.description],
+      [2, 7, 8, 9, 10, 18])
+    assert.equal(det.mapping.reference, undefined) // KODE_TRAN_TELLER bukan referensi
+    const r = csv.parseStatementRows(rows, det.mapping, { headerRowIndex: 0, dateOrder: 'DMY' }, 'ACC')
+    assert.deepEqual(r.errors, [])
+    assert.equal(r.balanceChain, 'VERIFIED')
+    assert.deepEqual([r.creditCount, r.creditTotal, r.debitCount, r.debitTotal], [3, 311000, 2, 3407500])
+    assert.equal(csv.parseRupiahCell('.00').value, 0)
+  })
+
+  await test('IBIZ: impor tanpa mengetik total (rantai saldo), jejak integrity=BALANCE_CHAIN, impor ulang aman', async () => {
+    const text = ibiz(fixture)
+    const pv = await imp.previewStatementImport({ csvText: text, filename: 'IBIZ.csv' })
+    assert.equal(pv.ok, true); assert.equal(pv.balanceVerified, true)
+    const s = await imp.importManualBankStatement({ csvText: text, filename: 'IBIZ.csv', importedBy: 'admin' })
+    assert.equal(s.newTransactionsCount, 5)
+    assert.match(one('SELECT response_message m FROM finance_bri_statement_fetches').m, /integrity=BALANCE_CHAIN$/)
+    const again = await imp.importManualBankStatement({ csvText: text, filename: 'IBIZ.csv', importedBy: 'admin' })
+    assert.equal(again.newTransactionsCount, 0); assert.equal(again.dedupedCount, 5)
+    // Berkas urut baruâ†’lama juga terverifikasi dan menghasilkan ID baris yang sama (tidak menggandakan).
+    const rev = await imp.importManualBankStatement({ csvText: ibiz(fixture, { reverse: true }), filename: 'rev.csv', importedBy: 'admin' })
+    assert.equal(rev.newTransactionsCount, 0)
+    assert.equal(one('SELECT COUNT(*) n FROM finance_bri_statement_transactions').n, 5)
+  })
+
+  await test('IBIZ: baris hilang / nominal diubah memutus rantai saldo dan seluruh impor ditolak', async () => {
+    await assert.rejects(() => imp.importManualBankStatement({ csvText: ibiz(fixture, { drop: 1 }), filename: 'x.csv', importedBy: 'admin' }), /rantai saldo terputus/)
+    await assert.rejects(() => imp.importManualBankStatement({ csvText: ibiz(fixture, { tamper: 1 }), filename: 'x.csv', importedBy: 'admin' }), /saldo tidak konsisten/)
+    assert.equal(one('SELECT COUNT(*) n FROM finance_bri_statement_transactions').n, 0)
+    assert.equal(one('SELECT COUNT(*) n FROM finance_bri_statement_fetches').n, 0)
+  })
+
+  await test('IBIZ: bila total manual diisi tetap harus cocok walau rantai saldo terverifikasi', async () => {
+    const text = ibiz(fixture)
+    await assert.rejects(() => imp.importManualBankStatement({ csvText: text, filename: 'x.csv', importedBy: 'admin', expectedCreditCount: 3, expectedCreditTotal: 311001 }), /tidak cocok/)
+    await imp.importManualBankStatement({ csvText: text, filename: 'x.csv', importedBy: 'admin', expectedCreditCount: 3, expectedCreditTotal: 311000 })
+    assert.equal(one('SELECT COUNT(*) n FROM finance_bri_statement_transactions').n, 5)
   })
 
   console.log(`\n${count} tests passed`)

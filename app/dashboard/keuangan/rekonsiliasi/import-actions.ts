@@ -40,13 +40,13 @@ export async function previewStatementImportAction(input: ImportPayload): Promis
 }
 
 export async function confirmStatementImportAction(
-  input: ImportPayload & { expectedCreditCount: number; expectedCreditTotal: number }
+  input: ImportPayload & { expectedCreditCount?: number; expectedCreditTotal?: number }
 ) {
   const user = await operator()
   const summary = await importManualBankStatement({
     ...clean(input),
-    expectedCreditCount: Number(input.expectedCreditCount),
-    expectedCreditTotal: Number(input.expectedCreditTotal),
+    expectedCreditCount: input.expectedCreditCount === undefined ? undefined : Number(input.expectedCreditCount),
+    expectedCreditTotal: input.expectedCreditTotal === undefined ? undefined : Number(input.expectedCreditTotal),
     importedBy: user.id,
   })
   return {
