@@ -219,6 +219,27 @@ async function main() {
     assert.equal((await mt.getTransferSubmissionByOrder(order.id)).status, 'KEDALUWARSA')
   })
 
+  await test('cash payment of the same bill closes a transfer that is still waiting for proof', async () => {
+    const order = await transferOrder('student', [{ obligationId: 'uspp', itemType: 'USPP', amount: 500000 }])
+    const cash = await createPaymentOrder({ santriId: 'student', payerType: 'LOKET', paymentMethod: 'CASH', items: [{ obligationId: 'uspp', itemType: 'USPP', amount: 500000 }] })
+    await h.load('lib/finance/payments.ts').recordOrderPayment({ orderId: cash.id, channel: 'CASH', method: 'CASH', externalReference: 'cash-1' })
+    assert.equal(one('SELECT status FROM finance_payment_orders WHERE id=?', order.id).status, 'CANCELLED')
+    const sub = await mt.getTransferSubmissionByOrder(order.id)
+    assert.equal(sub.status, 'DIBATALKAN')
+    const ev = one(`SELECT * FROM finance_transfer_submission_events WHERE submission_id=? AND action='CANCELLED'`, sub.id)
+    assert.equal(ev.actor_kind, 'SYSTEM'); assert.equal(ev.from_status, 'MENUNGGU_BUKTI'); assert.match(ev.notes, /dilunasi/)
+    await assert.rejects(() => upload('student', order.id), /sudah ditutup/)
+  })
+
+  await test('cash payment does not touch a transfer whose proof is under review', async () => {
+    const order = await transferOrder('student', [{ obligationId: 'uspp', itemType: 'USPP', amount: 500000 }])
+    await upload('student', order.id)
+    const cash = await createPaymentOrder({ santriId: 'student', payerType: 'LOKET', paymentMethod: 'CASH', items: [{ obligationId: 'uspp', itemType: 'USPP', amount: 500000 }] })
+    await h.load('lib/finance/payments.ts').recordOrderPayment({ orderId: cash.id, channel: 'CASH', method: 'CASH', externalReference: 'cash-2' })
+    assert.equal(one('SELECT status FROM finance_payment_orders WHERE id=?', order.id).status, 'PENDING')
+    assert.equal((await mt.getTransferSubmissionByOrder(order.id)).status, 'MENUNGGU_VERIFIKASI')
+  })
+
   await test('AL-BAGHORY has no transfer payment; SADESA cannot be billed makan via transfer', async () => {
     await assert.rejects(() => transferOrder('baghory', [{ itemType: 'UANG_JAJAN', amount: 10000 }]))
     h.db.exec(`INSERT INTO finance_obligations(id,santri_id,item_type,period,amount_expected) VALUES('makan-sadesa','sadesa','UANG_MAKAN','2026-10',70000)`)

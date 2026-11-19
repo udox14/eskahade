@@ -524,6 +524,29 @@ export async function recordOrderPayment(
       `,
       params: [paidAt, order.santri_id, order.id, ...paidObligationIds],
     })
+
+    // 7c. Order transfer yang baru dibatalkan di atas masih punya pengajuan MENUNGGU_BUKTI. Tutup juga
+    // pengajuannya agar Portal Wali tidak lagi menampilkan instruksi transfer & tombol unggah bukti
+    // untuk tagihan yang sudah lunas. Hanya MENUNGGU_BUKTI → DIBATALKAN (transisi sah); bukti yang
+    // sedang diperiksa tidak tersentuh karena ordernya memang tidak dibatalkan langkah 7b.
+    const staleSubmissions = `
+      SELECT s.id FROM finance_transfer_submissions s
+      JOIN finance_payment_orders o ON o.id = s.order_id
+      WHERE o.santri_id = ? AND o.status = 'CANCELLED' AND o.payment_method = 'MANUAL_TRANSFER'
+        AND s.status = 'MENUNGGU_BUKTI'`
+    statements.push({
+      sql: `
+        INSERT INTO finance_transfer_submission_events (id, submission_id, action, from_status, to_status, actor_kind, notes, created_at)
+        SELECT lower(hex(randomblob(16))), id, 'CANCELLED', 'MENUNGGU_BUKTI', 'DIBATALKAN', 'SYSTEM',
+               'Tagihan sudah dilunasi melalui pembayaran ' || ?, ?
+        FROM (${staleSubmissions})
+      `,
+      params: [paymentNumber, paidAt, order.santri_id],
+    })
+    statements.push({
+      sql: `UPDATE finance_transfer_submissions SET status = 'DIBATALKAN', updated_at = ? WHERE id IN (${staleSubmissions})`,
+      params: [paidAt, order.santri_id],
+    })
   }
 
   // 8. Eksekusi batch dengan penanganan race condition
