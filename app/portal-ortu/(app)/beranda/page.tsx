@@ -22,12 +22,22 @@ import { VaCopyButton } from './_va-copy-button'
 
 export const dynamic = 'force-dynamic'
 
+// Sapaan mengikuti jam WIB (server berjalan di UTC, jadi jangan pakai getHours() lokal).
 function getGreeting() {
-  const hour = new Date().getHours()
-  if (hour >= 3 && hour < 11) return 'Selamat pagi,'
+  const hour = Number(
+    new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Jakarta' }).format(new Date()),
+  )
+  if (hour >= 4 && hour < 11) return 'Selamat pagi,'
   if (hour >= 11 && hour < 15) return 'Selamat siang,'
   if (hour >= 15 && hour < 18) return 'Selamat sore,'
   return 'Selamat malam,'
+}
+
+function formatAsramaKamar(asrama?: string | null, kamar?: string | null) {
+  const parts: string[] = []
+  if (asrama) parts.push(`Asrama ${asrama}`)
+  if (kamar) parts.push(/^kamar/i.test(String(kamar)) ? String(kamar) : `Kamar ${kamar}`)
+  return parts.join(' · ')
 }
 
 export default async function PortalBerandaPage() {
@@ -78,16 +88,16 @@ export default async function PortalBerandaPage() {
           <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-400 tracking-tight">
             {greeting}
           </p>
-          <h1 className="text-base font-bold text-slate-950 dark:text-slate-100 truncate mt-0.5 leading-snug">
+          <h1 className="text-lg font-bold text-slate-950 dark:text-slate-100 line-clamp-2 break-words mt-0.5 leading-tight">
             {session.nama}
           </h1>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-            NIS {session.nis}
-            {session.asrama ? ` · Asrama ${session.asrama}` : ''}
-            {session.kamar ? ` (${session.kamar})` : ''}
-          </p>
+          {formatAsramaKamar(session.asrama, session.kamar) && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+              {formatAsramaKamar(session.asrama, session.kamar)}
+            </p>
+          )}
         </div>
-        <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 flex items-center justify-center shadow-xs">
+        <div className="w-11 h-11 shrink-0 rounded-full overflow-hidden bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 flex items-center justify-center ring-2 ring-white dark:ring-slate-800 shadow-xs">
           {publicMediaUrl(session.foto_url) ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={publicMediaUrl(session.foto_url)} alt={session.nama} className="w-full h-full object-cover" />

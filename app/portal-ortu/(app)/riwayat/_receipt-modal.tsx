@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef } from 'react'
-import { Printer, X } from 'lucide-react'
+import { Download, X } from 'lucide-react'
 import type { PortalTransactionHistoryItem } from '@/lib/portal/finance'
 import { formatRupiah } from '@/lib/portal/format'
 import type { LetterheadProfile } from '@/lib/print/letterhead'
@@ -386,8 +386,8 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
             onClick={handleIsolatedPrint}
             className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#064e3b] hover:bg-[#047857] px-4 py-2.5 text-xs font-bold text-[#bef264] shadow-xs active:scale-95 transition cursor-pointer"
           >
-            <Printer className="h-4 w-4" />
-            <span>Cetak / Simpan Kuitansi</span>
+            <Download className="h-4 w-4" />
+            <span>Unduh</span>
           </button>
         </>
       }

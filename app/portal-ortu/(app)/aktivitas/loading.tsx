@@ -16,11 +16,11 @@ export default function AktivitasLoading() {
       </div>
 
       {/* Kartu ringkasan kehadiran */}
-      <div aria-hidden className="rounded-[22px] bg-[#064e3b]/90 p-5 space-y-3">
-        <Sk className="h-3 w-28 bg-white/25" />
-        <Sk className="h-8 w-20 bg-white/25" />
-        <Sk className="h-3 w-48 bg-white/15" />
-      </div>
+      <SkCard className="p-5 space-y-3">
+        <Sk className="h-3 w-28" />
+        <Sk className="h-8 w-20" />
+        <Sk className="h-3 w-48 bg-slate-100 dark:bg-slate-800/70" />
+      </SkCard>
 
       {/* Kotak ringkasan */}
       <div className="grid grid-cols-4 gap-2">
