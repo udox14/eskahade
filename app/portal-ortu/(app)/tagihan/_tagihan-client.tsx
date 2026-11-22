@@ -293,7 +293,7 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
         <div className="p-5 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-[#bef264]">
-              {isSelectionActive ? `Dipilih (${selectedItemsSummary.count} tagihan)` : 'Total Belum Dibayar'}
+              Total Belum Dibayar
             </span>
             {activeObligations.length > 0 && (
               <button
@@ -306,26 +306,45 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-2.5">
             <p className="text-3xl font-black font-mono tracking-tight text-white">
-              {formatRupiah(isSelectionActive ? selectedItemsSummary.grossAmount : billingData.obligations.totalRemaining)}
+              {formatRupiah(billingData.obligations.totalRemaining)}
             </p>
-            <div className="flex items-center justify-between gap-3 text-xs text-emerald-100/80 font-medium">
-              <span>
-                {isSelectionActive
-                  ? 'Siap dibayar'
-                  : billingData.obligations.totalRemaining > 0
-                  ? `${activeObligations.length} tagihan${pastObligations.length > 0 ? ` • ${pastObligations.length} tunggakan` : ''} • pilih untuk membayar`
-                  : (billingData.obligations.uspp && billingData.obligations.uspp.remaining > 0)
+
+            {billingData.obligations.totalRemaining > 0 ? (
+              <div className="space-y-1.5">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/15">
+                  <div
+                    className="h-full rounded-full bg-[#bef264] transition-all duration-300"
+                    style={{
+                      width: `${Math.min(100, Math.round((selectedItemsSummary.grossAmount / billingData.obligations.totalRemaining) * 100))}%`,
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3 text-xs font-medium">
+                  {isSelectionActive ? (
+                    <>
+                      <span className="text-emerald-100/80">
+                        {selectedItemsSummary.count} dari {activeObligations.length} tagihan dipilih
+                      </span>
+                      <span className="font-mono font-bold text-[#bef264]">
+                        {formatRupiah(selectedItemsSummary.grossAmount)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-emerald-100/80">
+                      {`${activeObligations.length} tagihan${pastObligations.length > 0 ? ` • ${pastObligations.length} tunggakan` : ''} • pilih untuk membayar`}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs font-medium text-emerald-100/80">
+                {billingData.obligations.uspp && billingData.obligations.uspp.remaining > 0
                   ? 'Tagihan rutin sudah lunas'
                   : 'Alhamdulillah, seluruh tagihan telah lunas'}
-              </span>
-              {isSelectionActive && billingData.obligations.totalRemaining > 0 && (
-                <span className="shrink-0 text-emerald-200/90 text-[11px] font-semibold">
-                  Total belum dibayar: {formatRupiah(billingData.obligations.totalRemaining)}
-                </span>
-              )}
-            </div>
+              </p>
+            )}
 
             {billingData.obligations.uspp && billingData.obligations.uspp.remaining > 0 && (
               <div className="pt-2 mt-0.5 border-t border-white/15 flex items-center justify-between text-xs">
@@ -522,13 +541,13 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
             Alhamdulillah, seluruh tagihan bulan ini sudah lunas.
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 rounded-[18px] border border-slate-200/80 dark:border-slate-800 px-3 shadow-2xs">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 rounded-[18px] border border-slate-200/80 dark:border-slate-800 px-2 shadow-2xs">
             {currentObligations.map(ob => {
               const isChecked = selectedIds.has(ob.id)
               return (
                 <label
                   key={ob.id}
-                  className={`flex min-h-[52px] cursor-pointer items-center justify-between py-3 px-1 rounded-xl transition ${
+                  className={`flex min-h-[52px] cursor-pointer items-center justify-between py-3 px-3 rounded-xl transition ${
                     isChecked ? 'bg-emerald-50/50 dark:bg-emerald-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
                   }`}
                 >
@@ -562,41 +581,127 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
         )}
       </div>
 
-      <details className="rounded-xl border border-slate-200 bg-white dark:bg-slate-900 p-4">
-        <summary className="cursor-pointer text-sm font-semibold">Bayar periode mendatang</summary>
-        <p className="my-2 text-xs text-slate-500">Pilihan ini belum termasuk tagihan berjalan atau tunggakan.</p>
-        <select aria-label="Pilih periode pembayaran di muka" defaultValue="" disabled={loadingAdvance}
-          className="w-full rounded-lg border bg-transparent p-2 text-sm" onChange={async e=>{
-            const period=e.target.value;if(!period)return
-            setLoadingAdvance(true)
-            try {
-              const result=await selectPortalAdvancePeriodAction(period)
-              setBillingOverride(result.data);setSelectedIds(new Set())
-            } catch {toast.error('Tagihan periode mendatang belum dapat dimuat. Hubungi bagian keuangan.')}
-            finally {setLoadingAdvance(false)}
-          }}>
-          <option value="">Pilih periode</option>
-          {billingData.advancePeriods?.map(p=><option key={p} value={p}>{p}</option>)}
-        </select>
-        {loadingAdvance && <p className="my-2 text-xs">Memuat tagihan…</p>}
-        {billingData.obligations.upcoming.map(ob=><label key={ob.id} className="mt-3 flex items-center gap-3 text-sm">
-          <input type="checkbox" checked={selectedIds.has(ob.id)} onChange={()=>toggleSelect(ob.id)}/>
-          <span className="flex-1">{ob.itemLabel} · {ob.periodLabel} <span className="text-xs text-slate-500">Mendatang</span></span>
-          <span>{formatRupiah(ob.remaining)}</span>
-        </label>)}
+      {/* 6. TAGIHAN TAHUNAN (JIKA ADA) */}
+      {annualObligations.length > 0 && (
+        <div className="space-y-2 pt-1">
+          <div className="pb-0.5">
+            <h2 className="text-base sm:text-lg font-bold text-slate-950 dark:text-slate-100">
+              Tagihan Tahunan
+            </h2>
+          </div>
+
+          <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 rounded-[18px] border border-slate-200/80 dark:border-slate-800 px-2 shadow-2xs">
+            {annualObligations.map(ob => {
+              const isChecked = selectedIds.has(ob.id)
+              const periodText = cleanPeriodLabel(ob.periodLabel)
+              return (
+                <label
+                  key={ob.id}
+                  className={`flex min-h-[54px] cursor-pointer items-center justify-between py-3 px-3 rounded-xl transition ${
+                    isChecked ? 'bg-slate-100/60 dark:bg-slate-800/60' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                  }`}
+                >
+                  <div className="flex items-start gap-3 min-w-0 pr-3">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleSelect(ob.id)}
+                      className="mt-0.5 h-5 w-5 rounded-md border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0 accent-emerald-600"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">{cleanItemLabel(ob.itemLabel)}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">{periodText}</p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100 font-mono">{formatRupiah(ob.remaining)}</p>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* PEMBAYARAN LAINNYA */}
+      <div className="pt-2 pb-0.5">
+        <h2 className="text-base sm:text-lg font-bold text-slate-950 dark:text-slate-100">Pembayaran Lainnya</h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Di luar tagihan rutin</p>
+      </div>
+
+      <details className="group space-y-2">
+        <summary className="flex cursor-pointer list-none items-center justify-between rounded-[18px] border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-3.5 shadow-2xs [&::-webkit-details-marker]:hidden">
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Bayar periode mendatang</p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Bayar SPP di muka untuk bulan-bulan berikutnya</p>
+          </div>
+          <CaretRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-90" weight="bold" />
+        </summary>
+
+        <div className="space-y-3 pt-2">
+          <select
+            aria-label="Pilih periode pembayaran di muka"
+            defaultValue=""
+            disabled={loadingAdvance}
+            className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-3 text-sm font-medium text-slate-900 dark:text-slate-100 shadow-2xs focus:border-emerald-600 focus:outline-hidden disabled:opacity-60"
+            onChange={async e=>{
+              const period=e.target.value;if(!period)return
+              setLoadingAdvance(true)
+              try {
+                const result=await selectPortalAdvancePeriodAction(period)
+                setBillingOverride(result.data);setSelectedIds(new Set())
+              } catch {toast.error('Tagihan periode mendatang belum dapat dimuat. Hubungi bagian keuangan.')}
+              finally {setLoadingAdvance(false)}
+            }}
+          >
+            <option value="">Bayar sampai bulan…</option>
+            {billingData.advancePeriods?.map(p=><option key={p} value={p}>{p}</option>)}
+          </select>
+          {loadingAdvance && <p className="text-xs text-slate-500">Memuat tagihan…</p>}
+
+          {billingData.obligations.upcoming.length > 0 && (
+            <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 rounded-[18px] border border-slate-200/80 dark:border-slate-800 px-2 shadow-2xs">
+              {billingData.obligations.upcoming.map(ob => {
+                const isChecked = selectedIds.has(ob.id)
+                return (
+                  <label
+                    key={ob.id}
+                    className={`flex min-h-[52px] cursor-pointer items-center justify-between py-3 px-3 rounded-xl transition ${
+                      isChecked ? 'bg-emerald-50/50 dark:bg-emerald-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 pr-3">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleSelect(ob.id)}
+                        className="h-5 w-5 rounded-md border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0 accent-emerald-600"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">
+                          {cleanItemLabel(ob.itemLabel)}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                          {cleanPeriodLabel(ob.periodLabel || '')}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="shrink-0 text-sm font-bold text-slate-900 dark:text-slate-100 font-mono">
+                      {formatRupiah(ob.remaining)}
+                    </p>
+                  </label>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </details>
 
       {/* 5. USPP (UANG BANGUNAN) */}
       {billingData.obligations.uspp && (
-        <div className="space-y-2 pt-1">
-          <div className="pb-0.5">
-            <h2 className="text-base sm:text-lg font-bold text-slate-950 dark:text-slate-100">
-              USPP (Uang Bangunan)
-            </h2>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 rounded-[18px] border border-slate-200/80 dark:border-slate-800 p-3.5 space-y-3 shadow-2xs">
-            <label className="flex min-h-[44px] cursor-pointer items-center justify-between">
+        <div>
+          <div className="bg-white dark:bg-slate-900 rounded-[18px] border border-slate-200/80 dark:border-slate-800 p-2 space-y-3 shadow-2xs">
+            <label className="flex min-h-[52px] cursor-pointer items-center justify-between px-3">
               <div className="flex items-center gap-3 min-w-0 pr-2">
                 <input
                   type="checkbox"
@@ -606,10 +711,10 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
                 />
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">
-                    Bayar sisa USPP
+                    USPP (Uang Bangunan)
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
-                    Sisa kewajiban: {formatRupiah(billingData.obligations.uspp.remaining)}
+                    Sisa {formatRupiah(billingData.obligations.uspp.remaining)}
                   </p>
                 </div>
               </div>
@@ -669,54 +774,18 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
         </div>
       )}
 
-      {/* 6. TAGIHAN TAHUNAN (JIKA ADA) */}
-      {annualObligations.length > 0 && (
-        <div className="space-y-2 pt-1">
-          <div className="pb-0.5">
-            <h2 className="text-base sm:text-lg font-bold text-slate-950 dark:text-slate-100">
-              Tagihan Tahunan
-            </h2>
+      {/* ISI UANG JAJAN */}
+      <div className="rounded-[18px] border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-3.5 space-y-3 shadow-2xs">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+              <Wallet className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug">Isi Uang Jajan</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">Titipan jajan santri</p>
+            </div>
           </div>
-
-          <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 rounded-[18px] border border-slate-200/80 dark:border-slate-800 px-3 shadow-2xs">
-            {annualObligations.map(ob => {
-              const isChecked = selectedIds.has(ob.id)
-              const periodText = cleanPeriodLabel(ob.periodLabel)
-              return (
-                <label
-                  key={ob.id}
-                  className={`flex min-h-[54px] cursor-pointer items-center justify-between py-3 px-1 rounded-xl transition ${
-                    isChecked ? 'bg-slate-100/60 dark:bg-slate-800/60' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                  }`}
-                >
-                  <div className="flex items-start gap-3 min-w-0 pr-3">
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => toggleSelect(ob.id)}
-                      className="mt-0.5 h-5 w-5 rounded-md border-slate-300 dark:border-slate-700 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0 accent-emerald-600"
-                    />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">{cleanItemLabel(ob.itemLabel)}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">{periodText}</p>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-slate-900 dark:text-slate-100 font-mono">{formatRupiah(ob.remaining)}</p>
-                  </div>
-                </label>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 7. ISI UANG JAJAN */}
-      <div className="space-y-1.5 pt-1">
-        <div className="flex items-center justify-between pb-0.5">
-          <h2 className="text-base sm:text-lg font-bold text-slate-950 dark:text-slate-100">
-            Isi Uang Jajan
-          </h2>
           {topUpAmount > 0 && (
             <button
               type="button"
@@ -724,11 +793,31 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
                 setTopUpAmount(0)
                 setIsTopUpSelected(false)
               }}
-              className="text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition cursor-pointer"
+              className="shrink-0 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition cursor-pointer"
             >
               Hapus
             </button>
           )}
+        </div>
+
+        <div className="grid grid-cols-4 gap-1.5">
+          {[50000, 100000, 200000, 500000].map(val => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => {
+                setTopUpAmount(val)
+                setIsTopUpSelected(true)
+              }}
+              className={`py-1.5 text-xs font-bold rounded-lg border transition cursor-pointer active:scale-95 ${
+                topUpAmount === val
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-500'
+                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700'
+              }`}
+            >
+              {val / 1000}rb
+            </button>
+          ))}
         </div>
 
         <div className="relative">
@@ -737,6 +826,7 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
           </span>
           <input
             type="number"
+            inputMode="numeric"
             min={0}
             step={10000}
             value={topUpAmount > 0 ? topUpAmount : ''}
@@ -745,7 +835,7 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
               setTopUpAmount(val)
               setIsTopUpSelected(val > 0)
             }}
-            placeholder="isi nominal"
+            placeholder="Nominal lainnya"
             className="w-full pl-10 pr-4 py-2.5 text-sm font-mono font-bold border border-slate-300 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs focus:border-emerald-600 dark:focus:border-emerald-500 focus:outline-hidden placeholder:font-sans placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
         </div>

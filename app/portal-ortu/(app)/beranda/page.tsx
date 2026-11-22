@@ -235,40 +235,41 @@ export default async function PortalBerandaPage() {
           </div>
         ) : hasUnpaidBills ? (
           /* KONDISI: ADA TAGIHAN */
-          <div className="rounded-[18px] border border-red-200/90 dark:border-red-800/60 overflow-hidden shadow-2xs relative">
-            <div className="absolute top-0 right-0 bg-red-600 text-white font-bold text-[11px] px-3.5 py-1.5 rounded-bl-xl tracking-tight shadow-xs z-10">
-              Belum Lunas
-            </div>
-
-            <div className="bg-red-50/90 dark:bg-red-950/40 p-4 space-y-1.5">
-              <div className="pr-24">
-                <p className="text-xs text-red-700 dark:text-red-300 font-bold">{currentPeriodLabel}</p>
-                <p className="text-2xl font-black font-mono text-slate-950 dark:text-white mt-0.5">
+          <div className="rounded-[18px] border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs space-y-3.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {hasRoutineBills ? 'Total belum dibayar' : 'Sisa uang bangunan'}
+                </p>
+                <p className="text-3xl font-black font-mono tracking-tight text-slate-950 dark:text-white mt-1">
                   {formatRupiah(hasRoutineBills ? tagihanRemaining : usppRemaining)}
                 </p>
               </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                {hasRoutineBills
-                  ? `${unpaidCount} tagihan belum dibayar`
-                  : 'Sisa uang bangunan santri (dapat dicicil berkala)'}
-              </p>
+              <span className="mt-0.5 shrink-0 inline-flex items-center gap-1.5 rounded-full bg-red-50 dark:bg-red-950/50 border border-red-100 dark:border-red-900/60 px-2.5 py-1 text-[11px] font-bold text-red-700 dark:text-red-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                Belum lunas
+              </span>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 border-t border-red-200/80 dark:border-red-800/60 px-4 py-3 flex items-center justify-between gap-2">
-              <span className="text-xs text-slate-600 dark:text-slate-400">
-                {hasUsppBills ? (
-                  <>Sisa USPP: <strong className="font-mono text-slate-900 dark:text-slate-200">{formatRupiah(usppRemaining)}</strong></>
-                ) : (
-                  <span>Status: Perlu Diselesaikan</span>
-                )}
-              </span>
-              <Link
-                href="/portal-ortu/tagihan"
-                className="rounded-xl bg-red-600 hover:bg-red-700 px-3.5 py-2 text-xs font-bold text-white shadow-xs active:scale-95 transition"
-              >
-                Bayar sekarang &rarr;
-              </Link>
-            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400 -mt-1.5">
+              {hasRoutineBills
+                ? `${unpaidCount} tagihan • ${currentPeriodLabel}`
+                : 'Dapat dicicil berkala'}
+              {hasRoutineBills && hasUsppBills && (
+                <>
+                  {' · '}Sisa USPP{' '}
+                  <strong className="font-mono font-semibold text-slate-800 dark:text-slate-200">{formatRupiah(usppRemaining)}</strong>
+                </>
+              )}
+            </p>
+
+            <Link
+              href="/portal-ortu/tagihan"
+              className="flex w-full min-h-11 items-center justify-center gap-1.5 rounded-xl bg-[#064e3b] hover:bg-[#047857] px-4 py-2.5 text-sm font-bold text-[#bef264] shadow-xs active:scale-[0.98] transition"
+            >
+              Bayar sekarang
+              <CaretRight className="w-4 h-4" weight="bold" />
+            </Link>
           </div>
         ) : (
           /* KONDISI: TAGIHAN LUNAS */
@@ -316,74 +317,72 @@ export default async function PortalBerandaPage() {
           </h2>
         </div>
 
-        <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 rounded-[18px] border border-slate-200/80 dark:border-slate-800 px-4 shadow-2xs">
+        <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 rounded-[22px] border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
           {/* Baris 1: Presensi Pengajian */}
           <Link
             href="/portal-ortu/absensi"
-            className="flex items-center justify-between py-3.5 group active:scale-[0.99] transition"
+            className="flex items-center gap-3.5 px-5 py-4 group active:bg-slate-50 dark:active:bg-slate-800/60 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition"
           >
-            <div className="flex items-center gap-3 min-w-0 pr-2">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400">
-                <CalendarCheck className="w-5 h-5" weight="duotone" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                  Presensi pengajian bulan ini
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                  {absen.totalSesi > 0
-                    ? `${absen.hadir} dari ${absen.totalSesi} sesi hadir${absen.alfa > 0 ? ` · ${absen.alfa} sesi alfa` : ''}`
-                    : 'Belum ada jadwal sesi aktif'}
-                </p>
-              </div>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-300 ring-1 ring-inset ring-emerald-100 dark:ring-emerald-900/60">
+              <CalendarCheck className="w-5 h-5" weight="duotone" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">
+                Presensi pengajian
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                {absen.totalSesi > 0
+                  ? `${absen.hadir} dari ${absen.totalSesi} sesi hadir bulan ini${absen.alfa > 0 ? ` · ${absen.alfa} alfa` : ''}`
+                  : 'Belum ada jadwal sesi bulan ini'}
+              </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {absen.totalSesi > 0 && (
-                <span className="text-xs font-bold font-mono text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md">
+                <span className="text-xs font-bold font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-full">
                   {Math.round((absen.hadir / absen.totalSesi) * 100)}%
                 </span>
               )}
-              <CaretRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition" />
+              <CaretRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 dark:text-slate-600 dark:group-hover:text-slate-400 transition" weight="bold" />
             </div>
           </Link>
 
           {/* Baris 2: Kedisiplinan & Asrama */}
           <Link
             href="/portal-ortu/pelanggaran"
-            className="flex items-center justify-between py-3.5 group active:scale-[0.99] transition"
+            className="flex items-center gap-3.5 px-5 py-4 group active:bg-slate-50 dark:active:bg-slate-800/60 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition"
           >
-            <div className="flex items-center gap-3 min-w-0 pr-2">
-              <div
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                  disiplin.jumlah > 0
-                    ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <ShieldCheck className="w-5 h-5" weight="duotone" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                  Kedisiplinan & asrama
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                  {pelanggaran.length === 0
-                    ? 'Tertib · Tidak ada catatan pelanggaran'
-                    : `${disiplin.jumlah} kejadian${disiplin.pending?` · ${disiplin.pending} catatan perlu verifikasi`:''}`}
-                </p>
-              </div>
+            <div
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ${
+                disiplin.jumlah > 0
+                  ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-300 ring-rose-100 dark:ring-rose-900/60'
+                  : 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-300 ring-blue-100 dark:ring-blue-900/60'
+              }`}
+            >
+              <ShieldCheck className="w-5 h-5" weight="duotone" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">
+                Kedisiplinan & asrama
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                {pelanggaran.length === 0
+                  ? 'Tidak ada catatan pelanggaran'
+                  : disiplin.pending
+                  ? `${disiplin.pending} catatan perlu verifikasi`
+                  : 'Ada catatan yang perlu diperhatikan'}
+              </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <span
-                className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                className={`text-xs font-bold px-2.5 py-1 rounded-full ${
                   disiplin.jumlah > 0
-                    ? 'text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 font-mono'
-                    : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 font-mono'
+                    ? 'text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60'
+                    : 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60'
                 }`}
               >
-                {disiplin.jumlah} kejadian
+                {disiplin.jumlah > 0 ? `${disiplin.jumlah} kejadian` : 'Tertib'}
               </span>
-              <CaretRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition" />
+              <CaretRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 dark:text-slate-600 dark:group-hover:text-slate-400 transition" weight="bold" />
             </div>
           </Link>
         </div>

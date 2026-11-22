@@ -206,7 +206,7 @@ export function BerandaWalletCard({
         subtitle={
           checkoutResult
             ? 'Menunggu pembayaran — transfer sesuai instruksi di bawah'
-            : 'Saldo titipan belanja & jajan santri di pesantren'
+            : undefined
         }
         icon={
           checkoutResult ? (
@@ -267,7 +267,7 @@ export function BerandaWalletCard({
       >
         {!checkoutResult ? (
           /* FORM TOP-UP */
-          <div className="space-y-4 text-sm">
+          <div className="space-y-5 text-sm">
             {/* Saldo saat ini */}
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Saldo saat ini{' '}
@@ -321,8 +321,8 @@ export function BerandaWalletCard({
 
             {/* Cara Pembayaran */}
             {availableMethods.length > 0 && (
-            <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Cara pembayaran</span>
+            <div className="space-y-2.5 pt-5 border-t border-slate-100 dark:border-slate-800">
+              <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">Cara pembayaran</span>
               {availableMethods.map(method => {
                 const active = paymentMethod === method
                 return (
@@ -361,7 +361,7 @@ export function BerandaWalletCard({
 
             {/* Rincian Subtotal & Biaya */}
             {paymentMethod && (
-            <div className="space-y-1.5 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs text-slate-600 dark:text-slate-400">
+            <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-5 text-xs text-slate-600 dark:text-slate-400">
               <div className="flex justify-between">
                 <span>Nominal Top-Up</span>
                 <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{formatRupiah(topUpAmount)}</span>
@@ -376,7 +376,7 @@ export function BerandaWalletCard({
                   <span className="text-slate-500">ditambahkan sistem (Rp1–Rp999)</span>
                 </div>
               )}
-              <div className="flex justify-between border-t border-slate-100 dark:border-slate-800 pt-2 font-bold text-slate-950 dark:text-slate-100 text-sm">
+              <div className="flex justify-between border-t border-slate-100 dark:border-slate-800 pt-3 mt-1 font-bold text-slate-950 dark:text-slate-100 text-sm">
                 <span>Total Pembayaran</span>
                 <span className="font-mono text-emerald-800 dark:text-emerald-400">{formatRupiah(totalCharged)}</span>
               </div>
