@@ -41,9 +41,10 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
   // Identitas Lembaga (Dinamis dari Pengaturan Kop Keuangan)
   const instansiName = letterheadProfile?.institutionName || 'Pondok Pesantren Sukahideng'
   const brandShort = instansiName.toLowerCase().replace(/^(pondok pesantren|pesantren)\s+/i, '')
-  const instansiSub = letterheadProfile?.subheading || 'Seksi Pengajaran & Keuangan'
   const instansiAddr = letterheadProfile?.address || 'Desa Sukarapih, Kec. Sukarame, Tasikmalaya 46461'
-  const instansiContact = letterheadProfile?.contactLine || 'keuangan@sukahideng.ponpes.id'
+  // Penerbit kuitansi = Koperasi (tetap, tidak mengikuti kop keuangan)
+  const issuerName = 'Koperasi Pondok Pesantren Sukahideng'
+  const instansiContact = 'kopskhd@gmail.com'
 
   // Rincian Pos Tagihan
   const detailList =
@@ -127,7 +128,7 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
             display: flex;
             align-items: center;
             gap: 10px;
-            text-align: right;
+            text-align: left;
           }
           .brand-name {
             font-size: 18px;
@@ -135,25 +136,19 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
             letter-spacing: -0.02em;
             color: #0f172a;
             display: block;
+            text-transform: capitalize;
+            line-height: 1.2;
           }
           .brand-sub {
-            font-size: 9px;
+            font-size: 11px;
             color: #64748b;
             display: block;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            line-height: 1.2;
           }
           .brand-logo {
-            width: 38px;
-            height: 38px;
-            background: #0f172a;
-            color: #fff;
-            font-weight: 900;
-            font-size: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 8px;
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
           }
           .meta-list {
             margin-bottom: 24px;
@@ -248,11 +243,11 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
             <h1 class="receipt-title">Kuitansi Pembayaran</h1>
           </div>
           <div class="brand-box">
+            <img class="brand-logo" src="${window.location.origin}/logo.png" alt="Logo" />
             <div>
-              <span class="brand-name">${brandShort}</span>
               <span class="brand-sub">Pondok Pesantren</span>
+              <span class="brand-name">${brandShort}</span>
             </div>
-            <div class="brand-logo">S</div>
           </div>
         </div>
 
@@ -277,8 +272,7 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
 
         <div class="address-grid">
           <div class="address-col">
-            <p class="address-title">${instansiName}</p>
-            <p class="address-line">${instansiSub}</p>
+            <p class="address-title">${issuerName}</p>
             <p class="address-line">${instansiAddr}</p>
             <p class="address-line" style="font-size: 11px; color: #64748b; margin-top: 4px;">${instansiContact}</p>
           </div>
@@ -288,7 +282,6 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
             <p class="address-line" style="font-weight: 600; color: #0f172a;">${santri.nama}</p>
             <p class="address-line">NIS: ${santri.nis}</p>
             ${santri.asrama ? `<p class="address-line">Asrama: ${santri.asrama}${santri.kamar ? ` (Kamar ${santri.kamar})` : ''}</p>` : ''}
-            <p class="address-line">Santri Pondok Pesantren Sukahideng</p>
           </div>
         </div>
 
@@ -410,17 +403,15 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
               Kuitansi Pembayaran
             </h2>
           </div>
-          <div className="flex items-center gap-2.5 shrink-0 text-right">
-            <div className="flex flex-col items-end">
-              <span className="font-extrabold text-sm sm:text-base text-slate-900 leading-none tracking-tight">
-                {brandShort}
-              </span>
-              <span className="text-[9px] text-slate-400 font-medium tracking-wide">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <img src="/logo.png" alt="Logo Pondok Pesantren Sukahideng" className="h-10 w-10 object-contain shrink-0" />
+            <div className="flex flex-col leading-tight">
+              <span className="text-[11px] text-slate-500 font-medium">
                 Pondok Pesantren
               </span>
-            </div>
-            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-base shadow-xs shrink-0">
-              S
+              <span className="font-extrabold text-base text-slate-900 tracking-tight capitalize">
+                {brandShort}
+              </span>
             </div>
           </div>
         </div>
@@ -448,8 +439,7 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
         {/* 3. Two-Column Address Block */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-3 border-t border-slate-100 text-xs">
           <div className="space-y-0.5 leading-relaxed">
-            <p className="font-bold text-slate-950 text-xs">{instansiName}</p>
-            <p className="text-slate-600">{instansiSub}</p>
+            <p className="font-bold text-slate-950 text-xs">{issuerName}</p>
             <p className="text-slate-600">{instansiAddr}</p>
             <p className="text-slate-500 text-[11px] font-mono mt-1">{instansiContact}</p>
           </div>
@@ -463,7 +453,6 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
                 Asrama: {santri.asrama} {santri.kamar ? `(Kamar ${santri.kamar})` : ''}
               </p>
             )}
-            <p className="text-slate-600 text-[11px]">Santri Pondok Pesantren Sukahideng</p>
           </div>
         </div>
 
@@ -540,9 +529,6 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
         <div className="pt-6 border-t border-slate-100 text-center text-[10px] text-slate-400 space-y-0.5">
           <p>
             Tanda terima pembayaran sah diterbitkan otomatis melalui Portal Orang Tua Pesantren Sukahideng.
-          </p>
-          <p className="font-mono text-[9px] text-slate-400">
-            Verifikasi Sistem: OK · Idempotency Key Terverifikasi
           </p>
         </div>
       </div>

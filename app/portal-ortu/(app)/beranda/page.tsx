@@ -119,57 +119,37 @@ export default async function PortalBerandaPage() {
       {/* 3. TOMBOL SHORTCUT DI BAWAH HERO */}
       <div>
         <div className="grid grid-cols-4 gap-2.5">
-          {/* Shortcut 1: Presensi Pengajian */}
-          <Link
-            href="/portal-ortu/absensi"
-            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-emerald-50/90 dark:bg-emerald-950/40 border border-slate-200/60 dark:border-white/5 p-2.5 text-center active:scale-95 transition hover:bg-emerald-100/70 dark:hover:bg-emerald-900/50"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-200/60 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-300">
-              <CalendarCheck className="w-5 h-5" weight="duotone" />
-            </div>
-            <span className="text-[11px] font-bold text-emerald-950 dark:text-emerald-200 tracking-tight leading-none">
-              Presensi
-            </span>
-          </Link>
-
-          {/* Shortcut 2: Kedisiplinan / Jumlah Kejadian */}
-          <Link
-            href="/portal-ortu/pelanggaran"
-            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-blue-50/90 dark:bg-blue-950/40 border border-slate-200/60 dark:border-white/5 p-2.5 text-center active:scale-95 transition hover:bg-blue-100/70 dark:hover:bg-blue-900/50"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-200/60 dark:bg-blue-900/60 text-blue-900 dark:text-blue-300">
-              <ShieldCheck className="w-5 h-5" weight="duotone" />
-            </div>
-            <span className="text-[11px] font-bold text-blue-950 dark:text-blue-200 tracking-tight leading-none">
-              Kedisiplinan
-            </span>
-          </Link>
-
-          {/* Shortcut 3: Cicilan USPP (Uang Gedung) */}
-          <Link
-            href="/portal-ortu/tagihan"
-            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-amber-50/90 dark:bg-amber-950/40 border border-slate-200/60 dark:border-white/5 p-2.5 text-center active:scale-95 transition hover:bg-amber-100/70 dark:hover:bg-amber-900/50"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-200/60 dark:bg-amber-900/60 text-amber-900 dark:text-amber-300">
-              <CreditCard className="w-5 h-5" weight="duotone" />
-            </div>
-            <span className="text-[11px] font-bold text-amber-950 dark:text-amber-200 tracking-tight leading-none">
-              Cicil USPP
-            </span>
-          </Link>
-
-          {/* Shortcut 4: Kuitansi Resmi / Bukti Bayar */}
-          <Link
-            href="/portal-ortu/riwayat"
-            className="flex min-h-[76px] flex-col items-center justify-center gap-2 rounded-[18px] bg-teal-50/90 dark:bg-teal-950/40 border border-slate-200/60 dark:border-white/5 p-2.5 text-center active:scale-95 transition hover:bg-teal-100/70 dark:hover:bg-teal-900/50"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-200/60 dark:bg-teal-900/60 text-teal-900 dark:text-teal-300">
-              <ClockCounterClockwise className="w-5 h-5" weight="duotone" />
-            </div>
-            <span className="text-[11px] font-bold text-teal-950 dark:text-teal-200 tracking-tight leading-none">
-              Kuitansi
-            </span>
-          </Link>
+          {[
+            { href: '/portal-ortu/absensi', label: 'Presensi', Icon: CalendarCheck,
+              card: 'bg-emerald-50/90 dark:bg-emerald-950/40 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/50',
+              chip: 'bg-emerald-200/60 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300',
+              text: 'text-emerald-950 dark:text-emerald-200' },
+            { href: '/portal-ortu/pelanggaran', label: 'Kedisiplinan', Icon: ShieldCheck,
+              card: 'bg-blue-50/90 dark:bg-blue-950/40 hover:bg-blue-100/70 dark:hover:bg-blue-900/50',
+              chip: 'bg-blue-200/60 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300',
+              text: 'text-blue-950 dark:text-blue-200' },
+            { href: '/portal-ortu/tagihan', label: 'Cicil USPP', Icon: CreditCard,
+              card: 'bg-amber-50/90 dark:bg-amber-950/40 hover:bg-amber-100/70 dark:hover:bg-amber-900/50',
+              chip: 'bg-amber-200/60 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300',
+              text: 'text-amber-950 dark:text-amber-200' },
+            { href: '/portal-ortu/riwayat', label: 'Kuitansi', Icon: ClockCounterClockwise,
+              card: 'bg-teal-50/90 dark:bg-teal-950/40 hover:bg-teal-100/70 dark:hover:bg-teal-900/50',
+              chip: 'bg-teal-200/60 dark:bg-teal-900/60 text-teal-800 dark:text-teal-300',
+              text: 'text-teal-950 dark:text-teal-200' },
+          ].map(({ href, label, Icon, card, chip, text }) => (
+            <Link
+              key={href}
+              href={href}
+              className={`flex min-h-[84px] flex-col items-center justify-center gap-2 rounded-[18px] border border-slate-200/60 dark:border-white/5 p-2.5 text-center active:scale-95 transition ${card}`}
+            >
+              <div className={`flex h-10 w-10 items-center justify-center rounded-full ${chip}`}>
+                <Icon className="w-5 h-5" weight="duotone" />
+              </div>
+              <span className={`text-[11px] font-bold tracking-tight leading-none ${text}`}>
+                {label}
+              </span>
+            </Link>
+          ))}
         </div>
       </div>
 

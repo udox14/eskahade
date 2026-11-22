@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Wallet, Copy, Check, CheckCircle2, Clock, Loader2 } from 'lucide-react'
+import { Wallet, Plus, Copy, Check, CheckCircle2, Clock, Loader2 } from 'lucide-react'
 import { formatRupiah } from '@/lib/portal/format'
 import { BottomSheet } from '../../_components/bottom-sheet'
 import { WalletLimitCard } from '../akun/_wallet-limit-card'
@@ -133,46 +133,47 @@ export function BerandaWalletCard({
   return (
     <>
       {/* 1. HERO UTAMA: SALDO UANG JAJAN SANTRI */}
-      <div className="rounded-[22px] bg-[#064e3b] p-5 text-white shadow-[0_8px_24px_rgba(6,78,59,0.16)] relative overflow-hidden">
-        <div className="relative z-10 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#bef264]">
-              Dompet Uang Jajan
+      <div className="rounded-[22px] bg-gradient-to-br from-[#065f46] to-[#064e3b] text-white shadow-[0_8px_24px_rgba(6,78,59,0.16)] relative overflow-hidden">
+        <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-white/5" />
+        <div aria-hidden className="pointer-events-none absolute -right-2 top-14 h-20 w-20 rounded-full bg-white/[0.04]" />
+
+        <div className="relative z-10 p-5 pb-4">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10">
+              <Wallet className="h-4 w-4 text-[#bef264]" />
             </span>
-            <span className="text-[11px] text-emerald-200/90 font-medium">
-              Saldo di loket
-            </span>
+            <span className="text-sm font-semibold text-emerald-50">Uang Jajan</span>
           </div>
 
-          <div className="space-y-0.5">
-            <p className="text-3xl font-black font-mono tracking-tight text-white">
+          <div className="mt-4">
+            <p className="text-xs font-medium text-emerald-200/80">Saldo tersedia</p>
+            <p className="mt-0.5 text-4xl font-black font-mono tracking-tight text-white">
               {formatRupiah(balance)}
             </p>
-            <p className="text-xs text-emerald-100/80 font-medium">
-              Limit belanja hari ini:{' '}
-              <span className="font-bold font-mono text-[#bef264]">
-                {formatRupiah(effectiveDailyLimit)}
-              </span>
-            </p>
           </div>
 
-          {/* Aksi Langsung pada Hero: Isi Saldo & Atur Limit (Membuka BottomSheet / Drawer) */}
-          <div className="pt-1 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsTopUpOpen(true)}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#bef264] px-4 py-2.5 text-xs font-bold text-[#064e3b] shadow-xs hover:bg-[#a3e635] active:scale-[0.98] transition cursor-pointer"
-            >
-              <span>+ Isi saldo jajan</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsLimitOpen(true)}
-              className="inline-flex items-center justify-center gap-1 rounded-xl bg-emerald-800/80 px-3.5 py-2.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-800 hover:text-white active:scale-[0.98] transition cursor-pointer"
-            >
-              <span>Atur limit</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setIsTopUpOpen(true)}
+            className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#bef264] px-4 py-3 text-sm font-bold text-[#064e3b] shadow-xs hover:bg-[#a3e635] active:scale-[0.99] transition cursor-pointer"
+          >
+            <Plus className="h-4 w-4" strokeWidth={3} />
+            <span>Isi Saldo</span>
+          </button>
+        </div>
+
+        <div className="relative z-10 flex items-center justify-between gap-3 border-t border-white/10 bg-black/10 px-5 py-3">
+          <p className="text-xs text-emerald-100/80 font-medium">
+            Limit Uang Jajan Harian{' '}
+            <span className="font-bold font-mono text-white">{formatRupiah(effectiveDailyLimit)}</span>
+          </p>
+          <button
+            type="button"
+            onClick={() => setIsLimitOpen(true)}
+            className="shrink-0 rounded-lg px-2 py-1 -mr-2 text-xs font-semibold text-[#bef264] hover:bg-white/10 active:scale-95 transition cursor-pointer"
+          >
+            Atur limit
+          </button>
         </div>
       </div>
 
@@ -237,10 +238,10 @@ export function BerandaWalletCard({
                 </div>
                 <button
                   type="button"
-                  disabled
-                  className="w-full min-h-12 rounded-xl bg-slate-200 dark:bg-slate-800 px-4 py-3 text-sm font-bold text-slate-400 cursor-not-allowed"
+                  onClick={() => setIsTopUpOpen(false)}
+                  className="w-full min-h-12 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 active:scale-[0.98] transition cursor-pointer"
                 >
-                  Top-Up Online Belum Dibuka
+                  Mengerti
                 </button>
               </div>
             ) : (
@@ -267,46 +268,25 @@ export function BerandaWalletCard({
         {!checkoutResult ? (
           /* FORM TOP-UP */
           <div className="space-y-4 text-sm">
-            {/* Informasi Saldo Saat Ini */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 text-xs">
-              <span className="text-emerald-950 dark:text-emerald-200 font-semibold">Saldo Dompet Saat Ini</span>
-              <span className="font-mono font-bold text-emerald-900 dark:text-emerald-300 text-sm">{formatRupiah(balance)}</span>
-            </div>
+            {/* Saldo saat ini */}
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Saldo saat ini{' '}
+              <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{formatRupiah(balance)}</span>
+            </p>
 
-            {/* Pilihan Cepat Nominal */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                Pilih Nominal Top-Up
-              </label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {[50000, 100000, 200000, 500000].map(val => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => setTopUpAmount(val)}
-                    className={`py-2 text-xs font-bold font-mono rounded-xl border transition active:scale-95 cursor-pointer ${
-                      topUpAmount === val
-                        ? 'bg-emerald-800 text-white border-emerald-800 dark:bg-emerald-600 dark:border-emerald-500 shadow-xs'
-                        : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    {val >= 1000000 ? `${val / 1000000}jt` : `${val / 1000}rb`}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Input Nominal Manual */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                Atau Masukkan Nominal Lainnya
+            {/* Nominal: input utama + pilihan cepat */}
+            <div className="space-y-2.5">
+              <label htmlFor="topup-amount" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Nominal top-up
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-slate-500 font-mono">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400 dark:text-slate-500 font-mono">
                   Rp
                 </span>
                 <input
+                  id="topup-amount"
                   type="number"
+                  inputMode="numeric"
                   min={10000}
                   step={10000}
                   value={topUpAmount > 0 ? topUpAmount : ''}
@@ -314,13 +294,33 @@ export function BerandaWalletCard({
                     const parsed = parseInt(e.target.value, 10) || 0
                     setTopUpAmount(Math.max(0, parsed))
                   }}
-                  placeholder="isi nominal (min. Rp10.000)"
-                  className="w-full pl-10 pr-4 py-2.5 text-sm font-mono font-bold border border-slate-300 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-850 dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs focus:border-emerald-600 dark:focus:border-emerald-500 focus:outline-hidden placeholder:font-sans placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                  placeholder="0"
+                  className="w-full pl-12 pr-4 py-3.5 text-2xl font-mono font-black border border-slate-300 dark:border-slate-700 rounded-2xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs focus:border-emerald-600 dark:focus:border-emerald-500 focus:outline-hidden placeholder:text-slate-300 dark:placeholder:text-slate-600"
                 />
               </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[50000, 100000, 200000, 500000].map(val => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setTopUpAmount(val)}
+                    className={`py-2 text-xs font-bold rounded-xl border transition active:scale-95 cursor-pointer ${
+                      topUpAmount === val
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-500'
+                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {val >= 1000000 ? `${val / 1000000}jt` : `${val / 1000}rb`}
+                  </button>
+                ))}
+              </div>
+              {topUpAmount > 0 && topUpAmount < 10000 && (
+                <p className="text-[11px] text-red-600 dark:text-red-400">Minimal top-up Rp10.000</p>
+              )}
             </div>
 
             {/* Cara Pembayaran */}
+            {availableMethods.length > 0 && (
             <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
               <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Cara pembayaran</span>
               {availableMethods.map(method => {
@@ -357,8 +357,10 @@ export function BerandaWalletCard({
                 </label>
               )}
             </div>
+            )}
 
             {/* Rincian Subtotal & Biaya */}
+            {paymentMethod && (
             <div className="space-y-1.5 border-t border-slate-100 dark:border-slate-800 pt-3 text-xs text-slate-600 dark:text-slate-400">
               <div className="flex justify-between">
                 <span>Nominal Top-Up</span>
@@ -379,6 +381,7 @@ export function BerandaWalletCard({
                 <span className="font-mono text-emerald-800 dark:text-emerald-400">{formatRupiah(totalCharged)}</span>
               </div>
             </div>
+            )}
           </div>
         ) : (
           /* RESULT PETUNJUK PEMBAYARAN */

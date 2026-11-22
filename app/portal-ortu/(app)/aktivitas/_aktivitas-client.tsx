@@ -614,11 +614,11 @@ export function AktivitasClient({
         <section className="space-y-4">
           {/* KARTU STATUS KEDISIPLINAN (HERO BANNER) */}
           {disiplin.catatan === 0 ? (
-            <div className="rounded-[22px] bg-[#064e3b] p-5 text-white shadow-[0_8px_24px_rgba(6,78,59,0.16)] flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-[#bef264] shrink-0 border border-white/10">
-                <ShieldCheck className="w-6 h-6 text-[#bef264]" />
+            <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900 p-6 text-center space-y-2">
+              <div className="mx-auto w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                <ShieldCheck className="w-5 h-5" />
               </div>
-              <p className="text-base sm:text-lg font-bold text-white tracking-tight">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                 Tidak ada pelanggaran tercatat
               </p>
             </div>

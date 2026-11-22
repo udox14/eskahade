@@ -293,7 +293,7 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
         <div className="p-5 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-[#bef264]">
-              {isSelectionActive ? 'Subtotal Dipilih' : 'Tagihan Dipilih'}
+              {isSelectionActive ? `Dipilih (${selectedItemsSummary.count} tagihan)` : 'Total Belum Dibayar'}
             </span>
             {activeObligations.length > 0 && (
               <button
@@ -308,19 +308,21 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
 
           <div className="space-y-1">
             <p className="text-3xl font-black font-mono tracking-tight text-white">
-              {formatRupiah(selectedItemsSummary.grossAmount)}
+              {formatRupiah(isSelectionActive ? selectedItemsSummary.grossAmount : billingData.obligations.totalRemaining)}
             </p>
-            <div className="flex items-center justify-between text-xs text-emerald-100/80 font-medium">
+            <div className="flex items-center justify-between gap-3 text-xs text-emerald-100/80 font-medium">
               <span>
                 {isSelectionActive
-                  ? `${selectedItemsSummary.count} item dipilih untuk dibayar`
-                  : (billingData.obligations.totalRemaining > 0 || (billingData.obligations.uspp && billingData.obligations.uspp.remaining > 0))
-                  ? 'Belum ada tagihan yang dipilih'
+                  ? 'Siap dibayar'
+                  : billingData.obligations.totalRemaining > 0
+                  ? `${activeObligations.length} tagihan${pastObligations.length > 0 ? ` • ${pastObligations.length} tunggakan` : ''} • pilih untuk membayar`
+                  : (billingData.obligations.uspp && billingData.obligations.uspp.remaining > 0)
+                  ? 'Tagihan rutin sudah lunas'
                   : 'Alhamdulillah, seluruh tagihan telah lunas'}
               </span>
-              {billingData.obligations.totalRemaining > 0 && (
-                <span className="text-emerald-200/90 text-[11px] font-semibold">
-                  Tagihan rutin: {formatRupiah(billingData.obligations.totalRemaining)}
+              {isSelectionActive && billingData.obligations.totalRemaining > 0 && (
+                <span className="shrink-0 text-emerald-200/90 text-[11px] font-semibold">
+                  Total belum dibayar: {formatRupiah(billingData.obligations.totalRemaining)}
                 </span>
               )}
             </div>
@@ -353,29 +355,6 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
       </div>
 
       {billingData.billingWarnings?.map(w=><p key={w} role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{w}</p>)}
-      <details className="rounded-xl border border-slate-200 p-4">
-        <summary className="cursor-pointer text-sm font-semibold">Bayar periode mendatang</summary>
-        <p className="my-2 text-xs text-slate-500">Pilihan ini belum termasuk tagihan berjalan atau tunggakan.</p>
-        <select aria-label="Pilih periode pembayaran di muka" defaultValue="" disabled={loadingAdvance}
-          className="w-full rounded-lg border bg-transparent p-2 text-sm" onChange={async e=>{
-            const period=e.target.value;if(!period)return
-            setLoadingAdvance(true)
-            try {
-              const result=await selectPortalAdvancePeriodAction(period)
-              setBillingOverride(result.data);setSelectedIds(new Set())
-            } catch {toast.error('Tagihan periode mendatang belum dapat dimuat. Hubungi bagian keuangan.')}
-            finally {setLoadingAdvance(false)}
-          }}>
-          <option value="">Pilih periode</option>
-          {billingData.advancePeriods?.map(p=><option key={p} value={p}>{p}</option>)}
-        </select>
-        {loadingAdvance && <p className="my-2 text-xs">Memuat tagihan…</p>}
-        {billingData.obligations.upcoming.map(ob=><label key={ob.id} className="mt-3 flex items-center gap-3 text-sm">
-          <input type="checkbox" checked={selectedIds.has(ob.id)} onChange={()=>toggleSelect(ob.id)}/>
-          <span className="flex-1">{ob.itemLabel} · {ob.periodLabel} <span className="text-xs text-slate-500">Mendatang</span></span>
-          <span>{formatRupiah(ob.remaining)}</span>
-        </label>)}
-      </details>
 
       {openTransfers.map(transfer => (
         <TransferStatusCard key={transfer.submissionId} transfer={transfer} onOpen={() => setTransferSheet(transfer)} />
@@ -582,6 +561,30 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
           </div>
         )}
       </div>
+
+      <details className="rounded-xl border border-slate-200 bg-white dark:bg-slate-900 p-4">
+        <summary className="cursor-pointer text-sm font-semibold">Bayar periode mendatang</summary>
+        <p className="my-2 text-xs text-slate-500">Pilihan ini belum termasuk tagihan berjalan atau tunggakan.</p>
+        <select aria-label="Pilih periode pembayaran di muka" defaultValue="" disabled={loadingAdvance}
+          className="w-full rounded-lg border bg-transparent p-2 text-sm" onChange={async e=>{
+            const period=e.target.value;if(!period)return
+            setLoadingAdvance(true)
+            try {
+              const result=await selectPortalAdvancePeriodAction(period)
+              setBillingOverride(result.data);setSelectedIds(new Set())
+            } catch {toast.error('Tagihan periode mendatang belum dapat dimuat. Hubungi bagian keuangan.')}
+            finally {setLoadingAdvance(false)}
+          }}>
+          <option value="">Pilih periode</option>
+          {billingData.advancePeriods?.map(p=><option key={p} value={p}>{p}</option>)}
+        </select>
+        {loadingAdvance && <p className="my-2 text-xs">Memuat tagihan…</p>}
+        {billingData.obligations.upcoming.map(ob=><label key={ob.id} className="mt-3 flex items-center gap-3 text-sm">
+          <input type="checkbox" checked={selectedIds.has(ob.id)} onChange={()=>toggleSelect(ob.id)}/>
+          <span className="flex-1">{ob.itemLabel} · {ob.periodLabel} <span className="text-xs text-slate-500">Mendatang</span></span>
+          <span>{formatRupiah(ob.remaining)}</span>
+        </label>)}
+      </details>
 
       {/* 5. USPP (UANG BANGUNAN) */}
       {billingData.obligations.uspp && (
