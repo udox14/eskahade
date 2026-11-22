@@ -349,7 +349,6 @@ export default function StatusPembayaranContent({
       />
 
       <LegacySyncNotice count={data.billingReviewCount} canSync={!!data.userPermissions?.canRecordPayment} onUpdated={()=>fetchData()} />
-      <BillingAuditPanel canApply={!!data.userPermissions?.canRecordPayment} onUpdated={()=>fetchData()} />
 
       {/* 2. TABS NAVIGASI */}
       <div className="border-b border-slate-200">
@@ -1606,6 +1605,9 @@ export default function StatusPembayaranContent({
           />
         )}
       </div>
+
+      {/* 8b. PEMERIKSAAN PENERBITAN TAGIHAN (di bawah halaman) */}
+      <BillingAuditPanel canApply={!!data.userPermissions?.canRecordPayment} onUpdated={()=>fetchData()} />
 
       {/* 9. RIGHT SLIDE-OVER DETAIL DRAWER */}
       <StatusPembayaranDetailDrawer

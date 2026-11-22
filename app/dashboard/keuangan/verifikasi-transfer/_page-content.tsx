@@ -90,10 +90,10 @@ export default function VerifikasiTransferContent({ initialData }: { initialData
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-semibold">
+            <div className="flex w-full sm:w-auto overflow-x-auto rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-semibold [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {(['MENUNGGU_VERIFIKASI', 'PERLU_PERBAIKAN', 'DITERIMA', 'DITOLAK', 'SEMUA'] as const).map(status => (
                 <button key={status} type="button" onClick={() => apply({ status })}
-                  className={`px-3 py-1.5 rounded-md ${filter.status === status ? 'bg-emerald-700 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                  className={`shrink-0 whitespace-nowrap px-3.5 py-2 rounded-md ${filter.status === status ? 'bg-emerald-700 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
                   {status === 'SEMUA' ? 'Semua' : STATUS_LABEL[status]}
                   {status === 'MENUNGGU_VERIFIKASI' && data.pendingCount > 0 ? ` (${data.pendingCount})` : ''}
                 </button>
