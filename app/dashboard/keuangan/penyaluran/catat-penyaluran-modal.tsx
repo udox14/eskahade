@@ -417,10 +417,10 @@ function CatatPenyaluranForm({
 
               {/* Bukti Lampiran / Transfer */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>Lampiran Bukti Penyaluran / Transfer</span>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span>Bukti Penyaluran</span>
                   {method === 'TRANSFER' && (
-                    <span className="text-[10px] text-amber-600 font-bold uppercase">Disarankan untuk Transfer</span>
+                    <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-amber-700">Disarankan untuk transfer</span>
                   )}
                 </label>
                 {proofAttachmentUrl ? (
