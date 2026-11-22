@@ -32,6 +32,7 @@ export interface CashTransferRow {
   amount: number
   cash_session_id: string
   session_code: string
+  session_status: 'OPEN' | 'CLOSED'
   operator_id: string
   operator_name: string | null
   account_snapshot: string
@@ -50,7 +51,7 @@ export interface CashTransferRow {
 }
 
 const SELECT_ROWS = `
-  SELECT t.id, t.transfer_number, t.direction, t.amount, t.cash_session_id, s.session_code, t.operator_id,
+  SELECT t.id, t.transfer_number, t.direction, t.amount, t.cash_session_id, s.session_code, s.status AS session_status, t.operator_id,
          u.full_name AS operator_name, t.account_snapshot, t.account_number, t.handled_by_name, t.bank_transacted_at,
          t.bank_reference, t.notes, t.status, t.void_reason, t.voided_at, t.statement_transaction_id, t.matched_at,
          t.match_notes, t.created_at
@@ -73,6 +74,63 @@ function generateTransferNumber(): string {
 
 export async function getCashTransfer(id: string): Promise<CashTransferRow | null> {
   return queryOne<CashTransferRow>(`${SELECT_ROWS} WHERE t.id = ?`, [id])
+}
+
+export interface CashTransferListFilter {
+  /** Batasi ke mutasi yang dicatat operator ini (Petugas Koperasi hanya melihat miliknya). */
+  operatorId?: string | null
+  direction?: CashTransferDirection | 'SEMUA'
+  /** POSTED_UNMATCHED = belum dicocokkan rekening koran; MATCHED = sudah; VOIDED = dibatalkan. */
+  state?: 'SEMUA' | 'POSTED_UNMATCHED' | 'MATCHED' | 'VOIDED'
+  /** Tanggal WIB (YYYY-MM-DD), berdasarkan waktu transaksi di bank. */
+  fromDate?: string | null
+  toDate?: string | null
+  limit?: number
+  offset?: number
+}
+
+/** Daftar mutasi kas lintas sesi + ringkasan (menu Kas Bank). */
+export async function listCashTransfers(filter: CashTransferListFilter = {}) {
+  const where: string[] = []
+  const params: unknown[] = []
+  if (filter.operatorId) { where.push('t.operator_id = ?'); params.push(filter.operatorId) }
+  if (filter.direction === 'BANK_TO_CASH' || filter.direction === 'CASH_TO_BANK') { where.push('t.direction = ?'); params.push(filter.direction) }
+  if (filter.state === 'POSTED_UNMATCHED') where.push(`t.status = 'POSTED' AND t.statement_transaction_id IS NULL`)
+  else if (filter.state === 'MATCHED') where.push('t.statement_transaction_id IS NOT NULL')
+  else if (filter.state === 'VOIDED') where.push(`t.status = 'VOIDED'`)
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/
+  // bank_transacted_at disimpan UTC; batas tanggal WIB = 00:00 WIB = 17:00 UTC hari sebelumnya.
+  if (filter.fromDate && dateRe.test(filter.fromDate)) {
+    where.push('t.bank_transacted_at >= ?'); params.push(new Date(filter.fromDate + 'T00:00:00+07:00').toISOString())
+  }
+  if (filter.toDate && dateRe.test(filter.toDate)) {
+    where.push('t.bank_transacted_at < ?')
+    params.push(new Date(new Date(filter.toDate + 'T00:00:00+07:00').getTime() + 24 * 3600 * 1000).toISOString())
+  }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
+  const limit = Math.min(Math.max(filter.limit ?? 50, 1), 200)
+  const offset = Math.max(filter.offset ?? 0, 0)
+  const [items, summary] = await Promise.all([
+    query<CashTransferRow>(`${SELECT_ROWS} ${whereSql} ORDER BY t.bank_transacted_at DESC, t.created_at DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset]),
+    queryOne<{ total: number; bank_in: number; bank_out: number; unmatched: number; voided: number }>(
+      `SELECT COUNT(*) AS total,
+              COALESCE(SUM(CASE WHEN t.status = 'POSTED' AND t.direction = 'BANK_TO_CASH' THEN t.amount ELSE 0 END), 0) AS bank_in,
+              COALESCE(SUM(CASE WHEN t.status = 'POSTED' AND t.direction = 'CASH_TO_BANK' THEN t.amount ELSE 0 END), 0) AS bank_out,
+              COALESCE(SUM(CASE WHEN t.status = 'POSTED' AND t.statement_transaction_id IS NULL THEN 1 ELSE 0 END), 0) AS unmatched,
+              COALESCE(SUM(CASE WHEN t.status = 'VOIDED' THEN 1 ELSE 0 END), 0) AS voided
+       FROM finance_cash_transfers t ${whereSql}`, params),
+  ])
+  return {
+    items,
+    total: summary?.total ?? 0,
+    summary: {
+      bankIn: summary?.bank_in ?? 0,
+      bankOut: summary?.bank_out ?? 0,
+      unmatched: summary?.unmatched ?? 0,
+      voided: summary?.voided ?? 0,
+    },
+  }
 }
 
 export async function listCashTransfersForSession(sessionId: string): Promise<CashTransferRow[]> {

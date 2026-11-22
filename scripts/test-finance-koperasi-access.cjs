@@ -81,6 +81,21 @@ async function main() {
     assert.deepEqual(roles('/dashboard/keuangan/rekonsiliasi'), ['admin', 'bendahara', 'pimpinan'])
   })
 
+  await test('migration 0201 adds the Kas Bank menu once and keeps customised roles', async () => {
+    const db = new DatabaseSync(':memory:')
+    db.exec(`CREATE TABLE fitur_akses (id INTEGER PRIMARY KEY, group_name TEXT, title TEXT, href TEXT UNIQUE, icon TEXT, roles TEXT, is_active INTEGER, urutan INTEGER)`)
+    const sql = fs.readFileSync('migrations/0201_finance_kas_bank_menu.sql', 'utf8')
+    db.exec(sql); db.exec(sql)
+    const row = db.prepare(`SELECT * FROM fitur_akses WHERE href='/dashboard/koperasi/kas-bank'`).get()
+    assert.equal(row.group_name, 'Operasional'); assert.equal(row.icon, 'Landmark'); assert.equal(row.is_active, 1)
+    assert.deepEqual(JSON.parse(row.roles), ['admin', 'bendahara', 'admin_koperasi', 'petugas_koperasi', 'pimpinan'])
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM fitur_akses').get().n, 1)
+    db.exec(`UPDATE fitur_akses SET roles='["admin"]', is_active=0`)
+    db.exec(sql)
+    const after = db.prepare(`SELECT roles, is_active FROM fitur_akses`).get()
+    assert.equal(after.roles, '["admin"]'); assert.equal(after.is_active, 1)
+  })
+
   console.log(`koperasi menu access: ${count} passed`)
 }
 main().catch(error => { console.error(error); process.exit(1) })

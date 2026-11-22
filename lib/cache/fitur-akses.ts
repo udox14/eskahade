@@ -109,6 +109,7 @@ async function ensureFiturAksesReady() {
       ('Keuangan', 'Pengaturan Keuangan', '/dashboard/keuangan/tarif', 'Settings2', '["admin","bendahara","pimpinan","admin_koperasi"]', 1, 8),
       ('Operasional', 'Loket Kasir', '/dashboard/koperasi/loket', 'CashRegister', '["admin","bendahara","admin_koperasi","petugas_koperasi"]', 1, 1),
       ('Operasional', 'Pencairan Uang Jajan', '/dashboard/koperasi/pencairan-uang-jajan', 'HandCoins', '["admin","bendahara","admin_koperasi","petugas_koperasi"]', 1, 2),
+      ('Operasional', 'Kas Bank', '/dashboard/koperasi/kas-bank', 'Landmark', '["admin","bendahara","admin_koperasi","petugas_koperasi","pimpinan"]', 1, 3),
       ('Keuangan', 'Verifikasi Transfer', '/dashboard/keuangan/verifikasi-transfer', 'ListChecks', '["admin","bendahara","admin_koperasi","petugas_koperasi"]', 1, 2),
       ('Master Data', 'Setup Tahun Ajaran', '/dashboard/setup-tahun-ajaran', 'ClipboardList', '["admin"]', 1, 2),
       ('Master Data', 'Pembagian Kitab Guru', '/dashboard/master/guru-kitab', 'BookOpen', '["admin"]', 1, 6),

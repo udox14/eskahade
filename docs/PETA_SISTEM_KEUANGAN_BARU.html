@@ -6,223 +6,438 @@
 <title>Peta Interaktif Sistem Keuangan Baru — Eskahade</title>
 <style>
 :root{
-  --bg:#f6f7f5;--card:#fff;--ink:#15201b;--muted:#5b6862;--line:#dfe4e0;
-  --brand:#064e3b;--brand-2:#0f766e;--lime:#bef264;--soft:#ecfdf5;
-  --amber:#b45309;--amber-bg:#fffbeb;--red:#b91c1c;--red-bg:#fef2f2;--blue:#1d4ed8;--blue-bg:#eff6ff;
-  --mono:ui-monospace,SFMono-Regular,Consolas,monospace;
+  --bg:#f2f5f3;--surface:#fff;--ink:#0f1f19;--ink-2:#26352f;--muted:#5f6d67;--line:#e2e8e4;--line-2:#d3dcd6;
+  --brand:#064e3b;--brand-700:#065f46;--brand-600:#047857;--brand-500:#10b981;--brand-50:#ecfdf5;--brand-100:#d1fae5;--lime:#bef264;
+  --amber:#b45309;--amber-50:#fffbeb;--amber-200:#fde68a;--red:#b91c1c;--red-50:#fef2f2;--red-200:#fecaca;
+  --blue:#1d4ed8;--blue-50:#eff6ff;--blue-200:#bfdbfe;--violet:#6d28d9;--violet-50:#f5f3ff;--slate-50:#f8faf9;
+  --mono:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,monospace;
+  --shadow-sm:0 1px 2px rgba(15,31,25,.06);--shadow:0 1px 3px rgba(15,31,25,.06),0 8px 24px -12px rgba(15,31,25,.18);
+  --r:14px;
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{margin:0;font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg)}
-a{color:var(--brand-2)}
-aside{position:fixed;inset:0 auto 0 0;width:250px;background:var(--brand);color:#e7f5ef;overflow-y:auto;padding:18px 14px}
-aside h1{font-size:15px;margin:0 0 2px;color:#fff}
-aside .sub{font-size:12px;color:#a7d8c5;margin-bottom:14px}
-aside nav a{display:block;color:#d6efe5;text-decoration:none;padding:6px 10px;border-radius:8px;font-size:13.5px}
-aside nav a:hover,aside nav a.on{background:rgba(255,255,255,.12);color:#fff}
-aside nav .grp{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#86c5ad;margin:12px 10px 4px}
-aside nav a.main{color:var(--lime);font-weight:600}
-main{margin-left:250px;padding:28px 34px 80px;max-width:1120px}
-section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin-bottom:22px}
-h2{margin:0 0 6px;font-size:21px}
-h3{margin:20px 0 8px;font-size:16px}
-h4{margin:14px 0 6px;font-size:14px}
+html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{margin:0;font:14.5px/1.6 "Inter","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+a{color:var(--brand-600)}
+code{font-family:var(--mono);font-size:12.5px;background:#eef3f0;color:#1d3a30;padding:1px 6px;border-radius:6px;border:1px solid #e1e9e4}
+mark{background:#fde68a;color:#78350f;border-radius:4px;padding:0 2px}
+b,strong{color:var(--ink)}
+
+/* ---------- Sidebar ---------- */
+aside{position:fixed;inset:0 auto 0 0;width:272px;background:linear-gradient(180deg,#053d2f 0%,#064e3b 55%,#065f46 100%);color:#d5ece2;overflow-y:auto;padding:22px 16px 30px;z-index:5}
+.brand{display:flex;gap:11px;align-items:center;margin-bottom:6px}
+.brand-mark{width:38px;height:38px;border-radius:11px;background:var(--lime);color:var(--brand);display:grid;place-items:center;font-weight:900;font-size:17px;box-shadow:0 6px 18px -6px rgba(190,242,100,.6)}
+.brand h1{font-size:15px;line-height:1.2;margin:0;color:#fff}
+.brand small{display:block;font-size:11.5px;color:#9fd3bf}
+.side-meta{font-size:11.5px;color:#8fc7b1;margin:10px 2px 14px;padding:9px 11px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.04)}
+nav .grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:#7fbfa6;margin:16px 10px 6px;font-weight:700}
+nav a{display:flex;align-items:center;gap:10px;color:#d5ece2;text-decoration:none;padding:7px 10px;border-radius:10px;font-size:13.5px;transition:background .15s,color .15s}
+nav a .n{flex:none;width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,.08);display:grid;place-items:center;font-size:11px;font-weight:700;color:#bfe3d4}
+nav a:hover{background:rgba(255,255,255,.08);color:#fff}
+nav a.on{background:rgba(190,242,100,.14);color:#fff}
+nav a.on .n{background:var(--lime);color:var(--brand)}
+nav a.main{color:#eaffc7;font-weight:600}
+nav a .star{margin-left:auto;font-size:10px;font-weight:800;color:var(--brand);background:var(--lime);border-radius:6px;padding:1px 6px}
+
+/* ---------- Layout ---------- */
+main{margin-left:272px;padding:30px 38px 90px;max-width:1240px}
+@media(max-width:1060px){
+  aside{position:sticky;top:0;width:auto;padding:10px 12px 8px;box-shadow:0 6px 20px -12px rgba(0,0,0,.5)}
+  .brand{margin-bottom:8px}.brand-mark{width:30px;height:30px;font-size:14px}.brand small,.side-meta,nav .grp,nav a .star{display:none}
+  nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+  nav a{flex:none;padding:5px 10px 5px 6px;font-size:12.5px;background:rgba(255,255,255,.06)}
+  main{margin:0;padding:18px}
+  html{scroll-padding-top:120px}
+  .hero h2{font-size:22px}
+}
+
+.hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#064e3b 0%,#047857 60%,#0f766e 100%);color:#eafff4;border-radius:22px;padding:30px 32px;margin-bottom:26px;box-shadow:var(--shadow)}
+.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(190,242,100,.35),transparent 70%)}
+.hero .eyebrow{display:inline-flex;gap:8px;align-items:center;font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--lime)}
+.hero h2{font-size:28px;line-height:1.2;margin:8px 0 8px;color:#fff;max-width:760px}
+.hero p{margin:0;max-width:780px;color:#cdeedf}
+.hero-stats{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;position:relative;z-index:1}
+.hero-stats div{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:8px 14px;font-size:12px;color:#cdeedf}
+.hero-stats b{display:block;font-size:18px;color:#fff}
+
+section.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:26px 28px;margin-bottom:24px;box-shadow:var(--shadow-sm)}
+.sec-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:10px}
+.sec-num{flex:none;width:38px;height:38px;border-radius:12px;background:var(--brand-50);color:var(--brand-600);display:grid;place-items:center;font-weight:800;font-size:15px;border:1px solid var(--brand-100)}
+.sec-head h2{font-size:20px;line-height:1.3;margin:5px 0 0;letter-spacing:-.01em}
+.sec-head .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+h3{font-size:15.5px;margin:24px 0 10px;letter-spacing:-.005em}
+h4{font-size:13.5px;margin:0 0 8px}
 p{margin:6px 0 10px}
-.lead{color:var(--muted);margin-top:0}
-.src{font-size:12px;color:var(--muted);border-top:1px dashed var(--line);margin-top:16px;padding-top:8px}
-.src code{font-size:11.5px}
-code{font-family:var(--mono);font-size:13px;background:#f1f4f2;padding:1px 5px;border-radius:5px}
-.tag{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:#f7f9f8;color:var(--muted);vertical-align:middle}
-.tag.main{background:var(--lime);color:var(--brand);border-color:#a3e635}
-.tag.opt{background:#f1f5f9}
-.tag.off{background:#f3f4f6;color:#6b7280;text-decoration:line-through}
+.lead{color:var(--muted);font-size:14.5px;margin:2px 0 16px;max-width:900px}
+.src{display:flex;gap:8px;font-size:11.8px;color:var(--muted);border-top:1px dashed var(--line-2);margin-top:20px;padding-top:12px;line-height:1.7}
+.src:before{content:"Sumber";flex:none;font-weight:700;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#7b8a84;background:#f1f5f2;border-radius:6px;padding:1px 7px;height:fit-content;margin-top:2px}
+.src code{font-size:11px}
+.small{font-size:12.5px;color:var(--muted)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-@media(max-width:1000px){.grid2,.grid3{grid-template-columns:1fr}aside{position:static;width:auto}main{margin:0;padding:16px}}
-.box{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fbfcfb}
-.box.hl{background:var(--soft);border-color:#a7f3d0}
-.note{border-left:4px solid var(--amber);background:var(--amber-bg);padding:10px 12px;border-radius:8px;margin:10px 0;font-size:14px}
-.note.info{border-color:var(--blue);background:var(--blue-bg)}
-.note.ok{border-color:#059669;background:var(--soft)}
-.note.bad{border-color:var(--red);background:var(--red-bg)}
-table{border-collapse:collapse;width:100%;font-size:13.5px}
-th,td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}
-th{background:#f4f6f5;font-weight:600}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:1060px){.grid2,.grid3{grid-template-columns:1fr}}
+ul.tight{margin:6px 0 10px 0;padding:0;list-style:none}
+ul.tight li{position:relative;padding-left:20px;margin:6px 0}
+ul.tight li:before{content:"";position:absolute;left:4px;top:.62em;width:6px;height:6px;border-radius:50%;background:var(--brand-500)}
+
+/* ---------- Tags / pills ---------- */
+.tag{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;border:1px solid var(--line-2);background:#f6f8f7;color:var(--muted);letter-spacing:.02em}
+.tag.main{background:var(--lime);color:var(--brand);border-color:#a3e635}
+.tag.opt{background:#eef2f7;color:#475569;border-color:#dbe3ec}
+.tag.off{background:#f3f4f6;color:#6b7280;text-decoration:line-through}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.pill:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
+.p-green{background:var(--brand-50);color:#047857;box-shadow:inset 0 0 0 1px #a7f3d0}
+.p-amber{background:var(--amber-50);color:var(--amber);box-shadow:inset 0 0 0 1px #fcd34d}
+.p-red{background:var(--red-50);color:var(--red);box-shadow:inset 0 0 0 1px var(--red-200)}
+.p-gray{background:#f3f4f6;color:#4b5563;box-shadow:inset 0 0 0 1px #d1d5db}
+.p-blue{background:var(--blue-50);color:var(--blue);box-shadow:inset 0 0 0 1px var(--blue-200)}
+.p-violet{background:var(--violet-50);color:var(--violet);box-shadow:inset 0 0 0 1px #ddd6fe}
+
+/* ---------- Callouts ---------- */
+.note{display:flex;gap:11px;align-items:flex-start;border-radius:12px;padding:11px 14px;margin:12px 0;font-size:13.5px;background:var(--amber-50);border:1px solid #fde68a;color:#5a3a0a}
+.note:before{content:"!";flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:900;color:#fff;background:#d97706;margin-top:1px}
+.note.info{background:var(--blue-50);border-color:var(--blue-200);color:#1e3a8a}
+.note.info:before{content:"i";background:var(--blue);font-style:italic;font-family:Georgia,serif}
+.note.ok{background:var(--brand-50);border-color:#a7f3d0;color:#064e3b}
+.note.ok:before{content:"✓";background:var(--brand-600)}
+.note.bad{background:var(--red-50);border-color:var(--red-200);color:#7f1d1d}
+.note.bad:before{content:"✕";background:var(--red)}
+.note > div{flex:1;min-width:0}
+.err{color:var(--red);font-weight:700}
+
+/* ---------- Tables ---------- */
+.tbl{border:1px solid var(--line);border-radius:12px;overflow:auto;background:#fff}
+table{border-collapse:collapse;width:100%;font-size:13.2px}
+th,td{padding:9px 12px;text-align:left;vertical-align:top;border-bottom:1px solid #edf1ee}
+th{background:#f6f9f7;font-weight:700;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:#5b6a63;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#fbfdfc}
 td.r,th.r{text-align:right}
 td.c,th.c{text-align:center}
 .mono{font-family:var(--mono)}
-mark{background:#fde68a;border-radius:3px;padding:0 1px}
-label{font-size:13.5px}
-input[type=text],input[type=number],input[type=date],select,textarea{font:inherit;font-size:14px;padding:6px 8px;border:1px solid #c9d2cd;border-radius:8px;background:#fff;color:var(--ink)}
-input[type=number]{width:140px}
-.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:6px 0}
-.field{display:flex;flex-direction:column;gap:3px;margin:6px 0}
-button{font:inherit;font-size:13.5px;padding:7px 12px;border-radius:9px;border:1px solid #c9d2cd;background:#fff;cursor:pointer;color:var(--ink)}
-button:hover{background:#f2f5f3}
-button.pri{background:var(--brand);color:var(--lime);border-color:var(--brand);font-weight:600}
-button.pri:hover{background:#05402f}
-button.warn{border-color:#fca5a5;color:var(--red)}
-button.ghost{border-style:dashed}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---------- Forms & buttons ---------- */
+label{font-size:13px}
+input[type=text],input[type=number],input[type=date],select,textarea{font:inherit;font-size:13.5px;padding:8px 10px;border:1px solid var(--line-2);border-radius:10px;background:#fff;color:var(--ink);transition:border-color .15s,box-shadow .15s;min-width:0}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand-500);box-shadow:0 0 0 3px rgba(16,185,129,.18)}
+input[type=checkbox],input[type=radio]{accent-color:var(--brand-600);width:15px;height:15px;vertical-align:-2px}
+.f{display:flex;flex-direction:column;gap:5px}
+.f > span{font-size:11.5px;font-weight:700;color:#4b5a54;letter-spacing:.02em}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:8px 0 12px}
+.money{display:flex;align-items:stretch;border:1px solid var(--line-2);border-radius:10px;background:#fff;overflow:hidden}
+.money:focus-within{border-color:var(--brand-500);box-shadow:0 0 0 3px rgba(16,185,129,.18)}
+.money em{font-style:normal;font-size:12px;font-weight:700;color:#6b7a74;background:#f4f7f5;padding:8px 10px;border-right:1px solid var(--line)}
+.money input{border:none;box-shadow:none!important;border-radius:0;width:100%;font-family:var(--mono)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
+.choice{display:flex;flex-wrap:wrap;gap:8px}
+.choice label{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--line-2);border-radius:10px;background:#fff;cursor:pointer;transition:border-color .15s,background .15s}
+.choice label:hover{border-color:var(--brand-500)}
+.choice label:has(input:checked){border-color:var(--brand-500);background:var(--brand-50);color:var(--brand)}
+.item{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;margin:7px 0}
+.item:has(> input:checked){border-color:#86efac;background:#f6fef9}
+.item .t{font-weight:600;font-size:13.5px}
+.item .s{display:block;font-size:12px;color:var(--muted);font-weight:400}
+.item .money{width:150px}
+.item .sub{grid-column:2 / 4;display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted)}
+button{font:inherit;font-size:13px;font-weight:600;padding:8px 14px;border-radius:10px;border:1px solid var(--line-2);background:#fff;cursor:pointer;color:var(--ink-2);transition:background .15s,border-color .15s,transform .05s}
+button:hover{background:#f3f7f5;border-color:#c3cfc8}
+button:active{transform:translateY(1px)}
+button.pri{background:var(--brand-600);color:#fff;border-color:var(--brand-600);box-shadow:0 4px 12px -6px rgba(4,120,87,.7)}
+button.pri:hover{background:var(--brand-700)}
+button.warn{color:var(--red);border-color:var(--red-200);background:#fff}
+button.warn:hover{background:var(--red-50)}
+button.ghost{border-style:dashed;color:var(--muted)}
+button.sm{padding:5px 10px;font-size:12px}
 button:disabled{opacity:.45;cursor:not-allowed}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+
+/* ---------- Simulation frame ---------- */
+.sim{border:1px solid #bfe6d3;border-radius:18px;overflow:hidden;margin:18px 0;background:linear-gradient(180deg,#f7fcf9,#f3f8f5);box-shadow:var(--shadow-sm)}
+.sim-bar{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:11px 16px;background:linear-gradient(90deg,#064e3b,#047857);color:#eafff4}
+.sim-bar .ttl{display:flex;gap:10px;align-items:center;font-weight:700;font-size:14px}
+.sim-bar .ttl:before{content:"SIMULASI";font-size:10px;font-weight:800;letter-spacing:.12em;background:var(--lime);color:var(--brand);border-radius:6px;padding:2px 7px}
+.sim-bar .hint{font-size:11.5px;color:#b9e5d1}
+.sim-bar button{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff}
+.sim-bar button:hover{background:rgba(255,255,255,.2)}
+.sim-body{padding:16px;display:grid;gap:16px}
+.sim-body > *,.grid2 > *,.grid3 > *,.panel{min-width:0}
+.fgrid > *{min-width:0}
+.fgrid input,.fgrid select{width:100%}
+.sim-body.two{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}
+@media(max-width:1060px){.sim-body.two{grid-template-columns:1fr}}
+.panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}
+.panel-t{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#6a7a73;margin:0 0 12px}
+.panel-t .who{letter-spacing:.02em;text-transform:none;font-weight:700}
 .out{margin-top:10px}
-.err{color:var(--red);font-weight:600}
-.okc{color:#047857;font-weight:600}
-.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}
-.flow .st{border:1.5px solid var(--brand-2);background:#fff;border-radius:10px;padding:8px 12px;cursor:pointer;font-weight:600;font-size:13.5px}
-.flow .st.on{background:var(--brand);color:var(--lime)}
-.flow .ar{color:var(--muted);font-weight:700}
-.side{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
-.side .st{border-style:dashed}
-.sm-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
-.node{border:1.5px solid var(--line);border-radius:10px;padding:8px;font-size:12.5px;background:#fff;min-height:62px}
+.out:empty{display:none}
+.result{border-radius:14px;border:1px dashed var(--line-2);padding:14px;background:#fff}
+.result.empty{display:grid;place-items:center;color:var(--muted);font-size:13px;min-height:120px;text-align:center}
+
+/* ---------- KPI ---------- */
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.kpi div{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff}
+.kpi small{display:block;color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.kpi b{display:block;font-size:17px;font-family:var(--mono);font-variant-numeric:tabular-nums;margin-top:2px}
+.kpi .hl{background:var(--brand-50);border-color:#a7f3d0}
+.kpi .hl b{color:var(--brand-600)}
+
+/* ---------- Timeline ---------- */
+.timeline{list-style:none;margin:0;padding:4px 0 0;max-height:300px;overflow:auto}
+.timeline li{position:relative;padding:0 0 12px 22px;font-size:12.8px}
+.timeline li:before{content:"";position:absolute;left:6px;top:14px;bottom:-2px;width:2px;background:var(--line)}
+.timeline li:last-child:before{display:none}
+.timeline .dot{position:absolute;left:0;top:5px;width:14px;height:14px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1.5px currentColor;background:currentColor}
+.timeline .who-PARENT{color:#2563eb}.timeline .who-STAFF{color:#059669}.timeline .who-SYSTEM{color:#64748b}.timeline .who-IN{color:#059669}.timeline .who-OUT{color:#dc2626}.timeline .who-INFO{color:#64748b}
+.timeline b{font-size:13px}
+.timeline .meta{color:var(--muted);font-size:11.5px}
+.timeline .nt{color:#41514a;font-size:12px;margin-top:1px}
+.empty-t{color:var(--muted);font-size:12.5px;padding:6px 0}
+
+/* ---------- Flow (overview) ---------- */
+.flow{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:4px 2px 10px}
+.flow .st{flex:1 1 0;min-width:112px;position:relative;cursor:pointer;background:#fff;border:1.5px solid var(--line-2);border-radius:14px;padding:12px 12px 11px;margin-right:24px;transition:border-color .15s,box-shadow .15s,transform .1s}
+.flow .st:hover{border-color:var(--brand-500);transform:translateY(-1px)}
+.flow .st:not(:last-child):after{content:"";position:absolute;right:-20px;top:50%;width:14px;height:14px;transform:translateY(-50%);background:no-repeat center/14px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a39c' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E")}
+.flow .st small{display:block;font-size:10.5px;font-weight:800;color:#8a9a93;letter-spacing:.08em}
+.flow .st b{display:block;font-size:13.5px;line-height:1.3;margin-top:2px}
+.flow .st.on{border-color:var(--brand-600);background:var(--brand-50);box-shadow:0 0 0 3px rgba(16,185,129,.15)}
+.flow .st.on small{color:var(--brand-600)}
+.layers{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 0}
+.layers > span:first-child{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#7b8a84;margin-right:4px}
+.layers .ly{cursor:pointer;border:1.5px dashed var(--line-2);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:600;background:#fff}
+.layers .ly:hover{border-color:var(--brand-500)}
+.layers .ly.on{border-style:solid;border-color:var(--brand-600);background:var(--brand-50);color:var(--brand)}
+.flow-desc{margin-top:14px;border-radius:14px;border:1px solid #a7f3d0;background:linear-gradient(180deg,#f0fdf6,#fff);padding:14px 16px}
+.flow-desc h4{font-size:15px;margin:0 0 4px}
+
+/* ---------- State machine ---------- */
+.stages{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;position:relative}
+@media(max-width:1060px){.stages{grid-template-columns:1fr}}
+.stage{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px}
+.stage > small{display:block;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#7b8a84;margin-bottom:8px}
+.node{border:1.5px solid var(--line);border-radius:12px;padding:9px 11px;margin:7px 0;background:#fbfcfb;transition:all .2s}
 .node b{display:block;font-size:13px}
-.node.on{border-color:var(--brand);background:var(--brand);color:#fff}
-.node.on small{color:var(--lime)}
-.node.done{border-color:#a7f3d0;background:var(--soft)}
-.node small{color:var(--muted)}
-.log{font-size:12.5px;max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fcfdfc}
-.log div{padding:5px 9px;border-bottom:1px solid #eef1ef}
-.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.kpi div{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff}
-.kpi small{display:block;color:var(--muted);font-size:11.5px}
-.kpi b{font-size:15px}
-.phone{width:300px;border:10px solid #1f2937;border-radius:28px;background:#f8faf9;padding:12px;font-size:13px}
-.phone .amt{font-size:22px;font-weight:800;text-align:center;font-family:var(--mono)}
-ul.tight{margin:4px 0 8px 18px;padding:0}
-ul.tight li{margin:2px 0}
-.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600}
-.p-amber{background:var(--amber-bg);color:var(--amber);border:1px solid #fcd34d}
-.p-green{background:var(--soft);color:#047857;border:1px solid #6ee7b7}
-.p-red{background:var(--red-bg);color:var(--red);border:1px solid #fca5a5}
-.p-gray{background:#f3f4f6;color:#4b5563;border:1px solid #d1d5db}
-.p-blue{background:var(--blue-bg);color:var(--blue);border:1px solid #93c5fd}
-details{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:8px 0;background:#fcfdfc}
-details summary{cursor:pointer;font-weight:600}
-.check li{list-style:none;margin-left:-18px}
-.check input{margin-right:6px}
-.small{font-size:12.5px;color:var(--muted)}
+.node span{display:block;font-size:11.5px;color:var(--muted)}
+.node.done{border-color:#a7f3d0;background:#f3fdf7}
+.node.on{border-color:var(--brand-600);background:var(--brand-600);color:#fff;box-shadow:0 8px 20px -10px rgba(4,120,87,.8)}
+.node.on b{color:#fff}.node.on span{color:#d1fae5}
+.node.on.bad{border-color:#dc2626;background:#dc2626;box-shadow:0 8px 20px -10px rgba(220,38,38,.8)}
+.node.on.gray{border-color:#64748b;background:#64748b;box-shadow:none}
+.node.on.amber{border-color:#d97706;background:#d97706}
+.node.on.amber span{color:#fef3c7}
+.stage-hint{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5}
+.cfgline{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px;font-size:12.5px;color:var(--muted)}
+.cfgline .amt{font-size:17px;font-weight:800;color:var(--ink);font-family:var(--mono)}
+.fx{display:grid;grid-template-columns:150px 1fr;gap:6px 12px;font-size:13px}
+.fx dt{color:var(--muted);font-size:12px;font-weight:600;padding-top:2px}
+.fx dd{margin:0}
+
+/* ---------- Phone ---------- */
+.phone-wrap{display:grid;place-items:center;padding:6px}
+.phone{width:310px;border-radius:38px;background:#111827;padding:11px;box-shadow:0 30px 60px -30px rgba(15,31,25,.6)}
+.phone .scr{border-radius:28px;background:#f6faf8;overflow:hidden;min-height:430px}
+.phone .notch{height:24px;display:flex;justify-content:center;align-items:flex-start;background:#064e3b}
+.phone .notch i{display:block;width:84px;height:16px;background:#111827;border-radius:0 0 12px 12px}
+.phone .top{background:#064e3b;color:#eafff4;padding:6px 16px 14px}
+.phone .top small{display:block;font-size:10.5px;color:#9fd3bf}
+.phone .top b{color:#fff;font-size:14px}
+.phone .body{padding:12px 14px 16px;font-size:12.5px}
+.phone .amtcard{background:#fff;border:1px solid #e5ece8;border-radius:16px;padding:12px;text-align:center}
+.phone .amtcard small{font-size:10px;font-weight:800;letter-spacing:.1em;color:#6b7a74}
+.phone .amt{font-size:24px;font-weight:900;font-family:var(--mono);margin:2px 0}
+.phone .bank{margin-top:10px;background:var(--brand-50);border:1px solid #a7f3d0;border-radius:14px;padding:10px 12px}
+.phone .bank .no{font-family:var(--mono);font-weight:800;font-size:16px;letter-spacing:.05em;color:#064e3b}
+.phone .brk{margin-top:10px;border-top:1px dashed #d8e2dc;border-bottom:1px dashed #d8e2dc;padding:6px 0}
+.phone .brk div{display:flex;justify-content:space-between;padding:2px 0}
+.phone .brk div.t{font-weight:800}
+.phone .cta{margin-top:12px;background:#064e3b;color:var(--lime);border-radius:12px;text-align:center;padding:10px;font-weight:800}
+.phone .idle{display:grid;place-items:center;min-height:330px;color:#6b7a74;text-align:center;padding:20px;font-size:13px}
+
+/* ---------- Matrix ---------- */
+.cell{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.cell small{font-size:11.5px;color:var(--muted);line-height:1.35}
+
+/* ---------- Progress ---------- */
+.pos{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;background:#fff}
+.pos .hd{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.pos .hd b{font-size:13.5px}
+.bar{height:8px;border-radius:999px;background:#eef2f0;overflow:hidden;margin:8px 0 4px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#10b981,#059669);border-radius:999px;transition:width .4s}
+.pos .ft{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
+
+/* ---------- Misc ---------- */
+.avatar{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#e0f2e9;color:#065f46;font-size:11px;font-weight:800;margin-right:8px;vertical-align:middle}
+.mini-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:1060px){.mini-cards{grid-template-columns:1fr}}
+.mini{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:linear-gradient(180deg,#fff,#fbfdfc)}
+.mini h4{font-size:14px;margin:0 0 6px}
+.mini p{font-size:12.8px;color:#4b5a54;margin:0}
+.finding{display:grid;grid-template-columns:34px 1fr;gap:12px;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:10px 0;background:#fff}
+.finding .no{width:30px;height:30px;border-radius:9px;background:#f1f5f3;display:grid;place-items:center;font-weight:800;color:#4b5a54}
+.finding h4{margin:0 0 4px;font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.finding p{margin:0;font-size:13px;color:#3f4f48}
+.legend{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12px;color:var(--muted);margin-top:10px}
+.footer{text-align:center;color:var(--muted);font-size:12px;margin-top:30px}
+.toggle-grid{display:grid;grid-template-columns:auto repeat(7,1fr);gap:6px;align-items:center;font-size:12px}
+.toggle-grid .h{font-size:10px;font-weight:800;color:#7b8a84;text-align:center;line-height:1.2}
+.toggle-grid label{display:grid;place-items:center;height:30px;border:1px solid var(--line-2);border-radius:8px;cursor:pointer;background:#fff}
+.toggle-grid label:has(input:checked){background:var(--brand-600);border-color:var(--brand-600)}
+.toggle-grid label:has(input:checked):after{content:"✓";color:#fff;font-weight:900}
+.toggle-grid input{display:none}
+.toggle-grid .nm{font-weight:700;font-size:12.5px;padding-right:6px}
 </style>
 </head>
 <body>
 <aside>
-  <h1>Sistem Keuangan Baru</h1>
-  <div class="sub">Peta interaktif · disusun dari kode repo per 19 Nov 2026 (commit <span class="mono">fff65674</span>)</div>
+  <div class="brand"><div class="brand-mark">E</div><div><h1>Sistem Keuangan Baru</h1><small>Eskahade · Peta interaktif</small></div></div>
+  <div class="side-meta">Disusun dari kode repo · branch <b style="color:#eaffc7">main</b> @ <span style="font-family:var(--mono)">21fc9f48</span> · 19 Nov 2026</div>
   <nav id="nav">
     <div class="grp">Gambaran</div>
-    <a href="#ringkasan">1. Gambaran besar</a>
-    <a href="#peran">2. Peran &amp; menu</a>
+    <a href="#ringkasan"><span class="n">1</span>Gambaran besar</a>
+    <a href="#peran"><span class="n">2</span>Peran &amp; menu</a>
     <div class="grp">Uang masuk</div>
-    <a href="#tagihan">3. Tagihan &amp; periode</a>
-    <a href="#transfer" class="main">4. Transfer Manual — checkout</a>
-    <a href="#verifikasi" class="main">5. Transfer Manual — verifikasi</a>
-    <a href="#jalur" class="main">6. Pengaturan Jalur Pembayaran</a>
-    <a href="#tunai">7. Tunai di loket &amp; sesi kas</a>
+    <a href="#tagihan"><span class="n">3</span>Tagihan &amp; periode</a>
+    <a href="#transfer" class="main"><span class="n">4</span>Transfer — checkout<span class="star">UTAMA</span></a>
+    <a href="#verifikasi" class="main"><span class="n">5</span>Transfer — verifikasi<span class="star">UTAMA</span></a>
+    <a href="#jalur" class="main"><span class="n">6</span>Jalur Pembayaran</a>
+    <a href="#tunai"><span class="n">7</span>Sesi kas &amp; Kas Bank</a>
     <div class="grp">Kontrol</div>
-    <a href="#rekon">8. Rekonsiliasi &amp; mutasi bank</a>
-    <a href="#koreksi">9. Koreksi &amp; dana belum teralokasi</a>
+    <a href="#rekon"><span class="n">8</span>Rekonsiliasi &amp; mutasi</a>
+    <a href="#koreksi"><span class="n">9</span>Koreksi &amp; belum teralokasi</a>
     <div class="grp">Uang keluar</div>
-    <a href="#jajan">10. Uang jajan &amp; pencairan kolektif</a>
-    <a href="#salur">11. Penyaluran dana</a>
-    <a href="#koperasi">12. Pendapatan Koperasi</a>
+    <a href="#jajan"><span class="n">10</span>Uang jajan &amp; kolektif</a>
+    <a href="#salur"><span class="n">11</span>Penyaluran dana</a>
+    <a href="#koperasi"><span class="n">12</span>Pendapatan Koperasi</a>
     <div class="grp">Lainnya</div>
-    <a href="#portal">13. Portal Wali</a>
-    <a href="#laporan">14. Dashboard, riwayat, laporan</a>
-    <a href="#penjaga">15. Penjaga sistem (guard)</a>
-    <a href="#briva">16. BRIVA (opsional)</a>
-    <a href="#temuan">17. Temuan &amp; status</a>
+    <a href="#portal"><span class="n">13</span>Portal Wali</a>
+    <a href="#laporan"><span class="n">14</span>Dashboard &amp; laporan</a>
+    <a href="#penjaga"><span class="n">15</span>Penjaga sistem</a>
+    <a href="#briva"><span class="n">16</span>BRIVA (opsional)</a>
+    <a href="#temuan"><span class="n">17</span>Temuan &amp; status</a>
   </nav>
 </aside>
 
 <main>
 
-<!-- ============================================================ -->
-<section id="ringkasan">
-  <h2>1. Gambaran besar</h2>
-  <p class="lead">Dokumen ini menggambarkan perilaku yang <b>sudah ada di kode</b>, bukan rencana. Setiap bagian diberi rujukan file sumber. Nominal pada simulasi adalah <b>contoh</b>; tarif asli diatur di Pengaturan Keuangan.</p>
-  <div class="note info"><b>Fokus dokumen: Transfer Manual.</b> Nilai awal <code>payment_channel_mode</code> dari migrasi 0198 adalah <code>TRANSFER</code>. BRIVA hanya muncul bila admin memilih mode BRIVA/BOTH <i>dan</i> env <code>FEATURE_FLAG_BRIVA_ONLINE=true</code> <i>dan</i> santri punya Fixed BRIVA aktif. Tanpa itu, portal wali hanya menampilkan transfer manual.</div>
+<div class="hero">
+  <span class="eyebrow">Eskahade · Keuangan</span>
+  <h2>Peta Interaktif Sistem Keuangan Baru</h2>
+  <p>Semua perilaku di halaman ini diambil dari kode yang benar-benar ada di repo, bukan rencana. Setiap bagian diberi rujukan file sumber, dan simulasinya berjalan di browser saja — tidak menyentuh database. Nominal pada simulasi adalah contoh.</p>
+  <div class="hero-stats">
+    <div><b>17</b>bagian</div>
+    <div><b>10</b>simulasi interaktif</div>
+    <div><b>Transfer Manual</b>jalur utama</div>
+    <div><b>PAID ≠ SETTLED</b>prinsip kunci</div>
+  </div>
+</div>
 
-  <h3>Alur uang (klik setiap tahap)</h3>
+<!-- ============================================================ -->
+<section class="card" id="ringkasan">
+  <div class="sec-head"><div class="sec-num">1</div><div><h2>Gambaran besar</h2></div></div>
+  <div class="note info"><div><b>Fokus dokumen: Transfer Manual.</b> Nilai awal <code>payment_channel_mode</code> dari migrasi 0198 adalah <code>TRANSFER</code>. BRIVA hanya muncul bila admin memilih mode BRIVA/BOTH <i>dan</i> env <code>FEATURE_FLAG_BRIVA_ONLINE=true</code> <i>dan</i> santri punya Fixed BRIVA aktif. Tanpa itu, portal wali hanya menampilkan transfer manual.</div></div>
+
+  <h3>Alur uang — klik setiap tahap</h3>
   <div class="flow" id="flowMain"></div>
-  <div class="side" id="flowSide"></div>
-  <div class="box hl out" id="flowDesc"></div>
+  <div class="layers" id="flowSide"></div>
+  <div class="flow-desc" id="flowDesc"></div>
 
   <h3>Empat jalur uang masuk yang aktif</h3>
-  <table>
-    <tr><th>Jalur</th><th>Siapa</th><th>Biaya admin Koperasi</th><th>Kapan dianggap PAID</th></tr>
+  <div class="tbl"><table>
+    <thead><tr><th>Jalur</th><th>Siapa</th><th>Biaya admin Koperasi</th><th>Kapan dianggap PAID</th></tr></thead>
+    <tbody>
     <tr><td><span class="tag main">Transfer Manual</span></td><td>Wali di Portal → petugas verifikasi</td><td>Ya (aturan <code>TRANSFER_CHECKOUT_FEE</code>) + kode unik</td><td>Saat petugas menekan <i>Terima pembayaran</i> dengan nominal persis</td></tr>
-    <tr><td>Tunai — Catat Pembayaran</td><td>Bendahara/Admin di Status Pembayaran</td><td>Tidak (biaya hanya untuk BRIVA &amp; Transfer)</td><td>Saat dicatat (wajib sesi kas terbuka)</td></tr>
-    <tr><td>Tunai — Loket Kasir</td><td>Petugas Koperasi</td><td>Tidak</td><td>Saat dicatat (wajib sesi kas terbuka)</td></tr>
+    <tr><td><span class="tag">Tunai — Catat Pembayaran</span></td><td>Bendahara/Admin di Status Pembayaran</td><td>Tidak (biaya hanya untuk BRIVA &amp; Transfer)</td><td>Saat dicatat (wajib sesi kas terbuka)</td></tr>
+    <tr><td><span class="tag">Tunai — Loket Kasir</span></td><td>Petugas Koperasi</td><td>Tidak</td><td>Saat dicatat (wajib sesi kas terbuka)</td></tr>
     <tr><td><span class="tag opt">BRIVA</span></td><td>Wali bayar ke VA</td><td>Ya (aturan <code>ONLINE_CHECKOUT_FEE</code>)</td><td>Callback BRI terverifikasi — lihat bagian 16</td></tr>
-  </table>
-  <div class="src">Sumber: <code>lib/finance/orders.ts</code> (createPaymentOrder), <code>lib/finance/transfer-config.ts</code>, <code>lib/portal/finance.ts</code> (getPortalPaymentChannels, isOnlineBrivaAvailable), <code>migrations/0198…sql</code> baris 871–876.</div>
+    </tbody>
+  </table></div>
+  <div class="src"><div><code>lib/finance/orders.ts</code> (createPaymentOrder), <code>lib/finance/transfer-config.ts</code>, <code>lib/portal/finance.ts</code> (getPortalPaymentChannels, isOnlineBrivaAvailable), <code>migrations/0198…sql</code> baris 871–876.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="peran">
-  <h2>2. Peran &amp; menu</h2>
-  <p class="lead">Akses menu diambil dari seed <code>fitur_akses</code> (migrasi 0166 &amp; 0198). Hak ubah diambil dari pemeriksaan di server action. Bila akses menu pernah diubah lewat pengaturan akses di aplikasi, isi tabel bisa berbeda.</p>
-  <div style="overflow-x:auto"><table id="roleTable"></table></div>
-  <p class="small">● = bisa membuka &amp; mengubah · ◐ = hanya melihat · ○ = tidak ada di menu · * = berlaku setelah migrasi <code>0199_finance_koperasi_menu_access.sql</code> diterapkan (temuan #2–#4).</p>
-  <div class="src">Sumber: <code>lib/cache/fitur-akses.ts</code>, <code>migrations/0166_finance_navigation_and_settings.sql</code>, <code>migrations/0198…sql</code> baris 884–896, <code>lib/finance/authorization.ts</code>, <code>lib/finance/manual-transfer.ts</code> (getVerifierScope), <code>app/dashboard/keuangan/penyaluran/actions.ts</code>, <code>app/dashboard/keuangan/tarif/payment-channel-actions.ts</code>.</div>
+<section class="card" id="peran">
+  <div class="sec-head"><div class="sec-num">2</div><div><h2>Peran &amp; menu</h2></div></div>
+  <p class="lead">Akses menu diambil dari seed <code>fitur_akses</code> (migrasi 0166, 0198, 0199). Hak ubah diambil dari pemeriksaan di server action. Bila akses menu pernah diubah lewat pengaturan akses di aplikasi, isi tabel bisa berbeda.</p>
+  <div class="tbl"><table id="roleTable"></table></div>
+  <div class="legend"><span class="pill p-green">Ubah</span> bisa membuka &amp; mengubah <span class="pill p-amber">Lihat</span> hanya melihat <span class="pill p-gray">Tidak</span> tidak ada di menu · <b>*</b> berlaku setelah migrasi <code>0199</code> diterapkan</div>
+  <div class="src"><div><code>lib/cache/fitur-akses.ts</code>, <code>migrations/0166_finance_navigation_and_settings.sql</code>, <code>migrations/0198…sql</code> baris 884–896, <code>migrations/0199_finance_koperasi_menu_access.sql</code>, <code>lib/finance/authorization.ts</code>, <code>lib/finance/manual-transfer.ts</code> (getVerifierScope), <code>app/dashboard/keuangan/penyaluran/actions.ts</code>, <code>app/dashboard/keuangan/tarif/actions.ts</code>, <code>payment-channel-actions.ts</code>.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="tagihan">
-  <h2>3. Tagihan &amp; periode</h2>
+<section class="card" id="tagihan">
+  <div class="sec-head"><div class="sec-num">3</div><div><h2>Tagihan &amp; periode</h2></div></div>
   <p class="lead">Tagihan (<i>obligation</i>) diterbitkan per santri, per item, per periode. Status dihitung dari <code>terbayar</code> vs <code>tagihan − pembebasan</code>: Belum Bayar → Sebagian → Lunas, atau Dibebaskan.</p>
-  <table>
-    <tr><th>Item</th><th>Siklus</th><th>Boleh dicicil?</th><th>Penerima dana</th></tr>
-    <tr><td>SPP Bulanan</td><td>Bulanan</td><td><b>Tidak pernah</b> — wajib lunas sisa tagihan</td><td>Bendahara Pesantren</td></tr>
-    <tr><td>Uang Makan (Katering)</td><td>Bulanan</td><td>Mengikuti aturan cicilan tarif (bawaan: tidak)</td><td>Katering (penyedia dari Master Jasa)</td></tr>
-    <tr><td>Uang Nyuci (Laundry)</td><td>Bulanan</td><td>Mengikuti aturan cicilan tarif</td><td>Laundry (penyedia dari Master Jasa)</td></tr>
-    <tr><td>EHB, Ekstrakurikuler, Kesehatan</td><td>Tahunan (tahun ajaran Juli–Juni)</td><td>Mengikuti aturan cicilan tarif</td><td>Bendahara Pesantren</td></tr>
-    <tr><td>USPP / Uang Bangunan</td><td>Sekali (lifetime)</td><td><b>Selalu boleh</b></td><td>Bendahara Pesantren</td></tr>
-    <tr><td>Uang Jajan</td><td>Bukan tagihan — top-up dana titipan</td><td>Bebas nominal</td><td>Tidak disalurkan (titipan santri)</td></tr>
-  </table>
+  <div class="tbl"><table>
+    <thead><tr><th>Item</th><th>Siklus</th><th>Boleh dicicil?</th><th>Penerima dana</th></tr></thead>
+    <tbody>
+    <tr><td><b>SPP Bulanan</b></td><td>Bulanan</td><td><span class="pill p-red">Tidak pernah</span> wajib lunas sisa tagihan</td><td>Bendahara Pesantren</td></tr>
+    <tr><td><b>Uang Makan (Katering)</b></td><td>Bulanan</td><td>Mengikuti aturan cicilan tarif (bawaan: tidak)</td><td>Katering (penyedia dari Master Jasa)</td></tr>
+    <tr><td><b>Uang Nyuci (Laundry)</b></td><td>Bulanan</td><td>Mengikuti aturan cicilan tarif</td><td>Laundry (penyedia dari Master Jasa)</td></tr>
+    <tr><td><b>EHB, Ekstrakurikuler, Kesehatan</b></td><td>Tahunan (tahun ajaran Juli–Juni)</td><td>Mengikuti aturan cicilan tarif</td><td>Bendahara Pesantren</td></tr>
+    <tr><td><b>USPP / Uang Bangunan</b></td><td>Sekali (lifetime)</td><td><span class="pill p-green">Selalu boleh</span></td><td>Bendahara Pesantren</td></tr>
+    <tr><td><b>Uang Jajan</b></td><td>Bukan tagihan — top-up dana titipan</td><td>Bebas nominal</td><td>Tidak disalurkan (titipan santri)</td></tr>
+    </tbody>
+  </table></div>
 
   <div class="grid2">
-    <div class="box">
-      <h4>Simulasi: santri ini ditagih apa?</h4>
-      <div class="row"><label>Asrama <select id="bAsrama"></select></label>
-      <label>Kategori <select id="bKat"><option>REGULER</option><option>SADESA</option></select></label></div>
-      <div id="bOut" class="out"></div>
-      <p class="small">Pembebasan lain (beasiswa, keringanan) diberikan manual di Pengaturan Keuangan → Pembebasan Biaya: per santri atau per kelas, per item atau semua item, untuk rentang periode, wajib alasan, ada pratinjau dampak, dan bisa dicabut dengan alasan.</p>
+    <div class="sim">
+      <div class="sim-bar"><span class="ttl">Santri ini ditagih apa?</span></div>
+      <div class="sim-body">
+        <div class="fgrid">
+          <label class="f"><span>Asrama</span><select id="bAsrama"></select></label>
+          <label class="f"><span>Kategori santri</span><select id="bKat"><option>REGULER</option><option>SADESA</option></select></label>
+        </div>
+        <div id="bOut"></div>
+        <p class="small" style="margin:0">Pembebasan lain (beasiswa, keringanan) diberikan manual di Pengaturan Keuangan → Pembebasan Biaya: per santri atau per kelas, per item atau semua item, untuk rentang periode, wajib alasan, ada pratinjau dampak, dan bisa dicabut dengan alasan.</p>
+      </div>
     </div>
-    <div class="box">
-      <h4>Simulasi: periode pada tanggal tertentu (WIB)</h4>
-      <div class="row"><label>Tanggal <input type="date" id="pDate"></label></div>
-      <div id="pOut" class="out"></div>
+    <div class="sim">
+      <div class="sim-bar"><span class="ttl">Periode pada tanggal tertentu (WIB)</span></div>
+      <div class="sim-body">
+        <div class="fgrid"><label class="f"><span>Tanggal</span><input type="date" id="pDate"></label></div>
+        <div id="pOut"></div>
+      </div>
     </div>
   </div>
-  <div class="note info">Periode lewat = <b>Tunggakan</b>, periode sekarang = <b>Berjalan</b>, periode depan = <b>Mendatang</b>. Bayar di muka tersedia di Portal, Catat Pembayaran, dan Loket, tetapi <b>tidak pernah dipilih otomatis</b> dan tidak masuk total kewajiban. Cutover: Juli 2026 (bulanan) dan 2026 (tahunan).</div>
-  <div class="src">Sumber: <code>lib/finance/types.ts</code> (computeObligationStatus, FINANCE_ITEM_LABELS), <code>lib/finance/billing-periods.ts</code> (billingClock, advanceBillingPeriods), <code>lib/finance/non-billable-santri.ts</code>, <code>lib/finance/transfer-config.ts</code> (isFlexibleItem), <code>docs/FINANCE_BILLING_ISSUANCE.md</code>.</div>
+  <div class="note info"><div>Periode lewat = <b>Tunggakan</b>, periode sekarang = <b>Berjalan</b>, periode depan = <b>Mendatang</b>. Bayar di muka tersedia di Portal, Catat Pembayaran, dan Loket, tetapi <b>tidak pernah dipilih otomatis</b> dan tidak masuk total kewajiban. Cutover: Juli 2026 (bulanan) dan 2026 (tahunan).</div></div>
+  <div class="src"><div><code>lib/finance/types.ts</code> (computeObligationStatus, FINANCE_ITEM_LABELS), <code>lib/finance/billing-periods.ts</code> (billingClock, advanceBillingPeriods), <code>lib/finance/non-billable-santri.ts</code>, <code>lib/finance/transfer-config.ts</code> (isFlexibleItem), <code>docs/FINANCE_BILLING_ISSUANCE.md</code>.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="transfer">
-  <h2>4. Transfer Manual — checkout wali <span class="tag main">UTAMA</span></h2>
+<section class="card" id="transfer">
+  <div class="sec-head"><div class="sec-num">4</div><div><h2>Transfer Manual — checkout wali</h2><div class="tags"><span class="tag main">UTAMA</span></div></div></div>
   <p class="lead">Wali memilih tagihan → memilih rekening tujuan → memilih cara biaya admin (ditambahkan/dipotong) → server menghitung total + kode unik → wali mentransfer nominal persis → mengunggah bukti.</p>
 
-  <div class="grid2">
-    <div class="box">
-      <h4>Pengaturan (contoh)</h4>
-      <div class="row"><label>Biaya admin Koperasi per transfer <input type="number" id="coFee" value="5000" min="0" max="100000"></label></div>
-      <div class="row"><label>Kode unik maksimal <input type="number" id="coMax" value="999" min="99" max="999"></label></div>
-      <div class="row"><label><input type="checkbox" id="coDeductOn" checked> Opsi "potong dari nominal" aktif</label></div>
-      <h4>Item yang dipilih wali (nominal contoh)</h4>
-      <div class="row"><label><input type="checkbox" id="coSpp" checked> SPP 1 bulan — sisa Rp200.000 (wajib penuh)</label></div>
-      <div class="row"><label><input type="checkbox" id="coMakan"> Uang Makan — sisa Rp350.000, bayar</label> <input type="number" id="coMakanAmt" value="350000"> <label><input type="checkbox" id="coMakanCicil"> tarif "Boleh Dicicil"</label></div>
-      <div class="row"><label><input type="checkbox" id="coUspp"> Cicilan USPP — sisa Rp3.000.000, bayar</label> <input type="number" id="coUsppAmt" value="500000"></div>
-      <div class="row"><label><input type="checkbox" id="coUj" checked> Top-up Uang Jajan</label> <input type="number" id="coUjAmt" value="300000"></div>
-      <h4>Pembebanan biaya admin</h4>
-      <div class="row"><label><input type="radio" name="coMode" value="ADD" checked> Tambahkan ke transfer</label> <label><input type="radio" name="coMode" value="DEDUCT"> Potong dari nominal</label></div>
-      <div class="row"><button class="pri" id="coRun">Buat pembayaran</button></div>
+  <div class="sim">
+    <div class="sim-bar"><span class="ttl">Checkout transfer di Portal Wali</span><span class="hint">Nominal & biaya = contoh</span></div>
+    <div class="sim-body two">
+      <div class="panel">
+        <div class="panel-t">Pengaturan Jalur Pembayaran (contoh)</div>
+        <div class="fgrid">
+          <label class="f"><span>Biaya admin per transfer</span><span class="money"><em>Rp</em><input type="number" id="coFee" value="5000" min="0" max="100000"></span></label>
+          <label class="f"><span>Kode unik maksimal</span><input type="number" id="coMax" value="999" min="99" max="999"></label>
+        </div>
+        <div class="choice" style="margin-bottom:14px"><label><input type="checkbox" id="coDeductOn" checked> Opsi "potong dari nominal" aktif</label></div>
+
+        <div class="panel-t">Item yang dipilih wali</div>
+        <label class="item"><input type="checkbox" id="coSpp" checked><span class="t">SPP 1 bulan<span class="s">Sisa Rp200.000 · wajib lunas penuh</span></span><span class="num">Rp200.000</span></label>
+        <div class="item"><input type="checkbox" id="coMakan"><span class="t">Uang Makan<span class="s">Sisa Rp350.000</span></span><span class="money"><em>Rp</em><input type="number" id="coMakanAmt" value="350000"></span>
+          <span class="sub"><label><input type="checkbox" id="coMakanCicil"> Tarif diatur "Boleh Dicicil"</label></span></div>
+        <div class="item"><input type="checkbox" id="coUspp"><span class="t">Cicilan USPP<span class="s">Sisa Rp3.000.000 · boleh dicicil</span></span><span class="money"><em>Rp</em><input type="number" id="coUsppAmt" value="500000"></span></div>
+        <div class="item"><input type="checkbox" id="coUj" checked><span class="t">Top-up Uang Jajan<span class="s">Dana titipan, nominal bebas</span></span><span class="money"><em>Rp</em><input type="number" id="coUjAmt" value="300000"></span></div>
+
+        <div class="panel-t" style="margin-top:14px">Pembebanan biaya admin</div>
+        <div class="choice">
+          <label><input type="radio" name="coMode" value="ADD" checked> Tambahkan ke transfer</label>
+          <label><input type="radio" name="coMode" value="DEDUCT"> Potong dari nominal</label>
+        </div>
+        <div class="btns"><button class="pri" id="coRun">Buat pembayaran</button></div>
+      </div>
+      <div class="phone-wrap"><div class="phone"><div class="scr"><div class="notch"><i></i></div><div class="top"><small>Portal Wali · Tagihan</small><b>Transfer &amp; unggah bukti</b></div><div id="coPhone"><div class="idle">Isi pilihan di kiri, lalu tekan <b>Buat pembayaran</b> untuk melihat layar yang diterima wali.</div></div></div></div></div>
     </div>
-    <div>
-      <div class="phone" id="coPhone"><div class="small" style="text-align:center">Tekan "Buat pembayaran" untuk melihat layar wali.</div></div>
-    </div>
+    <div style="padding:0 16px 16px"><div id="coOut" class="out"></div></div>
   </div>
-  <div id="coOut" class="out"></div>
 
   <h3>Aturan yang ditegakkan server</h3>
   <ul class="tight">
@@ -233,191 +448,215 @@ details summary{cursor:pointer;font-weight:600}
     <li>Rekening tujuan disalin (snapshot) ke order; mengubah rekening di pengaturan tidak mengubah order lama.</li>
     <li>Batas unggah bukti = pengaturan <i>Batas unggah bukti (jam)</i>, bawaan 24 jam. Order tanpa bukti yang lewat batas ditandai <i>Kedaluwarsa</i> saat portal wali atau antrian verifikasi dibuka.</li>
   </ul>
-  <div class="src">Sumber: <code>lib/finance/orders.ts</code> (createPaymentOrder, pickUniqueTransferCode, langkah 2b DEDUCT), <code>lib/portal/finance.ts</code> (createPortalPaymentOrder), <code>app/portal-ortu/(app)/tagihan/_transfer-panel.tsx</code>, <code>_tagihan-client.tsx</code>.</div>
+  <div class="src"><div><code>lib/finance/orders.ts</code> (createPaymentOrder, pickUniqueTransferCode, langkah 2b DEDUCT), <code>lib/portal/finance.ts</code> (createPortalPaymentOrder), <code>app/portal-ortu/(app)/tagihan/_transfer-panel.tsx</code>, <code>_tagihan-client.tsx</code>.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="verifikasi">
-  <h2>5. Transfer Manual — bukti &amp; verifikasi petugas <span class="tag main">UTAMA</span></h2>
-  <p class="lead">Simulasikan satu pengajuan dari awal sampai selesai. Tombol yang tersedia mengikuti aturan transisi yang dijaga trigger database. Coba juga tombol yang <i>seharusnya ditolak</i>.</p>
-  <div class="row small" id="smCfg"></div>
-  <div class="sm-grid" id="smNodes"></div>
+<section class="card" id="verifikasi">
+  <div class="sec-head"><div class="sec-num">5</div><div><h2>Transfer Manual — bukti &amp; verifikasi petugas</h2><div class="tags"><span class="tag main">UTAMA</span></div></div></div>
+  <p class="lead">Simulasikan satu pengajuan dari awal sampai selesai. Tombol mengikuti aturan transisi yang dijaga trigger database — coba juga tombol yang <i>seharusnya ditolak</i>.</p>
 
-  <div class="grid2">
-    <div class="box">
-      <h4>Aksi Wali (Portal)</h4>
-      <div class="row"><label>Foto bukti <select id="smPhoto"><option value="NEW">Foto baru (belum pernah diunggah)</option></select></label></div>
-      <div class="row"><input type="text" id="smSender" placeholder="Nama pemilik rekening pengirim" value="Siti Aminah"> <input type="text" id="smBank" placeholder="Bank / e-wallet" value="BSI"></div>
-      <div class="row">
-        <button id="smUpload">Kirim bukti transfer</button>
-        <button id="smCancel" class="warn">Batalkan pembayaran</button>
-        <button id="smNew">Buat pembayaran baru</button>
+  <div class="sim">
+    <div class="sim-bar"><span class="ttl">Perjalanan satu pengajuan transfer</span><button class="sm" id="smReset">↺ Ulangi simulasi</button></div>
+    <div class="sim-body">
+      <div class="cfgline" id="smCfg"></div>
+      <div class="stages" id="smNodes"></div>
+      <div class="grid2">
+        <div class="panel">
+          <div class="panel-t"><span class="pill p-blue">Wali</span><span class="who">Portal Orang Tua</span></div>
+          <div class="fgrid">
+            <label class="f"><span>Foto bukti</span><select id="smPhoto"><option value="NEW">Foto baru (belum pernah diunggah)</option></select></label>
+            <label class="f"><span>Pemilik rekening pengirim</span><input type="text" id="smSender" value="Siti Aminah"></label>
+            <label class="f"><span>Bank / e-wallet</span><input type="text" id="smBank" value="BSI"></label>
+          </div>
+          <div class="btns">
+            <button class="pri" id="smUpload">Kirim bukti transfer</button>
+            <button class="warn" id="smCancel">Batalkan pembayaran</button>
+            <button id="smNew">Buat pembayaran baru</button>
+          </div>
+          <div class="panel-t" style="margin-top:16px"><span class="pill p-gray">Sistem</span><span class="who">Kejadian lain</span></div>
+          <div class="btns" style="margin-top:0">
+            <button id="smExpire">Batas waktu unggah lewat</button>
+            <button id="smCash">Tagihan dilunasi tunai di loket</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-t"><span class="pill p-green">Petugas</span><span class="who">Verifikasi Transfer</span></div>
+          <div class="fgrid">
+            <label class="f"><span>Nominal di mutasi rekening</span><span class="money"><em>Rp</em><input type="number" id="smRecv"></span></label>
+            <label class="f"><span>Alasan / catatan</span><input type="text" id="smNote" placeholder="mis. foto buram"></label>
+          </div>
+          <div class="btns">
+            <button class="pri" id="smApprove">Terima pembayaran</button>
+            <button id="smUnalloc">Terima sbg dana belum teralokasi</button>
+          </div>
+          <div class="btns">
+            <button id="smFix">Minta unggah ulang</button>
+            <button class="warn" id="smReject">Tolak</button>
+          </div>
+        </div>
       </div>
-      <h4>Sistem / kejadian lain</h4>
-      <div class="row">
-        <button id="smExpire">Batas waktu unggah lewat</button>
-        <button id="smCash">Tagihan dilunasi tunai di loket</button>
+      <div id="smMsg" class="out"></div>
+      <div class="grid2">
+        <div class="panel"><div class="panel-t">Akibat di database</div><dl class="fx" id="smEffect"></dl></div>
+        <div class="panel"><div class="panel-t">Jejak audit (append-only)</div><ul class="timeline" id="smLog"></ul></div>
       </div>
-    </div>
-    <div class="box">
-      <h4>Aksi Petugas (Verifikasi Transfer)</h4>
-      <div class="row"><label>Nominal yang tercatat di mutasi rekening <input type="number" id="smRecv"></label></div>
-      <div class="row"><input type="text" id="smNote" placeholder="Alasan / catatan" style="width:100%"></div>
-      <div class="row">
-        <button class="pri" id="smApprove">Terima pembayaran</button>
-        <button id="smUnalloc">Terima sebagai dana belum teralokasi</button>
-      </div>
-      <div class="row">
-        <button id="smFix">Minta unggah ulang</button>
-        <button id="smReject" class="warn">Tolak</button>
-      </div>
+      <p class="small" style="margin:0">Foto yang sudah pernah diunggah tetap tercatat meski simulasi diulang — sama seperti sistem (hash foto unik selamanya). Pilih foto lama di daftar untuk mencoba pemakaian ulang.</p>
     </div>
   </div>
-  <div id="smMsg" class="out"></div>
 
-  <div class="grid2 out">
-    <div>
-      <h4>Akibat di database (per simulasi)</h4>
-      <table id="smEffect"></table>
-    </div>
-    <div>
-      <h4>Jejak audit (append-only)</h4>
-      <div class="log" id="smLog"></div>
-    </div>
-  </div>
-  <div class="row"><button class="ghost" id="smReset">Ulangi simulasi</button> <span class="small">Foto yang sudah pernah diunggah tetap tercatat meski diulang — sama seperti sistem (hash foto unik selamanya). Pilih foto lama di daftar untuk mencoba pemakaian ulang.</span></div>
-
-  <h3>Yang dilihat petugas saat memeriksa</h3>
-  <ul class="tight">
-    <li>Foto bukti, nominal yang harus ada di mutasi (tiga digit kode unik disorot), asrama/kamar, nama &amp; bank pengirim, waktu transfer, catatan wali.</li>
-    <li>Rincian item, biaya admin, kode unik, 6 transfer sebelumnya santri ini, dan jejak audit.</li>
-    <li><b>Peringatan otomatis</b>: pengajuan lain bernominal sama dalam 7 hari terakhir, dan nama pengirim yang sama dipakai untuk santri lain yang masih menunggu.</li>
-    <li>Jika dua petugas memproses bersamaan, hanya satu yang berhasil; yang lain mendapat pesan "baru saja diproses petugas lain".</li>
-  </ul>
-  <h3>Validasi unggah bukti</h3>
-  <ul class="tight">
-    <li>Foto maks 2 MB (dikompres otomatis di HP), harus gambar. Satu foto (hash isi) hanya boleh dipakai <b>sekali</b> di seluruh sistem.</li>
-    <li>Nama pengirim &amp; bank wajib (≥2 huruf). Waktu transfer tidak boleh di masa depan, dan tidak boleh lebih dari 24 jam sebelum pembayaran dibuat.</li>
-    <li>Wali hanya bisa membatalkan selama bukti belum dikirim.</li>
-  </ul>
-
-  <h3>Pembagian tugas petugas per asrama</h3>
-  <div class="grid2">
-    <div class="box">
-      <h4>Penugasan (ubah centang)</h4>
-      <div id="scAssign"></div>
-    </div>
-    <div class="box">
-      <h4>Antrian yang terlihat oleh…</h4>
-      <div class="row"><select id="scViewer"></select></div>
-      <div id="scOut"></div>
-    </div>
-  </div>
-  <div class="src">Sumber: <code>lib/finance/manual-transfer.ts</code> (submitTransferProof, approveTransferSubmission, approveTransferAsUnallocated, closeWithoutPayment, getVerifierScope, getTransferReviewDetail), <code>app/dashboard/keuangan/verifikasi-transfer/*</code>, <code>migrations/0198…sql</code> trigger <code>trg_finance_transfer_sub_transition</code>, <code>…_terminal</code>, <code>…_order_locked_in_review</code>, <code>…_proof_guard</code>; <code>lib/finance/payments.ts</code> langkah 5b/5c &amp; 7b.</div>
-</section>
-
-<!-- ============================================================ -->
-<section id="jalur">
-  <h2>6. Pengaturan Keuangan → Jalur Pembayaran</h2>
   <div class="grid2">
     <div>
-      <table>
-        <tr><th>Pengaturan</th><th>Batas</th><th>Bawaan</th></tr>
-        <tr><td>Mode: <i>Transfer bank saja</i> / <i>BRIVA saja</i> / <i>Keduanya</i></td><td>—</td><td>Transfer</td></tr>
-        <tr><td>Biaya admin Koperasi per transfer</td><td>Rp0–Rp100.000</td><td>Rp0 (aturan nonaktif)</td></tr>
-        <tr><td>Kode unik maksimal</td><td>99–999</td><td>999</td></tr>
-        <tr><td>Batas unggah bukti</td><td>1–168 jam</td><td>24 jam</td></tr>
-        <tr><td>Izinkan "potong dari nominal"</td><td>ya/tidak</td><td>ya</td></tr>
-        <tr><td>Rekening tujuan (banyak)</td><td>no. rek 5–25 digit; bank+no unik</td><td>belum ada</td></tr>
-        <tr><td>Petugas verifikasi per asrama</td><td>semua asrama kecuali AL-BAGHORY</td><td>belum ada</td></tr>
-      </table>
-    </div>
-    <div>
+      <h3>Yang dilihat petugas saat memeriksa</h3>
       <ul class="tight">
+        <li>Foto bukti, nominal yang harus ada di mutasi (tiga digit kode unik disorot), asrama/kamar, nama &amp; bank pengirim, waktu transfer, catatan wali.</li>
+        <li>Rincian item, biaya admin, kode unik, 6 transfer sebelumnya santri ini, dan jejak audit.</li>
+        <li><b>Peringatan otomatis</b>: pengajuan lain bernominal sama dalam 7 hari terakhir, dan nama pengirim yang sama dipakai untuk santri lain yang masih menunggu.</li>
+        <li>Jika dua petugas memproses bersamaan, hanya satu yang berhasil; yang lain mendapat pesan "baru saja diproses petugas lain".</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Validasi unggah bukti</h3>
+      <ul class="tight">
+        <li>Foto maks 2 MB (dikompres otomatis di HP), harus gambar. Satu foto (hash isi) hanya boleh dipakai <b>sekali</b> di seluruh sistem.</li>
+        <li>Nama pengirim &amp; bank wajib (≥2 huruf). Waktu transfer tidak boleh di masa depan, dan tidak boleh lebih dari 24 jam sebelum pembayaran dibuat.</li>
+        <li>Wali hanya bisa membatalkan selama bukti belum dikirim.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="sim">
+    <div class="sim-bar"><span class="ttl">Pembagian tugas petugas per asrama</span><span class="hint">Klik kotak untuk menugaskan</span></div>
+    <div class="sim-body two">
+      <div class="panel"><div class="panel-t">Penugasan</div><div id="scAssign"></div></div>
+      <div class="panel"><div class="panel-t">Antrian yang terlihat oleh…</div><div class="fgrid"><label class="f"><span>Pengguna</span><select id="scViewer"></select></label></div><div id="scOut"></div></div>
+    </div>
+  </div>
+  <div class="src"><div><code>lib/finance/manual-transfer.ts</code> (submitTransferProof, approveTransferSubmission, approveTransferAsUnallocated, closeWithoutPayment, getVerifierScope, getTransferReviewDetail), <code>app/dashboard/keuangan/verifikasi-transfer/*</code>, <code>migrations/0198…sql</code> trigger <code>trg_finance_transfer_sub_transition</code>, <code>…_terminal</code>, <code>…_order_locked_in_review</code>, <code>…_proof_guard</code>; <code>lib/finance/payments.ts</code> langkah 5b/5c, 7b &amp; 7c.</div></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="card" id="jalur">
+  <div class="sec-head"><div class="sec-num">6</div><div><h2>Pengaturan Keuangan → Jalur Pembayaran</h2></div></div>
+  <div class="grid2">
+    <div class="tbl"><table>
+      <thead><tr><th>Pengaturan</th><th>Batas</th><th>Bawaan</th></tr></thead>
+      <tbody>
+      <tr><td>Mode: <i>Transfer bank saja</i> / <i>BRIVA saja</i> / <i>Keduanya</i></td><td>—</td><td><span class="pill p-green">Transfer</span></td></tr>
+      <tr><td>Biaya admin Koperasi per transfer</td><td class="num">Rp0–Rp100.000</td><td>Rp0 (aturan nonaktif)</td></tr>
+      <tr><td>Kode unik maksimal</td><td class="num">99–999</td><td class="num">999</td></tr>
+      <tr><td>Batas unggah bukti</td><td>1–168 jam</td><td>24 jam</td></tr>
+      <tr><td>Izinkan "potong dari nominal"</td><td>ya/tidak</td><td>ya</td></tr>
+      <tr><td>Rekening tujuan (banyak)</td><td>no. rek 5–25 digit; bank+no unik</td><td>belum ada</td></tr>
+      <tr><td>Petugas verifikasi per asrama</td><td>semua asrama kecuali AL-BAGHORY</td><td>belum ada</td></tr>
+      </tbody>
+    </table></div>
+    <div>
+      <ul class="tight" style="margin-top:0">
         <li>Hanya <b>Admin</b> atau <b>Admin Koperasi</b> yang dapat menyimpan Jalur Pembayaran dan tab BRIVA &amp; Koperasi. Tab Tarif, Pembebasan, Limit, dan Kop hanya dapat diubah <b>Admin</b> atau <b>Bendahara</b> (dijaga di server).</li>
         <li>Mode Transfer/Keduanya tidak bisa disimpan sebelum ada <b>minimal satu rekening aktif</b>; rekening terakhir tidak bisa dinonaktifkan selama transfer aktif.</li>
         <li>Mengubah biaya admin membuat <b>versi aturan baru</b> (berlaku sejak disimpan); order lama tetap memakai biaya yang tersalin saat order dibuat.</li>
         <li>Mengubah rekening tidak mengubah pembayaran yang sudah dibuat.</li>
         <li>Petugas tanpa asrama yang ditugaskan melihat antrian kosong.</li>
+        <li>Rekening Koperasi yang sama dipakai sebagai pilihan di <b>Kas Bank</b> (bagian 7).</li>
       </ul>
       <p class="small">Tab lain di Pengaturan Keuangan: Tarif &amp; Cicilan (versi tarif berlaku, tarif khusus periode, titik pengalihan Koperasi), Pembebasan Biaya, Limit Uang Jajan, BRIVA &amp; Koperasi, Kop &amp; Cetak.</p>
     </div>
   </div>
-  <div class="src">Sumber: <code>app/dashboard/keuangan/tarif/payment-channel-actions.ts</code>, <code>payment-channel-tab.tsx</code>, <code>_page-content.tsx</code> (daftar tab), <code>lib/finance/transfer-config.ts</code>.</div>
+  <div class="src"><div><code>app/dashboard/keuangan/tarif/payment-channel-actions.ts</code>, <code>payment-channel-tab.tsx</code>, <code>_page-content.tsx</code> (daftar tab), <code>lib/finance/transfer-config.ts</code>.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="tunai">
-  <h2>7. Tunai di loket &amp; sesi kas</h2>
-  <p class="lead">Semua uang tunai melewati <b>sesi kas</b> milik petugas: buka dengan kas awal → transaksi → tutup dengan hitung fisik → selisih tercatat.</p>
-  <div class="grid2">
-    <div class="box">
-      <h4>Laci kas (dipakai bersama simulasi pencairan kolektif di bagian 10)</h4>
-      <div class="row"><label>Kas awal <input type="number" id="csOpen" value="2000000"></label> <button id="csOpenBtn">Buka sesi kas</button></div>
-      <div class="row"><button id="csPay">+ Terima SPP tunai Rp200.000</button> <button id="csTop">+ Setor uang jajan tunai Rp50.000 (Ahmad)</button></div>
-      <div class="row"><button id="csBankIn">Kas Bank: ambil dari rekening Rp1.000.000</button> <button id="csBankOut">Kas Bank: setor ke rekening Rp300.000</button></div>
-      <div class="row"><label>Kas fisik dihitung <input type="number" id="csCount"></label> <button id="csClose" class="warn">Tutup sesi</button></div>
-      <div id="csMsg"></div>
-    </div>
-    <div>
-      <div class="kpi" id="csKpi"></div>
-      <div class="log out" id="csLog"></div>
+<section class="card" id="tunai">
+  <div class="sec-head"><div class="sec-num">7</div><div><h2>Tunai di loket, sesi kas &amp; Kas Bank</h2><div class="tags"><span class="tag">baru: Kas Bank</span></div></div></div>
+  <p class="lead">Semua uang tunai melewati <b>sesi kas</b> milik petugas: buka dengan kas awal → transaksi → tutup dengan hitung fisik → selisih tercatat. Uang yang diambil dari / disetor ke rekening Koperasi dicatat lewat <b>Kas Bank</b> — tombol di Loket Kasir atau menu Operasional → Kas Bank.</p>
+
+  <div class="sim">
+    <div class="sim-bar"><span class="ttl">Laci kas petugas</span><span class="hint">Dipakai bersama simulasi pencairan kolektif (bagian 10)</span></div>
+    <div class="sim-body two">
+      <div class="panel">
+        <div class="panel-t">1 · Buka sesi</div>
+        <div class="row" style="margin-top:0"><span class="money" style="width:200px"><em>Rp</em><input type="number" id="csOpen" value="2000000"></span><button class="pri" id="csOpenBtn">Buka sesi kas</button></div>
+        <div class="panel-t" style="margin-top:16px">2 · Transaksi tunai</div>
+        <div class="btns" style="margin-top:0"><button id="csPay">+ Terima SPP tunai Rp200.000</button><button id="csTop">+ Setor uang jajan Rp50.000</button></div>
+        <div class="panel-t" style="margin-top:16px">3 · Kas Bank (rekening ↔ laci)</div>
+        <div class="btns" style="margin-top:0"><button id="csBankIn">⬇ Ambil dari rekening Rp1.000.000</button><button id="csBankOut">⬆ Setor ke rekening Rp300.000</button></div>
+        <div class="panel-t" style="margin-top:16px">4 · Tutup sesi</div>
+        <div class="row" style="margin-top:0"><span class="money" style="width:200px"><em>Rp</em><input type="number" id="csCount" placeholder="kas fisik dihitung"></span><button class="warn" id="csClose">Tutup sesi</button></div>
+        <div id="csMsg" class="out"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-t">Posisi laci</div>
+        <div class="kpi" id="csKpi"></div>
+        <div class="panel-t" style="margin-top:16px">Riwayat sesi</div>
+        <ul class="timeline" id="csLog"></ul>
+      </div>
     </div>
   </div>
-  <ul class="tight">
-    <li><b>Catat Pembayaran Tunai</b> (menu Status Pembayaran) dan <b>Loket Kasir</b> sama-sama mewajibkan sesi kas terbuka. Pembayaran tunai <b>tanpa</b> biaya admin.</li>
-    <li>Setor uang jajan tunai → ledger <code>TOPUP_CASH</code>.</li>
-    <li><b>Kas Bank (Mutasi Kas Bank ↔ Tunai)</b>: uang yang diambil petugas dari rekening Koperasi untuk laci dicatat sebagai <i>Ambil dari rekening</i> (kas masuk sesi); uang tunai yang disetor balik dicatat <i>Setor ke rekening</i> (kas keluar, tidak boleh melebihi isi laci). Wajib: rekening Koperasi, nama petugas yang ke bank, waktu transaksi, foto struk/slip (satu foto hanya sekali). Bukan pembayaran, bukan pendapatan, tidak menyentuh saldo santri. Pembatalan hanya selama sesi masih buka dan belum dicocokkan dengan rekening koran, dengan alasan.</li>
-    <li><b>Kas awal bersambung</b>: saat membuka sesi, sistem menampilkan sisa fisik sesi terakhir petugas itu. Bila kas awal berbeda, catatan asal/selisih wajib diisi.</li>
-    <li><b>Penarikan individual di loket (kartu + PIN) dinonaktifkan di server</b>; pencairan lewat menu Pencairan Uang Jajan (kolektif).</li>
-    <li>Sesi kas tidak bisa ditutup selama masih ada pencairan kolektif berstatus <i>Sedang dibawa</i>.</li>
-    <li>Bila tagihan dilunasi tunai sementara ada order online yang menunggu, order itu dibatalkan otomatis beserta pengajuan transfernya yang belum berbukti — <b>kecuali</b> order transfer yang buktinya sedang dicek.</li>
-  </ul>
-  <div class="src">Sumber: <code>lib/finance/cash-session.ts</code>, <code>lib/finance/cash-transfers.ts</code>, <code>migrations/0200_finance_cash_transfers.sql</code>, <code>app/dashboard/koperasi/loket/cash-transfer-modal.tsx</code>, <code>app/dashboard/koperasi/loket/actions.ts</code> (executeLoketWithdrawal → assertCredentialsModuleEnabled, executeLoketDepositOrPayment), <code>lib/finance/credentials-switch.ts</code>, <code>app/dashboard/keuangan/status-pembayaran/catat-bayar-modal.tsx</code>, <code>lib/finance/payments.ts</code> langkah 7b.</div>
+  <div class="grid2">
+    <ul class="tight">
+      <li><b>Catat Pembayaran Tunai</b> (menu Status Pembayaran) dan <b>Loket Kasir</b> sama-sama mewajibkan sesi kas terbuka. Pembayaran tunai <b>tanpa</b> biaya admin.</li>
+      <li>Setor uang jajan tunai → ledger <code>TOPUP_CASH</code>.</li>
+      <li><b>Penarikan individual di loket (kartu + PIN) dinonaktifkan di server</b>; pencairan lewat menu Pencairan Uang Jajan (kolektif).</li>
+      <li>Sesi kas tidak bisa ditutup selama masih ada pencairan kolektif berstatus <i>Sedang dibawa</i>.</li>
+      <li>Bila tagihan dilunasi tunai sementara ada order online yang menunggu, order itu dibatalkan otomatis beserta pengajuan transfernya yang belum berbukti — <b>kecuali</b> order transfer yang buktinya sedang dicek.</li>
+    </ul>
+    <ul class="tight">
+      <li><b>Kas Bank</b>: <i>Ambil dari rekening</i> = kas masuk sesi; <i>Setor ke rekening</i> = kas keluar (tidak boleh melebihi isi laci). Wajib: rekening Koperasi, nama petugas yang ke bank, waktu transaksi, <b>foto struk/slip</b> (satu foto hanya sekali).</li>
+      <li>Bukan pembayaran, bukan pendapatan, tidak menyentuh saldo santri. Pembatalan hanya selama sesi masih buka dan belum dicocokkan dengan rekening koran, dengan alasan.</li>
+      <li><b>Menu Kas Bank</b> (Operasional → Kas Bank, migrasi <code>0201</code>): daftar semua mutasi lintas sesi dengan filter arah/status/tanggal, ringkasan total ambil &amp; setor, jumlah yang belum dicocokkan, foto bukti, dan tombol catat/batalkan. Petugas Koperasi hanya melihat mutasi yang ia catat.</li>
+      <li><b>Kas awal bersambung</b>: saat membuka sesi, sistem menampilkan sisa fisik sesi terakhir petugas itu. Bila kas awal berbeda, catatan asal/selisih wajib diisi.</li>
+    </ul>
+  </div>
+  <div class="src"><div><code>lib/finance/cash-session.ts</code>, <code>lib/finance/cash-transfers.ts</code>, <code>migrations/0200_finance_cash_transfers.sql</code>, <code>app/dashboard/koperasi/loket/cash-transfer-modal.tsx</code>, <code>app/dashboard/koperasi/kas-bank/*</code>, <code>migrations/0201_finance_kas_bank_menu.sql</code>, <code>app/dashboard/koperasi/loket/actions.ts</code> (executeLoketWithdrawal → assertCredentialsModuleEnabled, executeLoketDepositOrPayment), <code>lib/finance/credentials-switch.ts</code>, <code>app/dashboard/keuangan/status-pembayaran/catat-bayar-modal.tsx</code>, <code>lib/finance/payments.ts</code> langkah 7b–7c.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="rekon">
-  <h2>8. Rekonsiliasi &amp; mutasi bank</h2>
-  <p class="lead"><b>PAID ≠ SETTLED.</b> Transfer yang diterima petugas berstatus <i>PAID</i>. Menjadi <i>SETTLED</i> hanya setelah dicocokkan dengan baris mutasi rekening (rekening koran) di menu Rekonsiliasi — selalu dengan keputusan manusia (<code>MANUAL_RESOLVED</code>) beserta catatan.</p>
+<section class="card" id="rekon">
+  <div class="sec-head"><div class="sec-num">8</div><div><h2>Rekonsiliasi &amp; mutasi bank</h2></div></div>
+  <p class="lead"><b>PAID ≠ SETTLED.</b> Transfer yang diterima petugas berstatus <i>PAID</i>. Menjadi <i>SETTLED</i> hanya setelah dicocokkan dengan baris mutasi rekening (rekening koran) di menu Rekonsiliasi — selalu keputusan manusia (<code>MANUAL_RESOLVED</code>) beserta catatan.</p>
 
   <h3>Impor mutasi CSV (internet banking)</h3>
   <p>Berkas CSV (mis. ekspor IBIZ BRI) dipratinjau dulu. Impor <b>ditolak seluruhnya</b> bila integritas tidak terbukti, dengan salah satu cara: (a) rantai saldo per baris cocok otomatis, atau (b) operator mengetik jumlah baris kredit &amp; total kredit sesuai tampilan bank. Baris yang sudah pernah diimpor tidak tersimpan dua kali.</p>
-  <div class="box">
-    <h4>Simulasi cek rantai saldo</h4>
-    <table id="chainTable"></table>
-    <div class="row"><button id="chainAdd">+ baris</button> <button class="pri" id="chainCheck">Periksa integritas</button></div>
-    <div id="chainOut"></div>
+  <div class="sim">
+    <div class="sim-bar"><span class="ttl">Cek rantai saldo berkas CSV</span><span class="hint">Ubah angka untuk mensimulasikan baris hilang/diubah</span></div>
+    <div class="sim-body">
+      <div class="tbl"><table id="chainTable"></table></div>
+      <div class="btns" style="margin-top:0"><button id="chainAdd">+ Tambah baris</button><button class="pri" id="chainCheck">Periksa integritas</button></div>
+      <div id="chainOut" class="out"></div>
+    </div>
   </div>
 
-  <h3>Simulasi pencocokan satu baris kredit mutasi</h3>
-  <div class="grid2">
-    <div class="box">
-      <h4>Data di sistem (bisa diubah)</h4>
-      <table id="mtData"></table>
-      <div class="row"><button id="mtAddPay">+ payment transfer PAID</button> <button id="mtAddSub">+ pengajuan belum selesai</button></div>
-    </div>
-    <div class="box">
-      <h4>Baris mutasi masuk</h4>
-      <div class="row"><label>Nominal kredit <input type="number" id="mtAmt" value="505020"></label> <button class="pri" id="mtRun">Cocokkan</button></div>
-      <div id="mtOut"></div>
+  <div class="sim">
+    <div class="sim-bar"><span class="ttl">Pencocokan satu baris kredit mutasi</span></div>
+    <div class="sim-body two">
+      <div class="panel">
+        <div class="panel-t">Data di sistem (bisa diubah)</div>
+        <div class="tbl"><table id="mtData"></table></div>
+        <div class="btns"><button class="sm" id="mtAddPay">+ payment transfer PAID</button><button class="sm" id="mtAddSub">+ pengajuan belum selesai</button></div>
+      </div>
+      <div class="panel">
+        <div class="panel-t">Baris mutasi masuk (kredit)</div>
+        <div class="row" style="margin-top:0"><span class="money" style="width:200px"><em>Rp</em><input type="number" id="mtAmt" value="505020"></span><button class="pri" id="mtRun">Cocokkan</button></div>
+        <div class="btns"><button class="sm ghost" data-amt="505020">505.020</button><button class="sm ghost" data-amt="300417">300.417</button><button class="sm ghost" data-amt="410777">410.777</button><button class="sm ghost" data-amt="250099">250.099</button><button class="sm ghost" data-amt="123456">123.456</button></div>
+        <div id="mtOut" class="out"></div>
+      </div>
     </div>
   </div>
-  <p class="small">Urutan pemeriksaan untuk transfer manual (setelah pencocokan BRIVA): ① payment transfer berstatus PAID ≤45 hari dengan total (pembayaran+admin+kode unik) sama → 1 kandidat = <i>EXACT_MATCH (kandidat)</i>, >1 = <i>AMBIGUOUS</i>; ② bila tidak ada, pengajuan wali yang belum selesai bernominal sama → <i>PENDING_VERIFICATION</i> (dilarang dicatat sebagai dana belum teralokasi); ③ selain itu <i>NO_MATCH</i>. Payment yang sudah SETTLED bukan kandidat.</p>
+  <p class="small">Urutan pemeriksaan untuk transfer manual (setelah pencocokan BRIVA): ① payment transfer PAID ≤45 hari dengan total (pembayaran+admin+kode unik) sama → 1 kandidat = <i>EXACT_MATCH (kandidat)</i>, &gt;1 = <i>AMBIGUOUS</i>; ② pengajuan wali yang belum selesai bernominal sama → <i>PENDING_VERIFICATION</i> (dilarang dicatat sebagai dana belum teralokasi); ③ setoran Kas Bank yang belum dicocokkan bernominal sama → <i>Kemungkinan setoran tunai petugas</i> (juga dilarang); ④ selain itu <i>NO_MATCH</i>. Payment yang sudah SETTLED bukan kandidat.</p>
 
   <h3>Mutasi Kas Bank ↔ Tunai di rekening koran</h3>
-  <p>Panel <i>Mutasi Kas Bank ↔ Tunai</i> (tab Rekonsiliasi Bank) mencocokkan setiap pengambilan tunai dengan satu baris <b>debit</b>, dan setiap setoran dengan satu baris <b>kredit</b> — arah, nominal, dan rekening harus sama, oleh Admin/Bendahara dengan catatan. Panel juga menampilkan debit yang belum dijelaskan (penarikan yang lupa dicatat, penyaluran via transfer, biaya bank). Kredit yang bernominal sama dengan setoran tunai yang belum dicocokkan ditandai <i>Kemungkinan setoran tunai petugas</i> dan <b>dilarang</b> dicatat sebagai dana belum teralokasi.</p>
-
+  <p>Panel <i>Mutasi Kas Bank ↔ Tunai</i> (tab Rekonsiliasi Bank) mencocokkan setiap pengambilan tunai dengan satu baris <b>debit</b>, dan setiap setoran dengan satu baris <b>kredit</b> — arah, nominal, dan rekening harus sama, oleh Admin/Bendahara dengan catatan. Panel juga menampilkan debit yang belum dijelaskan (penarikan yang lupa dicatat, penyaluran via transfer, biaya bank).</p>
   <h3>Tab di halaman Rekonsiliasi</h3>
   <p>Rekonsiliasi Bank · Kas Loket &amp; Fisik (selisih kas per sesi) · Perlu Resolusi (dana belum teralokasi/selisih) · Riwayat Koreksi · Sinkronisasi Modul Lama. Ubah data hanya Admin/Bendahara; Pimpinan melihat.</p>
-  <div class="src">Sumber: <code>lib/finance/statement-import.ts</code>, <code>lib/finance/statement-csv.ts</code>, <code>lib/finance/bank-statement/matching-engine.ts</code> (langkah 2b, 2c, 3), <code>…/settlement-service.ts</code>, trigger <code>trg_finance_bri_settlement_items_guard</code> &amp; <code>trg_finance_payments_prevent_invalid_settled</code>, commit <code>fff65674</code>, <code>17b5fdfe</code>.</div>
+  <div class="src"><div><code>lib/finance/statement-import.ts</code>, <code>lib/finance/statement-csv.ts</code>, <code>lib/finance/bank-statement/matching-engine.ts</code> (langkah 2b, 2c, 2d, 3), <code>…/unallocated-service.ts</code>, <code>…/settlement-service.ts</code>, <code>lib/finance/cash-transfers.ts</code>, <code>app/dashboard/keuangan/rekonsiliasi/cash-transfer-panel.tsx</code>, trigger <code>trg_finance_bri_settlement_items_guard</code> &amp; <code>trg_finance_payments_prevent_invalid_settled</code>.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="koreksi">
-  <h2>9. Koreksi &amp; dana belum teralokasi</h2>
+<section class="card" id="koreksi">
+  <div class="sec-head"><div class="sec-num">9</div><div><h2>Koreksi &amp; dana belum teralokasi</h2></div></div>
   <div class="grid2">
-    <div>
+    <div class="mini">
       <h4>Dana belum teralokasi (UNALLOCATED)</h4>
       <ul class="tight">
         <li>Muncul bila petugas memilih <i>Terima sebagai dana belum teralokasi</i> (nominal mutasi berbeda / tagihan perlu diperiksa), atau dari mutasi bank tanpa pasangan.</li>
@@ -426,156 +665,179 @@ details summary{cursor:pointer;font-weight:600}
         <li>Pada transfer belum teralokasi, biaya admin &amp; kode unik <b>tidak</b> dicatat sebagai pendapatan Koperasi.</li>
       </ul>
     </div>
-    <div>
+    <div class="mini">
       <h4>Koreksi non-destruktif</h4>
-      <table>
-        <tr><th>Jenis</th><th>Kegunaan (label di aplikasi)</th></tr>
-        <tr><td>VOID</td><td>Pembatalan pembukuan internal (sebelum tutup buku/penyaluran)</td></tr>
-        <tr><td>REVERSAL</td><td>Pembalikan mutasi sistem atau saldo dompet santri</td></tr>
-        <tr><td>REFUND</td><td>Pengembalian dana riil kepada orang tua/santri — tunai (wajib sesi kas), transfer bank pesantren, atau refund gateway</td></tr>
-      </table>
-      <p>Bila alokasinya <b>sudah disalurkan</b> ke vendor, sistem membuat <b>Kasus Pemulihan Dana</b> (bukan memotong periode berikutnya diam-diam), lalu ditandai RECOVERED setelah selesai.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Jenis</th><th>Kegunaan (label di aplikasi)</th></tr></thead>
+        <tbody>
+        <tr><td><span class="pill p-gray">VOID</span></td><td>Pembatalan pembukuan internal (sebelum tutup buku/penyaluran)</td></tr>
+        <tr><td><span class="pill p-blue">REVERSAL</span></td><td>Pembalikan mutasi sistem atau saldo dompet santri</td></tr>
+        <tr><td><span class="pill p-amber">REFUND</span></td><td>Pengembalian dana riil kepada orang tua/santri — tunai (wajib sesi kas), transfer bank pesantren, atau refund gateway</td></tr>
+        </tbody>
+      </table></div>
+      <p style="margin-top:10px">Bila alokasinya <b>sudah disalurkan</b> ke vendor, sistem membuat <b>Kasus Pemulihan Dana</b> (bukan memotong periode berikutnya diam-diam), lalu ditandai RECOVERED setelah selesai.</p>
     </div>
   </div>
-  <div class="src">Sumber: <code>app/dashboard/keuangan/rekonsiliasi/actions.ts</code>, <code>manual-allocation-modal.tsx</code>, <code>record-correction-modal.tsx</code>, <code>recovery-case-modal.tsx</code>, <code>lib/finance/corrections.ts</code>, <code>lib/finance/manual-transfer.ts</code> (approveTransferAsUnallocated).</div>
+  <div class="src"><div><code>app/dashboard/keuangan/rekonsiliasi/actions.ts</code>, <code>manual-allocation-modal.tsx</code>, <code>record-correction-modal.tsx</code>, <code>recovery-case-modal.tsx</code>, <code>lib/finance/corrections.ts</code>, <code>lib/finance/manual-transfer.ts</code> (approveTransferAsUnallocated).</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="jajan">
-  <h2>10. Uang jajan &amp; pencairan kolektif</h2>
+<section class="card" id="jajan">
+  <div class="sec-head"><div class="sec-num">10</div><div><h2>Uang jajan &amp; pencairan kolektif</h2></div></div>
   <p class="lead">Uang jajan adalah <b>dana titipan</b>: tercatat di buku besar per santri (masuk/keluar), tidak pernah diedit langsung, tidak disalurkan, bukan pendapatan Koperasi.</p>
-  <table>
-    <tr><th>Gerakan ledger</th><th>Arah</th><th>Asal</th></tr>
-    <tr><td><code>TOPUP_TRANSFER</code></td><td>Masuk</td><td>Transfer manual diterima petugas / alokasi manual ke saldo</td></tr>
-    <tr><td><code>TOPUP_CASH</code></td><td>Masuk</td><td>Setor tunai di loket</td></tr>
-    <tr><td><code>TOPUP_ONLINE</code></td><td>Masuk</td><td>BRIVA (bila aktif)</td></tr>
-    <tr><td><code>WITHDRAWAL_KOLEKTIF</code></td><td>Keluar</td><td>Diserahkan ke perwakilan</td></tr>
-    <tr><td><code>WITHDRAWAL_KOLEKTIF_RETURN</code></td><td>Masuk</td><td>Santri tidak hadir, uang kembali ke laci</td></tr>
-    <tr><td><code>WITHDRAWAL_LOKET</code></td><td>Keluar</td><td>Penarikan individual — <b>dinonaktifkan</b></td></tr>
-    <tr><td><code>REVERSAL</code></td><td>—</td><td>Koreksi</td></tr>
-  </table>
-  <div class="note info"><b>Limit:</b> limit harian efektif = min(limit global pesantren [bawaan Rp100.000], limit harian dari wali). Wali juga bisa mengatur limit mingguan &amp; bulanan di Portal → Akun. Dihitung <b>bersih</b>: penarikan loket + kolektif − pengembalian.</div>
-
-  <h3>Simulasi pencairan kolektif (memakai laci kas di bagian 7)</h3>
   <div class="grid2">
-    <div class="box">
-      <div class="row"><label>Limit global harian <input type="number" id="pyGlobal" value="100000"></label></div>
-      <div class="row"><label>Nominal per santri <input type="number" id="pyEach" value="50000"></label> <button id="pyApply">Terapkan</button></div>
-      <div class="row"><input type="text" id="pyRep" placeholder="Nama perwakilan" value="Rizki (kamar 3)"></div>
-      <table id="pyTable"></table>
-      <div class="row"><button class="pri" id="pyGive">Serahkan ke perwakilan</button></div>
-    </div>
-    <div class="box">
-      <h4>Penyelesaian setelah perwakilan kembali</h4>
-      <div id="pySettle" class="small">Belum ada pencairan yang sedang dibawa.</div>
+    <div class="tbl"><table>
+      <thead><tr><th>Gerakan ledger</th><th>Arah</th><th>Asal</th></tr></thead>
+      <tbody>
+      <tr><td><code>TOPUP_TRANSFER</code></td><td><span class="pill p-green">Masuk</span></td><td>Transfer manual diterima / alokasi manual ke saldo</td></tr>
+      <tr><td><code>TOPUP_CASH</code></td><td><span class="pill p-green">Masuk</span></td><td>Setor tunai di loket</td></tr>
+      <tr><td><code>TOPUP_ONLINE</code></td><td><span class="pill p-green">Masuk</span></td><td>BRIVA (bila aktif)</td></tr>
+      <tr><td><code>WITHDRAWAL_KOLEKTIF</code></td><td><span class="pill p-red">Keluar</span></td><td>Diserahkan ke perwakilan</td></tr>
+      <tr><td><code>WITHDRAWAL_KOLEKTIF_RETURN</code></td><td><span class="pill p-green">Masuk</span></td><td>Santri tidak hadir, uang kembali ke laci</td></tr>
+      <tr><td><code>WITHDRAWAL_LOKET</code></td><td><span class="pill p-gray">Nonaktif</span></td><td>Penarikan individual</td></tr>
+      <tr><td><code>REVERSAL</code></td><td>—</td><td>Koreksi</td></tr>
+      </tbody>
+    </table></div>
+    <div>
+      <div class="note info" style="margin-top:0"><div><b>Limit harian efektif</b> = min(limit global pesantren [bawaan Rp100.000], limit harian dari wali). Wali juga bisa mengatur limit mingguan &amp; bulanan di Portal → Akun. Dihitung <b>bersih</b>: penarikan loket + kolektif − pengembalian.</div></div>
+      <ul class="tight">
+        <li>Maks 60 santri per pencairan; satu santri hanya satu pencairan hidup per hari (WIB). Santri yang dibatalkan boleh dicairkan lagi hari itu.</li>
+        <li>Uang di laci harus cukup; tiap santri tidak boleh melebihi saldo dan sisa limit.</li>
+        <li>Setiap santri berakhir <b>DITERIMA</b> atau <b>DIBATALKAN</b>. Pembatalan wajib alasan; uang yang dikembalikan wajib <b>sama persis</b> dengan total yang dibatalkan.</li>
+        <li>Tersedia cetak daftar dengan kolom paraf penerima.</li>
+      </ul>
     </div>
   </div>
-  <div id="pyMsg" class="out"></div>
-  <ul class="tight">
-    <li>Maks 60 santri per pencairan; satu santri hanya satu pencairan hidup per hari (WIB). Santri yang dibatalkan boleh dicairkan lagi hari itu.</li>
-    <li>Uang di laci harus cukup; tiap santri tidak boleh melebihi saldo dan sisa limit.</li>
-    <li>Setiap santri berakhir <b>DITERIMA</b> atau <b>DIBATALKAN</b>. Pembatalan wajib alasan; uang yang dikembalikan wajib <b>sama persis</b> dengan total yang dibatalkan.</li>
-    <li>Tersedia cetak daftar dengan kolom paraf penerima.</li>
-  </ul>
-  <div class="src">Sumber: <code>lib/finance/wallet-payout.ts</code> (getPayoutCandidates, createPayoutBatch, settlePayoutBatch), <code>lib/finance/wallet.ts</code> (evaluateWalletLimit, DEFAULT_GLOBAL_DAILY_LIMIT), <code>migrations/0198…sql</code> indeks <code>uq_finance_payout_items_santri_day</code>, trigger <code>trg_finance_wallet_withdrawal_limit</code>, <code>app/dashboard/koperasi/pencairan-uang-jajan/_page-content.tsx</code>.</div>
+
+  <div class="sim">
+    <div class="sim-bar"><span class="ttl">Pencairan uang jajan kolektif via perwakilan</span><span class="hint">Butuh sesi kas terbuka (bagian 7)</span></div>
+    <div class="sim-body two">
+      <div class="panel">
+        <div class="panel-t">1 · Serahkan ke perwakilan</div>
+        <div class="fgrid">
+          <label class="f"><span>Limit global harian</span><span class="money"><em>Rp</em><input type="number" id="pyGlobal" value="100000"></span></label>
+          <label class="f"><span>Nominal per santri</span><span class="row" style="margin:0;flex-wrap:nowrap"><span class="money"><em>Rp</em><input type="number" id="pyEach" value="50000"></span><button class="sm" id="pyApply">Terapkan</button></span></label>
+          <label class="f"><span>Perwakilan</span><input type="text" id="pyRep" value="Rizki (kamar 3)"></label>
+        </div>
+        <div class="tbl"><table id="pyTable"></table></div>
+        <div class="btns"><button class="pri" id="pyGive">Serahkan ke perwakilan</button></div>
+      </div>
+      <div class="panel">
+        <div class="panel-t">2 · Penyelesaian setelah perwakilan kembali</div>
+        <div id="pySettle"></div>
+      </div>
+    </div>
+    <div style="padding:0 16px 16px"><div id="pyMsg" class="out"></div></div>
+  </div>
+  <div class="src"><div><code>lib/finance/wallet-payout.ts</code> (getPayoutCandidates, createPayoutBatch, settlePayoutBatch), <code>lib/finance/wallet.ts</code> (evaluateWalletLimit, DEFAULT_GLOBAL_DAILY_LIMIT), <code>migrations/0198…sql</code> indeks <code>uq_finance_payout_items_santri_day</code>, trigger <code>trg_finance_wallet_withdrawal_limit</code>, <code>app/dashboard/koperasi/pencairan-uang-jajan/_page-content.tsx</code>.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="salur">
-  <h2>11. Penyaluran dana</h2>
+<section class="card" id="salur">
+  <div class="sec-head"><div class="sec-num">11</div><div><h2>Penyaluran dana</h2></div></div>
   <p class="lead">Dana yang sudah teralokasi dari pembayaran PAID/SETTLED menjadi "Siap Salur" ke penerimanya. Tab: Bendahara Pesantren · Katering (Makan) · Laundry (Cuci) · Riwayat Penyaluran.</p>
-  <div class="grid2">
-    <div class="box">
-      <table id="dsPos"></table>
-      <h4>Catat Penyaluran Dana</h4>
-      <div class="row"><label>Pos <select id="dsSel"></select></label>
-      <label>Peran <select id="dsRole"><option value="bendahara">Bendahara</option><option value="admin">Admin</option><option value="petugas_koperasi">Petugas Koperasi</option><option value="admin_koperasi">Admin Koperasi</option><option value="pimpinan">Pimpinan</option></select></label></div>
-      <div class="row"><label><input type="radio" name="dsM" value="TRANSFER" checked> Transfer Bank</label> <label><input type="radio" name="dsM" value="CASH"> Tunai (Cash)</label></div>
-      <div class="row"><label>Nominal <input type="number" id="dsAmt" value="1000000"></label></div>
-      <div class="row"><input type="text" id="dsRef" placeholder="Nomor referensi bank / nama penerima kas"></div>
-      <div class="row"><label><input type="checkbox" id="dsProof"> Bukti transfer terlampir</label> <label><input type="checkbox" id="dsAcc" checked> Rekening dipilih dari master</label></div>
-      <div class="row"><button class="pri" id="dsGo">Konfirmasi &amp; Salurkan Dana</button></div>
-      <div id="dsMsg"></div>
-    </div>
-    <div>
-      <ul class="tight">
-        <li>Metode di layar: <b>Transfer Bank</b> (manual, wajib nomor referensi + bukti + rekening dari master, hanya Admin/Bendahara) dan <b>Tunai</b> (wajib nama penerima).</li>
-        <li><b>Petugas Koperasi</b> hanya bisa mencatat <b>Tunai</b> (tombol Transfer Bank nonaktif). <b>Admin Koperasi</b> tidak boleh mencatat penyaluran, tetapi boleh mengelola/impor rekening penerima. Pimpinan hanya melihat.</li>
-        <li>Rekening penerima disalin (snapshot) ke penyaluran; edit master tidak mengubah riwayat. Rekening bisa diimpor dari template.</li>
-        <li>Database menolak penyaluran yang melebihi dana teralokasi (anti-dobel).</li>
-        <li><b>Tidak ikut disalurkan:</b> Uang Jajan (titipan) dan pendapatan Koperasi (biaya admin + kode unik).</li>
-        <li>Penyaluran QLola (BRI) ada di kode tetapi <b>tidak tampil</b> di layar Catat Penyaluran.</li>
-      </ul>
-      <h4>Riwayat (simulasi)</h4>
-      <div class="log" id="dsLog"></div>
+  <div class="sim">
+    <div class="sim-bar"><span class="ttl">Catat Penyaluran Dana</span><span class="hint">Coba ganti peran untuk melihat aturan akses</span></div>
+    <div class="sim-body two">
+      <div class="panel">
+        <div class="panel-t">Pos dana</div>
+        <div id="dsPos"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-t">Form penyaluran</div>
+        <div class="fgrid">
+          <label class="f"><span>Pos</span><select id="dsSel"></select></label>
+          <label class="f"><span>Peran yang mencatat</span><select id="dsRole"><option value="bendahara">Bendahara</option><option value="admin">Admin</option><option value="petugas_koperasi">Petugas Koperasi</option><option value="admin_koperasi">Admin Koperasi</option><option value="pimpinan">Pimpinan</option></select></label>
+        </div>
+        <div class="choice"><label><input type="radio" name="dsM" value="TRANSFER" checked> Transfer Bank</label><label><input type="radio" name="dsM" value="CASH"> Tunai (Cash)</label></div>
+        <div class="fgrid">
+          <label class="f"><span>Nominal</span><span class="money"><em>Rp</em><input type="number" id="dsAmt" value="1000000"></span></label>
+          <label class="f"><span>No. referensi bank / nama penerima kas</span><input type="text" id="dsRef"></label>
+        </div>
+        <div class="choice"><label><input type="checkbox" id="dsProof"> Bukti transfer terlampir</label><label><input type="checkbox" id="dsAcc" checked> Rekening dari master</label></div>
+        <div class="btns"><button class="pri" id="dsGo">Konfirmasi &amp; Salurkan Dana</button></div>
+        <div id="dsMsg" class="out"></div>
+        <div class="panel-t" style="margin-top:14px">Riwayat (simulasi)</div>
+        <ul class="timeline" id="dsLog"></ul>
+      </div>
     </div>
   </div>
-  <div class="src">Sumber: <code>app/dashboard/keuangan/penyaluran/actions.ts</code> (recordDistributionAction), <code>lib/finance/distributions.ts</code> (executeDistribution, getEligibleAllocationsForDistribution), <code>catat-penyaluran-modal.tsx</code>, <code>lib/finance/distribution-flags.ts</code>, trigger <code>trg_finance_dist_items_prevent_overdraw</code>.</div>
+  <ul class="tight">
+    <li>Metode di layar: <b>Transfer Bank</b> (manual, wajib nomor referensi + bukti + rekening dari master, hanya Admin/Bendahara) dan <b>Tunai</b> (wajib nama penerima).</li>
+    <li><b>Petugas Koperasi</b> hanya bisa mencatat <b>Tunai</b> (tombol Transfer Bank nonaktif). <b>Admin Koperasi</b> tidak boleh mencatat penyaluran, tetapi boleh mengelola/impor rekening penerima. Pimpinan hanya melihat.</li>
+    <li>Rekening penerima disalin (snapshot) ke penyaluran; edit master tidak mengubah riwayat. Rekening bisa diimpor dari template.</li>
+    <li>Database menolak penyaluran yang melebihi dana teralokasi (anti-dobel).</li>
+    <li><b>Tidak ikut disalurkan:</b> Uang Jajan (titipan) dan pendapatan Koperasi (biaya admin + kode unik).</li>
+    <li>Penyaluran QLola (BRI) ada di kode tetapi <b>tidak tampil</b> di layar Catat Penyaluran.</li>
+  </ul>
+  <div class="src"><div><code>app/dashboard/keuangan/penyaluran/actions.ts</code> (recordDistributionAction, authorizeUser), <code>lib/finance/distributions.ts</code> (executeDistribution, getEligibleAllocationsForDistribution), <code>catat-penyaluran-modal.tsx</code>, <code>lib/finance/distribution-flags.ts</code>, trigger <code>trg_finance_dist_items_prevent_overdraw</code>.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="koperasi">
-  <h2>12. Pendapatan Koperasi</h2>
+<section class="card" id="koperasi">
+  <div class="sec-head"><div class="sec-num">12</div><div><h2>Pendapatan Koperasi</h2></div></div>
   <div class="grid2">
-    <div>
-      <ul class="tight">
-        <li>Dua sumber dari transfer manual, dicatat <b>terpisah</b>: <b>Biaya admin</b> dan <b>Kode unik</b>. Keduanya diposting dalam batch yang sama saat petugas menerima pembayaran.</li>
-        <li>Buku pendapatan Koperasi append-only; pembatalan memakai entri REVERSAL/REFUND.</li>
-        <li>Laporan: Laporan &amp; Ekspor → Penerimaan → kartu <i>Pendapatan Koperasi</i>, per bulan, per kanal (BRIVA/Transfer bank/Tunai) dan per sumber, plus rincian harian.</li>
-        <li>Bukan fee bank. Biaya bank (BRI) disimpan terpisah dan tidak pernah dijumlahkan dengan biaya admin.</li>
-      </ul>
-    </div>
-    <div class="box hl">
-      <h4>Contoh dari simulasi checkout</h4>
-      <div id="kopOut" class="small">Jalankan simulasi di bagian 4 lalu terima pembayaran di bagian 5.</div>
-    </div>
+    <ul class="tight">
+      <li>Dua sumber dari transfer manual, dicatat <b>terpisah</b>: <b>Biaya admin</b> dan <b>Kode unik</b>. Keduanya diposting dalam batch yang sama saat petugas menerima pembayaran.</li>
+      <li>Buku pendapatan Koperasi append-only; pembatalan memakai entri REVERSAL/REFUND.</li>
+      <li>Laporan: Laporan &amp; Ekspor → Penerimaan → kartu <i>Pendapatan Koperasi</i>, per bulan, per kanal (BRIVA/Transfer bank/Tunai) dan per sumber, plus rincian harian.</li>
+      <li>Bukan fee bank. Biaya bank (BRI) disimpan terpisah dan tidak pernah dijumlahkan dengan biaya admin.</li>
+      <li>Kas Bank (ambil/setor rekening) <b>tidak</b> menghasilkan pendapatan.</li>
+    </ul>
+    <div class="result empty" id="kopOut">Jalankan checkout di bagian 4, lalu terima pembayaran di bagian 5 — rincian pendapatannya muncul di sini.</div>
   </div>
-  <div class="src">Sumber: <code>lib/finance/payments.ts</code> langkah 5b–5c, <code>lib/finance/cooperative-admin.ts</code>, <code>app/dashboard/keuangan/laporan/cooperative-income-card.tsx</code>.</div>
+  <div class="src"><div><code>lib/finance/payments.ts</code> langkah 5b–5c, <code>lib/finance/cooperative-admin.ts</code>, <code>app/dashboard/keuangan/laporan/cooperative-income-card.tsx</code>.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="portal">
-  <h2>13. Portal Wali</h2>
-  <table>
-    <tr><th>Halaman</th><th>Isi keuangan</th></tr>
-    <tr><td>Beranda</td><td>Saldo uang jajan, kartu status transfer yang sedang berjalan; nomor VA hanya bila BRIVA aktif.</td></tr>
-    <tr><td>Tagihan</td><td>Daftar tagihan berjalan &amp; tunggakan, cicilan USPP (nominal bebas ≤ sisa), top-up uang jajan, <i>Bayar periode mendatang</i> (pilihan terpisah), pilih cara bayar, rekening tujuan, pembebanan biaya admin, lalu lembar "Transfer &amp; unggah bukti". Kartu status tampil untuk transfer yang masih terbuka dan hasil 3 hari terakhir.</td></tr>
-    <tr><td>Riwayat</td><td>Riwayat pembayaran &amp; kuitansi.</td></tr>
-    <tr><td>Akun</td><td>Atur limit uang jajan harian/mingguan/bulanan.</td></tr>
-  </table>
-  <h4>Label status yang dilihat wali vs petugas</h4>
-  <table>
-    <tr><th>Kode</th><th>Wali</th><th>Petugas</th></tr>
-    <tr><td>MENUNGGU_BUKTI</td><td>Menunggu Bukti Transfer</td><td>Menunggu Bukti</td></tr>
-    <tr><td>MENUNGGU_VERIFIKASI</td><td>Sedang Dicek Petugas</td><td>Perlu Dicek</td></tr>
-    <tr><td>PERLU_PERBAIKAN</td><td>Perlu Unggah Ulang</td><td>Menunggu Unggah Ulang</td></tr>
-    <tr><td>DITERIMA</td><td>Pembayaran Diterima</td><td>Diterima</td></tr>
-    <tr><td>DITOLAK / DIBATALKAN / KEDALUWARSA</td><td>Ditolak / Dibatalkan / Kedaluwarsa</td><td>sama</td></tr>
-  </table>
+<section class="card" id="portal">
+  <div class="sec-head"><div class="sec-num">13</div><div><h2>Portal Wali</h2></div></div>
+  <div class="grid2">
+    <div class="tbl"><table>
+      <thead><tr><th>Halaman</th><th>Isi keuangan</th></tr></thead>
+      <tbody>
+      <tr><td><b>Beranda</b></td><td>Saldo uang jajan, kartu status transfer yang sedang berjalan; nomor VA hanya bila BRIVA aktif.</td></tr>
+      <tr><td><b>Tagihan</b></td><td>Tagihan berjalan &amp; tunggakan, cicilan USPP (nominal bebas ≤ sisa), top-up uang jajan, <i>Bayar periode mendatang</i> (pilihan terpisah), pilih cara bayar, rekening tujuan, pembebanan biaya admin, lalu lembar "Transfer &amp; unggah bukti". Kartu status tampil untuk transfer yang masih terbuka dan hasil 3 hari terakhir.</td></tr>
+      <tr><td><b>Riwayat</b></td><td>Riwayat pembayaran &amp; kuitansi.</td></tr>
+      <tr><td><b>Akun</b></td><td>Atur limit uang jajan harian/mingguan/bulanan.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="tbl"><table>
+      <thead><tr><th>Kode</th><th>Dilihat wali</th><th>Dilihat petugas</th></tr></thead>
+      <tbody>
+      <tr><td><code>MENUNGGU_BUKTI</code></td><td>Menunggu Bukti Transfer</td><td>Menunggu Bukti</td></tr>
+      <tr><td><code>MENUNGGU_VERIFIKASI</code></td><td>Sedang Dicek Petugas</td><td>Perlu Dicek</td></tr>
+      <tr><td><code>PERLU_PERBAIKAN</code></td><td>Perlu Unggah Ulang</td><td>Menunggu Unggah Ulang</td></tr>
+      <tr><td><code>DITERIMA</code></td><td>Pembayaran Diterima</td><td>Diterima</td></tr>
+      <tr><td><code>DITOLAK</code> / <code>DIBATALKAN</code> / <code>KEDALUWARSA</code></td><td>Ditolak / Dibatalkan / Kedaluwarsa</td><td>sama</td></tr>
+      </tbody>
+    </table></div>
+  </div>
   <p class="small">Pengajuan pembayaran modul lama (<code>portal_payment_submission</code>) sudah ditutup untuk permintaan baru; halaman Konfirmasi Portal lama tinggal untuk histori.</p>
-  <div class="src">Sumber: <code>app/portal-ortu/(app)/tagihan/*</code>, <code>beranda/*</code>, <code>akun/*</code>, <code>riwayat/*</code>, <code>lib/portal/finance.ts</code>.</div>
+  <div class="src"><div><code>app/portal-ortu/(app)/tagihan/*</code>, <code>beranda/*</code>, <code>akun/*</code>, <code>riwayat/*</code>, <code>lib/portal/finance.ts</code>.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="laporan">
-  <h2>14. Dashboard, riwayat, laporan</h2>
-  <div class="grid3">
-    <div class="box"><h4>Dashboard Keuangan</h4><p class="small">Penerimaan Pesantren, Total Tunggakan, Total Saldo Titipan Santri, Top-Up &amp; Penarikan periode ini, Settlement &amp; Mismatch, tren Penerimaan vs Penyaluran bulanan, transaksi terbaru, aktivitas loket hari ini, pintasan ke modul.</p></div>
-    <div class="box"><h4>Status Pembayaran</h4><p class="small">Tab Ringkasan · Bulanan · Tahunan · USPP · Tunggakan; filter asrama/kelas/item/status; detail per santri; Catat Pembayaran (tunai); Pemeriksaan penerbitan tagihan (pratinjau, lalu tambah maks 25 kandidat).</p></div>
-    <div class="box"><h4>Riwayat Transaksi</h4><p class="small">Kategori: Dana masuk operasional · Dana titipan santri · Pencairan uang santri · Penyaluran (katering, laundry, bendahara); detail per transaksi.</p></div>
-    <div class="box"><h4>Uang Jajan Santri</h4><p class="small">Total Saldo Titipan, Santri Bersaldo, Top-Up &amp; Pencairan bulan ini; limit efektif per santri; buku besar per santri.</p></div>
-    <div class="box"><h4>Laporan &amp; Ekspor</h4><p class="small">Penerimaan (+ Pendapatan Koperasi) · Penyaluran · Penunggak · Pembebasan · Detail per Santri · Uang Jajan · Transaksi Loket · Settlement · Rekonsiliasi. Ekspor Excel &amp; Cetak/PDF.</p></div>
-    <div class="box"><h4>Pimpinan</h4><p class="small">Menu Monitoring Pimpinan → Keuangan (baca saja) dan akses lihat ke menu Keuangan.</p></div>
+<section class="card" id="laporan">
+  <div class="sec-head"><div class="sec-num">14</div><div><h2>Dashboard, riwayat, laporan</h2></div></div>
+  <div class="mini-cards">
+    <div class="mini"><h4>Dashboard Keuangan</h4><p>Penerimaan Pesantren, Total Tunggakan, Total Saldo Titipan Santri, Top-Up &amp; Penarikan periode ini, Settlement &amp; Mismatch, tren Penerimaan vs Penyaluran bulanan, transaksi terbaru, aktivitas loket hari ini, pintasan ke modul.</p></div>
+    <div class="mini"><h4>Status Pembayaran</h4><p>Tab Ringkasan · Bulanan · Tahunan · USPP · Tunggakan; filter asrama/kelas/item/status; detail per santri; Catat Pembayaran (tunai); Pemeriksaan penerbitan tagihan (pratinjau, lalu tambah maks 25 kandidat).</p></div>
+    <div class="mini"><h4>Riwayat Transaksi</h4><p>Kategori: Dana masuk operasional · Dana titipan santri · Pencairan uang santri · Penyaluran (katering, laundry, bendahara); detail per transaksi.</p></div>
+    <div class="mini"><h4>Uang Jajan Santri</h4><p>Total Saldo Titipan, Santri Bersaldo, Top-Up &amp; Pencairan bulan ini; limit efektif per santri; buku besar per santri.</p></div>
+    <div class="mini"><h4>Laporan &amp; Ekspor</h4><p>Penerimaan (+ Pendapatan Koperasi) · Penyaluran · Penunggak · Pembebasan · Detail per Santri · Uang Jajan · Transaksi Loket (termasuk Kas Bank) · Settlement · Rekonsiliasi. Ekspor Excel &amp; Cetak/PDF.</p></div>
+    <div class="mini"><h4>Pimpinan</h4><p>Menu Monitoring Pimpinan → Keuangan (baca saja) dan akses lihat ke menu Keuangan.</p></div>
   </div>
-  <div class="src">Sumber: <code>app/dashboard/keuangan/_page-content.tsx</code>, <code>status-pembayaran/_page-content.tsx</code>, <code>riwayat/_page-content.tsx</code>, <code>uang-jajan/_page-content.tsx</code>, <code>laporan/_page-content.tsx</code> (ReportType), <code>app/dashboard/pimpinan/keuangan/page.tsx</code>.</div>
+  <div class="src"><div><code>app/dashboard/keuangan/_page-content.tsx</code>, <code>status-pembayaran/_page-content.tsx</code>, <code>riwayat/_page-content.tsx</code>, <code>uang-jajan/_page-content.tsx</code>, <code>laporan/_page-content.tsx</code> (ReportType), <code>lib/finance/reports.ts</code> (getCashSessionsReport), <code>app/dashboard/pimpinan/keuangan/page.tsx</code>.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="penjaga">
-  <h2>15. Penjaga sistem (guard di database)</h2>
+<section class="card" id="penjaga">
+  <div class="sec-head"><div class="sec-num">15</div><div><h2>Penjaga sistem (guard di database)</h2></div></div>
   <p class="lead">Aturan berikut tidak hanya dicek di layar, tetapi juga ditolak oleh database (trigger/indeks), sehingga tetap aman walau ada klik ganda atau dua petugas bersamaan.</p>
-  <table>
-    <tr><th>Mencegah</th><th>Penjaga</th></tr>
+  <div class="tbl"><table>
+    <thead><tr><th>Mencegah</th><th>Penjaga</th></tr></thead>
+    <tbody>
     <tr><td>Dua pembayaran online aktif per santri</td><td>indeks <code>uq_finance_payment_orders_single_active_online</code></td></tr>
     <tr><td>Dua order transfer menunggu dengan total sama</td><td>indeks <code>uq_finance_payment_orders_transfer_amount</code></td></tr>
     <tr><td>Order transfer yang buktinya sedang dicek dibatalkan/diganti/kedaluwarsa</td><td><code>trg_finance_transfer_order_locked_in_review</code></td></tr>
@@ -588,38 +850,30 @@ details summary{cursor:pointer;font-weight:600}
     <tr><td>Transaksi kas tanpa sesi kas terbuka</td><td><code>trg_finance_operation_session_guard</code></td></tr>
     <tr><td>SETTLED tanpa bukti mutasi</td><td><code>trg_finance_payments_prevent_invalid_settled</code>, <code>trg_finance_bri_settlement_items_guard</code></td></tr>
     <tr><td>Penyaluran melebihi dana teralokasi</td><td><code>trg_finance_dist_items_prevent_overdraw</code></td></tr>
-    <tr><td>Mutasi kas tanpa sesi terbuka, setoran melebihi laci, foto bukti dobel, riwayat diubah/dihapus</td><td><code>trg_finance_cash_transfer_insert_guard</code>, <code>…_immutable</code>, <code>…_void_guard</code>, <code>…_no_delete</code>, unik <code>proof_hash</code></td></tr>
+    <tr><td>Kas Bank tanpa sesi terbuka, setoran melebihi laci, foto bukti dobel, riwayat diubah/dihapus</td><td><code>trg_finance_cash_transfer_insert_guard</code>, <code>…_immutable</code>, <code>…_void_guard</code>, <code>…_no_delete</code>, unik <code>proof_hash</code></td></tr>
     <tr><td>Satu baris rekening koran dipakai dua kali / setoran tunai dianggap uang wali</td><td>indeks <code>uq_finance_cash_transfers_statement</code>, <code>trg_finance_cash_transfer_match_guard</code>, <code>trg_finance_statement_cash_transfer_guard</code></td></tr>
     <tr><td>Kas awal beda dari sisa sesi terakhir tanpa penjelasan</td><td><code>trg_finance_cash_session_opening_gap_note</code></td></tr>
     <tr><td>Klik ganda / kirim ulang</td><td>kunci idempotensi per operasi (<code>finance_idempotency_keys</code>)</td></tr>
-  </table>
-  <div class="src">Sumber: <code>migrations/0198_manual_transfer_and_collective_payout.sql</code> (indeks baris 117–401, trigger 407–780), <code>lib/finance/operation.ts</code>.</div>
+    </tbody>
+  </table></div>
+  <div class="src"><div><code>migrations/0198_manual_transfer_and_collective_payout.sql</code> (indeks baris 117–401, trigger 407–780), <code>migrations/0200_finance_cash_transfers.sql</code>, <code>lib/finance/operation.ts</code>.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="briva">
-  <h2>16. BRIVA <span class="tag opt">opsional</span></h2>
+<section class="card" id="briva">
+  <div class="sec-head"><div class="sec-num">16</div><div><h2>BRIVA</h2><div class="tags"><span class="tag opt">opsional</span></div></div></div>
   <p>Ringkas saja, sesuai permintaan. Kode BRIVA tetap ada (endpoint inquiry/payment, Fixed VA per santri, biaya admin <code>ONLINE_CHECKOUT_FEE</code>), tetapi di portal hanya tampil bila: mode BRIVA/BOTH <b>dan</b> <code>FEATURE_FLAG_BRIVA_ONLINE=true</code> <b>dan</b> santri punya Fixed BRIVA aktif. Selain itu wali melihat pesan bahwa layanan BRIVA belum dibuka. Duitku sudah dihapus dari sistem aktif.</p>
-  <div class="src">Sumber: <code>lib/portal/finance.ts</code> (isOnlineBrivaAvailable), <code>app/api/bri/v1.0/transfer-va/*</code>, <code>lib/finance/bri/*</code>.</div>
+  <div class="src"><div><code>lib/portal/finance.ts</code> (isOnlineBrivaAvailable), <code>app/api/bri/v1.0/transfer-va/*</code>, <code>lib/finance/bri/*</code>.</div></div>
 </section>
 
 <!-- ============================================================ -->
-<section id="temuan">
-  <h2>17. Temuan &amp; status perbaikan</h2>
-  <p class="lead">Temuan audit kode 19 Nov 2026 beserta statusnya. Perbaikan diuji otomatis (<code>test-finance-manual-transfer.cjs</code>, <code>test-finance-koperasi-access.cjs</code>), belum dicoba langsung di aplikasi. Perubahan menu (#2–#4) aktif setelah migrasi <code>0199</code> diterapkan.</p>
-  <ol>
-    <li><span class="pill p-green">Diperbaiki 19 Nov 2026</span> <b>Tagihan dilunasi tunai saat transfer masih "Menunggu Bukti".</b> Dulu order transfer dibatalkan tetapi pengajuan wali tetap <i>Menunggu Bukti</i>, sehingga wali masih bisa mengunggah bukti untuk tagihan yang sudah lunas. Sekarang <code>payments.ts</code> langkah 7c ikut menutup pengajuan itu menjadi <i>Dibatalkan</i> (jejak audit: SYSTEM, "Tagihan sudah dilunasi melalui pembayaran …") dalam batch yang sama. Bukti yang sedang diperiksa tetap tidak disentuh. Diuji di <code>scripts/test-finance-manual-transfer.cjs</code>.</li>
-    <li><span class="pill p-green">Diperbaiki 19 Nov 2026</span> <b>Admin Koperasi &amp; menu Pengaturan Keuangan.</b> Migrasi <code>0199</code> menambahkan admin_koperasi ke menu. Di server, tab Tarif/Pembebasan/Limit/Kop kini hanya bisa diubah Admin &amp; Bendahara (sebelumnya peran Koperasi pun lolos bila diberi menu); Admin Koperasi langsung dibuka di tab Jalur Pembayaran. Bendahara tetap hanya melihat Jalur Pembayaran (sesuai AGENTS §47: admin yang memilih mode).</li>
-    <li><span class="pill p-green">Diperbaiki 19 Nov 2026</span> <b>Admin Koperasi &amp; Laporan.</b> Migrasi <code>0199</code> membuka Laporan &amp; Ekspor (baca saja) untuk admin_koperasi.</li>
-    <li><span class="pill p-green">Diperbaiki 19 Nov 2026</span> <b>Peran Koperasi &amp; Penyaluran.</b> Migrasi <code>0199</code> membuka menu untuk petugas_koperasi (catat Tunai) dan admin_koperasi (lihat + kelola rekening penerima). Layar kini menyembunyikan/menonaktifkan tombol yang pasti ditolak server.</li>
-    <li><span class="pill p-gray">Keputusan Bos</span> <b>Biaya admin transfer bawaan Rp0.</b> Bukan bug; isi nominalnya di Jalur Pembayaran bila ingin ada biaya (layar sudah menjelaskan "Rp0 berarti tanpa biaya admin").</li>
-    <li><span class="pill p-green">Diperbaiki 19 Nov 2026</span> <b>Kedaluwarsa order transfer.</b> Penyapu kini juga dijalankan saat portal wali dan antrian Verifikasi Transfer dibuka (bukan hanya saat checkout transfer baru). Bila gagal (mis. akun baca-saja) hanya dicatat di log, halaman tetap tampil.</li>
-    <li><span class="pill p-gray">Sesuai desain</span> <b>Settlement transfer selalu manual.</b> Sesuai aturan PAID ≠ SETTLED; kandidat kode unik tetap butuh keputusan petugas.</li>
-    <li><span class="pill p-gray">Pengaturan</span> <b>Petugas tanpa penugasan asrama</b> melihat antrian kosong. Layar Jalur Pembayaran sudah menampilkan "Belum ada petugas untuk: …"; cukup bagikan asramanya.</li>
-  </ol>
+<section class="card" id="temuan">
+  <div class="sec-head"><div class="sec-num">17</div><div><h2>Temuan &amp; status perbaikan</h2></div></div>
+  <p class="lead">Temuan audit kode 19 Nov 2026 beserta statusnya. Perbaikan diuji otomatis (<code>test-finance-manual-transfer.cjs</code>, <code>test-finance-koperasi-access.cjs</code>, <code>test-finance-cash-transfers.cjs</code>), belum dicoba langsung di aplikasi. Perubahan menu (#2–#4) aktif setelah migrasi <code>0199</code>, Kas Bank setelah <code>0200</code>.</p>
+  <div id="findings"></div>
 </section>
 
-<p class="small" style="text-align:center">Dibuat dari pembacaan kode repo Eskahade. Simulasi berjalan di browser saja, tidak menyentuh database.</p>
+<p class="footer">Dibuat dari pembacaan kode repo Eskahade. Simulasi berjalan di browser saja, tidak menyentuh database.</p>
 </main>
 
 <script>
@@ -630,12 +884,14 @@ const rp=n=>'Rp'+Math.round(n||0).toLocaleString('id-ID');
 const int=v=>{const n=Number(String(v).trim());return Number.isFinite(n)?Math.round(n):NaN};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function amtHtml(n){const t=Math.round(n).toLocaleString('id-ID');const cut=t.length-3;return 'Rp'+t.slice(0,cut)+'<mark>'+t.slice(cut)+'</mark>'}
-const msg=(el,text,kind)=>{el.innerHTML='<div class="note '+(kind||'')+'">'+text+'</div>'};
+const note=(kind,html)=>'<div class="note '+(kind||'')+'"><div>'+html+'</div></div>';
+const msg=(el,text,kind)=>{el.innerHTML=note(kind,text)};
 const nowStr=()=>new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+const initials=n=>n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
 
 /* ---------- nav highlight ---------- */
 const links=[...document.querySelectorAll('#nav a')];
-const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){links.forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+e.target.id))}})},{rootMargin:'-40% 0px -55% 0px'});
+const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){links.forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+e.target.id))}})},{rootMargin:'-35% 0px -60% 0px'});
 document.querySelectorAll('main section').forEach(s=>io.observe(s));
 
 /* ---------- 1. Flow ---------- */
@@ -651,15 +907,16 @@ const FLOW=[
 const SIDE=[
  {k:'Uang Jajan (ledger)',d:'Bagian alokasi UANG_JAJAN menjadi ledger masuk <code>TOPUP_TRANSFER</code>. Keluar lewat pencairan kolektif. Tidak disalurkan, bukan pendapatan.',s:'wallet.ts, wallet-payout.ts'},
  {k:'Pendapatan Koperasi',d:'Biaya admin + kode unik dicatat terpisah di buku pendapatan Koperasi; tidak disalurkan ke Pesantren/Katering/Laundry.',s:'payments.ts 5b–5c'},
- {k:'Sesi kas',d:'Semua uang tunai (bayar tunai, setor jajan, pencairan kolektif, pengembalian) melalui sesi kas petugas dengan hitung fisik saat tutup.',s:'cash-session.ts'},
+ {k:'Sesi kas',d:'Semua uang tunai (bayar tunai, setor jajan, pencairan kolektif, pengembalian, Kas Bank) melalui sesi kas petugas dengan hitung fisik saat tutup. Kas awal bersambung ke sisa sesi sebelumnya.',s:'cash-session.ts'},
+ {k:'Kas Bank',d:'Perpindahan uang antara rekening Koperasi dan laci loket (ambil/setor) dengan foto struk/slip. Masuk hitungan sesi kas dan dicocokkan ke baris debit/kredit rekening koran. Bukan pembayaran atau pendapatan.',s:'cash-transfers.ts, migrasi 0200'},
  {k:'Koreksi',d:'VOID / REVERSAL / REFUND, tanpa menghapus riwayat. Bila sudah disalurkan → Kasus Pemulihan Dana.',s:'corrections.ts'}
 ];
 function drawFlow(sel){
-  $('flowMain').innerHTML=FLOW.map((f,i)=>(i?'<span class="ar">→</span>':'')+'<span class="st'+(sel===('m'+i)?' on':'')+'" data-k="m'+i+'">'+f.k+'</span>').join('');
-  $('flowSide').innerHTML='<span class="small" style="align-self:center">Lapisan pendamping:</span>'+SIDE.map((f,i)=>'<span class="st'+(sel===('s'+i)?' on':'')+'" data-k="s'+i+'">'+f.k+'</span>').join('');
+  $('flowMain').innerHTML=FLOW.map((f,i)=>'<div class="st'+(sel===('m'+i)?' on':'')+'" data-k="m'+i+'"><small>TAHAP '+(i+1)+'</small><b>'+f.k+'</b></div>').join('');
+  $('flowSide').innerHTML='<span>Lapisan pendamping</span>'+SIDE.map((f,i)=>'<span class="ly'+(sel===('s'+i)?' on':'')+'" data-k="s'+i+'">'+f.k+'</span>').join('');
   const item=sel[0]==='m'?FLOW[+sel.slice(1)]:SIDE[+sel.slice(1)];
-  $('flowDesc').innerHTML='<b>'+item.k+'</b><br>'+item.d+'<div class="small" style="margin-top:6px">File: <code>'+item.s+'</code></div>';
-  document.querySelectorAll('#flowMain .st,#flowSide .st').forEach(e=>e.onclick=()=>drawFlow(e.dataset.k));
+  $('flowDesc').innerHTML='<h4>'+item.k+'</h4><div>'+item.d+'</div><div class="small" style="margin-top:8px">File: <code>'+item.s+'</code></div>';
+  document.querySelectorAll('#flowMain .st,#flowSide .ly').forEach(e=>e.onclick=()=>drawFlow(e.dataset.k));
 }
 drawFlow('m0');
 
@@ -668,31 +925,38 @@ const ROLES=['Admin','Bendahara','Admin Koperasi','Petugas Koperasi','Pimpinan']
 const MENU=[
  ['Dashboard Keuangan','●','●','○','○','◐'],
  ['Status Pembayaran (+ Catat Pembayaran Tunai)','●','●','○','○','◐'],
- ['Verifikasi Transfer','● semua asrama','● semua asrama','● semua asrama','● asrama tugasnya','○ (baca via URL)'],
- ['Penyaluran Dana','● transfer &amp; tunai','● transfer &amp; tunai','◐ + kelola rekening penerima*','● tunai saja*','◐'],
+ ['Verifikasi Transfer','● semua asrama','● semua asrama','● semua asrama','● asrama tugasnya','○ baca via URL'],
+ ['Penyaluran Dana','● transfer & tunai','● transfer & tunai','◐ + kelola rekening penerima*','● tunai saja*','◐'],
  ['Rekonsiliasi','●','●','○','○','◐'],
  ['Uang Jajan Santri','●','●','●','●','◐'],
  ['Riwayat Transaksi','●','●','○','○','◐'],
- ['Laporan &amp; Ekspor','●','●','◐*','○','◐'],
- ['Pengaturan Keuangan','● semua tab','● Tarif, Pembebasan, Limit, Kop (Jalur &amp; BRIVA ◐)','● Jalur &amp; BRIVA-Koperasi* (tab lain ◐)','○','◐'],
- ['Loket Kasir (sesi kas, bayar/setor tunai)','●','●','●','●','○'],
+ ['Laporan & Ekspor','●','●','◐*','○','◐'],
+ ['Pengaturan Keuangan','● semua tab','● Tarif, Pembebasan, Limit, Kop · Jalur & BRIVA lihat','● Jalur & BRIVA-Koperasi* · tab lain lihat','○','◐'],
+ ['Loket Kasir (sesi kas, bayar/setor tunai, Kas Bank)','●','●','●','●','○'],
  ['Pencairan Uang Jajan (kolektif)','●','●','●','●','○'],
- ['Kredensial &amp; Kartu','<span class="tag off">nonaktif</span>','<span class="tag off">nonaktif</span>','<span class="tag off">nonaktif</span>','<span class="tag off">nonaktif</span>','<span class="tag off">nonaktif</span>']
+ ['Kas Bank (mutasi rekening ↔ laci)','● semua petugas','● semua petugas','● semua petugas','● miliknya sendiri','◐ semua'],
+ ['Kredensial & Kartu','x','x','x','x','x']
 ];
-$('roleTable').innerHTML='<tr><th>Menu</th>'+ROLES.map(r=>'<th class="c">'+r+'</th>').join('')+'</tr>'+MENU.map(r=>'<tr><td>'+r[0]+'</td>'+r.slice(1).map(c=>'<td class="c">'+c+'</td>').join('')+'</tr>').join('')+
- '<tr><td>Portal Wali (Beranda, Tagihan, Riwayat, Akun)</td><td colspan="5" class="c">Hanya wali santri yang login; hanya santri miliknya</td></tr>';
+function cell(v){
+  const map={'●':['p-green','Ubah'],'◐':['p-amber','Lihat'],'○':['p-gray','Tidak'],'x':['p-gray','Nonaktif']};
+  const k=v[0];const [cls,lbl]=map[k]||['p-gray',v];const rest=v.slice(1).trim();
+  return '<div class="cell"><span class="pill '+cls+'">'+lbl+'</span>'+(rest?'<small>'+esc(rest)+'</small>':'')+'</div>';
+}
+$('roleTable').innerHTML='<thead><tr><th>Menu</th>'+ROLES.map(r=>'<th>'+r+'</th>').join('')+'</tr></thead><tbody>'+MENU.map(r=>'<tr><td><b>'+esc(r[0])+'</b></td>'+r.slice(1).map(c=>'<td>'+cell(c)+'</td>').join('')+'</tr>').join('')+
+ '<tr><td><b>Portal Wali</b> (Beranda, Tagihan, Riwayat, Akun)</td><td colspan="5"><span class="pill p-blue">Wali</span> <span class="small">hanya wali santri yang login, hanya santri miliknya</span></td></tr></tbody>';
 
-/* ---------- 3. Billable ---------- */
+/* ---------- 3. Billable & period ---------- */
 const ASRAMA=['AL-FALAH','AS-SALAM','BAHAGIA','ASY-SYIFA 1','ASY-SYIFA 2','ASY-SYIFA 3','ASY-SYIFA 4','AL-BAGHORY'];
 $('bAsrama').innerHTML=ASRAMA.map(a=>'<option>'+a+'</option>').join('');
 const ITEMS=[['SPP','SPP Bulanan'],['UANG_MAKAN','Uang Makan (Katering)'],['UANG_NYUCI','Uang Nyuci (Laundry)'],['EHB','EHB'],['EKSKUL','Ekstrakurikuler'],['KESEHATAN','Kesehatan (Poskestren)'],['USPP','USPP / Uang Bangunan']];
 function drawBill(){
   const a=$('bAsrama').value,k=$('bKat').value,baghory=a==='AL-BAGHORY';
-  let h='<table><tr><th>Item</th><th>Status</th></tr>';
-  ITEMS.forEach(([c,l])=>{let s;if(baghory)s='<span class="pill p-gray">Bebas total (AL-BAGHORY)</span>';else if(k==='SADESA'&&(c==='UANG_MAKAN'||c==='UANG_NYUCI'))s='<span class="pill p-gray">Bebas otomatis (SADESA)</span>';else s='<span class="pill p-green">Ditagih</span>';h+='<tr><td>'+l+'</td><td>'+s+'</td></tr>'});
-  h+='<tr><td>Pembayaran online (transfer/BRIVA)</td><td>'+(baghory?'<span class="pill p-gray">Tidak ada</span>':'<span class="pill p-green">Ada</span>')+'</td></tr>';
-  h+='<tr><td>Uang jajan &amp; pencairan kolektif</td><td>'+(baghory?'<span class="pill p-gray">Tidak ada</span>':'<span class="pill p-green">Ada</span>')+'</td></tr>';
-  h+='<tr><td>Bisa ditugaskan ke petugas verifikasi</td><td>'+(baghory?'<span class="pill p-gray">Tidak</span>':'<span class="pill p-green">Ya</span>')+'</td></tr></table>';
+  const yes=t=>'<span class="pill p-green">'+t+'</span>',no=t=>'<span class="pill p-gray">'+t+'</span>';
+  let h='<div class="tbl"><table><tbody>';
+  ITEMS.forEach(([c,l])=>{let s;if(baghory)s=no('Bebas total');else if(k==='SADESA'&&(c==='UANG_MAKAN'||c==='UANG_NYUCI'))s=no('Bebas otomatis (SADESA)');else s=yes('Ditagih');h+='<tr><td>'+l+'</td><td class="r">'+s+'</td></tr>'});
+  h+='<tr><td>Pembayaran online (transfer/BRIVA)</td><td class="r">'+(baghory?no('Tidak ada'):yes('Ada'))+'</td></tr>';
+  h+='<tr><td>Uang jajan &amp; pencairan kolektif</td><td class="r">'+(baghory?no('Tidak ada'):yes('Ada'))+'</td></tr>';
+  h+='<tr><td>Bisa ditugaskan ke petugas verifikasi</td><td class="r">'+(baghory?no('Tidak'):yes('Ya'))+'</td></tr></tbody></table></div>';
   $('bOut').innerHTML=h;
 }
 $('bAsrama').onchange=$('bKat').onchange=drawBill;drawBill();
@@ -712,11 +976,10 @@ const lbl=p=>BLN[Number(p.slice(5,7))-1]+' '+p.slice(0,4);
 function drawPeriod(){
   const v=$('pDate').value;if(!v)return;const d=new Date(v+'T12:00:00+07:00');
   const c=billingClock(d),adv=advance(d),ay=Number(c.annual);
-  $('pOut').innerHTML='<table><tr><td>Bulan berjalan (SPP, Makan, Nyuci)</td><td><b>'+lbl(c.monthly)+'</b></td></tr>'+
-  '<tr><td>Tahun ajaran berjalan (EHB, Ekskul, Kesehatan)</td><td><b>'+ay+'/'+(ay+1)+'</b> (Jul '+ay+' – Jun '+(ay+1)+')</td></tr>'+
-  '<tr><td>USPP</td><td>Selalu "Berjalan" (sisa cicilan lifetime)</td></tr>'+
-  '<tr><td>Pilihan bayar di muka</td><td>'+(adv.length?adv.map(lbl).join(', '):'—')+'</td></tr></table>'+
-  (c.monthly<'2026-07'?'<p class="err">Sebelum cutover Juli 2026 — tagihan bulanan sistem baru belum terbit.</p>':'');
+  $('pOut').innerHTML='<div class="kpi"><div class="hl"><small>Bulan berjalan</small><b>'+lbl(c.monthly)+'</b></div><div><small>Tahun ajaran</small><b>'+ay+'/'+(ay+1)+'</b></div></div>'+
+   '<p class="small" style="margin:10px 0 6px">SPP, Makan, Nyuci memakai bulan berjalan · EHB, Ekskul, Kesehatan memakai tahun ajaran (Jul '+ay+' – Jun '+(ay+1)+') · USPP selalu "Berjalan".</p>'+
+   '<div class="panel-t" style="margin:10px 0 6px">Pilihan bayar di muka</div><div class="choice">'+(adv.length?adv.map(p=>'<span class="pill p-violet">'+lbl(p)+'</span>').join(''):'<span class="small">—</span>')+'</div>'+
+   (c.monthly<'2026-07'?note('bad','Sebelum cutover Juli 2026 — tagihan bulanan sistem baru belum terbit.'):'');
 }
 const today=new Date(Date.now()+7*3600e3).toISOString().slice(0,10);$('pDate').value=today;$('pDate').onchange=drawPeriod;drawPeriod();
 
@@ -747,21 +1010,22 @@ function runCheckout(){
     if(!target)errs.push('Biaya admin hanya bisa dipotong dari Uang Jajan atau cicilan yang nominalnya lebih besar dari biaya admin. Pilih "Tambahkan biaya admin".');
     else target.alloc=target.amount-fee;
   }
-  if(errs.length){$('coOut').innerHTML='<div class="note bad">'+errs.map(esc).join('<br>')+'</div>';$('coPhone').innerHTML='<div class="err" style="text-align:center">Pembayaran tidak dibuat</div>';return}
+  if(errs.length){$('coOut').innerHTML=note('bad','<b>Server menolak pembayaran ini:</b><br>'+errs.map(esc).join('<br>'));$('coPhone').innerHTML='<div class="idle"><span class="pill p-red">Pembayaran tidak dibuat</span></div>';return}
   const gross=items.reduce((s,i)=>s+i.alloc,0),code=1+Math.floor(Math.random()*max),total=gross+fee+code;
   const ujAlloc=items.filter(i=>i.type==='UANG_JAJAN').reduce((s,i)=>s+i.alloc,0);
   lastCheckout={gross,fee,code,total,items:items.map(i=>({type:i.type,label:i.label,alloc:i.alloc})),mode,uj:ujAlloc};
   const typed=items.reduce((s,i)=>s+i.amount,0);
-  $('coPhone').innerHTML='<div class="small" style="text-align:center;font-weight:700">TRANSFER TEPAT SEJUMLAH</div><div class="amt">'+amtHtml(total)+'</div>'+
-   '<div class="small" style="text-align:center">Tiga digit terakhir ('+String(code).padStart(3,'0')+') adalah kode unik agar pembayaran Anda mudah dikenali. Mohon jangan dibulatkan.</div>'+
-   '<div class="box hl" style="margin:8px 0;padding:8px"><b>BANK (contoh)</b><div class="mono">1234567890</div><div class="small">a.n. Koperasi Pesantren (contoh)</div></div>'+
-   '<table style="font-size:12px"><tr><td>Pembayaran (masuk ke tagihan/saldo)</td><td class="r">'+rp(gross)+'</td></tr><tr><td>Biaya admin Koperasi'+(mode==='DEDUCT'&&fee>0?' (dipotong)':'')+'</td><td class="r">'+rp(fee)+'</td></tr><tr><td>Kode unik</td><td class="r">'+rp(code)+'</td></tr><tr><td><b>Total transfer</b></td><td class="r"><b>'+rp(total)+'</b></td></tr></table>'+
-   '<div class="small" style="margin-top:6px">Unggah bukti sebelum batas waktu (bawaan 24 jam). Setelah itu pembayaran dibatalkan otomatis.</div>';
-  $('coOut').innerHTML='<table><tr><th>Item</th><th class="r">Dipilih wali</th><th class="r">Masuk ke tagihan/saldo</th></tr>'+
-   items.map(i=>'<tr><td>'+i.label+(i===target?' <span class="pill p-amber">biaya admin dipotong di sini</span>':'')+'</td><td class="r">'+rp(i.amount)+'</td><td class="r">'+rp(i.alloc)+'</td></tr>').join('')+
-   '<tr><td><b>Jumlah</b></td><td class="r">'+rp(typed)+'</td><td class="r"><b>'+rp(gross)+'</b></td></tr></table>'+
-   '<div class="kpi out"><div><small>Total transfer wali</small><b>'+rp(total)+'</b></div><div><small>Masuk ke tagihan/saldo</small><b>'+rp(gross)+'</b></div><div><small>Pendapatan Koperasi (setelah diterima)</small><b>'+rp(fee+code)+'</b></div><div><small>Top-up uang jajan</small><b>'+rp(ujAlloc)+'</b></div></div>'+
-   '<div class="row out"><button class="pri" id="coSend">Lanjut ke simulasi verifikasi (bagian 5) →</button></div>';
+  $('coPhone').innerHTML='<div class="body"><div class="amtcard"><small>TRANSFER TEPAT SEJUMLAH</small><div class="amt">'+amtHtml(total)+'</div>'+
+   '<div style="font-size:11px;color:#5f6d67">Tiga digit terakhir ('+String(code).padStart(3,'0')+') adalah kode unik agar pembayaran Anda mudah dikenali. Mohon jangan dibulatkan.</div></div>'+
+   '<div class="bank"><b style="font-size:12px">BANK (contoh)</b><div class="no">1234 5678 90</div><div style="font-size:11.5px;color:#065f46">a.n. Koperasi Pesantren (contoh)</div></div>'+
+   '<div class="brk"><div><span>Pembayaran (masuk ke tagihan/saldo)</span><span class="num">'+rp(gross)+'</span></div><div><span>Biaya admin Koperasi'+(mode==='DEDUCT'&&fee>0?' (dipotong)':'')+'</span><span class="num">'+rp(fee)+'</span></div><div><span>Kode unik</span><span class="num">'+rp(code)+'</span></div><div class="t"><span>Total transfer</span><span class="num">'+rp(total)+'</span></div></div>'+
+   '<div style="font-size:11px;color:#92400e;margin-top:8px">Unggah bukti sebelum batas waktu (bawaan 24 jam). Setelah itu pembayaran dibatalkan otomatis.</div>'+
+   '<div class="cta">Kirim bukti transfer</div></div>';
+  $('coOut').innerHTML='<div class="grid2"><div class="tbl"><table><thead><tr><th>Item</th><th class="r">Dipilih wali</th><th class="r">Masuk ke tagihan/saldo</th></tr></thead><tbody>'+
+   items.map(i=>'<tr><td>'+i.label+(i===target?' <span class="pill p-amber">biaya admin dipotong di sini</span>':'')+'</td><td class="r num">'+rp(i.amount)+'</td><td class="r num">'+rp(i.alloc)+'</td></tr>').join('')+
+   '<tr><td><b>Jumlah</b></td><td class="r num">'+rp(typed)+'</td><td class="r num"><b>'+rp(gross)+'</b></td></tr></tbody></table></div>'+
+   '<div><div class="kpi"><div class="hl"><small>Total transfer wali</small><b>'+rp(total)+'</b></div><div><small>Masuk ke tagihan/saldo</small><b>'+rp(gross)+'</b></div><div><small>Pendapatan Koperasi*</small><b>'+rp(fee+code)+'</b></div><div><small>Top-up uang jajan*</small><b>'+rp(ujAlloc)+'</b></div></div>'+
+   '<p class="small" style="margin:8px 0">* baru tercatat setelah petugas menerima pembayaran.</p><div class="btns"><button class="pri" id="coSend">Lanjut ke simulasi verifikasi →</button></div></div></div>';
   $('coSend').onclick=()=>{smReset(lastCheckout);location.hash='#verifikasi'};
 }
 $('coRun').onclick=runCheckout;
@@ -769,40 +1033,48 @@ $('coRun').onclick=runCheckout;
 /* ---------- 5. State machine ---------- */
 const WALI={MENUNGGU_BUKTI:'Menunggu Bukti Transfer',MENUNGGU_VERIFIKASI:'Sedang Dicek Petugas',PERLU_PERBAIKAN:'Perlu Unggah Ulang',DITERIMA:'Pembayaran Diterima',DITOLAK:'Ditolak',DIBATALKAN:'Dibatalkan',KEDALUWARSA:'Kedaluwarsa'};
 const PETUGAS={MENUNGGU_BUKTI:'Menunggu Bukti',MENUNGGU_VERIFIKASI:'Perlu Dicek',PERLU_PERBAIKAN:'Menunggu Unggah Ulang',DITERIMA:'Diterima',DITOLAK:'Ditolak',DIBATALKAN:'Dibatalkan',KEDALUWARSA:'Kedaluwarsa'};
-const EVT={CREATED:'Pembayaran dibuat',PROOF_UPLOADED:'Bukti diunggah',APPROVED:'Diterima',APPROVED_UNALLOCATED:'Diterima (belum teralokasi)',REJECTED:'Ditolak',FIX_REQUESTED:'Diminta unggah ulang',CANCELLED:'Dibatalkan wali',EXPIRED:'Kedaluwarsa',REPLACED:'Diganti pembayaran baru'};
-const ORDER_NODES=['MENUNGGU_BUKTI','MENUNGGU_VERIFIKASI','PERLU_PERBAIKAN','DITERIMA','DITOLAK','DIBATALKAN','KEDALUWARSA'];
+const EVT={CREATED:'Pembayaran dibuat',PROOF_UPLOADED:'Bukti diunggah',APPROVED:'Diterima',APPROVED_UNALLOCATED:'Diterima (belum teralokasi)',REJECTED:'Ditolak',FIX_REQUESTED:'Diminta unggah ulang',CANCELLED:'Dibatalkan',EXPIRED:'Kedaluwarsa',REPLACED:'Diganti pembayaran baru'};
+const STAGES=[
+ {t:'Tahap 1 · Wali transfer & unggah bukti',n:['MENUNGGU_BUKTI','DIBATALKAN','KEDALUWARSA'],h:'Bisa dibatalkan wali, diganti pembayaran baru, atau kedaluwarsa — hanya selama bukti belum dikirim.'},
+ {t:'Tahap 2 · Petugas memeriksa mutasi',n:['MENUNGGU_VERIFIKASI','PERLU_PERBAIKAN'],h:'Selama di tahap ini order terkunci: tidak bisa kedaluwarsa, diganti, atau dibatalkan tunai.'},
+ {t:'Tahap 3 · Hasil akhir',n:['DITERIMA','DITOLAK'],h:'Status final — tidak bisa diubah lagi (trigger database).'}
+];
+const TONE={DITERIMA:'',DITOLAK:'bad',DIBATALKAN:'gray',KEDALUWARSA:'gray',PERLU_PERBAIKAN:'amber'};
+const STATUS_PILL={PENDING:'p-amber',PAID:'p-green',CANCELLED:'p-gray',EXPIRED:'p-gray',REPLACED:'p-gray',MENUNGGU_BUKTI:'p-amber',MENUNGGU_VERIFIKASI:'p-blue',PERLU_PERBAIKAN:'p-amber',DITERIMA:'p-green',DITOLAK:'p-red',DIBATALKAN:'p-gray',KEDALUWARSA:'p-gray',ALLOCATED:'p-green',UNALLOCATED:'p-amber'};
+const pill=s=>'<span class="pill '+(STATUS_PILL[s]||'p-gray')+'">'+s+'</span>';
 const usedHashes=new Set();let SM;
 function smReset(cfg){
   const c=cfg||lastCheckout||{gross:500000,fee:5000,code:20,total:505020,items:[{type:'SPP',label:'SPP 1 bulan',alloc:200000},{type:'UANG_JAJAN',label:'Isi Uang Jajan',alloc:300000}],mode:'ADD',uj:300000};
   SM={cfg:c,status:'MENUNGGU_BUKTI',order:'PENDING',payment:null,recon:null,income:[],wallet:0,resolution:null,proof:null,history:[],visited:new Set(['MENUNGGU_BUKTI'])};
-  addEvt('CREATED',null,'MENUNGGU_BUKTI','PARENT','Transfer '+rp(c.total)+' (kode unik '+c.code+', biaya admin '+c.mode+')');
+  addEvt('CREATED',null,'MENUNGGU_BUKTI','PARENT','Transfer '+rp(c.total)+' (kode unik '+c.code+', biaya admin '+(c.mode==='DEDUCT'?'dipotong':'ditambahkan')+')');
   $('smRecv').value=c.total;$('smNote').value='';$('smMsg').innerHTML='';smDraw();
 }
 function addEvt(a,f,t,who,n){SM.history.push({a,f,t,who,n,at:nowStr()})}
 function setStatus(s){SM.status=s;SM.visited.add(s)}
 function handled(){const s=SM.status;if(s==='MENUNGGU_BUKTI')return 'Belum ada bukti. Pengajuan berstatus Menunggu Bukti tidak muncul di antrian petugas.';if(s==='DITERIMA')return 'Pembayaran ini sudah diterima oleh Petugas.';if(s==='DITOLAK')return 'Pembayaran ini sudah ditolak oleh Petugas.';if(s==='PERLU_PERBAIKAN')return 'Pembayaran ini sedang menunggu wali mengunggah ulang bukti.';return 'Status pembayaran sudah berubah. Muat ulang antrian.'}
-function fail(t){msg($('smMsg'),'<span class="err">Ditolak sistem:</span> '+esc(t),'bad');smDraw()}
+function fail(t){msg($('smMsg'),'<b>Ditolak sistem:</b> '+esc(t),'bad');smDraw()}
 function ok(t){msg($('smMsg'),t,'ok');smDraw()}
 function smDraw(){
   const c=SM.cfg;
-  $('smCfg').innerHTML='Pengajuan simulasi: total transfer <b>'+amtHtml(c.total)+'</b> · pembayaran '+rp(c.gross)+' · biaya admin '+rp(c.fee)+(c.mode==='DEDUCT'?' (dipotong)':'')+' · kode unik '+rp(c.code);
-  $('smNodes').innerHTML=ORDER_NODES.map(n=>'<div class="node'+(n===SM.status?' on':(SM.visited.has(n)?' done':''))+'"><b>'+PETUGAS[n]+'</b><small>Wali: '+WALI[n]+'</small></div>').join('')+
-   '<div class="node small" style="border-style:dashed"><b>Transisi sah</b>Bukti→Dicek/Batal/Kedaluwarsa · Dicek→Terima/Tolak/Unggah ulang · Unggah ulang→Dicek/Tolak</div>';
+  $('smCfg').innerHTML='<span>Transfer yang diharapkan</span><span class="amt">'+amtHtml(c.total)+'</span><span class="pill p-gray">pembayaran '+rp(c.gross)+'</span><span class="pill p-gray">biaya admin '+rp(c.fee)+(c.mode==='DEDUCT'?' (dipotong)':'')+'</span><span class="pill p-gray">kode unik '+rp(c.code)+'</span>';
+  $('smNodes').innerHTML=STAGES.map(st=>'<div class="stage"><small>'+st.t+'</small>'+st.n.map(n=>{
+    const cls=n===SM.status?'on '+(TONE[n]||''):(SM.visited.has(n)?'done':'');
+    return '<div class="node '+cls+'"><b>'+PETUGAS[n]+'</b><span>Wali: '+WALI[n]+'</span></div>'}).join('')+'<div class="stage-hint">'+st.h+'</div></div>').join('');
   const pay=SM.payment;
   const rows=[
-   ['Pengajuan (submission)','<b>'+SM.status+'</b>'+(SM.resolution?' · resolusi '+SM.resolution:'')],
-   ['Order','<b>'+SM.order+'</b>'],
-   ['Payment',pay?('channel TRANSFER · '+pay.status+' · alokasi '+pay.alloc+' · '+rp(pay.amount)):'—'],
-   ['Alokasi ke tagihan/saldo',pay&&pay.alloc==='ALLOCATED'?c.items.map(i=>i.label+' '+rp(i.alloc)).join('<br>'):'—'],
-   ['Pendapatan Koperasi',SM.income.length?SM.income.map(i=>i.src+' '+rp(i.amt)).join('<br>'):'—'],
-   ['Ledger uang jajan',SM.wallet?('TOPUP_TRANSFER +'+rp(SM.wallet)):'—'],
-   ['Item rekonsiliasi',SM.recon||'—'],
-   ['Yang dilihat wali',WALI[SM.status]+(SM.resolution==='UNALLOCATED'?' — "Dana diterima dengan nominal berbeda. Bagian keuangan akan menghubungi Anda untuk penyesuaian."':'')+((SM.status==='MENUNGGU_BUKTI'&&SM.order!=='PENDING')?' <span class="pill p-amber">⚠ order sudah '+SM.order+'</span>':'')]
+   ['Pengajuan',pill(SM.status)+(SM.resolution?' <span class="small">resolusi '+SM.resolution+'</span>':'')],
+   ['Order',pill(SM.order)],
+   ['Payment',pay?('<span class="num">'+rp(pay.amount)+'</span> · TRANSFER · '+pill(pay.status)+' '+pill(pay.alloc)):'<span class="small">belum ada</span>'],
+   ['Alokasi',pay&&pay.alloc==='ALLOCATED'?c.items.map(i=>i.label+' <span class="num">'+rp(i.alloc)+'</span>').join('<br>'):'<span class="small">—</span>'],
+   ['Pendapatan Koperasi',SM.income.length?SM.income.map(i=>i.src+' <span class="num">'+rp(i.amt)+'</span>').join('<br>'):'<span class="small">—</span>'],
+   ['Ledger uang jajan',SM.wallet?'<code>TOPUP_TRANSFER</code> <span class="num">+'+rp(SM.wallet)+'</span>':'<span class="small">—</span>'],
+   ['Rekonsiliasi',SM.recon?'<span class="pill p-amber">UNALLOCATED_TRANSFER</span><br><span class="small">'+SM.recon+'</span>':'<span class="small">—</span>'],
+   ['Layar wali','<b>'+WALI[SM.status]+'</b>'+(SM.resolution==='UNALLOCATED'?'<br><span class="small">"Dana diterima dengan nominal berbeda. Bagian keuangan akan menghubungi Anda untuk penyesuaian."</span>':'')]
   ];
-  $('smEffect').innerHTML=rows.map(r=>'<tr><td style="width:38%">'+r[0]+'</td><td>'+r[1]+'</td></tr>').join('');
-  $('smLog').innerHTML=SM.history.slice().reverse().map(e=>'<div><b>'+EVT[e.a]+'</b> · '+(e.f||'—')+' → '+e.t+' · <span class="small">'+e.who+' · '+e.at+'</span>'+(e.n?'<br><span class="small">'+esc(e.n)+'</span>':'')+'</div>').join('');
+  $('smEffect').innerHTML=rows.map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('');
+  $('smLog').innerHTML=SM.history.slice().reverse().map(e=>'<li><span class="dot who-'+e.who+'"></span><b>'+EVT[e.a]+'</b> <span class="meta">· '+(e.f||'—')+' → '+e.t+' · '+({PARENT:'Wali',STAFF:'Petugas',SYSTEM:'Sistem'}[e.who])+' · '+e.at+'</span>'+(e.n?'<div class="nt">'+esc(e.n)+'</div>':'')+'</li>').join('');
   const kop=$('kopOut');
-  if(SM.income.length){kop.innerHTML='<table>'+SM.income.map(i=>'<tr><td>'+i.src+'</td><td>Transfer bank</td><td class="r">'+rp(i.amt)+'</td></tr>').join('')+'<tr><td colspan="2"><b>Total pendapatan Koperasi</b></td><td class="r"><b>'+rp(SM.income.reduce((s,i)=>s+i.amt,0))+'</b></td></tr></table>'}
+  if(SM.income.length){kop.classList.remove('empty');kop.innerHTML='<div class="panel-t">Dari pembayaran yang baru diterima</div><div class="tbl"><table><thead><tr><th>Sumber</th><th>Kanal</th><th class="r">Nominal</th></tr></thead><tbody>'+SM.income.map(i=>'<tr><td>'+i.src+'</td><td>Transfer bank</td><td class="r num">'+rp(i.amt)+'</td></tr>').join('')+'<tr><td colspan="2"><b>Total pendapatan Koperasi</b></td><td class="r num"><b>'+rp(SM.income.reduce((s,i)=>s+i.amt,0))+'</b></td></tr></tbody></table></div>'}
 }
 $('smUpload').onclick=()=>{
   if(!['MENUNGGU_BUKTI','PERLU_PERBAIKAN'].includes(SM.status))return fail('Bukti untuk pembayaran ini sudah diterima atau sudah ditutup.');
@@ -811,9 +1083,10 @@ $('smUpload').onclick=()=>{
   if(sb.length<2)return fail('Bank pengirim wajib diisi.');
   if(usedHashes.has(ph))return fail('Foto bukti ini sudah pernah diunggah. Unggah bukti transfer yang sesuai pembayaran ini.');
   usedHashes.add(ph);
-  $('smPhoto').innerHTML='<option value="NEW">Foto baru (belum pernah diunggah)</option>'+[...usedHashes].map(h=>'<option value="'+h+'">'+h+' (sudah pernah diunggah)</option>').join('');const f=SM.status;setStatus('MENUNGGU_VERIFIKASI');SM.proof=ph;
+  $('smPhoto').innerHTML='<option value="NEW">Foto baru (belum pernah diunggah)</option>'+[...usedHashes].map(h=>'<option value="'+h+'">'+h+' (sudah pernah diunggah)</option>').join('');
+  const f=SM.status;setStatus('MENUNGGU_VERIFIKASI');SM.proof=ph;
   addEvt('PROOF_UPLOADED',f,'MENUNGGU_VERIFIKASI','PARENT',ph+' · Pengirim '+sn+' ('+sb+')');
-  ok('Bukti terkirim. Petugas akan memeriksa pembayaran Anda. (Pengajuan masuk antrian petugas asrama santri ini.)');
+  ok('Bukti terkirim. Petugas akan memeriksa pembayaran Anda. Pengajuan masuk antrian petugas asrama santri ini.');
 };
 $('smCancel').onclick=()=>{
   if(SM.status!=='MENUNGGU_BUKTI')return fail(['DITERIMA','DITOLAK','DIBATALKAN','KEDALUWARSA'].includes(SM.status)?'Status sudah final.':'Pembayaran yang buktinya sudah dikirim tidak dapat dibatalkan.');
@@ -834,7 +1107,7 @@ $('smCash').onclick=()=>{
   if(['MENUNGGU_VERIFIKASI','PERLU_PERBAIKAN'].includes(SM.status))return ok('Tagihan dibayar tunai, tetapi order transfer ini <b>tidak</b> dibatalkan karena buktinya sedang diperiksa. Bila nanti diterima, tagihan sudah lunas sehingga petugas memakai "Terima sebagai dana belum teralokasi".');
   if(SM.status!=='MENUNGGU_BUKTI')return fail('Status sudah final.');
   SM.order='CANCELLED';setStatus('DIBATALKAN');addEvt('CANCELLED','MENUNGGU_BUKTI','DIBATALKAN','SYSTEM','Tagihan sudah dilunasi melalui pembayaran PAY-… (tunai)');
-  ok('Tagihan dibayar tunai: order transfer dibatalkan <b>dan</b> pengajuan wali ikut ditutup (Dibatalkan) dalam batch yang sama, sehingga wali tidak lagi melihat instruksi transfer. (Perbaikan temuan #1)');
+  ok('Tagihan dibayar tunai: order transfer dibatalkan <b>dan</b> pengajuan wali ikut ditutup (Dibatalkan) dalam batch yang sama, sehingga wali tidak lagi melihat instruksi transfer.');
 };
 $('smApprove').onclick=()=>{
   if(SM.status!=='MENUNGGU_VERIFIKASI')return fail(handled());
@@ -843,7 +1116,7 @@ $('smApprove').onclick=()=>{
   if(SM.order!=='PENDING')return fail(handled());
   setStatus('DITERIMA');SM.order='PAID';SM.resolution='EXACT';SM.payment={status:'PAID',alloc:'ALLOCATED',amount:SM.cfg.total};
   SM.income=[];if(SM.cfg.fee>0)SM.income.push({src:'Biaya admin',amt:SM.cfg.fee});if(SM.cfg.code>0)SM.income.push({src:'Kode unik',amt:SM.cfg.code});
-  SM.wallet=SM.cfg.uj||0;addEvt('APPROVED','MENUNGGU_VERIFIKASI','DITERIMA','STAFF',$('smNote').value.trim()||('Diterima Rp'+r));
+  SM.wallet=SM.cfg.uj||0;addEvt('APPROVED','MENUNGGU_VERIFIKASI','DITERIMA','STAFF',$('smNote').value.trim()||('Diterima Rp'+r.toLocaleString('id-ID')));
   ok('Pembayaran diterima. Satu batch: payment PAID + alokasi + pendapatan Koperasi + top-up uang jajan + status + jejak audit. Status menjadi SETTLED nanti lewat Rekonsiliasi (bagian 8).');
 };
 $('smUnalloc').onclick=()=>{
@@ -852,7 +1125,7 @@ $('smUnalloc').onclick=()=>{
   if(!(r>0))return fail('Nominal diterima harus lebih dari Rp0.');
   if(n.length<10)return fail('Jelaskan alasan (minimal 10 karakter), misalnya selisih nominal di mutasi.');
   setStatus('DITERIMA');SM.resolution='UNALLOCATED';if(SM.order==='PENDING')SM.order='CANCELLED';SM.payment={status:'PAID',alloc:'UNALLOCATED',amount:r};SM.income=[];SM.wallet=0;
-  SM.recon='UNALLOCATED_TRANSFER: seharusnya '+rp(SM.cfg.total)+', diterima '+rp(r)+' → selesaikan di Rekonsiliasi → Alokasi Manual';
+  SM.recon='seharusnya '+rp(SM.cfg.total)+', diterima '+rp(r)+' → selesaikan di Rekonsiliasi → Alokasi Manual';
   addEvt('APPROVED_UNALLOCATED','MENUNGGU_VERIFIKASI','DITERIMA','STAFF',n);
   ok('Dana dicatat sebagai belum teralokasi. Tidak ada alokasi otomatis dan tidak ada pendapatan Koperasi; muncul di Rekonsiliasi → Perlu Resolusi.');
 };
@@ -876,17 +1149,18 @@ const SC_ASR=ASRAMA.filter(a=>a!=='AL-BAGHORY');
 const PETUGAS_LIST=[{n:'Ahmad',a:['AL-FALAH','ASY-SYIFA 1']},{n:'Yusuf',a:['AS-SALAM','BAHAGIA','ASY-SYIFA 2']},{n:'Petugas Baru',a:[]}];
 const QUEUE=[['Fulan A','AL-FALAH',305112],['Fulan B','AS-SALAM',505020],['Fulan C','ASY-SYIFA 1',200431],['Fulan D','BAHAGIA',150077],['Fulan E','ASY-SYIFA 3',1005903],['Fulan F','ASY-SYIFA 4',255018]];
 function drawAssign(){
-  $('scAssign').innerHTML='<table><tr><th>Petugas</th>'+SC_ASR.map(a=>'<th class="c" style="font-size:11px">'+a+'</th>').join('')+'</tr>'+
-   PETUGAS_LIST.map((p,pi)=>'<tr><td>'+p.n+'</td>'+SC_ASR.map(a=>'<td class="c"><input type="checkbox" data-p="'+pi+'" data-a="'+a+'"'+(p.a.includes(a)?' checked':'')+'></td>').join('')+'</tr>').join('')+'</table>'+
-   '<p class="small">Asrama tanpa petugas: <b>'+(SC_ASR.filter(a=>!PETUGAS_LIST.some(p=>p.a.includes(a))).join(', ')||'—')+'</b> (tetap bisa diperiksa Admin/Bendahara/Admin Koperasi).</p>';
+  const uncovered=SC_ASR.filter(a=>!PETUGAS_LIST.some(p=>p.a.includes(a)));
+  $('scAssign').innerHTML='<div class="toggle-grid"><span></span>'+SC_ASR.map(a=>'<span class="h">'+a.replace('ASY-SYIFA ','SYIFA ')+'</span>').join('')+
+   PETUGAS_LIST.map((p,pi)=>'<span class="nm">'+p.n+'</span>'+SC_ASR.map(a=>'<label title="'+a+'"><input type="checkbox" data-p="'+pi+'" data-a="'+a+'"'+(p.a.includes(a)?' checked':'')+'></label>').join('')).join('')+'</div>'+
+   (uncovered.length?note('','Belum ada petugas untuk: <b>'+uncovered.join(', ')+'</b>. Bukti dari asrama ini hanya bisa diperiksa Admin/Bendahara/Admin Koperasi.'):note('ok','Semua asrama sudah punya petugas.'));
   $('scAssign').querySelectorAll('input').forEach(i=>i.onchange=()=>{const p=PETUGAS_LIST[+i.dataset.p];p.a=i.checked?[...p.a,i.dataset.a]:p.a.filter(x=>x!==i.dataset.a);drawAssign();drawScope()});
 }
 $('scViewer').innerHTML=['Admin','Bendahara','Admin Koperasi','Pimpinan'].concat(PETUGAS_LIST.map(p=>p.n+' (Petugas Koperasi)')).map(v=>'<option>'+v+'</option>').join('');
 function drawScope(){
   const v=$('scViewer').value;const all=['Admin','Bendahara','Admin Koperasi','Pimpinan'].includes(v);const can=v!=='Pimpinan';
   const p=PETUGAS_LIST.find(x=>v.startsWith(x.n+' '));const rows=QUEUE.filter(q=>all||(p&&p.a.includes(q[1])));
-  $('scOut').innerHTML=(rows.length?'<table><tr><th>Santri</th><th>Asrama</th><th class="r">Nominal</th></tr>'+rows.map(q=>'<tr><td>'+q[0]+'</td><td>'+q[1]+'</td><td class="r mono">'+amtHtml(q[2])+'</td></tr>').join('')+'</table>':'<p class="small">Tidak ada bukti transfer yang menunggu pemeriksaan.</p>')+
-   '<p class="small">'+(all?'Melihat semua asrama. ':'Hanya asrama yang ditugaskan. ')+(can?'Bisa menerima/menolak.':'<b>Hanya baca</b> — tidak bisa menerima/menolak.')+'</p>';
+  $('scOut').innerHTML='<div class="row" style="margin-top:0">'+(all?'<span class="pill p-blue">Semua asrama</span>':'<span class="pill p-violet">Asrama tugasnya saja</span>')+(can?'<span class="pill p-green">Bisa menerima/menolak</span>':'<span class="pill p-amber">Hanya baca</span>')+'</div>'+
+   (rows.length?'<div class="tbl"><table><thead><tr><th>Santri</th><th>Asrama</th><th class="r">Nominal</th></tr></thead><tbody>'+rows.map(q=>'<tr><td><span class="avatar">'+initials(q[0])+'</span>'+q[0]+'</td><td>'+q[1]+'</td><td class="r num">'+amtHtml(q[2])+'</td></tr>').join('')+'</tbody></table></div>':'<div class="result empty" style="min-height:90px">Tidak ada bukti transfer yang menunggu pemeriksaan.</div>');
 }
 $('scViewer').onchange=drawScope;drawAssign();drawScope();
 
@@ -902,31 +1176,31 @@ const STU=[
 ];
 let pick={};let BATCH=null;let BATCHES=0;
 const avail=()=>CS.start+CS.inn-CS.out;
-function csLog(t){CS.log.push(nowStr()+' · '+t);drawCS()}
+function csLog(t,dir){CS.log.push({t,dir:dir||'INFO',at:nowStr()});drawCS()}
 function drawCS(){
-  $('csKpi').innerHTML='<div><small>Status sesi</small><b>'+(CS.open?'OPEN':(CS.closed?'CLOSED':'belum dibuka'))+'</b></div><div><small>Kas awal</small><b>'+rp(CS.start)+'</b></div><div><small>Masuk / Keluar</small><b>'+rp(CS.inn)+' / '+rp(CS.out)+'</b></div><div><small>Seharusnya di laci</small><b>'+rp(avail())+'</b></div>';
-  $('csLog').innerHTML=CS.log.slice().reverse().map(l=>'<div>'+esc(l)+'</div>').join('')||'<div class="small">Belum ada transaksi.</div>';
+  $('csKpi').innerHTML='<div><small>Status sesi</small><b style="font-family:inherit">'+(CS.open?'<span class="pill p-green">OPEN</span>':(CS.closed?'<span class="pill p-gray">CLOSED</span>':'<span class="pill p-amber">Belum dibuka</span>'))+'</b></div><div><small>Kas awal</small><b>'+rp(CS.start)+'</b></div><div><small>Masuk</small><b style="color:#047857">+'+rp(CS.inn)+'</b></div><div><small>Keluar</small><b style="color:#b91c1c">−'+rp(CS.out)+'</b></div><div class="hl"><small>Seharusnya di laci</small><b>'+rp(avail())+'</b></div>';
+  $('csLog').innerHTML=CS.log.slice().reverse().map(l=>'<li><span class="dot who-'+l.dir+'"></span><b>'+esc(l.t)+'</b><div class="meta">'+l.at+'</div></li>').join('')||'<li class="empty-t">Belum ada transaksi.</li>';
 }
-$('csOpenBtn').onclick=()=>{if(CS.open)return msg($('csMsg'),'Sesi kas sudah terbuka.','bad');const v=int($('csOpen').value);if(!(v>=0))return msg($('csMsg'),'Saldo kas fisik awal harus berupa angka valid non-negatif.','bad');Object.assign(CS,{open:true,start:v,inn:0,out:0,closed:null});$('csMsg').innerHTML='';csLog('Sesi dibuka, kas awal '+rp(v))};
-$('csPay').onclick=()=>{if(!CS.open)return msg($('csMsg'),'Tidak ada sesi kas yang aktif. Buka sesi kas terlebih dahulu sebelum menerima pembayaran.','bad');CS.inn+=200000;csLog('+ SPP tunai Rp200.000 (tanpa biaya admin)')};
-$('csBankIn').onclick=()=>{if(!CS.open)return msg($('csMsg'),'Buka sesi kas terlebih dahulu sebelum mencatat mutasi kas.','bad');CS.inn+=1000000;csLog('+ Kas Bank: ambil dari rekening Rp1.000.000 (struk ATM, bukan pendapatan)')};
-$('csBankOut').onclick=()=>{if(!CS.open)return msg($('csMsg'),'Buka sesi kas terlebih dahulu sebelum mencatat mutasi kas.','bad');if(avail()<300000)return msg($('csMsg'),'Uang di laci tidak cukup untuk disetor (tersedia '+rp(avail())+').','bad');CS.out+=300000;csLog('− Kas Bank: setor ke rekening Rp300.000 (slip teller)')};
-$('csTop').onclick=()=>{if(!CS.open)return msg($('csMsg'),'Tidak ada sesi kas yang aktif. Buka sesi kas terlebih dahulu sebelum menerima pembayaran.','bad');CS.inn+=50000;STU[0].saldo+=50000;csLog('+ Setor uang jajan Ahmad Rp50.000 (TOPUP_CASH)');drawPy()};
+$('csOpenBtn').onclick=()=>{if(CS.open)return msg($('csMsg'),'Sesi kas sudah terbuka.','bad');const v=int($('csOpen').value);if(!(v>=0))return msg($('csMsg'),'Saldo kas fisik awal harus berupa angka valid non-negatif.','bad');Object.assign(CS,{open:true,start:v,inn:0,out:0,closed:null});$('csMsg').innerHTML='';csLog('Sesi dibuka · kas awal '+rp(v))};
+$('csPay').onclick=()=>{if(!CS.open)return msg($('csMsg'),'Tidak ada sesi kas yang aktif. Buka sesi kas terlebih dahulu sebelum menerima pembayaran.','bad');CS.inn+=200000;csLog('SPP tunai +Rp200.000 (tanpa biaya admin)','IN')};
+$('csTop').onclick=()=>{if(!CS.open)return msg($('csMsg'),'Tidak ada sesi kas yang aktif. Buka sesi kas terlebih dahulu sebelum menerima pembayaran.','bad');CS.inn+=50000;STU[0].saldo+=50000;csLog('Setor uang jajan Ahmad +Rp50.000 (TOPUP_CASH)','IN');drawPy()};
+$('csBankIn').onclick=()=>{if(!CS.open)return msg($('csMsg'),'Buka sesi kas terlebih dahulu sebelum mencatat mutasi kas.','bad');CS.inn+=1000000;csLog('Kas Bank: ambil dari rekening +Rp1.000.000 (struk ATM, bukan pendapatan)','IN')};
+$('csBankOut').onclick=()=>{if(!CS.open)return msg($('csMsg'),'Buka sesi kas terlebih dahulu sebelum mencatat mutasi kas.','bad');if(avail()<300000)return msg($('csMsg'),'Uang di laci tidak cukup untuk disetor (tersedia '+rp(avail())+').','bad');CS.out+=300000;csLog('Kas Bank: setor ke rekening −Rp300.000 (slip teller)','OUT')};
 $('csClose').onclick=()=>{
   if(!CS.open)return msg($('csMsg'),'Sesi kas belum dibuka.','bad');
   if(BATCH)return msg($('csMsg'),'Sesi kas tidak bisa ditutup selama masih ada pencairan kolektif yang sedang dibawa perwakilan.','bad');
   const f=int($('csCount').value);if(!(f>=0))return msg($('csMsg'),'Isi kas fisik yang dihitung.','bad');
-  const d=f-avail();CS.open=false;CS.closed=true;csLog('Sesi ditutup. Seharusnya '+rp(avail())+', fisik '+rp(f)+', selisih '+(d>=0?'+':'−')+rp(Math.abs(d)));
-  msg($('csMsg'),'Sesi ditutup. Selisih '+(d===0?'Rp0 (cocok)':(d>0?'lebih ':'kurang ')+rp(Math.abs(d)))+' — tercatat di Rekonsiliasi → Kas Loket &amp; Fisik.',d===0?'ok':'');
+  const d=f-avail();CS.open=false;CS.closed=true;csLog('Sesi ditutup · seharusnya '+rp(avail())+', fisik '+rp(f)+', selisih '+(d>=0?'+':'−')+rp(Math.abs(d)));
+  msg($('csMsg'),'Sesi ditutup. Selisih '+(d===0?'Rp0 (cocok)':(d>0?'lebih ':'kurang ')+rp(Math.abs(d)))+' — tercatat di Rekonsiliasi → Kas Loket &amp; Fisik. Sesi berikutnya akan menampilkan '+rp(f)+' sebagai acuan kas awal.',d===0?'ok':'');
 };
 drawCS();
 
 function limitOf(s){const g=int($('pyGlobal').value)||0;const daily=s.ortu===null?g:Math.min(g,s.ortu);return Math.max(0,daily-s.used)}
 function blocked(s){if(s.taken>0)return 'Sudah dicairkan hari ini';if(s.saldo<=0)return 'Saldo kosong';if(limitOf(s)<=0)return 'Limit harian habis';return null}
 function drawPy(){
-  $('pyTable').innerHTML='<tr><th></th><th>Santri</th><th class="r">Saldo</th><th class="r">Sisa limit</th><th class="r">Nominal</th></tr>'+STU.map(s=>{const b=blocked(s);const p=pick[s.id];
-   return '<tr><td>'+(b?'':'<input type="checkbox" data-s="'+s.id+'"'+(p!==undefined?' checked':'')+'>')+'</td><td>'+s.n+' <span class="small">kamar '+s.k+(s.ortu!==null?' · limit ortu '+rp(s.ortu):'')+'</span>'+(b?'<br><span class="pill p-gray">'+b+'</span>':'')+'</td><td class="r">'+rp(s.saldo)+'</td><td class="r">'+rp(limitOf(s))+'</td><td class="r">'+(b?'—':'<input type="number" style="width:100px" data-n="'+s.id+'" value="'+(p!==undefined?p:'')+'">')+'</td></tr>'}).join('')+
-   '<tr><td></td><td><b>Total</b></td><td></td><td></td><td class="r"><b>'+rp(Object.values(pick).reduce((a,b)=>a+(int(b)||0),0))+'</b></td></tr>';
+  $('pyTable').innerHTML='<thead><tr><th></th><th>Santri</th><th class="r">Saldo</th><th class="r">Sisa limit</th><th class="r">Nominal</th></tr></thead><tbody>'+STU.map(s=>{const b=blocked(s);const p=pick[s.id];
+   return '<tr><td>'+(b?'':'<input type="checkbox" data-s="'+s.id+'"'+(p!==undefined?' checked':'')+'>')+'</td><td><span class="avatar">'+initials(s.n)+'</span>'+s.n+'<div class="small" style="margin-left:34px">kamar '+s.k+(s.ortu!==null?' · limit ortu '+rp(s.ortu):'')+(b?' · <span class="pill p-gray">'+b+'</span>':'')+'</div></td><td class="r num">'+rp(s.saldo)+'</td><td class="r num">'+rp(limitOf(s))+'</td><td class="r">'+(b?'—':'<input type="number" style="width:86px" data-n="'+s.id+'" value="'+(p!==undefined?p:'')+'">')+'</td></tr>'}).join('')+
+   '<tr><td></td><td><b>Total diserahkan</b></td><td></td><td></td><td class="r num"><b>'+rp(Object.values(pick).reduce((a,b)=>a+(int(b)||0),0))+'</b></td></tr></tbody>';
   $('pyTable').querySelectorAll('input[type=checkbox]').forEach(i=>i.onchange=()=>{const id=+i.dataset.s;if(i.checked)pick[id]=int($('pyEach').value)||0;else delete pick[id];drawPy()});
   $('pyTable').querySelectorAll('input[type=number]').forEach(i=>i.onchange=()=>{const id=+i.dataset.n;pick[id]=int(i.value)||0;drawPy()});
 }
@@ -935,7 +1209,7 @@ $('pyGlobal').onchange=drawPy;
 $('pyGive').onclick=()=>{
   const out=$('pyMsg');const ids=Object.keys(pick).map(Number);
   if(BATCH)return msg(out,'Selesaikan dulu pencairan yang sedang dibawa (simulasi ini memakai satu perwakilan).','bad');
-  if(!CS.open)return msg(out,'Buka sesi kas terlebih dahulu sebelum menyerahkan uang ke perwakilan. (bagian 7)','bad');
+  if(!CS.open)return msg(out,'Buka sesi kas terlebih dahulu sebelum menyerahkan uang ke perwakilan (bagian 7).','bad');
   const rep=$('pyRep').value.trim();if(rep.length<2)return msg(out,'Nama perwakilan wajib diisi.','bad');
   if(!ids.length)return msg(out,'Pilih minimal satu santri.','bad');
   for(const id of ids){const s=STU.find(x=>x.id===id),a=pick[id];
@@ -946,15 +1220,16 @@ $('pyGive').onclick=()=>{
   if(avail()<total)return msg(out,'Uang di laci kas tidak cukup (tersedia '+rp(avail())+', dibutuhkan '+rp(total)+').','bad');
   BATCHES++;BATCH={no:'PJK-SIM-'+String(BATCHES).padStart(3,'0'),rep,items:ids.map(id=>({id,a:pick[id],ok:true,why:''}))};
   ids.forEach(id=>{const s=STU.find(x=>x.id===id);s.saldo-=pick[id];s.used+=pick[id];s.taken+=pick[id]});
-  CS.out+=total;csLog('− Pencairan kolektif '+BATCH.no+' via '+rep+' '+rp(total)+' ('+ids.length+' santri, WITHDRAWAL_KOLEKTIF)');
+  CS.out+=total;csLog('Pencairan kolektif '+BATCH.no+' via '+rep+' −'+rp(total)+' ('+ids.length+' santri)','OUT');
   pick={};drawPy();drawSettle();msg(out,'Uang '+rp(total)+' diserahkan ke '+esc(rep)+'. Status: <b>Sedang dibawa</b>. Saldo tiap santri langsung berkurang; sesi kas tidak bisa ditutup sampai diselesaikan.','ok');
 };
 function drawSettle(){
-  const el=$('pySettle');if(!BATCH){el.innerHTML='Belum ada pencairan yang sedang dibawa.';return}
+  const el=$('pySettle');if(!BATCH){el.innerHTML='<div class="result empty">Belum ada pencairan yang sedang dibawa.<br>Serahkan dulu uang ke perwakilan di panel kiri.</div>';return}
   const cancelled=BATCH.items.filter(i=>!i.ok).reduce((t,i)=>t+i.a,0);
-  el.innerHTML='<p><b>'+BATCH.no+'</b> · perwakilan '+esc(BATCH.rep)+' · <span class="pill p-amber">Sedang dibawa</span></p><p class="small">Hilangkan centang untuk santri yang tidak hadir / tidak menerima.</p>'+
-   '<table>'+BATCH.items.map((i,k)=>{const s=STU.find(x=>x.id===i.id);return '<tr><td><input type="checkbox" data-k="'+k+'"'+(i.ok?' checked':'')+'></td><td>'+s.n+'</td><td class="r">'+rp(i.a)+'</td><td>'+(i.ok?'':'<input type="text" placeholder="Alasan (mis. pulang)" data-w="'+k+'" value="'+esc(i.why)+'">')+'</td></tr>'}).join('')+'</table>'+
-   '<p>Hak dibatalkan: <b>'+rp(cancelled)+'</b></p><div class="row"><label>Uang yang dikembalikan perwakilan (hitung fisik) <input type="number" id="pyRet" value="0"></label></div><div class="row"><button class="pri" id="pyDone">Selesaikan pencairan</button></div>';
+  el.innerHTML='<div class="row" style="margin-top:0"><b>'+BATCH.no+'</b><span class="pill p-amber">Sedang dibawa</span><span class="small">perwakilan '+esc(BATCH.rep)+'</span></div><p class="small">Hilangkan centang untuk santri yang tidak hadir / tidak menerima.</p>'+
+   '<div class="tbl"><table><tbody>'+BATCH.items.map((i,k)=>{const s=STU.find(x=>x.id===i.id);return '<tr><td><input type="checkbox" data-k="'+k+'"'+(i.ok?' checked':'')+'></td><td><span class="avatar">'+initials(s.n)+'</span>'+s.n+'</td><td class="r num">'+rp(i.a)+'</td><td>'+(i.ok?'<span class="pill p-green">Diterima</span>':'<input type="text" placeholder="Alasan (mis. pulang)" data-w="'+k+'" value="'+esc(i.why)+'" style="width:150px">')+'</td></tr>'}).join('')+'</tbody></table></div>'+
+   '<div class="kpi" style="margin-top:10px"><div><small>Hak dibatalkan</small><b>'+rp(cancelled)+'</b></div></div>'+
+   '<div class="fgrid"><label class="f"><span>Uang dikembalikan perwakilan (hitung fisik)</span><span class="money"><em>Rp</em><input type="number" id="pyRet" value="0"></span></label></div><div class="btns"><button class="pri" id="pyDone">Selesaikan pencairan</button></div>';
   el.querySelectorAll('input[type=checkbox]').forEach(c=>c.onchange=()=>{BATCH.items[+c.dataset.k].ok=c.checked;drawSettle()});
   el.querySelectorAll('input[data-w]').forEach(c=>c.oninput=()=>{BATCH.items[+c.dataset.w].why=c.value});
   $('pyDone').onclick=()=>{
@@ -964,48 +1239,49 @@ function drawSettle(){
     if(ret!==tot)return msg(out,'Uang yang dikembalikan harus '+rp(tot)+' (jumlah hak santri yang dibatalkan). Hitung ulang uang dari perwakilan.','bad');
     if(canc.length&&!CS.open)return msg(out,'Buka sesi kas untuk menerima uang yang dikembalikan.','bad');
     canc.forEach(c=>{const s=STU.find(x=>x.id===c.id);s.saldo+=c.a;s.used-=c.a;s.taken-=c.a});
-    if(tot){CS.inn+=tot;csLog('+ Pengembalian '+BATCH.no+' '+rp(tot)+' ('+canc.length+' santri, WITHDRAWAL_KOLEKTIF_RETURN)')}
+    if(tot){CS.inn+=tot;csLog('Pengembalian '+BATCH.no+' +'+rp(tot)+' ('+canc.length+' santri)','IN')}
     const del=BATCH.items.filter(i=>i.ok).reduce((t,i)=>t+i.a,0);
     msg(out,'Pencairan diselesaikan: diterima '+rp(del)+', dikembalikan '+rp(tot)+'. Santri yang dibatalkan saldonya pulih dan boleh dicairkan lagi hari ini; yang diterima tidak bisa dicairkan lagi hari ini.','ok');
     BATCH=null;drawSettle();drawPy();
   };
 }
-drawPy();
+drawPy();drawSettle();
 
 /* ---------- 8. Chain & matching ---------- */
 let CHAIN=[[1000000,505020,0,1505020],[1505020,0,200000,1305020],[1305020,300417,0,1605437]];
 function drawChain(){
-  $('chainTable').innerHTML='<tr><th>#</th><th>Saldo awal</th><th>Kredit</th><th>Debit</th><th>Saldo akhir</th></tr>'+CHAIN.map((r,i)=>'<tr><td>'+(i+1)+'</td>'+r.map((v,j)=>'<td><input type="number" style="width:120px" data-r="'+i+'" data-c="'+j+'" value="'+v+'"></td>').join('')+'</tr>').join('');
+  $('chainTable').innerHTML='<thead><tr><th>#</th><th>Saldo awal</th><th>Kredit</th><th>Debit</th><th>Saldo akhir</th></tr></thead><tbody>'+CHAIN.map((r,i)=>'<tr><td>'+(i+1)+'</td>'+r.map((v,j)=>'<td><input type="number" style="width:130px" data-r="'+i+'" data-c="'+j+'" value="'+v+'"></td>').join('')+'</tr>').join('')+'</tbody>';
   $('chainTable').querySelectorAll('input').forEach(i=>i.onchange=()=>{CHAIN[+i.dataset.r][+i.dataset.c]=int(i.value)||0});
 }
 $('chainAdd').onclick=()=>{const l=CHAIN[CHAIN.length-1];CHAIN.push([l[3],0,0,l[3]]);drawChain()};
 $('chainCheck').onclick=()=>{
   const e=[];CHAIN.forEach((r,i)=>{if(r[0]+r[1]-r[2]!==r[3])e.push('Baris '+(i+1)+': saldo awal + kredit − debit ≠ saldo akhir');if(i&&r[0]!==CHAIN[i-1][3])e.push('Baris '+(i+1)+': saldo awal tidak sama dengan saldo akhir baris sebelumnya (ada baris hilang/diubah)')});
   const cr=CHAIN.filter(r=>r[1]>0);
-  $('chainOut').innerHTML=e.length?'<div class="note bad"><b>Impor ditolak seluruhnya.</b><br>'+e.join('<br>')+'<br>Alternatif: berkas tanpa kolom saldo memakai total kredit yang diketik operator.</div>':'<div class="note ok">Rantai saldo terverifikasi otomatis (integritas <code>BALANCE_CHAIN</code>). '+cr.length+' baris kredit, total '+rp(cr.reduce((t,r)=>t+r[1],0))+' siap dicocokkan. Baris debit diabaikan untuk pembayaran.</div>';
+  $('chainOut').innerHTML=e.length?note('bad','<b>Impor ditolak seluruhnya.</b><br>'+e.join('<br>')+'<br>Alternatif: berkas tanpa kolom saldo memakai total kredit yang diketik operator.'):note('ok','Rantai saldo terverifikasi otomatis (integritas <code>BALANCE_CHAIN</code>). '+cr.length+' baris kredit, total '+rp(cr.reduce((t,r)=>t+r[1],0))+' siap dicocokkan. Baris debit diabaikan untuk pembayaran (tetapi dipakai untuk Kas Bank).');
 };
 drawChain();
 
 let MT={pays:[['PAY-…01',505020,'PAID'],['PAY-…02',300417,'PAID'],['PAY-…03',300417,'PAID'],['PAY-…04',250099,'SETTLED']],subs:[['TRF-…09',410777,'MENUNGGU_VERIFIKASI']]};
 function drawMt(){
-  $('mtData').innerHTML='<tr><th>Data</th><th class="r">Total</th><th>Status</th></tr>'+
-   MT.pays.map((p,i)=>'<tr><td>Payment transfer '+p[0]+'</td><td class="r"><input type="number" style="width:110px" data-p="'+i+'" value="'+p[1]+'"></td><td><select data-ps="'+i+'"><option'+(p[2]==='PAID'?' selected':'')+'>PAID</option><option'+(p[2]==='SETTLED'?' selected':'')+'>SETTLED</option></select></td></tr>').join('')+
-   MT.subs.map((s,i)=>'<tr><td>Pengajuan wali '+s[0]+'</td><td class="r"><input type="number" style="width:110px" data-s="'+i+'" value="'+s[1]+'"></td><td>'+s[2]+'</td></tr>').join('');
+  $('mtData').innerHTML='<thead><tr><th>Data</th><th class="r">Total</th><th>Status</th></tr></thead><tbody>'+
+   MT.pays.map((p,i)=>'<tr><td>Payment '+p[0]+'</td><td class="r"><input type="number" style="width:110px" data-p="'+i+'" value="'+p[1]+'"></td><td><select data-ps="'+i+'"><option'+(p[2]==='PAID'?' selected':'')+'>PAID</option><option'+(p[2]==='SETTLED'?' selected':'')+'>SETTLED</option></select></td></tr>').join('')+
+   MT.subs.map((s,i)=>'<tr><td>Pengajuan '+s[0]+'</td><td class="r"><input type="number" style="width:110px" data-s="'+i+'" value="'+s[1]+'"></td><td>'+pill(s[2])+'</td></tr>').join('')+'</tbody>';
   $('mtData').querySelectorAll('input[data-p]').forEach(i=>i.onchange=()=>{MT.pays[+i.dataset.p][1]=int(i.value)||0});
   $('mtData').querySelectorAll('select[data-ps]').forEach(i=>i.onchange=()=>{MT.pays[+i.dataset.ps][2]=i.value});
   $('mtData').querySelectorAll('input[data-s]').forEach(i=>i.onchange=()=>{MT.subs[+i.dataset.s][1]=int(i.value)||0});
 }
 $('mtAddPay').onclick=()=>{MT.pays.push(['PAY-…'+String(MT.pays.length+1).padStart(2,'0'),100000,'PAID']);drawMt()};
 $('mtAddSub').onclick=()=>{MT.subs.push(['TRF-…'+String(MT.subs.length+10),100000,'MENUNGGU_BUKTI']);drawMt()};
+document.querySelectorAll('[data-amt]').forEach(b=>b.onclick=()=>{$('mtAmt').value=b.dataset.amt;$('mtRun').click()});
 $('mtRun').onclick=()=>{
   const a=int($('mtAmt').value);const c=MT.pays.filter(p=>p[2]==='PAID'&&p[1]===a);let h;
-  if(c.length===1){h='<div class="note ok"><b>EXACT_MATCH (kandidat)</b> — kandidat transfer manual '+c[0][0]+' (nominal dengan kode unik sama). Verifikasi lalu hubungkan.</div><div class="row"><input type="text" id="mtNote" placeholder="Catatan resolusi (wajib)"> <button class="pri" id="mtLink">Hubungkan → SETTLED</button></div>'}
-  else if(c.length>1)h='<div class="note"><b>AMBIGUOUS</b> — beberapa transfer manual memiliki nominal sama ('+c.map(x=>x[0]).join(', ')+'). Periksa manual; sistem tidak memilih sendiri.</div>';
+  if(c.length===1){h=note('ok','<span class="pill p-green">EXACT_MATCH · kandidat</span><br>Kandidat transfer manual '+c[0][0]+' (nominal dengan kode unik sama). Verifikasi lalu hubungkan.')+'<div class="fgrid"><label class="f"><span>Catatan resolusi (wajib)</span><input type="text" id="mtNote"></label></div><div class="btns" style="margin-top:0"><button class="pri" id="mtLink">Hubungkan → SETTLED</button></div>'}
+  else if(c.length>1)h=note('','<span class="pill p-amber">AMBIGUOUS</span><br>Beberapa transfer manual memiliki nominal sama ('+c.map(x=>x[0]).join(', ')+'). Periksa manual; sistem tidak memilih sendiri.');
   else{const s=MT.subs.filter(x=>x[1]===a);
-    if(s.length)h='<div class="note"><b>PENDING_VERIFICATION</b> — ada pengajuan transfer bernominal sama yang belum selesai diverifikasi ('+s.map(x=>x[0]).join(', ')+'). Verifikasi pengajuan itu lebih dulu; <b>dilarang</b> dicatat sebagai dana belum teralokasi.</div>';
-    else h='<div class="note info"><b>NO_MATCH</b> — tidak ada pasangan. Admin/Bendahara dapat mencatatnya sebagai <b>dana belum teralokasi</b> (dengan catatan) lalu menyelesaikannya lewat Alokasi Manual.</div>'+(MT.pays.some(p=>p[2]==='SETTLED'&&p[1]===a)?'<p class="small">Catatan: ada payment bernominal sama yang sudah SETTLED — itu bukan kandidat untuk mutasi baru.</p>':'');}
+    if(s.length)h=note('','<span class="pill p-blue">PENDING_VERIFICATION</span><br>Ada pengajuan transfer bernominal sama yang belum selesai diverifikasi ('+s.map(x=>x[0]).join(', ')+'). Verifikasi pengajuan itu lebih dulu; <b>dilarang</b> dicatat sebagai dana belum teralokasi.');
+    else h=note('info','<span class="pill p-gray">NO_MATCH</span><br>Tidak ada pasangan. Admin/Bendahara dapat mencatatnya sebagai <b>dana belum teralokasi</b> (dengan catatan) lalu menyelesaikannya lewat Alokasi Manual — kecuali nominalnya sama dengan setoran Kas Bank yang belum dicocokkan.')+(MT.pays.some(p=>p[2]==='SETTLED'&&p[1]===a)?'<p class="small">Catatan: ada payment bernominal sama yang sudah SETTLED — itu bukan kandidat untuk mutasi baru.</p>':'');}
   $('mtOut').innerHTML=h;
-  if(c.length===1)$('mtLink').onclick=()=>{if($('mtNote').value.trim().length<3){$('mtOut').insertAdjacentHTML('beforeend','<p class="err">Catatan resolusi wajib diisi.</p>');return}c[0][2]='SETTLED';drawMt();$('mtOut').innerHTML='<div class="note ok">'+c[0][0]+' menjadi <b>SETTLED</b> (MANUAL_RESOLVED, oleh Admin/Bendahara, dengan catatan + item rekonsiliasi). Baris mutasi yang sama tidak bisa dipakai dua kali.</div>'};
+  if(c.length===1)$('mtLink').onclick=()=>{if($('mtNote').value.trim().length<3){$('mtOut').insertAdjacentHTML('beforeend','<p class="err">Catatan resolusi wajib diisi.</p>');return}c[0][2]='SETTLED';drawMt();$('mtOut').innerHTML=note('ok',c[0][0]+' menjadi <b>SETTLED</b> (MANUAL_RESOLVED, oleh Admin/Bendahara, dengan catatan + item rekonsiliasi). Baris mutasi yang sama tidak bisa dipakai dua kali.')};
 };
 drawMt();
 
@@ -1013,23 +1289,41 @@ drawMt();
 const POS=[{k:'SPP',l:'SPP',to:'Bendahara Pesantren',in:12000000,out:8000000},{k:'USPP',l:'USPP / Bangunan',to:'Bendahara Pesantren',in:5000000,out:0},{k:'UANG_MAKAN',l:'Uang Makan',to:'Katering (Master Jasa)',in:20000000,out:15000000},{k:'UANG_NYUCI',l:'Uang Nyuci',to:'Laundry (Master Jasa)',in:4000000,out:4000000}];
 let DSN=0;
 function drawDs(){
-  $('dsPos').innerHTML='<tr><th>Pos</th><th>Penerima</th><th class="r">Dana masuk</th><th class="r">Disalurkan</th><th class="r">Siap salur</th></tr>'+POS.map(p=>'<tr><td>'+p.l+'</td><td>'+p.to+'</td><td class="r">'+rp(p.in)+'</td><td class="r">'+rp(p.out)+'</td><td class="r"><b>'+rp(p.in-p.out)+'</b>'+(p.in-p.out===0?' <span class="pill p-green">Tersalurkan Penuh</span>':'')+'</td></tr>').join('');
+  $('dsPos').innerHTML=POS.map(p=>{const pct=p.in?Math.round(p.out/p.in*100):0;const left=p.in-p.out;
+    return '<div class="pos"><div class="hd"><div><b>'+p.l+'</b><div class="small">'+p.to+'</div></div><div style="text-align:right">'+(left===0?'<span class="pill p-green">Tersalurkan penuh</span>':'<span class="small">Siap salur</span><div class="num"><b>'+rp(left)+'</b></div>')+'</div></div><div class="bar"><i style="width:'+pct+'%"></i></div><div class="ft"><span>Disalurkan '+rp(p.out)+' ('+pct+'%)</span><span>Dana masuk '+rp(p.in)+'</span></div></div>'}).join('');
   const cur=$('dsSel').value;$('dsSel').innerHTML=POS.map((p,i)=>'<option value="'+i+'">'+p.l+' → '+p.to+'</option>').join('');if(cur)$('dsSel').value=cur;
 }
 $('dsGo').onclick=()=>{
   const out=$('dsMsg');const p=POS[+$('dsSel').value],role=$('dsRole').value,m=document.querySelector('input[name=dsM]:checked').value,amt=int($('dsAmt').value),ref=$('dsRef').value.trim();
   if(role==='pimpinan')return msg(out,'Akses ditolak: Pimpinan dan akun peninjau hanya memiliki hak baca (view-only) dan dilarang mencatat penyaluran dana.','bad');
-  if(role==='admin_koperasi')return msg(out,'Akses ditolak: Role admin_koperasi tidak memiliki hak untuk mengajukan atau mencatat penyaluran dana.','bad');
-  if(m==='TRANSFER'&&role==='petugas_koperasi')return msg(out,'Akses ditolak: Penyaluran melalui Manual Transfer hanya dapat dilakukan oleh Admin atau Bendahara.','bad');
+  if(role==='admin_koperasi')return msg(out,'Akses ditolak: Role admin_koperasi tidak memiliki hak untuk mengajukan atau mencatat penyaluran dana. (Admin Koperasi boleh mengelola rekening penerima.)','bad');
+  if(m==='TRANSFER'&&role==='petugas_koperasi')return msg(out,'Tombol Transfer Bank nonaktif untuk Petugas Koperasi — penyaluran Transfer Bank hanya Admin atau Bendahara. Pilih Tunai.','bad');
   if(!(amt>0)||amt>p.in-p.out)return msg(out,'Nominal penyaluran tidak valid atau melebihi dana siap salur.','bad');
   if(m==='CASH'&&!ref)return msg(out,'Nama penerima kas wajib diisi.','bad');
   if(m==='TRANSFER'&&(!ref||!$('dsProof').checked))return msg(out,'Referensi dan bukti transfer wajib diisi.','bad');
   if(m==='TRANSFER'&&!$('dsAcc').checked)return msg(out,'Pilih rekening penerima aktif dari master rekening.','bad');
   p.out+=amt;DSN++;drawDs();
-  $('dsLog').insertAdjacentHTML('afterbegin','<div><b>DIST-SIM-'+DSN+'</b> · '+p.to+' · '+p.l+' · '+rp(amt)+' · '+(m==='CASH'?'Tunai, diterima '+esc(ref):'Transfer Bank, ref '+esc(ref)+' (rekening disnapshot)')+' · '+role+'</div>');
+  const li='<li><span class="dot who-OUT"></span><b>DIST-SIM-'+DSN+' · '+rp(amt)+'</b><div class="meta">'+p.to+' · '+p.l+' · '+(m==='CASH'?'Tunai, diterima '+esc(ref):'Transfer Bank, ref '+esc(ref)+' (rekening disnapshot)')+' · '+role+'</div></li>';
+  const log=$('dsLog');if(log.querySelector('.empty-t'))log.innerHTML='';log.insertAdjacentHTML('afterbegin',li);
   msg(out,'Penyaluran tercatat (DISTRIBUTED) dengan kuitansi. Sisa siap salur '+rp(p.in-p.out)+'.','ok');
 };
+$('dsLog').innerHTML='<li class="empty-t">Belum ada penyaluran.</li>';
 drawDs();
+
+/* ---------- 17. Findings ---------- */
+const FIND=[
+ ['green','Diperbaiki','Tagihan dilunasi tunai saat transfer masih "Menunggu Bukti".','Dulu order transfer dibatalkan tetapi pengajuan wali tetap <i>Menunggu Bukti</i>, sehingga wali masih bisa mengunggah bukti untuk tagihan yang sudah lunas. Sekarang <code>payments.ts</code> langkah 7c ikut menutup pengajuan itu menjadi <i>Dibatalkan</i> (jejak audit SYSTEM) dalam batch yang sama. Bukti yang sedang diperiksa tetap tidak disentuh.'],
+ ['green','Diperbaiki','Admin Koperasi &amp; menu Pengaturan Keuangan.','Migrasi <code>0199</code> menambahkan admin_koperasi ke menu. Di server, tab Tarif/Pembebasan/Limit/Kop kini hanya bisa diubah Admin &amp; Bendahara; Admin Koperasi langsung dibuka di tab Jalur Pembayaran. Bendahara tetap hanya melihat Jalur Pembayaran (AGENTS §47: admin yang memilih mode).'],
+ ['green','Diperbaiki','Admin Koperasi &amp; Laporan.','Migrasi <code>0199</code> membuka Laporan &amp; Ekspor (baca saja) untuk admin_koperasi.'],
+ ['green','Diperbaiki','Peran Koperasi &amp; Penyaluran.','Migrasi <code>0199</code> membuka menu untuk petugas_koperasi (catat Tunai) dan admin_koperasi (lihat + kelola rekening penerima). Layar kini menyembunyikan/menonaktifkan tombol yang pasti ditolak server.'],
+ ['gray','Keputusan Bos','Biaya admin transfer bawaan Rp0.','Bukan bug; isi nominalnya di Jalur Pembayaran bila ingin ada biaya (layar sudah menjelaskan "Rp0 berarti tanpa biaya admin").'],
+ ['green','Diperbaiki','Kedaluwarsa order transfer.','Penyapu kini juga dijalankan saat portal wali dan antrian Verifikasi Transfer dibuka. Bila gagal (mis. akun baca-saja) hanya dicatat di log, halaman tetap tampil.'],
+ ['gray','Sesuai desain','Settlement transfer selalu manual.','Sesuai aturan PAID ≠ SETTLED; kandidat kode unik tetap butuh keputusan petugas.'],
+ ['gray','Pengaturan','Petugas tanpa penugasan asrama melihat antrian kosong.','Layar Jalur Pembayaran sudah menampilkan "Belum ada petugas untuk: …"; cukup bagikan asramanya.'],
+ ['blue','Fitur baru','Uang yang diambil dari rekening untuk loket tidak tercatat.','Dibangun modul <b>Kas Bank (Mutasi Kas Bank ↔ Tunai)</b>, migrasi <code>0200</code>: tercatat di sesi kas dengan foto struk, kas awal bersambung ke sesi sebelumnya, dan dicocokkan ke baris debit/kredit rekening koran (bagian 7 &amp; 8). Menu sidebar sendiri: Operasional → Kas Bank (migrasi <code>0201</code>).'],
+ ['amber','Belum diperbaiki','Laporan Transaksi Loket belum menghitung penyaluran tunai.','Perhitungan sesi kas menghitung penyaluran tunai sebagai kas keluar, tetapi laporan Transaksi Loket (<code>reports.ts</code> getCashSessionsReport) tidak. Untuk sesi yang punya penyaluran tunai, angka "seharusnya di laci" di laporan bisa berbeda dari sesi kas. Ditemukan saat membangun Kas Bank; belum diubah.']
+];
+$('findings').innerHTML=FIND.map((f,i)=>'<div class="finding"><div class="no">'+(i+1)+'</div><div><h4><span class="pill p-'+f[0]+'">'+f[1]+'</span>'+f[2]+'</h4><p>'+f[3]+'</p></div></div>').join('');
 })();
 </script>
 </body>

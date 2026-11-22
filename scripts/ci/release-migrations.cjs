@@ -15,6 +15,7 @@ const reviewed = {
   '0198_manual_transfer_and_collective_payout.sql': '1d208ac9b74a00ec0e8203b98de30f07427de509ad00a2854108d9d1115e3b36',
   '0199_finance_koperasi_menu_access.sql': '888ec2cbd4d51d1a6bfb95093c156ac9e31a8e55867ff62efe2416043b6a6168',
   '0200_finance_cash_transfers.sql': 'a6c879bd05237e25ca65fe2ba52babc75851d8acde6ff871cc5bee737c96ce46',
+  '0201_finance_kas_bank_menu.sql': 'd7b084615146d0930a52508096df7125c21507b6af520f55188bce06c0ec5614',
 };
 
 function validateMigrationChanges(changes) {

@@ -74,7 +74,8 @@ test('both targets give Wrangler only the reviewed migration and their own DB', 
     }]);
     const migrationDir = path.join(dir, prepared.d1_databases[0].migrations_dir);
     const reviewedNames = ['0197_ehb_rab_autosave.sql', '0198_manual_transfer_and_collective_payout.sql',
-      '0199_finance_koperasi_menu_access.sql', '0200_finance_cash_transfers.sql'];
+      '0199_finance_koperasi_menu_access.sql', '0200_finance_cash_transfers.sql',
+      '0201_finance_kas_bank_menu.sql'];
     assert.deepEqual(fs.readdirSync(migrationDir).sort(), reviewedNames);
     for (const name of reviewedNames) fs.unlinkSync(path.join(migrationDir, name));
     fs.rmdirSync(migrationDir);

@@ -193,6 +193,37 @@ async function main() {
     await assert.rejects(() => ct.linkCashTransferToStatement('bendahara', { cashTransferId: dep.id, statementTransactionId: 'credit-used', notes: 'paksa cocokkan' }), /tidak cocok/)
   })
 
+  await test('Kas Bank menu: list filters and per-role scope', async () => {
+    const own = await cs.openCashSession('cashier', 1000000)
+    const other = await cs.openCashSession('cashier-2', 1000000)
+    const a = await record('cashier', { amount: 100000, bankTransactedAt: '2026-11-18T03:00:00Z' })
+    await record('cashier', { direction: 'CASH_TO_BANK', amount: 50000, bankTransactedAt: '2026-11-19T03:00:00Z' })
+    await record('cashier-2', { amount: 70000, bankTransactedAt: '2026-11-19T04:00:00Z' })
+    await ct.voidCashTransfer({ userId: 'cashier', roles: ['petugas_koperasi'] }, { id: a.id, reason: 'salah input' })
+    let list = await ct.listCashTransfers()
+    assert.equal(list.total, 3); assert.equal(list.summary.bankIn, 70000); assert.equal(list.summary.bankOut, 50000)
+    assert.equal(list.summary.voided, 1); assert.equal(list.summary.unmatched, 2)
+    assert.ok(list.items.every(r => r.session_status === 'OPEN'))
+    assert.equal((await ct.listCashTransfers({ operatorId: 'cashier' })).total, 2)
+    assert.equal((await ct.listCashTransfers({ direction: 'CASH_TO_BANK' })).total, 1)
+    assert.equal((await ct.listCashTransfers({ state: 'VOIDED' })).total, 1)
+    assert.equal((await ct.listCashTransfers({ state: 'POSTED_UNMATCHED' })).total, 2)
+    // WIB date bounds: 2026-11-19 WIB covers 2026-11-18T17:00Z .. 2026-11-19T17:00Z.
+    assert.equal((await ct.listCashTransfers({ fromDate: '2026-11-19', toDate: '2026-11-19' })).total, 2)
+    assert.equal((await ct.listCashTransfers({ limit: 1 })).items.length, 1)
+    // Server action scope: Petugas Koperasi sees only own rows, Bendahara sees all.
+    const page = h.load('app/dashboard/koperasi/kas-bank/actions.ts')
+    h.state.session = { id: 'cashier', role: 'petugas_koperasi', roles: ['petugas_koperasi'], full_name: 'Kasir' }
+    let data = await page.getKasBankData()
+    assert.equal(data.viewer.seesAll, false); assert.equal(data.total, 2); assert.equal(data.cashSession.id, own.id)
+    assert.equal(data.accounts.length, 1)
+    h.state.session = { id: 'bendahara', role: 'bendahara', roles: ['bendahara'], full_name: 'Bendahara' }
+    data = await page.getKasBankData({ direction: 'BANK_TO_CASH' })
+    assert.equal(data.viewer.seesAll, true); assert.equal(data.total, 2); assert.equal(data.cashSession, null)
+    assert.ok(other.id)
+    h.state.session = { id: 'admin', role: 'admin', roles: ['admin'], full_name: 'Admin' }
+  })
+
   console.log(`cash transfers: ${count} passed`)
 }
 main().catch(error => { console.error(error); process.exit(1) })
