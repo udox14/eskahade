@@ -1,18 +1,20 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { getDistributionReceiptAction } from './actions'
+import { getDistributionReceiptAction, getReceiptLetterheadAction } from './actions'
 import type { DistributionDetailWithItems } from '@/lib/finance/distribution-types'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
-import DocumentLetterhead from '@/components/print/document-letterhead'
 import {
-  Printer,
-  X,
-  CheckCircle,
-  Bank,
-  Money,
-} from '@phosphor-icons/react'
+  FinanceReceiptModal,
+  RECEIPT_ISSUER_PESANTREN,
+  applyLetterhead,
+  type ResolvedReceiptLetterhead,
+  formatReceiptDate,
+  formatReceiptRupiah,
+  makeReceiptNumber,
+  type ReceiptData,
+} from '@/components/finance/receipt-document'
 
 interface BuktiPenyaluranModalProps {
   isOpen: boolean
@@ -20,17 +22,91 @@ interface BuktiPenyaluranModalProps {
   distributionId: string | null
 }
 
+const METHOD_LABELS: Record<string, string> = {
+  BRI_QLOLA: 'BRI QLola',
+  TRANSFER: 'Transfer bank',
+  MANUAL_TRANSFER: 'Transfer manual',
+  CASH: 'Tunai (Cash)',
+}
+
+function buildReceipt(data: DistributionDetailWithItems): ReceiptData {
+  const itemLabel = FINANCE_ITEM_LABELS[data.item_type as FinanceItemType] || data.item_type
+  const date = formatReceiptDate(data.transferred_at)
+  const receiptNumber = makeReceiptNumber(data.distribution_number)
+  const isBank = data.method !== 'CASH'
+
+  const meta: ReceiptData['meta'] = [
+    { label: 'Nomor Transaksi', value: data.distribution_number, mono: true },
+    { label: 'Nomor Kuitansi', value: receiptNumber, mono: true },
+    { label: 'Tanggal Penyaluran', value: date },
+    { label: 'Metode Penyaluran', value: METHOD_LABELS[data.method] || data.method },
+    { label: 'Pos / Periode', value: `${itemLabel} (${data.period})` },
+  ]
+  if (data.operator_name) meta.push({ label: 'Petugas', value: data.operator_name })
+  if (data.notes) meta.push({ label: 'Catatan', value: data.notes })
+
+  const partyLines: string[] = []
+  if (isBank && data.destination_bank) {
+    partyLines.push(`${data.destination_bank} • ${data.destination_account ?? '-'}`)
+    if (data.account_holder_name) partyLines.push(`a.n ${data.account_holder_name}`)
+  }
+
+  const rows =
+    data.items && data.items.length > 0
+      ? data.items.map((it) => ({
+          label: `${it.santri_name} (${it.santri_nis}) — ${itemLabel} ${data.period}`,
+          unitPrice: it.amount,
+          amount: it.amount,
+        }))
+      : [{ label: `${itemLabel} ${data.period}`, unitPrice: data.total_amount, amount: data.total_amount }]
+
+  return {
+    title: 'Bukti Penyaluran Dana',
+    fileName: `Bukti-Penyaluran-${receiptNumber}`,
+    meta,
+    issuer: RECEIPT_ISSUER_PESANTREN,
+    variant: 'simple',
+    signatures: [
+      { role: 'Penerima Dana', name: data.recipient_name },
+      { role: 'Petugas / Bendahara', name: data.operator_name || '' },
+    ],
+    party: { title: 'Diterima Oleh', name: data.recipient_name, lines: partyLines },
+    heroText: `${formatReceiptRupiah(data.total_amount)} disalurkan pada ${date}`,
+    rowsHeader: `Rincian Alokasi Santri (${rows.length} transaksi)`,
+    rows,
+    summary: [],
+    totalLabel: 'Total Disalurkan',
+    totalValue: formatReceiptRupiah(data.total_amount),
+    footerNote:
+      'Dokumen diterbitkan melalui Sistem Administrasi & Keuangan Pondok Pesantren Sukahideng sebagai bukti penyaluran dana yang valid.',
+  }
+}
+
 export default function BuktiPenyaluranModal({
   isOpen,
   onClose,
   distributionId,
 }: BuktiPenyaluranModalProps) {
-  const [isPending] = useTransition()
   const [data, setData] = useState<DistributionDetailWithItems | null>(null)
+  const [letterhead, setLetterhead] = useState<ResolvedReceiptLetterhead | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    let active = true
+    getReceiptLetterheadAction('receipt_penyaluran')
+      .then((res) => {
+        if (active) setLetterhead(res)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (!isOpen || !distributionId) return
     let active = true
+    setData(null)
     getDistributionReceiptAction(distributionId)
       .then((res) => {
         if (active) setData(res)
@@ -45,212 +121,11 @@ export default function BuktiPenyaluranModal({
 
   if (!isOpen || !distributionId) return null
 
-  const handlePrint = () => {
-    window.print()
-  }
-
-  const formatDateTime = (isoString: string) => {
-    try {
-      const d = new Date(isoString)
-      return d.toLocaleDateString('id-ID', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch {
-      return isoString
-    }
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header Modal (Hidden on Print) */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 print:hidden">
-          <div className="flex items-center gap-2">
-            <CheckCircle size={20} weight="fill" className="text-emerald-600" />
-            <h3 className="font-bold text-slate-800 text-base">Bukti Penyaluran Dana</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition shadow-xs"
-            >
-              <Printer size={15} />
-              Cetak Kuitansi
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
-            >
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* Receipt Slip Body (Print Ready) */}
-        <div className="p-8 overflow-y-auto space-y-6 flex-1 bg-white text-slate-800" id="printable-receipt">
-          {isPending || !data ? (
-            <div className="text-center py-12 text-slate-400 text-sm">Memuat rincian kuitansi...</div>
-          ) : (
-            <>
-              {/* Slip Kop */}
-              <div>
-                <DocumentLetterhead />
-                <div className="text-center -mt-2 mb-4">
-                  <div className="inline-block px-3 py-0.5 rounded-md bg-slate-100 text-slate-800 text-[11px] font-bold uppercase tracking-widest">
-                    Tanda Terima Penyaluran Dana
-                  </div>
-                </div>
-              </div>
-
-              {/* Reference Info */}
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">
-                    Nomor Transaksi
-                  </span>
-                  <span className="font-mono font-bold text-slate-900 text-sm">
-                    {data.distribution_number}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">
-                    Waktu Penyaluran
-                  </span>
-                  <span className="font-medium text-slate-800">
-                    {formatDateTime(data.transferred_at)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Detail Transaksi Box */}
-              <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs">
-                <div className="px-4 py-2.5 flex justify-between bg-slate-50/50">
-                  <span className="text-slate-500 font-medium">Pihak Penerima Dana</span>
-                  <span className="font-bold text-slate-900 text-sm">{data.recipient_name}</span>
-                </div>
-                <div className="px-4 py-2 flex justify-between">
-                  <span className="text-slate-500 font-medium">Pos Item Finansial</span>
-                  <span className="font-semibold text-slate-800">
-                    {FINANCE_ITEM_LABELS[data.item_type as FinanceItemType] || data.item_type}
-                  </span>
-                </div>
-                <div className="px-4 py-2 flex justify-between">
-                  <span className="text-slate-500 font-medium">Periode Tagihan</span>
-                  <span className="font-medium text-slate-800">{data.period}</span>
-                </div>
-                <div className="px-4 py-2 flex justify-between">
-                  <span className="text-slate-500 font-medium">Metode Penyaluran</span>
-                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                    {data.method === 'TRANSFER' ? (
-                      <>
-                        <Bank size={14} className="text-slate-600" />
-                        Transfer Bank
-                      </>
-                    ) : (
-                      <>
-                        <Money size={14} className="text-slate-600" />
-                        Tunai (Cash)
-                      </>
-                    )}
-                  </span>
-                </div>
-                {data.method === 'TRANSFER' && (
-                  <div className="px-4 py-2.5 flex justify-between bg-slate-50/30">
-                    <span className="text-slate-500 font-medium">Rekening Tujuan</span>
-                    <span className="font-medium text-slate-900 text-right">
-                      {data.destination_bank} &bull; {data.destination_account}
-                      <span className="block text-[11px] text-slate-500">
-                        a.n {data.account_holder_name}
-                      </span>
-                    </span>
-                  </div>
-                )}
-                {data.notes && (
-                  <div className="px-4 py-2 flex justify-between bg-slate-50/20">
-                    <span className="text-slate-500 font-medium">Catatan</span>
-                    <span className="text-slate-700 italic text-right max-w-xs">{data.notes}</span>
-                  </div>
-                )}
-                {data.proof_attachment_url && (
-                  <div className="px-4 py-2.5 flex justify-between items-center bg-blue-50/40">
-                    <span className="text-slate-600 font-medium">Bukti Transfer Eksternal</span>
-                    <a
-                      href={data.proof_attachment_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs font-bold text-blue-700 hover:underline flex items-center gap-1"
-                    >
-                      Buka Bukti / Struk Transfer &rarr;
-                    </a>
-                  </div>
-                )}
-                <div className="px-4 py-3 flex justify-between items-center bg-emerald-50/40">
-                  <span className="font-bold text-slate-900 text-sm">Total Dana Disalurkan</span>
-                  <span className="font-black text-emerald-700 text-lg">
-                    Rp {data.total_amount.toLocaleString('id-ID')}
-                  </span>
-                </div>
-              </div>
-
-              {/* Rincian Santri Terkait */}
-              {data.items && data.items.length > 0 && (
-                <div>
-                  <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">
-                    Rincian Alokasi Santri ({data.items.length} transaksi)
-                  </div>
-                  <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg text-xs divide-y divide-slate-100">
-                    {data.items.map((item, idx) => (
-                      <div key={item.id} className="px-3 py-1.5 flex justify-between items-center hover:bg-slate-50">
-                        <span className="text-slate-700">
-                          {idx + 1}. <span className="font-semibold">{item.santri_name}</span> ({item.santri_nis})
-                        </span>
-                        <span className="font-mono font-medium text-slate-900">
-                          Rp {item.amount.toLocaleString('id-ID')}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Signature Blocks */}
-              <div className="pt-6 grid grid-cols-2 gap-8 text-center text-xs">
-                <div>
-                  <p className="text-slate-500">Penerima Dana,</p>
-                  <div className="h-16 flex items-end justify-center">
-                    <div className="border-b border-slate-400 w-44"></div>
-                  </div>
-                  <p className="font-bold text-slate-800 mt-1">{data.recipient_name}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Petugas / Bendahara,</p>
-                  <div className="h-16 flex items-end justify-center">
-                    <div className="border-b border-slate-400 w-44"></div>
-                  </div>
-                  <p className="font-bold text-slate-800 mt-1">{data.operator_name}</p>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Footer (Hidden on Print) */}
-        <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/50 flex justify-end print:hidden">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition"
-          >
-            Tutup
-          </button>
-        </div>
-      </div>
-    </div>
+    <FinanceReceiptModal
+      data={data ? applyLetterhead(buildReceipt(data), letterhead, { issuerFromProfile: true }) : null}
+      subtitle={data ? `No. Bukti: ${data.distribution_number}` : undefined}
+      onClose={onClose}
+    />
   )
 }

@@ -108,3 +108,9 @@ export async function getTransactionDetail(
 
   return await fetchTransactionDetail(id, sourceTable)
 }
+
+export async function getReceiptLetterheadAction(documentKey: 'receipt_pembayaran' | 'receipt_penyaluran') {
+  await authorizeFinanceFeature('/dashboard/keuangan/riwayat', false)
+  const { resolveDocumentLetterhead } = await import('@/lib/print/letterhead-server')
+  return resolveDocumentLetterhead(documentKey)
+}

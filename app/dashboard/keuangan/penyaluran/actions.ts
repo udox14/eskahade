@@ -480,3 +480,9 @@ export async function importProviderAccountsAction(
   return importProviderAccounts(rows)
 }
 
+
+export async function getReceiptLetterheadAction(documentKey: 'receipt_pembayaran' | 'receipt_penyaluran') {
+  await authorizeFinanceFeature('/dashboard/keuangan/penyaluran', false)
+  const { resolveDocumentLetterhead } = await import('@/lib/print/letterhead-server')
+  return resolveDocumentLetterhead(documentKey)
+}
