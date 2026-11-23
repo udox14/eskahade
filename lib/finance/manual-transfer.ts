@@ -21,6 +21,11 @@ import { resolveFundManagement } from './fund-management'
 import { rupiah } from './money'
 import { parseAccountSnapshot } from './transfer-config'
 import { putPrivateImageBytes } from '@/lib/r2/private-proofs'
+import { financeNotices, kickNotificationDispatch } from '@/lib/notifications/runtime'
+import { outboxIdsOf } from '@/lib/notifications/outbox'
+import {
+  transferApprovedNotices, transferClosedNotices, transferProofUploadedNotices, transferUnallocatedNotices,
+} from '@/lib/notifications/finance-events'
 
 export type TransferSubmissionStatus =
   | 'MENUNGGU_BUKTI' | 'MENUNGGU_VERIFIKASI' | 'PERLU_PERBAIKAN'
@@ -225,6 +230,8 @@ export async function submitTransferProof(input: SubmitProofInput) {
   })
   const timestamp = now()
   const fromStatus = submission.status
+  const proofEventId = generateId()
+  const notices = await financeNotices(() => transferProofUploadedNotices(submission, hash, proofEventId))
   try {
     await batch([
       {
@@ -243,8 +250,9 @@ export async function submitTransferProof(input: SubmitProofInput) {
         sql: `INSERT INTO finance_transfer_submission_events (id, submission_id, action, from_status, to_status, actor_kind, actor_id, proof_hash, notes, created_at)
               SELECT ?, ?, 'PROOF_UPLOADED', ?, 'MENUNGGU_VERIFIKASI', 'PARENT', NULL, ?, ?, ?
               WHERE EXISTS (SELECT 1 FROM finance_transfer_submissions WHERE id = ? AND status = 'MENUNGGU_VERIFIKASI' AND proof_hash = ?)`,
-        params: [generateId(), submission.id, fromStatus, hash, `Pengirim ${senderName} (${senderBank})`, timestamp, submission.id, hash],
+        params: [proofEventId, submission.id, fromStatus, hash, `Pengirim ${senderName} (${senderBank})`, timestamp, submission.id, hash],
       },
+      ...notices,
     ])
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -257,6 +265,7 @@ export async function submitTransferProof(input: SubmitProofInput) {
   if (updated?.status !== 'MENUNGGU_VERIFIKASI' || updated.proof_object_key !== objectKey) {
     throw new Error('Status pembayaran berubah saat unggah bukti. Muat ulang halaman.')
   }
+  if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
   return updated
 }
 
@@ -347,6 +356,8 @@ export async function approveTransferSubmission(actor: ReviewActor, input: { sub
   }).statements : []
   const notes = cleanText(input.notes, 300) || null
   const result = { paymentId: payment.id }
+  const approvedEventId = generateId()
+  const notices = await financeNotices(() => transferApprovedNotices(submission, receivedAmount, approvedEventId))
   try {
     await batch([
       operationStatement(identity, result, { santriId: submission.santri_id, amount: receivedAmount }),
@@ -362,13 +373,15 @@ export async function approveTransferSubmission(actor: ReviewActor, input: { sub
         sql: `INSERT INTO finance_transfer_submission_events (id, submission_id, action, from_status, to_status, actor_kind, actor_id, notes, created_at)
               SELECT ?, ?, 'APPROVED', 'MENUNGGU_VERIFIKASI', 'DITERIMA', 'STAFF', ?, ?, ?
               WHERE EXISTS (SELECT 1 FROM finance_transfer_submissions WHERE id = ? AND status = 'DITERIMA' AND payment_id = ?)`,
-        params: [generateId(), submission.id, actor.session.id, notes || `Diterima Rp${receivedAmount}`, timestamp, submission.id, payment.id],
+        params: [approvedEventId, submission.id, actor.session.id, notes || `Diterima Rp${receivedAmount}`, timestamp, submission.id, payment.id],
       },
       // A second verifier loses at the payment insert: the transfer guard requires MENUNGGU_VERIFIKASI.
+      ...notices,
     ])
   } catch (error) { concurrencyError(error) }
   const check = await getTransferSubmission(submission.id)
   if (check?.status !== 'DITERIMA' || check.payment_id !== payment.id) throw new Error('Pembayaran ini baru saja diproses petugas lain. Muat ulang antrian.')
+  if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
   return result
 }
 
@@ -387,6 +400,8 @@ export async function approveTransferAsUnallocated(actor: ReviewActor, input: { 
   const paymentNumber = `PAY-${timestamp.slice(0, 10).replace(/-/g, '')}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`
   const fundManagement = await resolveFundManagement(timestamp, 'NEW_FINANCE')
   const result = { paymentId }
+  const unallocatedEventId = generateId()
+  const notices = await financeNotices(() => transferUnallocatedNotices(submission, receivedAmount, unallocatedEventId))
   try {
     await batch([
       operationStatement(identity, result, { santriId: submission.santri_id, amount: receivedAmount }),
@@ -415,8 +430,9 @@ export async function approveTransferAsUnallocated(actor: ReviewActor, input: { 
         sql: `INSERT INTO finance_transfer_submission_events (id, submission_id, action, from_status, to_status, actor_kind, actor_id, notes, created_at)
               SELECT ?, ?, 'APPROVED_UNALLOCATED', 'MENUNGGU_VERIFIKASI', 'DITERIMA', 'STAFF', ?, ?, ?
               WHERE EXISTS (SELECT 1 FROM finance_transfer_submissions WHERE id = ? AND payment_id = ?)`,
-        params: [generateId(), submission.id, actor.session.id, notes, timestamp, submission.id, paymentId],
+        params: [unallocatedEventId, submission.id, actor.session.id, notes, timestamp, submission.id, paymentId],
       },
+      ...notices,
       {
         sql: `UPDATE finance_payment_orders SET status = 'CANCELLED', updated_at = ?
               WHERE id = ? AND status = 'PENDING' AND EXISTS (SELECT 1 FROM finance_transfer_submissions WHERE order_id = ? AND payment_id = ?)`,
@@ -426,6 +442,7 @@ export async function approveTransferAsUnallocated(actor: ReviewActor, input: { 
   } catch (error) { concurrencyError(error) }
   const check = await getTransferSubmission(submission.id)
   if (check?.payment_id !== paymentId) throw new Error('Pembayaran ini baru saja diproses petugas lain. Muat ulang antrian.')
+  if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
   return result
 }
 
@@ -436,6 +453,7 @@ async function closeWithoutPayment(actor: ReviewActor, input: { submissionId: st
   const submission = await loadReviewable(actor, input.submissionId, allowed)
   const timestamp = now()
   const toStatus = kind === 'REJECT' ? 'DITOLAK' : 'PERLU_PERBAIKAN'
+  const closeEventId = generateId()
   const statements = [
     {
       sql: `UPDATE finance_transfer_submissions SET status = ?, reviewed_by = ?, reviewed_at = ?, review_notes = ?, updated_at = ?
@@ -446,7 +464,7 @@ async function closeWithoutPayment(actor: ReviewActor, input: { submissionId: st
       sql: `INSERT INTO finance_transfer_submission_events (id, submission_id, action, from_status, to_status, actor_kind, actor_id, notes, created_at)
             SELECT ?, ?, ?, ?, ?, 'STAFF', ?, ?, ?
             WHERE EXISTS (SELECT 1 FROM finance_transfer_submissions WHERE id = ? AND status = ? AND reviewed_at = ?)`,
-      params: [generateId(), submission.id, kind === 'REJECT' ? 'REJECTED' : 'FIX_REQUESTED', submission.status, toStatus,
+      params: [closeEventId, submission.id, kind === 'REJECT' ? 'REJECTED' : 'FIX_REQUESTED', submission.status, toStatus,
         actor.session.id, reason, timestamp, submission.id, toStatus, timestamp] as unknown[],
     },
   ]
@@ -457,9 +475,11 @@ async function closeWithoutPayment(actor: ReviewActor, input: { submissionId: st
       params: [timestamp, submission.order_id, submission.order_id],
     })
   }
-  try { await batch(statements) } catch (error) { concurrencyError(error) }
+  const notices = await financeNotices(() => transferClosedNotices(submission, kind, reason, closeEventId))
+  try { await batch([...statements, ...notices]) } catch (error) { concurrencyError(error) }
   const check = await getTransferSubmission(submission.id)
   if (check?.status !== toStatus || check.reviewed_at !== timestamp) throw new Error('Status pembayaran baru saja berubah. Muat ulang antrian.')
+  if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
 }
 
 export const rejectTransferSubmission = (actor: ReviewActor, input: { submissionId: string; reason: string }) => closeWithoutPayment(actor, input, 'REJECT')

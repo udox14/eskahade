@@ -4,6 +4,7 @@ import { clearSession, getSession } from '@/lib/auth/session'
 import { actorFromSession, getRequestAuditContext, logActivity } from '@/lib/activity-log'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { unlinkCurrentDevice } from '@/lib/notifications/runtime'
 
 export async function signOut() {
   // Logging out must work even while the database cannot verify the session.
@@ -22,6 +23,8 @@ export async function signOut() {
     status: 'success',
     requestInfo: await getRequestAuditContext(),
   })
+  // Perangkat ini berhenti menerima push untuk akun yang logout.
+  await unlinkCurrentDevice(session ? { kind: 'USER', id: session.id } : null)
   await clearSession()
   revalidatePath('/', 'layout')
   redirect('/login')

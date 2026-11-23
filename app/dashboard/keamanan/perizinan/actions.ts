@@ -1,6 +1,9 @@
 'use server'
 
-import { query, queryOne, execute, generateId, getDB } from '@/lib/db'
+import { query, queryOne, execute, batch, generateId, getDB } from '@/lib/db'
+import { appNotices, kickNotificationDispatch } from '@/lib/notifications/runtime'
+import { outboxIdsOf } from '@/lib/notifications/outbox'
+import { izinDecidedNotices, izinSubmittedNotices } from '@/lib/notifications/approval-events'
 import { assertFeature } from '@/lib/auth/feature'
 import { getSession, getEffectiveRoles, hasAnyRole, isSuperAccess, type SessionUser } from '@/lib/auth/session'
 import { actorFromSession, diffWhitelistedFields, logActivity } from '@/lib/activity-log'
@@ -843,10 +846,16 @@ export async function ajukanIzinAsrama(formData: FormData): Promise<{ success: b
   await ensurePengajuanTable()
   const pengajuanId = generateId()
 
-  await execute(`
-    INSERT INTO perizinan_pengajuan (id, santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan, pemberi_izin, status, submitted_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
-  `, [pengajuanId, santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin, session?.id ?? null])
+  const notices = await appNotices(() => izinSubmittedNotices({
+    pengajuanId, santriId: santri_id, namaSantri: santri?.nama_lengkap || santri?.nis || 'santri', asrama: santri?.asrama ?? null,
+    jenis, alasan: alasan_final, actorId: session?.id ?? null,
+  }))
+  await batch([{
+    sql: `INSERT INTO perizinan_pengajuan (id, santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan, pemberi_izin, status, submitted_by)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)`,
+    params: [pengajuanId, santri_id, jenis, tgl_mulai, tgl_selesai_rencana, alasan_final, pemberi_izin, session?.id ?? null],
+  }, ...notices])
+  if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
 
   await logActivity({
     actor: actorFromSession(session),
@@ -1093,11 +1102,17 @@ export async function approveIzinAsrama(id: string, requestedAsrama?: string): P
     )
   } catch { /* non-fatal */ }
 
-  await execute(`
-    UPDATE perizinan_pengajuan
-    SET status = 'APPROVED', reviewed_by = ?, reviewed_at = datetime('now')
-    WHERE id = ?
-  `, [session?.id ?? null, id])
+  const approvedNotices = await appNotices(() => izinDecidedNotices({
+    pengajuanId: id, namaSantri: pengajuan.nama_lengkap || pengajuan.nis || 'santri', jenis: pengajuan.jenis,
+    alasan: pengajuan.alasan, submittedBy: pengajuan.submitted_by ?? null, decision: 'APPROVED',
+  }))
+  await batch([{
+    sql: `UPDATE perizinan_pengajuan
+          SET status = 'APPROVED', reviewed_by = ?, reviewed_at = datetime('now')
+          WHERE id = ?`,
+    params: [session?.id ?? null, id],
+  }, ...approvedNotices])
+  if (approvedNotices.length) await kickNotificationDispatch(outboxIdsOf(approvedNotices))
 
   await logActivity({
     actor: actorFromSession(session),
@@ -1134,7 +1149,7 @@ export async function rejectIzinAsrama(id: string, requestedAsrama?: string): Pr
   const scopeParams = scope.asrama ? [scope.asrama] : []
 
   const pengajuan = await queryOne<any>(
-    `SELECT pq.id, pq.santri_id
+    `SELECT pq.id, pq.santri_id, pq.jenis, pq.alasan, pq.submitted_by, s.nama_lengkap, s.nis
      FROM perizinan_pengajuan pq
      JOIN santri s ON s.id = pq.santri_id
      WHERE pq.id = ? AND pq.status = ?${scopeClause}`,
@@ -1142,11 +1157,17 @@ export async function rejectIzinAsrama(id: string, requestedAsrama?: string): Pr
   )
   if (!pengajuan) return { error: 'Pengajuan tidak ditemukan atau sudah diproses.' }
 
-  await execute(`
-    UPDATE perizinan_pengajuan
-    SET status = 'REJECTED', reviewed_by = ?, reviewed_at = datetime('now')
-    WHERE id = ?
-  `, [session?.id ?? null, id])
+  const rejectedNotices = await appNotices(() => izinDecidedNotices({
+    pengajuanId: id, namaSantri: pengajuan.nama_lengkap || pengajuan.nis || 'santri', jenis: pengajuan.jenis,
+    alasan: pengajuan.alasan, submittedBy: pengajuan.submitted_by ?? null, decision: 'REJECTED',
+  }))
+  await batch([{
+    sql: `UPDATE perizinan_pengajuan
+          SET status = 'REJECTED', reviewed_by = ?, reviewed_at = datetime('now')
+          WHERE id = ?`,
+    params: [session?.id ?? null, id],
+  }, ...rejectedNotices])
+  if (rejectedNotices.length) await kickNotificationDispatch(outboxIdsOf(rejectedNotices))
 
   await logActivity({
     actor: actorFromSession(session),

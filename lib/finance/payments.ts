@@ -5,6 +5,9 @@ import { rupiah } from './money'
 // Mengelola pencatatan pembayaran, alokasi atomik ke kewajiban, dan unallocated transfer
 
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
+import { financeNotices, kickNotificationDispatch } from '@/lib/notifications/runtime'
+import { outboxIdsOf } from '@/lib/notifications/outbox'
+import { paymentReceivedNotices } from '@/lib/notifications/finance-events'
 import { getPaymentOrderById } from '@/lib/finance/orders'
 import { resolveFundManagement } from '@/lib/finance/fund-management'
 import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
@@ -568,8 +571,17 @@ export async function recordOrderPayment(
         disbursed_amount:0,distribution_status:'UNDISBURSED',created_at:paidAt})),
     }
   }
+  // Jalur tanpa plan (pembayaran tunai Status Pembayaran): notifikasi wali di batch yang sama,
+  // dijaga keberadaan baris payment. Jalur dengan plan diberi notifikasi oleh pemanggilnya.
+  const walletOnly = allocatableItems.length > 0 && allocatableItems.every(a => !a.obligationId)
+  const notices = await financeNotices(() => paymentReceivedNotices({
+    paymentId, santriId: order.santri_id, namaSantri: orderSantri?.nama_lengkap ?? 'santri',
+    nominal: walletOnly ? grossAmount : grossAmount + cooperativeAdminFee,
+    metode: input.channel === 'CASH' ? 'Tunai' : input.channel, waktu: paidAt, walletOnly,
+  }))
   try {
-    await batch(statements)
+    await batch([...statements, ...notices])
+    if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err)
 

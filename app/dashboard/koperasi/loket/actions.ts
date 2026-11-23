@@ -63,6 +63,9 @@ import { rupiah, sumRupiah } from '@/lib/finance/money'
 import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
 import { createPaymentOrder } from '@/lib/finance/orders'
 import { recordOrderPayment } from '@/lib/finance/payments'
+import { financeNotices, kickNotificationDispatch } from '@/lib/notifications/runtime'
+import { outboxIdsOf } from '@/lib/notifications/outbox'
+import { cashTopupNotices, paymentReceivedNotices } from '@/lib/notifications/finance-events'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
 
 // â”€â”€â”€ TIPE DATA INTERFACE LOKET â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -933,8 +936,17 @@ export async function executeLoketDepositOrPayment(
       items: receiptItems,
       walletBalanceAfter,
     }
-    try { await batch([operationStatement(identity,receipt,{santriId:input.santriId,amount:totalCashReceived,cashSessionId:activeSession.id,expectedWalletBalance:topupCashAmount>0 ? walletBalanceAfter!-topupCashAmount : undefined}),...plan.statements]) }
+    // Satu notifikasi wali per setoran: "Pembayaran Diterima" bila ada tagihan, "Uang Jajan Masuk" bila murni top-up.
+    const notices = await financeNotices(() => paymentId
+      ? paymentReceivedNotices({ paymentId, santriId: student.id, namaSantri: student.nama_lengkap, nominal: totalCashReceived,
+          metode: 'Tunai di Loket', waktu: paidTimestamp, walletOnly: false })
+      : topupLedgerId
+        ? cashTopupNotices({ ledgerId: topupLedgerId, santriId: student.id, namaSantri: student.nama_lengkap,
+            nominal: topupCashAmount, saldoSetelah: walletBalanceAfter })
+        : [])
+    try { await batch([operationStatement(identity,receipt,{santriId:input.santriId,amount:totalCashReceived,cashSessionId:activeSession.id,expectedWalletBalance:topupCashAmount>0 ? walletBalanceAfter!-topupCashAmount : undefined}),...plan.statements,...notices]) }
     catch(error) { const committed=await operationReplay<LoketPaymentReceipt>(identity); if(committed)return committed; throw error }
+    if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
     return receipt
   })()
 

@@ -22,9 +22,17 @@
     "test:finance:statement-import": "node scripts/test-finance-statement-import.cjs",
     "test:finance:billing:d1": "node scripts/test-finance-billing-d1.cjs",
     "test:supervisi": "node scripts/test-supervisi.cjs",
-    "test:guru-export": "node scripts/test-guru-export.cjs"
+    "test:guru-export": "node scripts/test-guru-export.cjs",
+    "test:notifications": "node scripts/test-notifications.cjs && node scripts/test-notifications-webpush.cjs && node scripts/test-notifications-fcm.cjs && node scripts/test-notifications-finance.cjs && node scripts/test-notifications-briva.cjs && node scripts/test-notifications-approval.cjs && node scripts/test-notifications-broadcast.cjs",
+    "android:open": "cap open android",
+    "android:build:debug": "node scripts/android-build.cjs debug",
+    "android:build:release": "node scripts/android-build.cjs release",
+    "android:build:bundle": "node scripts/android-build.cjs bundle"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/push-notifications": "^8.1.3",
     "@opennextjs/cloudflare": "latest",
     "@phosphor-icons/react": "^2.1.10",
     "@tanstack/react-table": "^8.21.3",
@@ -43,6 +51,8 @@
     "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/cli": "^8.6.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

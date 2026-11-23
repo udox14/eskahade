@@ -16,6 +16,9 @@ import { getActiveCashSession, recalculateCashSession } from './cash-session'
 import { operationIdentity, operationReplay, operationStatement } from './operation'
 import { rupiah } from './money'
 import { isAsramaBebasTagihan } from './non-billable-santri'
+import { financeNotices, kickNotificationDispatch } from '@/lib/notifications/runtime'
+import { outboxIdsOf } from '@/lib/notifications/outbox'
+import { payoutSettledNotices, payoutTakenNotices } from '@/lib/notifications/finance-events'
 
 export const MAX_PAYOUT_ITEMS = 60
 
@@ -169,6 +172,7 @@ export async function createPayoutBatch(operatorId: string, input: CreatePayoutI
         String(input.scopeLabel || '').trim().slice(0, 80) || null, items.length, total, String(input.notes || '').trim().slice(0, 300) || null, timestamp],
     },
   ]
+  const notices: Array<{ sql: string; params: unknown[] }> = []
   for (const item of items) {
     const itemId = generateId()
     const wallet = walletMutationStatements({
@@ -182,9 +186,13 @@ export async function createPayoutBatch(operatorId: string, input: CreatePayoutI
             VALUES (?, ?, ?, ?, ?, 'DIBAWA', ?, ?, ?)`,
       params: [itemId, batchId, item.santriId, today, item.amount, wallet.id, timestamp, timestamp],
     })
+    notices.push(...await financeNotices(() => payoutTakenNotices({
+      itemId, santriId: item.santriId, namaSantri: byId.get(item.santriId)?.nama_lengkap ?? 'santri', amount: item.amount, updatedAt: timestamp,
+    }, representativeName)))
   }
-  try { await batch(statements) } catch (error) { friendly(error) }
+  try { await batch([...statements, ...notices]) } catch (error) { friendly(error) }
   await recalculateCashSession(session.id)
+  if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
   return result
 }
 
@@ -254,10 +262,16 @@ export async function settlePayoutBatch(operatorId: string, input: SettlePayoutI
             settle_notes = ? WHERE id = ? AND status = 'DIBAWA'`,
     params: [deliveredTotal, cancelledTotal, operatorId, timestamp, String(input.notes || '').trim().slice(0, 300) || null, payout.id],
   })
-  try { await batch(statements) } catch (error) { friendly(error) }
+  // Notifikasi per santri, dijaga status & updated_at item hasil batch ini (bukan item yang diproses petugas lain).
+  const reasons = new Map(cancelled.map(c => [c.itemId, c.reason]))
+  const notices = await financeNotices(() => items.filter(i => i.status === 'DIBAWA').flatMap(i => payoutSettledNotices(
+    { itemId: i.id, santriId: i.santri_id, namaSantri: i.nama_lengkap, amount: i.amount },
+    cancelledIds.has(i.id) ? 'DIBATALKAN' : 'DITERIMA', timestamp, reasons.get(i.id))))
+  try { await batch([...statements, ...notices]) } catch (error) { friendly(error) }
   const check = await queryOne<{ status: string }>(`SELECT status FROM finance_wallet_payout_batches WHERE id = ?`, [payout.id])
   if (check?.status !== 'SELESAI') throw new Error('Pencairan ini baru saja diproses petugas lain. Muat ulang halaman.')
   if (session) await recalculateCashSession(session.id)
+  if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
   return { batchId: payout.id }
 }
 

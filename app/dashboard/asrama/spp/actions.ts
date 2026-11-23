@@ -1,6 +1,9 @@
 'use server'
 
 import { query, queryOne, execute, batch, generateId } from '@/lib/db'
+import { appNotices, kickNotificationDispatch } from '@/lib/notifications/runtime'
+import { outboxIdsOf } from '@/lib/notifications/outbox'
+import { setoranSubmittedNotices } from '@/lib/notifications/approval-events'
 import { getSession, hasAnyRole, type SessionUser } from '@/lib/auth/session'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { revalidatePath } from 'next/cache'
@@ -1220,8 +1223,12 @@ export async function submitSetoranSppJuliSantriBaru(
 
     const currentYear = now.getFullYear()
     const currentMonth = now.getMonth() + 1
-    await execute(
-      `INSERT INTO spp_setoran
+    const notices = await appNotices(() => setoranSubmittedNotices({
+      unit: cleanUnit, tahun: cleanTahun, bulan: cleanBulan, jumlah: cleanJumlah, tujuan: 'BENDAHARA_PUSAT',
+      actorId: session?.id ?? null, stamp: now.toISOString(),
+    }))
+    await batch([{
+      sql: `INSERT INTO spp_setoran
          (id, asrama, unit_setor, jenis_unit_setor, bulan, tahun,
           tanggal_setor, nama_penyetor, jumlah_aktual, jumlah_bulan_ini,
           jumlah_tunggakan_bayar, status, tujuan_setoran)
@@ -1233,12 +1240,13 @@ export async function submitSetoranSppJuliSantriBaru(
          jumlah_bulan_ini       = excluded.jumlah_bulan_ini,
          jumlah_tunggakan_bayar = 0,
          status                 = 'menunggu_konfirmasi'`,
-      [
+      params: [
         generateId(), cleanUnit, cleanUnit,
         isSadesaUnit(cleanUnit) ? 'SADESA' : 'ASRAMA',
         cleanBulan, cleanTahun, cleanNama, cleanJumlah, cleanJumlah,
-      ]
-    )
+      ],
+    }, ...notices])
+    if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
 
     await logActivity({
       actor: actorFromSession(session),
@@ -1309,8 +1317,12 @@ export async function submitSetoranAsrama(
     if (jumlahTotal <= 0) return { error: 'Jumlah setoran harus lebih dari 0.' }
     if (!namaPenyetor.trim()) return { error: 'Nama penyetor wajib diisi.' }
 
-    await execute(
-      `INSERT INTO spp_setoran
+    const notices = await appNotices(() => setoranSubmittedNotices({
+      unit: cleanUnit, tahun: yr, bulan: mo, jumlah: jumlahTotal, tujuan: 'DEWAN_SANTRI',
+      actorId: session?.id ?? null, stamp: now.toISOString(),
+    }))
+    await batch([{
+      sql: `INSERT INTO spp_setoran
          (id, asrama, unit_setor, jenis_unit_setor, bulan, tahun,
           tanggal_setor, nama_penyetor, jumlah_aktual, jumlah_bulan_ini, jumlah_tunggakan_bayar, status, tujuan_setoran)
        VALUES (?, ?, ?, ?, ?, ?, date('now'), ?, ?, ?, ?, 'menunggu_konfirmasi', ?)
@@ -1321,13 +1333,14 @@ export async function submitSetoranAsrama(
          jumlah_bulan_ini      = excluded.jumlah_bulan_ini,
          jumlah_tunggakan_bayar = excluded.jumlah_tunggakan_bayar,
          status                = 'menunggu_konfirmasi'`,
-      [
+      params: [
         generateId(), cleanUnit, cleanUnit,
         isSadesaUnit(cleanUnit) ? 'SADESA' : 'ASRAMA',
         mo, yr,
         namaPenyetor.trim(), jumlahTotal, jumlahBulanIni || 0, jumlahTunggakan || 0, tujuanSetoran,
-      ]
-    )
+      ],
+    }, ...notices])
+    if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
 
     await logActivity({
       actor: actorFromSession(session),

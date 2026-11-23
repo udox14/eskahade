@@ -6,6 +6,10 @@ import { PortalThemeProvider } from './_components/theme-provider'
 export const metadata: Metadata = {
   title: 'Portal Orang Tua — ESKAHADE',
   description: 'Portal orang tua santri Pondok Pesantren Sukahideng',
+  // Manifest terpisah: wali yang menambah portal ke Layar Utama langsung masuk portal
+  // (Web Push iPhone hanya berlaku untuk aplikasi yang dipasang di Layar Utama).
+  manifest: '/portal-ortu/manifest.webmanifest',
+  appleWebApp: { capable: true, title: 'Portal Ortu', statusBarStyle: 'default' },
 }
 
 // Shell portal ortu: mobile-first, terpisah total dari layout dashboard staf.

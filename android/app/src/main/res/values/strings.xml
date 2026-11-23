@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ESKAHADE</string>
+    <string name="title_activity_main">ESKAHADE</string>
+    <string name="package_name">com.sukahideng.app</string>
+    <string name="custom_url_scheme">com.sukahideng.app</string>
+</resources>

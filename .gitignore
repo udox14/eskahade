@@ -99,3 +99,6 @@ __pycache__/
 *.db-wal
 *.db-shm
 
+
+# Tooling Android lokal (JDK/SDK) untuk scripts/android-build.cjs
+/.tools/

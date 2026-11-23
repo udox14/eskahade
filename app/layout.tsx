@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { VersionWatcher } from '@/components/version-watcher'
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt'
+import { NativePushRuntime } from '@/components/native/native-push-runtime'
 
 export const metadata: Metadata = {
   title: "ESKAHADE",
@@ -99,6 +100,7 @@ export default function RootLayout({
         <Toaster position="top-center" richColors />
         <VersionWatcher />
         <PwaInstallPrompt />
+        <NativePushRuntime />
       </body>
     </html>
   );
