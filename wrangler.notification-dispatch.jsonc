@@ -6,6 +6,7 @@
   "compatibility_date": "2026-10-21",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
+  "workers_dev": false,
   "vars": {"ESKAHADE_ENV":"sandbox","NOTIFICATIONS_DISPATCH_ENABLED":"true"},
   "triggers": {"crons":["*/2 * * * *"]},
   "observability": {"enabled":true,"head_sampling_rate":1},
@@ -16,8 +17,9 @@
   "env": {
     "production": {
       "name":"eskahade-notification-dispatch",
-      // Production diaktifkan eksplisit setelah migration 0202 diterapkan & diuji di sandbox.
-      "vars":{"ESKAHADE_ENV":"production","NOTIFICATIONS_DISPATCH_ENABLED":"false"},
+      // Diaktifkan 2026-11-23 setelah migration 0202 diterapkan di production (rilis PR #9).
+      "workers_dev": false,
+      "vars":{"ESKAHADE_ENV":"production","NOTIFICATIONS_DISPATCH_ENABLED":"true"},
       "triggers":{"crons":["*/2 * * * *"]},
       "d1_databases":[{"binding":"DB","database_name":"eskahade-db","database_id":"a2010f08-f314-46af-88fd-dbb9b4ef1bb1"}]
     }
