@@ -72,13 +72,16 @@ async function mintAccessToken(config: FcmConfig, fetchImpl: typeof fetch): Prom
   try {
     response = await fetchImpl(TOKEN_URL, {
       method: 'POST',
-      redirect: 'error',
+      redirect: 'manual',
       signal: AbortSignal.timeout(8000),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${unsigned}.${b64url(signature)}` }),
     })
   } catch {
     throw new FcmAuthError(true, 'Server token Google tidak terjangkau.')
+  }
+  if (response.status >= 300 && response.status < 400) {
+    throw new FcmAuthError(true, `Redirect token FCM ditolak (${response.status}).`)
   }
   if (!response.ok) throw new FcmAuthError(response.status >= 500 || response.status === 429, `Token FCM ditolak (${response.status}).`)
   const json = await response.json().catch(() => ({})) as { access_token?: string; expires_in?: number }
@@ -104,6 +107,7 @@ interface FcmErrorBody {
 
 export function classifyFcmResponse(status: number, body: FcmErrorBody | null): PushSendResult {
   if (status >= 200 && status < 300) return { outcome: 'SENT', httpStatus: status, errorCode: null }
+  if (status >= 300 && status < 400) return { outcome: 'TRANSIENT', httpStatus: status, errorCode: 'REDIRECT_BLOCKED' }
   const code = body?.error?.details?.find(d => d.errorCode)?.errorCode ?? body?.error?.status ?? null
   // Token tidak berlaku lagi (aplikasi dihapus/di-reset) atau milik project Firebase lain.
   if (code === 'UNREGISTERED' || code === 'SENDER_ID_MISMATCH' || status === 404) {
@@ -173,7 +177,7 @@ export async function sendFcm(
   try {
     const response = await fetchImpl(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(config.projectId)}/messages:send`, {
       method: 'POST',
-      redirect: 'error',
+      redirect: 'manual',
       signal: AbortSignal.timeout(8000),
       headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' },
       body,

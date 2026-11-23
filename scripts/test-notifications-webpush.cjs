@@ -155,6 +155,7 @@ async function main() {
     assert.equal(wp.classifyPushStatus(404).outcome, 'EXPIRED')
     assert.equal(wp.classifyPushStatus(429).outcome, 'TRANSIENT')
     assert.equal(wp.classifyPushStatus(503).outcome, 'TRANSIENT')
+    assert.deepEqual(wp.classifyPushStatus(302), { outcome: 'TRANSIENT', httpStatus: 302, errorCode: 'REDIRECT_BLOCKED' })
     assert.deepEqual(wp.classifyPushStatus(403), { outcome: 'REJECTED', httpStatus: 403, errorCode: 'VAPID_REJECTED' })
   })
 
@@ -205,7 +206,7 @@ async function main() {
     assert.equal(init.headers.Urgency, 'high')
     assert.equal(init.headers.TTL, '86400')
     assert.match(init.headers.Authorization, /^vapid t=.+, k=/)
-    assert.equal(init.redirect, 'error')
+    assert.equal(init.redirect, 'manual')
     const payload = JSON.parse(await decrypt(init.body, device.ua))
     assert.equal(payload.title, 'Transfer Ditolak')
     assert.doesNotMatch(payload.body, /Bukti buram/)
