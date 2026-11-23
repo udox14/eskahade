@@ -1,6 +1,9 @@
 'use server'
 
 import { batch, execute, generateId, now, query, queryOne } from '@/lib/db'
+import { appNotices, emitNoticesAfterWrite, kickNotificationDispatch } from '@/lib/notifications/runtime'
+import { outboxIdsOf } from '@/lib/notifications/outbox'
+import { keluarDecidedNotices } from '@/lib/notifications/approval-events'
 import { getSession } from '@/lib/auth/session'
 import { assertCrud } from '@/lib/auth/crud'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
@@ -299,8 +302,8 @@ export async function setujuiPengajuanKeluar(params: {
   if (!session) return { error: 'Tidak terautentikasi' }
   await ensureKeluarTandaiSchema()
 
-  const pengajuan = await queryOne<{ id: string; santri_id: string }>(
-    `SELECT id, santri_id
+  const pengajuan = await queryOne<{ id: string; santri_id: string; ditandai_oleh: string | null }>(
+    `SELECT id, santri_id, ditandai_oleh
      FROM santri_keluar_tandai
      WHERE id = ? AND status = 'pending'`,
     [params.pengajuanId]
@@ -318,6 +321,10 @@ export async function setujuiPengajuanKeluar(params: {
   if (result.berhasil === 0) {
     return { error: result.errors[0] || 'Gagal memproses pengajuan' }
   }
+  // Proses massal di atas bukan satu batch: notifikasi ke pengaju dijaga status 'disetujui'.
+  await emitNoticesAfterWrite(() => keluarDecidedNotices({
+    pengajuanId: pengajuan.id, namaSantri: santri?.nama_lengkap || 'santri', submittedBy: pengajuan.ditandai_oleh, decision: 'disetujui',
+  }))
 
   await logActivity({
     actor: actorFromSession(session),
@@ -347,24 +354,31 @@ export async function tolakPengajuanKeluar(params: {
   if (!session) return { error: 'Tidak terautentikasi' }
   await ensureKeluarTandaiSchema()
 
-  const pengajuan = await queryOne<{ id: string; santri_id: string }>(
-    `SELECT id, santri_id
-     FROM santri_keluar_tandai
-     WHERE id = ? AND status = 'pending'`,
+  const pengajuan = await queryOne<{ id: string; santri_id: string; ditandai_oleh: string | null; nama_lengkap: string | null }>(
+    `SELECT t.id, t.santri_id, t.ditandai_oleh, s.nama_lengkap
+     FROM santri_keluar_tandai t
+     LEFT JOIN santri s ON s.id = t.santri_id
+     WHERE t.id = ? AND t.status = 'pending'`,
     [params.pengajuanId]
   )
   if (!pengajuan) return { error: 'Pengajuan tidak ditemukan atau sudah diproses' }
 
-  await execute(
-    `UPDATE santri_keluar_tandai
-     SET status = 'ditolak',
-         diproses_oleh = ?,
-         diproses_at = ?,
-         keputusan_catatan = ?,
-         updated_at = ?
-     WHERE id = ?`,
-    [session.id, now(), String(params.keputusanCatatan ?? '').trim() || null, now(), params.pengajuanId]
-  )
+  const catatan = String(params.keputusanCatatan ?? '').trim() || null
+  const notices = await appNotices(() => keluarDecidedNotices({
+    pengajuanId: pengajuan.id, namaSantri: pengajuan.nama_lengkap || 'santri', submittedBy: pengajuan.ditandai_oleh,
+    decision: 'ditolak', catatan,
+  }))
+  await batch([{
+    sql: `UPDATE santri_keluar_tandai
+          SET status = 'ditolak',
+              diproses_oleh = ?,
+              diproses_at = ?,
+              keputusan_catatan = ?,
+              updated_at = ?
+          WHERE id = ?`,
+    params: [session.id, now(), catatan, now(), params.pengajuanId],
+  }, ...notices])
+  if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
 
   await logActivity({
     actor: actorFromSession(session),

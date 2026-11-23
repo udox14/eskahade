@@ -5,7 +5,10 @@
 import { revalidatePath } from 'next/cache'
 import { actorFromSession, logActivity } from '@/lib/activity-log'
 import { assertFeature } from '@/lib/auth/feature'
-import { execute, query, queryOne } from '@/lib/db'
+import { batch, execute, query, queryOne } from '@/lib/db'
+import { appNotices, kickNotificationDispatch } from '@/lib/notifications/runtime'
+import { outboxIdsOf } from '@/lib/notifications/outbox'
+import { setoranConfirmedNotices } from '@/lib/notifications/approval-events'
 import { sppJuliPusatLogCondition } from '@/lib/spp/tujuan-setoran'
 
 const PATH = '/dashboard/keuangan/setoran-spp-baru'
@@ -56,7 +59,12 @@ export async function konfirmasiSetoranPusat(setoranId: string) {
   const row = await queryOne<any>(`SELECT * FROM spp_setoran WHERE id = ? AND tujuan_setoran = 'BENDAHARA_PUSAT'`, [setoranId])
   if (!row) return { error: 'Setoran Bendahara Pesantren tidak ditemukan.' }
   if (row.status === 'dikonfirmasi') return { error: 'Setoran sudah dikonfirmasi.' }
-  await execute(`UPDATE spp_setoran SET status = 'dikonfirmasi', tanggal_terima = datetime('now'), penerima_id = ? WHERE id = ? AND tujuan_setoran = 'BENDAHARA_PUSAT'`, [access.id, setoranId])
+  const notices = await appNotices(() => setoranConfirmedNotices({
+    unit: String(row.unit_setor || row.asrama), tahun: Number(row.tahun), bulan: Number(row.bulan), jumlah: Number(row.jumlah_aktual),
+    tujuan: 'BENDAHARA_PUSAT', actorId: access.id, stamp: new Date().toISOString(),
+  }))
+  await batch([{ sql: `UPDATE spp_setoran SET status = 'dikonfirmasi', tanggal_terima = datetime('now'), penerima_id = ? WHERE id = ? AND tujuan_setoran = 'BENDAHARA_PUSAT'`, params: [access.id, setoranId] }, ...notices])
+  if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
   await logActivity({ actor: actorFromSession(access), module: 'spp_setoran_pusat', action: 'confirm', fiturHref: PATH, logKind: 'update', entityType: 'spp_setoran', entityId: setoranId, entityLabel: row.unit_setor, summary: `Konfirmasi setoran SPP santri baru ${row.unit_setor}`, details: { jumlah: row.jumlah_aktual, tahun: row.tahun, bulan: row.bulan } })
   revalidatePath(PATH); revalidatePath('/dashboard/asrama/spp')
   return { success: true }

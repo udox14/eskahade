@@ -1,6 +1,9 @@
 'use server'
 
-import { execute, generateId, getDB, now, query, queryOne } from '@/lib/db'
+import { batch, execute, generateId, getDB, now, query, queryOne } from '@/lib/db'
+import { appNotices, kickNotificationDispatch } from '@/lib/notifications/runtime'
+import { outboxIdsOf } from '@/lib/notifications/outbox'
+import { keluarSubmittedNotices } from '@/lib/notifications/approval-events'
 import { assertFeature } from '@/lib/auth/feature'
 import { getSession, hasRole, isAdmin, type SessionUser } from '@/lib/auth/session'
 import { isAsramaTanpaKamar } from '@/lib/asrama'
@@ -733,26 +736,30 @@ export async function tandaiSantriKeluarDariKamar(params: {
   const catatan = String(params.catatan ?? '').trim() || null
   const stampedAt = now()
 
-  if (existing) {
-    await execute(
-      `UPDATE santri_keluar_tandai
-       SET asrama = ?,
-           kamar = ?,
-           tanggal_tandai = ?,
-           catatan = ?,
-           ditandai_oleh = ?,
-           updated_at = ?
-       WHERE id = ?`,
-      [asrama, santri.kamar, stampedAt, catatan, session.id, stampedAt, existing.id]
-    )
-  } else {
-    await execute(
-      `INSERT INTO santri_keluar_tandai (
-        id, santri_id, asrama, kamar, tanggal_tandai, catatan, status, ditandai_oleh, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-      [generateId(), params.santriId, asrama, santri.kamar, stampedAt, catatan, session.id, stampedAt]
-    )
-  }
+  const pengajuanId = existing?.id ?? generateId()
+  const write = existing
+    ? {
+        sql: `UPDATE santri_keluar_tandai
+              SET asrama = ?,
+                  kamar = ?,
+                  tanggal_tandai = ?,
+                  catatan = ?,
+                  ditandai_oleh = ?,
+                  updated_at = ?
+              WHERE id = ?`,
+        params: [asrama, santri.kamar, stampedAt, catatan, session.id, stampedAt, pengajuanId] as unknown[],
+      }
+    : {
+        sql: `INSERT INTO santri_keluar_tandai (
+                id, santri_id, asrama, kamar, tanggal_tandai, catatan, status, ditandai_oleh, created_at
+              ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+        params: [pengajuanId, params.santriId, asrama, santri.kamar, stampedAt, catatan, session.id, stampedAt] as unknown[],
+      }
+  const notices = await appNotices(() => keluarSubmittedNotices({
+    pengajuanId, namaSantri: santri.nama_lengkap, asrama, actorId: session.id, stamp: stampedAt,
+  }))
+  await batch([write, ...notices])
+  if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
 
   await logActivity({
     actor: actorFromSession(session),

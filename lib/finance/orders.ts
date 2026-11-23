@@ -18,6 +18,8 @@ import type {
   FinanceOrderStatus,
   FinanceObligation,
 } from '@/lib/finance/types'
+import { financeNotices, kickNotificationDispatch } from '@/lib/notifications/runtime'
+import { transferExpiredNotices } from '@/lib/notifications/finance-events'
 
 function generateSubmissionNumber(): string {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
@@ -72,7 +74,10 @@ export async function expireStaleTransferOrders(): Promise<void> {
     WHERE o.status = 'PENDING' AND o.payment_method = 'MANUAL_TRANSFER' AND o.expires_at < ? AND s.status = 'MENUNGGU_BUKTI'`
   const rows = await query<{ id: string }>(stale + ' LIMIT 1', [timestamp])
   if (!rows.length) return
+  // Notifikasi wali dipilih SEBELUM status diubah (submission masih MENUNGGU_BUKTI), batch yang sama.
+  const notices = await financeNotices(() => transferExpiredNotices(stale, [timestamp]))
   await batch([
+    ...notices,
     {
       sql: `INSERT INTO finance_transfer_submission_events (id, submission_id, action, from_status, to_status, actor_kind, notes, created_at)
             SELECT lower(hex(randomblob(16))), s.id, 'EXPIRED', 'MENUNGGU_BUKTI', 'KEDALUWARSA', 'SYSTEM', 'Bukti transfer tidak diunggah sampai batas waktu', ?
@@ -91,6 +96,7 @@ export async function expireStaleTransferOrders(): Promise<void> {
       params: [timestamp],
     },
   ])
+  if (notices.length) await kickNotificationDispatch()
 }
 
 /**

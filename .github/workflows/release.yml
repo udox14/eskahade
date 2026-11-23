@@ -65,6 +65,7 @@ jobs:
           npm run test:pengajian-violations
           npm run test:pengajian-photos
           npm run test:supervisi
+          npm run test:notifications
       - name: Build Cloudflare Worker
         env:
           NODE_OPTIONS: --require=./scripts/stabilization/isolation/build-no-dotenv.cjs

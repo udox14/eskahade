@@ -1,6 +1,9 @@
 'use server'
 
 import { query, queryOne, execute, batch, generateId } from '@/lib/db'
+import { appNotices, kickNotificationDispatch } from '@/lib/notifications/runtime'
+import { outboxIdsOf } from '@/lib/notifications/outbox'
+import { setoranConfirmedNotices } from '@/lib/notifications/approval-events'
 import { getSession, hasAnyRole } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 import { SADESA_CATEGORY, SADESA_UNIT } from '@/lib/spp/unit-setor'
@@ -368,6 +371,10 @@ export async function simpanSetoran(
       return { error: 'Asrama ini tidak memiliki kewajiban SPP.' }
     }
 
+    const notices = await appNotices(() => setoranConfirmedNotices({
+      unit: cleanUnit, tahun: Number(tahun), bulan: Number(bulan), jumlah: Number(jumlahAktual),
+      tujuan: 'DEWAN_SANTRI', actorId: session?.id ?? null, stamp: new Date().toISOString(),
+    }))
     await batch([
       {
         sql: `UPDATE spp_setoran
@@ -402,7 +409,9 @@ export async function simpanSetoran(
           namaPenyetor,
         ],
       },
+      ...notices,
     ])
+    if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
 
     revalidatePath('/dashboard/dewan-santri/setoran')
     revalidatePath('/dashboard/asrama/status-setoran')

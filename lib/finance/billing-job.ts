@@ -2,6 +2,7 @@ import type { BillingStore } from './billing-store'
 import { createBillingIssuance, summarizeIssuance, type BillingCandidate } from './billing-issuance'
 import { billingClock } from './billing-periods'
 import { readBillingCutover } from './billing-cutover'
+import { billIssuedNotices, notificationSchemaReady, safeNotices } from '../notifications/finance-events'
 
 export async function recordBillingIssue(store: BillingStore, candidate: BillingCandidate) {
   if (candidate.outcome === 'REVIEW' || candidate.outcome === 'FAILED') {
@@ -43,6 +44,7 @@ export async function runBillingJob(store: BillingStore, at = new Date(), pageSi
       const result = await issuer.ensureStudent(student.id)
       for (const candidate of result.candidates) await recordBillingIssue(store,candidate)
       candidates.push(...result.candidates)
+      await notifyBillsIssued(store, student.id, date, result.candidates)
       cursor = student.id
     }
     const summary = summarizeIssuance(candidates)
@@ -56,5 +58,26 @@ export async function runBillingJob(store: BillingStore, at = new Date(), pageSi
     // No cursor advance for a partially processed page. Never rewrite existing obligations on replay.
     await store.execute('UPDATE finance_billing_runs SET lease_token=NULL,lease_until=NULL WHERE id=? AND lease_token=?', [id,token])
     throw error
+  }
+}
+
+/**
+ * Ringkasan "Tagihan baru terbit" untuk wali: satu notifikasi per santri per hari penerbitan.
+ * Tidak pernah menggagalkan penerbitan (kegagalan hanya dicatat).
+ */
+async function notifyBillsIssued(store: BillingStore, santriId: string, businessDate: string, candidates: BillingCandidate[]) {
+  const created = candidates.filter(c => c.created && c.obligation)
+  if (!created.length) return
+  try {
+    if (!(await notificationSchemaReady(store))) return
+    const student = await store.queryOne<{ nama_lengkap: string }>('SELECT nama_lengkap FROM santri WHERE id = ?', [santriId])
+    const notices = await safeNotices(store, () => billIssuedNotices({
+      santriId, namaSantri: student?.nama_lengkap ?? 'santri', businessDate,
+      periods: created.map(c => c.period), count: created.length,
+      total: created.reduce((sum, c) => sum + Math.max(0, c.obligation!.amount_expected - (c.obligation!.amount_exempted ?? 0)), 0),
+    }))
+    for (const statement of notices) await store.execute(statement.sql, statement.params)
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'bill_notice_failed', message: error instanceof Error ? error.message.slice(0, 200) : 'unknown' }))
   }
 }

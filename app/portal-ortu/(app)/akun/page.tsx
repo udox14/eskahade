@@ -3,6 +3,7 @@ import { getParentWalletLimits, getGlobalDailyLimit } from '@/lib/finance/wallet
 import { getStudentPinStatus } from '@/lib/finance/pins'
 import { queryOne } from '@/lib/db'
 import { AkunClient } from './_akun-client'
+import { PushToggleCard } from '@/components/notifications/push-cards'
 import { isCredentialsModuleEnabled } from '@/lib/finance/credentials-switch'
 
 export const dynamic = 'force-dynamic'
@@ -40,6 +41,8 @@ export default async function AkunPage() {
         pinStatus={pinStatus}
         showPin={showPin}
       />
+
+      {!session.must_change_password && <PushToggleCard audience="portal" ownerKey={session.santri_id} />}
     </div>
   )
 }

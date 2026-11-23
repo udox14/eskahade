@@ -45,7 +45,9 @@ export function PwaInstallPrompt() {
       const isStandaloneMode = 
         window.matchMedia('(display-mode: standalone)').matches ||
         (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
-        document.referrer.includes('android-app://');
+        document.referrer.includes('android-app://') ||
+        // Di dalam APK Android (Capacitor) aplikasi sudah terpasang.
+        /ESKAHADE_APP_NATIVE/i.test(window.navigator.userAgent);
       
       setIsStandalone(isStandaloneMode);
       return isStandaloneMode;

@@ -9,7 +9,10 @@ import { rupiah } from './money'
 //    serta audit trail catatan selisih (difference_notes) jika terjadi mismatch.
 // 5. Rekalkulasi authoritatif dari entri buku besar mutasi riil (finance_payments & finance_wallet_ledger).
 
-import { query, queryOne, execute, generateId, now } from '@/lib/db'
+import { query, queryOne, execute, batch, generateId, now } from '@/lib/db'
+import { financeNotices, kickNotificationDispatch } from '@/lib/notifications/runtime'
+import { outboxIdsOf } from '@/lib/notifications/outbox'
+import { cashDifferenceNotices } from '@/lib/notifications/finance-events'
 
 export interface FinanceCashSession {
   id: string
@@ -406,17 +409,29 @@ export async function closeCashSession(
 
   const timestamp = now()
 
-  await execute(
-    `UPDATE finance_cash_sessions
-     SET status = 'CLOSED',
-         actual_closing_balance = ?,
-         difference = ?,
-         difference_notes = ?,
-         closed_at = ?,
-         updated_at = ?
-     WHERE id = ?`,
-    [validActual, difference, cleanNotes, timestamp, timestamp, sessionId]
-  )
+  // Selisih kas → notifikasi pengawas keuangan di batch yang sama (dijaga status CLOSED + closed_at ini).
+  const operator = difference !== 0
+    ? await queryOne<{ full_name: string | null }>(`SELECT full_name FROM users WHERE id = ?`, [session.operator_id])
+    : null
+  const notices = await financeNotices(() => cashDifferenceNotices({
+    id: sessionId, operatorId: session.operator_id, operatorName: operator?.full_name || session.session_code,
+    difference, closedAt: timestamp,
+  }))
+  await batch([
+    {
+      sql: `UPDATE finance_cash_sessions
+            SET status = 'CLOSED',
+                actual_closing_balance = ?,
+                difference = ?,
+                difference_notes = ?,
+                closed_at = ?,
+                updated_at = ?
+            WHERE id = ?`,
+      params: [validActual, difference, cleanNotes, timestamp, timestamp, sessionId],
+    },
+    ...notices,
+  ])
+  if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
 
   const closed = await queryOne<FinanceCashSession>(
     `SELECT s.*, u.full_name AS operator_name

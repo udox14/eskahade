@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
+import { StaffNotificationBell } from '@/components/notifications/staff-notification-bell'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -139,6 +140,7 @@ export function HomeClient({ userName, avatarUrl, primaryRoleLabel, greeting, da
             <div className={whiteText ? "flex shrink-0 items-center gap-1.5 rounded-full bg-black/55 p-1 backdrop-blur-sm" : "flex shrink-0 items-center gap-1.5 rounded-full bg-white/85 p-1 backdrop-blur-sm"}>
               <button onClick={refresh} disabled={isRefreshing} title="Segarkan dashboard" aria-label="Segarkan dashboard" className="flex h-9 w-9 items-center justify-center rounded-full border border-current/30 transition duration-200 hover:bg-white/15 active:scale-95 motion-reduce:transition-none disabled:opacity-60"><RefreshCw className={"h-4 w-4 " + (isRefreshing ? 'animate-spin' : '')} aria-hidden="true" /></button>
 
+              <StaffNotificationBell tone="overlay" />
               <Link href="/dashboard/profil" title="Profil saya" aria-label="Profil saya" className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-current/35 bg-white/15 text-sm font-bold transition duration-200 hover:bg-white/25 active:scale-95 motion-reduce:transition-none">
                 {avatarUrl && !avatarFailed ? (
                   // eslint-disable-next-line @next/next/no-img-element

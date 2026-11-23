@@ -8,6 +8,9 @@ import { isValidIsoDateTimeWithOffset } from '../bank-statement/statement-ingest
 
 import crypto from 'node:crypto'
 import { query, queryOne, batch, generateId, now } from '@/lib/db'
+import { financeNotices, kickNotificationDispatch } from '@/lib/notifications/runtime'
+import { outboxIdsOf } from '@/lib/notifications/outbox'
+import { paymentReceivedNotices } from '@/lib/notifications/finance-events'
 import { loadBriConfig } from './config'
 import { verifyBriInboundNotificationSignature, hashBodySha256 } from './crypto'
 import { briLog, sanitizePayload } from '../finance-log'
@@ -1549,6 +1552,18 @@ export async function handleBrivaPayment(params: {
     }
   }
 
+  // 15b. Notifikasi wali (outbox) di batch yang sama, dijaga keberadaan baris payment ini.
+  // Tidak mengubah respons BRI; gagal membangun notifikasi → [] (lihat safeNotices).
+  const jajanTotal = orderItems.filter(item => item.item_type === 'UANG_JAJAN').reduce((sum, item) => sum + item.amount, 0)
+  const walletOnly = orderItems.every(item => item.item_type === 'UANG_JAJAN')
+  const notices = await financeNotices(() => paymentReceivedNotices({
+    // "Uang Jajan Masuk" menyebut yang masuk saldo (tanpa admin Koperasi); "Pembayaran Diterima" yang dibayar wali.
+    paymentId, santriId: studentVa.santri_id, namaSantri: student.nama_lengkap, nominal: walletOnly ? jajanTotal : parsedPaidRupiah,
+    metode: 'BRIVA', waktu: confirmedAt, walletOnly,
+    saldoSetelah: hasUangJajan ? currentWalletBalance + jajanTotal : null,
+  }))
+  statements.push(...notices)
+
   // 16. Execute Atomic Batch Transaction with Race & Compare-and-Set Catch
   try {
     await batch(statements)
@@ -1708,6 +1723,8 @@ export async function handleBrivaPayment(params: {
       },
     }
   }
+
+  if (notices.length) await kickNotificationDispatch(outboxIdsOf(notices))
 
   briLog('info', 'BRIVA_PAYMENT_SUCCESS', {
     durationMs: Date.now() - startTime,

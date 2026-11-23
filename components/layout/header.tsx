@@ -4,10 +4,11 @@ import { publicMediaUrl } from '@/lib/r2/references'
 
 import { useState, useRef, useEffect } from 'react'
 import { signOut } from './actions'
-import { SignOut as LogOut, Bell, List as Menu, Gear as Settings, CaretDown as ChevronDown } from '@phosphor-icons/react'
+import { SignOut as LogOut, List as Menu, Gear as Settings, CaretDown as ChevronDown } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import Image from 'next/image'
+import { StaffNotificationBell } from '@/components/notifications/staff-notification-bell'
 
 interface HeaderProps {
   userName: string
@@ -58,9 +59,7 @@ function useClock() {
 
 export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick, onSidebarClick }: HeaderProps) {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
-  const [isNotifOpen, setIsNotifOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
-  const notifRef = useRef<HTMLDivElement>(null)
   const now = useClock()
 
   const initials = userName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
@@ -75,16 +74,10 @@ export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick, 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setIsProfileOpen(false)
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setIsNotifOpen(false)
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
-
-  const notifications = [
-    { id: 1, title: 'Selamat Datang!', desc: 'Sistem manajemen pesantren siap digunakan.', time: 'Baru saja', read: false },
-  ]
-  const unreadCount = notifications.filter(n => !n.read).length
 
   return (
     <header className="flex items-center justify-between w-full h-full px-0">
@@ -127,49 +120,7 @@ export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick, 
       <div className="flex items-center gap-1.5">
 
         {/* Notifikasi */}
-        <div className="relative" ref={notifRef}>
-          <button
-            onClick={() => { setIsNotifOpen(v => !v); setIsProfileOpen(false) }}
-            className={cn(
-              'relative p-2 rounded-lg transition-colors',
-              isNotifOpen
-                ? 'bg-slate-100 text-slate-700'
-                : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
-            )}
-          >
-            <Bell className="w-4 h-4" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full" />
-            )}
-          </button>
-
-          {isNotifOpen && (
-            <div className="absolute right-0 top-10 w-72 bg-white rounded-xl shadow-lg border border-slate-200/80 overflow-hidden z-50">
-              <div className="px-4 py-2.5 border-b border-slate-100 flex justify-between items-center">
-                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Notifikasi</span>
-                {unreadCount > 0 && (
-                  <span className="text-[10px] bg-red-50 text-red-600 border border-red-100 px-1.5 py-0.5 rounded-full font-bold">
-                    {unreadCount} baru
-                  </span>
-                )}
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {notifications.map(n => (
-                  <div key={n.id} className={cn(
-                    'px-4 py-3 border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer transition-colors',
-                    !n.read && 'bg-blue-50/40'
-                  )}>
-                    <div className="flex justify-between items-start gap-2 mb-0.5">
-                      <p className="text-xs font-semibold text-slate-800">{n.title}</p>
-                      <span className="text-[10px] text-slate-400 whitespace-nowrap shrink-0">{n.time}</span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 leading-relaxed">{n.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <StaffNotificationBell />
 
         {/* Divider */}
         <div className="hidden md:block w-px h-5 bg-slate-200 mx-1" />
@@ -177,7 +128,7 @@ export function Header({ userName, userRole, userRoles, avatarUrl, onMenuClick, 
         {/* Profil */}
         <div className="relative" ref={profileRef}>
           <button
-            onClick={() => { setIsProfileOpen(v => !v); setIsNotifOpen(false) }}
+            onClick={() => setIsProfileOpen(v => !v)}
             className={cn(
               'flex items-center gap-2 px-2 py-1 rounded-lg transition-colors',
               isProfileOpen ? 'bg-slate-100' : 'hover:bg-slate-50'

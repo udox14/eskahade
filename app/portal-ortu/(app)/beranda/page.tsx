@@ -19,6 +19,8 @@ import { formatRupiah } from '@/lib/portal/format'
 import { toWibDateInputValue } from '@/lib/date/wib'
 import { BerandaWalletCard } from './_beranda-wallet-card'
 import { VaCopyButton } from './_va-copy-button'
+import { NotificationBadgeLink } from '@/components/notifications/notification-badge-link'
+import { PushPromptBanner } from '@/components/notifications/push-cards'
 
 export const dynamic = 'force-dynamic'
 
@@ -97,6 +99,11 @@ export default async function PortalBerandaPage() {
             </p>
           )}
         </div>
+        <NotificationBadgeLink
+          audience="portal"
+          href="/portal-ortu/notifikasi"
+          className="mr-2 h-11 w-11 shrink-0 rounded-full border border-slate-200 bg-white text-slate-700 shadow-xs dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+        />
         <div className="w-11 h-11 shrink-0 rounded-full overflow-hidden bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 flex items-center justify-center ring-2 ring-white dark:ring-slate-800 shadow-xs">
           {publicMediaUrl(session.foto_url) ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -108,6 +115,8 @@ export default async function PortalBerandaPage() {
           )}
         </div>
       </div>
+
+      <PushPromptBanner audience="portal" ownerKey={session.santri_id} />
 
       {/* 2. HERO UTAMA: SALDO UANG JAJAN SANTRI */}
       <BerandaWalletCard
