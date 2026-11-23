@@ -4,6 +4,7 @@
 //
 // Tidak pernah menyentuh tabel keuangan, audit transfer, atau activity_log.
 
+import { notificationSchemaReady } from './finance-events'
 import type { NotifStore } from './types'
 
 export const RETENTION_DEFAULTS = { inboxDays: 180, logDays: 60, inactiveDeviceDays: 90 }
@@ -26,6 +27,8 @@ async function purge(store: NotifStore, table: string, where: string, params: un
 }
 
 export async function runRetention(store: NotifStore, at = new Date()): Promise<RetentionResult> {
+  // Migration 0202 belum diterapkan → tidak ada yang perlu dibersihkan.
+  if (!(await notificationSchemaReady(store))) return { ran: false, deleted: {}, complete: true }
   const today = new Date(at.getTime() + 7 * 3600_000).toISOString().slice(0, 10)
   const marker = await store.queryOne<{ cursor: string }>('SELECT cursor FROM notif_source_cursors WHERE source = ?', [MARKER])
   if (marker?.cursor === today) return { ran: false, deleted: {}, complete: true }
