@@ -83,7 +83,8 @@ async function main() {
     assert.ok(createVerify('RSA-SHA256').update(`${h64}.${c64}`).verify(publicKey, Buffer.from(s64, 'base64url')))
     const send = fetchImpl.calls.send[0]
     assert.equal(send.init.headers.Authorization, 'Bearer ya29.test')
-    assert.equal(send.init.redirect, 'error')
+    assert.equal(fetchImpl.calls.oauth[0].redirect, 'manual')
+    assert.equal(send.init.redirect, 'manual')
     assert.equal(send.body.message.token, TOKEN_A)
     assert.deepEqual(send.body.message.notification, { title: 'Judul', body: 'Isi' })
     assert.deepEqual(send.body.message.data, { id: 'n-1', url: '/portal-ortu/riwayat', tag: 'PORTAL_TRANSFER_DITERIMA' })
@@ -95,6 +96,7 @@ async function main() {
     const cases = [
       [fcmError(404, 'UNREGISTERED'), 'EXPIRED', 'UNREGISTERED'],
       [fcmError(403, 'SENDER_ID_MISMATCH'), 'EXPIRED', 'SENDER_ID_MISMATCH'],
+      [[302, {}], 'TRANSIENT', 'REDIRECT_BLOCKED'],
       [fcmError(429, 'QUOTA_EXCEEDED'), 'TRANSIENT', 'QUOTA_EXCEEDED'],
       [fcmError(503, 'UNAVAILABLE'), 'TRANSIENT', 'UNAVAILABLE'],
       [fcmError(400, 'INVALID_ARGUMENT'), 'REJECTED', 'INVALID_ARGUMENT'],
@@ -119,6 +121,8 @@ async function main() {
     fcm.clearFcmTokenCache()
     assert.deepEqual(await fcm.sendFcm(TOKEN_A, payload, config, { fetchImpl: google({ oauth: () => [400, { error: 'invalid_grant' }] }) }),
       { outcome: 'REJECTED', httpStatus: null, errorCode: 'FCM_AUTH_REJECTED' })
+    assert.deepEqual(await fcm.sendFcm(TOKEN_A, payload, config, { fetchImpl: google({ oauth: () => [302, {}] }) }),
+      { outcome: 'TRANSIENT', httpStatus: null, errorCode: 'FCM_AUTH_UNAVAILABLE' })
     assert.equal((await fcm.sendFcm(TOKEN_A, payload, config, { fetchImpl: google({ oauth: () => [503, {}] }) })).outcome, 'TRANSIENT')
     assert.equal((await fcm.sendFcm(TOKEN_A, payload, config, { fetchImpl: google({ oauth: () => new Error('dns') }) })).outcome, 'TRANSIENT')
     assert.equal((await fcm.sendFcm(TOKEN_A, payload, { ...config, privateKey: '-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----' },

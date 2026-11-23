@@ -200,6 +200,7 @@ export function isValidSubscriptionKeys(p256dh: unknown, auth: unknown): boolean
 
 export function classifyPushStatus(status: number): PushSendResult {
   if (status >= 200 && status < 300) return { outcome: 'SENT', httpStatus: status, errorCode: null }
+  if (status >= 300 && status < 400) return { outcome: 'TRANSIENT', httpStatus: status, errorCode: 'REDIRECT_BLOCKED' }
   if (status === 404 || status === 410) return { outcome: 'EXPIRED', httpStatus: status, errorCode: 'SUBSCRIPTION_GONE' }
   if (status === 429 || status >= 500) return { outcome: 'TRANSIENT', httpStatus: status, errorCode: status === 429 ? 'RATE_LIMITED' : 'PROVIDER_ERROR' }
   // 401/403 = kredensial VAPID ditolak → masalah konfigurasi, perangkat jangan dinonaktifkan.
@@ -226,7 +227,7 @@ export async function sendWebPush(
   try {
     const response = await (options.fetchImpl ?? fetch)(target.endpoint, {
       method: 'POST',
-      redirect: 'error',
+      redirect: 'manual',
       signal: AbortSignal.timeout(8000),
       headers: {
         Authorization: await vapidAuthorization(target.endpoint, config),
