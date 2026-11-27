@@ -1,13 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import {
-  X,
-  Receipt,
-  ArrowDownLeft,
-  ArrowUpRight,
-  Loader2,
-} from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { X, Receipt, ArrowDownLeft, ArrowUpRight, Loader2 } from 'lucide-react'
+import { formatFinanceDate } from '@/lib/finance/date-format'
 import {
   getLoketCurrentSessionTransactions,
   getPastCashSessions,
@@ -21,160 +16,185 @@ interface SessionHistoryDrawerProps {
   onClose: () => void
 }
 
+const formatRupiah = (val: number) => `Rp${Math.max(0, Math.round(val)).toLocaleString('id-ID')}`
+
 export default function SessionHistoryDrawer({
   isOpen,
   activeSessionId,
   onClose,
 }: SessionHistoryDrawerProps) {
-  const [tab, setTab] = useState<'CURRENT' | 'PAST'>('CURRENT')
+  const [tab, setTab] = useState<'CURRENT' | 'PAST'>(activeSessionId ? 'CURRENT' : 'PAST')
   const [currentTransactions, setCurrentTransactions] = useState<LoketSessionTransactionItem[]>([])
   const [pastSessions, setPastSessions] = useState<FinanceCashSession[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
-  const formatRupiah = (val: number) => `Rp${Math.max(0, val).toLocaleString('id-ID')}`
-
+  // Muat sekali saat drawer dibuka (tidak fetch ulang saat ganti tab)
   useEffect(() => {
     if (!isOpen) return
+    let active = true
 
     const loadData = async () => {
       setIsLoading(true)
       try {
-        if (activeSessionId) {
-          const items = await getLoketCurrentSessionTransactions(activeSessionId)
+        const [items, historyRes] = await Promise.all([
+          activeSessionId ? getLoketCurrentSessionTransactions(activeSessionId) : Promise.resolve([]),
+          getPastCashSessions({ page: 1, pageSize: 20 }),
+        ])
+        if (active) {
           setCurrentTransactions(items)
+          setPastSessions(historyRes.items)
         }
-        const historyRes = await getPastCashSessions({ page: 1, pageSize: 20 })
-        setPastSessions(historyRes.items)
       } catch (err) {
         console.error('Gagal memuat riwayat sesi kas:', err)
       } finally {
-        setIsLoading(false)
+        if (active) setIsLoading(false)
       }
     }
 
     loadData()
-  }, [isOpen, activeSessionId, tab])
+    return () => {
+      active = false
+    }
+  }, [isOpen, activeSessionId])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/40 backdrop-blur-2xs animate-in fade-in duration-150">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="session-history-title"
+      className="fixed inset-0 z-50 overflow-hidden bg-slate-950/40 backdrop-blur-2xs"
+    >
       <div className="absolute inset-0" onClick={onClose} />
 
-      <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-white shadow-2xl border-l border-slate-200 flex flex-col">
-          {/* Drawer Header */}
-          <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+      <div className="absolute inset-y-0 right-0 flex max-w-full pl-6 sm:pl-10">
+        <div className="flex w-screen max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-5 py-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
-                <Receipt className="w-5 h-5" />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                <Receipt className="h-5 w-5" aria-hidden="true" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Riwayat & Mutasi Loket</h3>
-                <p className="text-xs text-slate-500">Histori operasional kasir & sesi kas</p>
+                <h3 id="session-history-title" className="text-sm font-bold text-slate-900">
+                  Riwayat &amp; Mutasi Loket
+                </h3>
+                <p className="text-xs text-slate-500">Histori transaksi kasir &amp; sesi kas</p>
               </div>
             </div>
             <button
               type="button"
+              aria-label="Tutup panel riwayat"
               onClick={onClose}
-              className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 cursor-pointer"
             >
-              <X className="w-5 h-5" />
+              <X className="h-5 w-5" aria-hidden="true" />
             </button>
           </div>
 
-          {/* Tab Selection */}
-          <div className="p-3 border-b border-slate-200 bg-white flex gap-2">
+          {/* Sub-tabs */}
+          <div className="flex gap-1.5 border-b border-slate-200 bg-white px-4 py-2.5">
             <button
               type="button"
               onClick={() => setTab('CURRENT')}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-colors ${
+              className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${
                 tab === 'CURRENT'
-                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                  ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
                   : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
-              Mutasi Sesi Berjalan
+              Sesi Berjalan ({currentTransactions.length})
             </button>
             <button
               type="button"
               onClick={() => setTab('PAST')}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-colors ${
+              className={`flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-colors cursor-pointer ${
                 tab === 'PAST'
-                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                  ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
                   : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
-              Daftar Sesi Kas
+              Daftar Sesi ({pastSessions.length})
             </button>
           </div>
 
-          {/* Drawer Body Content */}
+          {/* Content */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {isLoading ? (
-              <div className="py-12 flex flex-col items-center justify-center text-slate-400 gap-2">
-                <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
-                <span className="text-xs">Memuat data...</span>
+              <div className="flex flex-col items-center justify-center gap-2 py-12 text-slate-500">
+                <Loader2 className="h-5 w-5 animate-spin text-emerald-700" aria-hidden="true" />
+                <span className="text-xs">Memuat data…</span>
               </div>
             ) : tab === 'CURRENT' ? (
-              /* Tab Mutasi Sesi Ini */
               !activeSessionId ? (
-                <div className="py-12 text-center text-slate-400 text-xs">
+                <div className="py-12 text-center text-xs text-slate-500">
                   Belum ada sesi kas yang sedang aktif.
                 </div>
               ) : currentTransactions.length === 0 ? (
-                <div className="py-12 text-center text-slate-400 text-xs">
+                <div className="py-12 text-center text-xs text-slate-500">
                   Belum ada transaksi pada sesi kas ini.
                 </div>
               ) : (
                 <div className="space-y-2.5">
-                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    Total {currentTransactions.length} Transaksi Sesi Ini
-                  </p>
-                  {currentTransactions.map((tx) => (
-                    <div
-                      key={tx.id}
-                      className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-1 hover:border-slate-300 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          {tx.type === 'WITHDRAWAL' || tx.type === 'CASH_TO_BANK' ? (
-                            <span className="p-1 rounded-md bg-rose-50 text-rose-600">
-                              <ArrowDownLeft className="w-3.5 h-3.5" />
+                  {currentTransactions.map((tx) => {
+                    const isOut = tx.type === 'WITHDRAWAL' || tx.type === 'CASH_TO_BANK'
+                    return (
+                      <div
+                        key={tx.id}
+                        className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs space-y-1"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span
+                              className={`rounded-md p-1 ${
+                                isOut ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'
+                              }`}
+                            >
+                              {isOut ? (
+                                <ArrowDownLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                              ) : (
+                                <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                              )}
                             </span>
-                          ) : (
-                            <span className="p-1 rounded-md bg-emerald-50 text-emerald-600">
-                              <ArrowUpRight className="w-3.5 h-3.5" />
-                            </span>
-                          )}
-                          <span className="text-xs font-bold text-slate-800">{tx.typeLabel}</span>
+                            <span className="truncate text-xs font-semibold text-slate-900">{tx.typeLabel}</span>
+                          </div>
+                          <strong
+                            className={`shrink-0 text-xs font-bold tabular-nums ${
+                              isOut ? 'text-rose-700' : 'text-emerald-700'
+                            }`}
+                          >
+                            {isOut ? '-' : '+'}
+                            {formatRupiah(tx.amount)}
+                          </strong>
                         </div>
-                        <strong
-                          className={`text-xs font-bold ${
-                            tx.type === 'WITHDRAWAL' || tx.type === 'CASH_TO_BANK' ? 'text-rose-700' : 'text-emerald-700'
-                          }`}
-                        >
-                          {tx.type === 'WITHDRAWAL' || tx.type === 'CASH_TO_BANK' ? '-' : '+'}
-                          {formatRupiah(tx.amount)}
-                        </strong>
-                      </div>
 
-                      <div className="flex justify-between text-[11px] text-slate-500">
-                        <span>
-                          {tx.santriNis ? `${tx.santriNama} (${tx.santriNis})` : `${tx.santriNama}${tx.referenceId ? ` · ${tx.referenceId}` : ''}`}
-                        </span>
-                        <span>{tx.createdAt.slice(11, 16)}</span>
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                          <span className="truncate">
+                            {tx.santriNis
+                              ? `${tx.santriNama} (${tx.santriNis})`
+                              : `${tx.santriNama}${tx.referenceId ? ` · ${tx.referenceId}` : ''}`}
+                          </span>
+                          <span className="shrink-0 tabular-nums">{formatFinanceDate(tx.createdAt, true)}</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )
+            ) : pastSessions.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-500">Belum ada riwayat sesi kas.</div>
             ) : (
-              /* Tab Daftar Sesi Kas Lampau */
               <div className="space-y-3">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  Histori Seluruh Sesi Kas
-                </p>
                 {pastSessions.map((ses) => {
                   const isClosed = ses.status === 'CLOSED'
                   const diff = ses.difference ?? 0
@@ -182,67 +202,63 @@ export default function SessionHistoryDrawer({
                   return (
                     <div
                       key={ses.id}
-                      className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2"
+                      className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-2.5"
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`w-2 h-2 rounded-full ${
-                              isClosed ? 'bg-slate-400' : 'bg-emerald-500'
-                            }`}
+                            className={`h-2 w-2 rounded-full ${isClosed ? 'bg-slate-400' : 'bg-emerald-500'}`}
                           />
-                          <strong className="text-xs font-bold text-slate-900 font-mono">
+                          <strong className="font-mono text-xs font-bold text-slate-900">
                             {ses.session_code}
                           </strong>
                         </div>
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            isClosed
-                              ? 'bg-slate-100 text-slate-700'
-                              : 'bg-emerald-100 text-emerald-800'
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            isClosed ? 'bg-slate-100 text-slate-700' : 'bg-emerald-100 text-emerald-800'
                           }`}
                         >
-                          {isClosed ? 'Ditutup' : 'Aktif'}
+                          {isClosed ? 'Ditutup' : 'Terbuka'}
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-1.5 text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-100 bg-slate-50 p-2.5 text-[11px] tabular-nums">
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Saldo Awal:</span>
-                          <span className="font-semibold">{formatRupiah(ses.opening_balance)}</span>
+                          <span className="block text-[10px] text-slate-500">Saldo Awal</span>
+                          <span className="font-semibold text-slate-800">{formatRupiah(ses.opening_balance)}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Kas Masuk:</span>
-                          <span className="font-semibold text-emerald-700">
-                            +{formatRupiah(ses.total_cash_in)}
+                          <span className="block text-[10px] text-slate-500">Kas Masuk</span>
+                          <span className="font-semibold text-emerald-700">+{formatRupiah(ses.total_cash_in)}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-slate-500">Kas Keluar</span>
+                          <span className="font-semibold text-rose-700">-{formatRupiah(ses.total_cash_out)}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-slate-500">Seharusnya</span>
+                          <span className="font-semibold text-slate-900">
+                            {formatRupiah(ses.expected_closing_balance)}
                           </span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">Kas Keluar:</span>
-                          <span className="font-semibold text-rose-700">
-                            -{formatRupiah(ses.total_cash_out)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[10px]">Expected Akhir:</span>
-                          <span className="font-semibold">{formatRupiah(ses.expected_closing_balance)}</span>
                         </div>
                       </div>
 
                       {isClosed && (
-                        <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                          <span className="text-slate-500 text-[11px]">Hitungan Fisik Kasir:</span>
+                        <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs tabular-nums">
+                          <span className="text-[11px] text-slate-500">Hitungan Fisik</span>
                           <div className="text-right">
-                            <span className="font-bold text-slate-900 block">
+                            <span className="block font-bold text-slate-900">
                               {formatRupiah(ses.actual_closing_balance ?? 0)}
                             </span>
                             {diff !== 0 && (
                               <span
-                                className={`text-[10px] font-bold ${
-                                  diff > 0 ? 'text-blue-600' : 'text-rose-600'
+                                className={`text-[10px] font-semibold ${
+                                  diff > 0 ? 'text-sky-700' : 'text-rose-700'
                                 }`}
                               >
-                                {diff > 0 ? `+${formatRupiah(diff)} (Lebih)` : `-${formatRupiah(Math.abs(diff))} (Kurang)`}
+                                {diff > 0
+                                  ? `+${formatRupiah(diff)} (Lebih)`
+                                  : `-${formatRupiah(Math.abs(diff))} (Kurang)`}
                               </span>
                             )}
                           </div>
@@ -250,13 +266,13 @@ export default function SessionHistoryDrawer({
                       )}
 
                       {ses.difference_notes && (
-                        <p className="text-[10px] text-slate-600 bg-amber-50 p-2 rounded border border-amber-200">
+                        <p className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-900">
                           Catatan: {ses.difference_notes}
                         </p>
                       )}
 
-                      <div className="text-[10px] text-slate-400 pt-1">
-                        Kasir: {ses.operator_name || ses.operator_id} • {ses.opened_at.slice(0, 16)}
+                      <div className="text-[11px] text-slate-500 tabular-nums">
+                        Kasir: {ses.operator_name || ses.operator_id} · {formatFinanceDate(ses.opened_at, true)}
                       </div>
                     </div>
                   )

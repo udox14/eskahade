@@ -16,6 +16,7 @@ export interface KasBankFilter {
   state?: 'SEMUA' | 'POSTED_UNMATCHED' | 'MATCHED' | 'VOIDED'
   fromDate?: string | null
   toDate?: string | null
+  search?: string | null
   offset?: number
 }
 
@@ -28,6 +29,7 @@ export async function getKasBankData(filter: KasBankFilter = {}) {
     state: filter.state ?? 'SEMUA',
     fromDate: filter.fromDate ?? null,
     toDate: filter.toDate ?? null,
+    search: filter.search ?? null,
     limit: 50,
     offset: filter.offset ?? 0,
   }
@@ -40,7 +42,14 @@ export async function getKasBankData(filter: KasBankFilter = {}) {
   return {
     ...list,
     viewer: { id: userId, name: operatorName, roles, isViewOnly, seesAll },
-    cashSession: cash ? { id: cash.id, code: cash.session_code, available: cash.available_balance ?? cash.expected_closing_balance } : null,
+    cashSession: cash
+      ? {
+          id: cash.id,
+          code: cash.session_code,
+          available: cash.available_balance ?? cash.expected_closing_balance,
+          reservedCashOut: cash.reserved_cash_out ?? 0,
+        }
+      : null,
     accounts: accounts.map((account): LoketCashAccountOption => ({
       id: account.id,
       label: `${account.bank_name} · ${account.account_number} · a.n. ${account.account_holder}`,

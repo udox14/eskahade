@@ -437,13 +437,24 @@ export interface CashSessionDetailReportResponse {
     amount: number
     reason: string
   }>
+  cashTransfers: Array<{
+    id: string
+    transferNumber: string
+    direction: 'BANK_TO_CASH' | 'CASH_TO_BANK'
+    amount: number
+    handledByName: string
+    bankTransactedAt: string
+    notes: string | null
+  }>
   authoritativeSummary: {
     openingBalance: number
     cashPaymentsIn: number
     cashTopupsIn: number
+    bankToCashIn: number
     totalCashIn: number
     cashWithdrawalsOut: number
     cashRefundsOut: number
+    cashToBankOut: number
     totalCashOut: number
     expectedClosingBalance: number
     actualClosingBalance: number | null
@@ -1362,10 +1373,10 @@ export async function getStudentDetailReport(
        COALESCE(k.nama_kelas, s.kelas_sekolah) AS kelas,
        s.no_wa_ortu,
        sva.va_number AS fixed_va,
-       sva.bank_code,
+       CASE WHEN sva.va_number IS NOT NULL THEN 'BRI' ELSE NULL END AS bank_code,
        fwl.parent_daily_limit
      FROM santri s
-     LEFT JOIN finance_student_va sva ON sva.santri_id = s.id
+     LEFT JOIN finance_student_va sva ON sva.santri_id = s.id AND sva.status = 'ACTIVE'
      LEFT JOIN finance_wallet_limits fwl ON fwl.santri_id = s.id
      LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
      LEFT JOIN kelas k ON k.id = rp.kelas_id
@@ -1612,26 +1623,6 @@ export async function getWalletReport(
   const pageSize = Math.max(1, Math.min(200, filters.pageSize || DEFAULT_FINANCE_PAGE_SIZE))
   const offset = (page - 1) * pageSize
 
-  // KPI Utama (Total In, Total Out, Saldo Berjalan Keseluruhan)
-  const kpiRow = await queryOne<{
-    total_in: number
-    total_out: number
-    total_mutations: number
-  }>(
-    `SELECT
-       COALESCE(SUM(CASE WHEN wl.direction = 'IN' THEN wl.amount ELSE 0 END), 0) AS total_in,
-       COALESCE(SUM(CASE WHEN wl.direction = 'OUT' THEN wl.amount ELSE 0 END), 0) AS total_out,
-       COUNT(*) AS total_mutations
-     FROM finance_wallet_ledger wl
-     JOIN santri s ON s.id = wl.santri_id
-     WHERE ${nonBillableSantriSqlPredicate('s.asrama')}`
-  )
-
-  const totalDepositIn = kpiRow?.total_in || 0
-  const totalWithdrawalOut = kpiRow?.total_out || 0
-  const totalCurrentBalance = totalDepositIn - totalWithdrawalOut
-  const totalMutationsCount = kpiRow?.total_mutations || 0
-
   if (mode === 'SUMMARY') {
     // Mode Rekap Saldo Per Santri
     // Limit harian efektif WAJIB mengikuti konfigurasi Pengaturan Keuangan
@@ -1664,57 +1655,80 @@ export async function getWalletReport(
 
     const whereSql = conditions.join(' AND ')
 
-    const countRow = await queryOne<{ count: number }>(
-      `SELECT COUNT(*) AS count
-       FROM santri s
-       LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
-       LEFT JOIN kelas k ON k.id = rp.kelas_id
-       WHERE ${whereSql}`,
-      params
-    )
-    const totalRecords = countRow?.count || 0
+    // KPI mengikuti filter santri yang aktif, dan WITHDRAWAL_KOLEKTIF_RETURN mengurangi penarikan (bukan menambah setoran)
+    const [countRow, kpiRow, rows] = await Promise.all([
+      queryOne<{ count: number }>(
+        `SELECT COUNT(*) AS count
+         FROM santri s
+         LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+         LEFT JOIN kelas k ON k.id = rp.kelas_id
+         WHERE ${whereSql}`,
+        params
+      ),
+      queryOne<{
+        total_in: number
+        total_out: number
+        total_mutations: number
+      }>(
+        `SELECT
+           COALESCE(SUM(CASE WHEN wl.direction = 'IN' AND wl.movement_type != 'WITHDRAWAL_KOLEKTIF_RETURN' THEN wl.amount ELSE 0 END), 0) AS total_in,
+           COALESCE(SUM(CASE WHEN wl.direction = 'OUT' THEN wl.amount WHEN wl.movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN' THEN -wl.amount ELSE 0 END), 0) AS total_out,
+           COUNT(wl.id) AS total_mutations
+         FROM santri s
+         LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+         LEFT JOIN kelas k ON k.id = rp.kelas_id
+         LEFT JOIN finance_wallet_ledger wl ON wl.santri_id = s.id
+         WHERE ${whereSql}`,
+        params
+      ),
+      query<{
+        santri_id: string
+        santri_name: string
+        santri_nis: string
+        santri_asrama: string | null
+        santri_kelas: string | null
+        total_in: number
+        total_out: number
+        parent_daily_limit: number | null
+        card_code: string | null
+        card_status: string | null
+      }>(
+        `SELECT
+           s.id AS santri_id,
+           s.nama_lengkap AS santri_name,
+           s.nis AS santri_nis,
+           s.asrama AS santri_asrama,
+           COALESCE(k.nama_kelas, s.kelas_sekolah) AS santri_kelas,
+           COALESCE(wl.total_in, 0) AS total_in,
+           COALESCE(wl.total_out, 0) AS total_out,
+           flim.parent_daily_limit,
+           fc.card_token AS card_code,
+           fc.status AS card_status
+         FROM santri s
+         LEFT JOIN (
+           SELECT
+             santri_id,
+             SUM(CASE WHEN direction = 'IN' AND movement_type != 'WITHDRAWAL_KOLEKTIF_RETURN' THEN amount ELSE 0 END) AS total_in,
+             SUM(CASE WHEN direction = 'OUT' THEN amount WHEN movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN' THEN -amount ELSE 0 END) AS total_out
+           FROM finance_wallet_ledger
+           GROUP BY santri_id
+         ) wl ON wl.santri_id = s.id
+         LEFT JOIN finance_wallet_limits flim ON flim.santri_id = s.id
+         LEFT JOIN finance_credentials fc ON fc.santri_id = s.id AND fc.status = 'ACTIVE'
+         LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+         LEFT JOIN kelas k ON k.id = rp.kelas_id
+         WHERE ${whereSql}
+         ORDER BY (COALESCE(wl.total_in, 0) - COALESCE(wl.total_out, 0)) DESC, s.nama_lengkap ASC
+         LIMIT ? OFFSET ?`,
+        [...params, pageSize, offset]
+      ),
+    ])
 
-    const rows = await query<{
-      santri_id: string
-      santri_name: string
-      santri_nis: string
-      santri_asrama: string | null
-      santri_kelas: string | null
-      total_in: number
-      total_out: number
-      parent_daily_limit: number | null
-      card_code: string | null
-      card_status: string | null
-    }>(
-      `SELECT
-         s.id AS santri_id,
-         s.nama_lengkap AS santri_name,
-         s.nis AS santri_nis,
-         s.asrama AS santri_asrama,
-         COALESCE(k.nama_kelas, s.kelas_sekolah) AS santri_kelas,
-         COALESCE(wl.total_in, 0) AS total_in,
-         COALESCE(wl.total_out, 0) AS total_out,
-         flim.parent_daily_limit,
-         fc.card_token AS card_code,
-         fc.status AS card_status
-       FROM santri s
-       LEFT JOIN (
-         SELECT
-           santri_id,
-           SUM(CASE WHEN direction = 'IN' THEN amount ELSE 0 END) AS total_in,
-           SUM(CASE WHEN direction = 'OUT' THEN amount ELSE 0 END) AS total_out
-         FROM finance_wallet_ledger
-         GROUP BY santri_id
-       ) wl ON wl.santri_id = s.id
-       LEFT JOIN finance_wallet_limits flim ON flim.santri_id = s.id
-       LEFT JOIN finance_credentials fc ON fc.santri_id = s.id AND fc.status = 'ACTIVE'
-       LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
-       LEFT JOIN kelas k ON k.id = rp.kelas_id
-       WHERE ${whereSql}
-       ORDER BY s.nama_lengkap ASC
-       LIMIT ? OFFSET ?`,
-      [...params, pageSize, offset]
-    )
+    const totalRecords = countRow?.count || 0
+    const totalDepositIn = kpiRow?.total_in || 0
+    const totalWithdrawalOut = Math.max(0, kpiRow?.total_out || 0)
+    const totalCurrentBalance = totalDepositIn - (kpiRow?.total_out || 0)
+    const totalMutationsCount = kpiRow?.total_mutations || 0
 
     const summaryItems: WalletSummaryRow[] = rows.map((r) => {
       const parentDailyLimit = r.parent_daily_limit ?? null
@@ -1728,7 +1742,7 @@ export async function getWalletReport(
         santriAsrama: r.santri_asrama,
         santriKelas: r.santri_kelas,
         totalIn: r.total_in,
-        totalOut: r.total_out,
+        totalOut: Math.max(0, r.total_out),
         currentBalance: r.total_in - r.total_out,
         parentDailyLimit,
         globalDailyLimit,
@@ -1798,61 +1812,80 @@ export async function getWalletReport(
 
     const whereSql = conditions.join(' AND ')
 
-    const countRow = await queryOne<{ count: number }>(
-      `SELECT COUNT(*) AS count
-       FROM finance_wallet_ledger fwl
-       JOIN santri s ON s.id = fwl.santri_id
-       LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
-       LEFT JOIN kelas k ON k.id = rp.kelas_id
-       WHERE ${whereSql}`,
-      params
-    )
-    const totalRecords = countRow?.count || 0
+    const [kpiRow, balanceRow, rows] = await Promise.all([
+      queryOne<{
+        total_in: number
+        total_out: number
+        total_mutations: number
+      }>(
+        `SELECT
+           COALESCE(SUM(CASE WHEN fwl.direction = 'IN' AND fwl.movement_type != 'WITHDRAWAL_KOLEKTIF_RETURN' THEN fwl.amount ELSE 0 END), 0) AS total_in,
+           COALESCE(SUM(CASE WHEN fwl.direction = 'OUT' THEN fwl.amount WHEN fwl.movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN' THEN -fwl.amount ELSE 0 END), 0) AS total_out,
+           COUNT(*) AS total_mutations
+         FROM finance_wallet_ledger fwl
+         JOIN santri s ON s.id = fwl.santri_id
+         LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+         LEFT JOIN kelas k ON k.id = rp.kelas_id
+         WHERE ${whereSql}`,
+        params
+      ),
+      queryOne<{ current_balance: number }>(
+        `SELECT
+           COALESCE(SUM(CASE WHEN wl.direction = 'IN' THEN wl.amount ELSE -wl.amount END), 0) AS current_balance
+         FROM finance_wallet_ledger wl
+         JOIN santri s ON s.id = wl.santri_id
+         WHERE ${nonBillableSantriSqlPredicate('s.asrama')}`
+      ),
+      query<{
+        id: string
+        created_at: string
+        santri_id: string
+        santri_name: string
+        santri_nis: string
+        santri_asrama: string | null
+        santri_kelas: string | null
+        movement_type: string
+        direction: 'IN' | 'OUT'
+        amount: number
+        balance_before: number
+        balance_after: number
+        operator_name: string | null
+        cash_session_code: string | null
+        notes: string | null
+      }>(
+        `SELECT
+           fwl.id,
+           fwl.created_at,
+           fwl.santri_id,
+           s.nama_lengkap AS santri_name,
+           s.nis AS santri_nis,
+           s.asrama AS santri_asrama,
+           COALESCE(k.nama_kelas, s.kelas_sekolah) AS santri_kelas,
+           fwl.movement_type,
+           fwl.direction,
+           fwl.amount,
+           fwl.balance_before,
+           fwl.balance_after,
+           u.full_name AS operator_name,
+           fcs.session_code AS cash_session_code,
+           fwl.notes
+         FROM finance_wallet_ledger fwl
+         JOIN santri s ON s.id = fwl.santri_id
+         LEFT JOIN users u ON u.id = fwl.operator_id
+         LEFT JOIN finance_cash_sessions fcs ON fcs.id = fwl.cash_session_id
+         LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
+         LEFT JOIN kelas k ON k.id = rp.kelas_id
+         WHERE ${whereSql}
+         ORDER BY fwl.created_at DESC
+         LIMIT ? OFFSET ?`,
+        [...params, pageSize, offset]
+      ),
+    ])
 
-    const rows = await query<{
-      id: string
-      created_at: string
-      santri_id: string
-      santri_name: string
-      santri_nis: string
-      santri_asrama: string | null
-      santri_kelas: string | null
-      movement_type: string
-      direction: 'IN' | 'OUT'
-      amount: number
-      balance_before: number
-      balance_after: number
-      operator_name: string | null
-      cash_session_code: string | null
-      notes: string | null
-    }>(
-      `SELECT
-         fwl.id,
-         fwl.created_at,
-         fwl.santri_id,
-         s.nama_lengkap AS santri_name,
-         s.nis AS santri_nis,
-         s.asrama AS santri_asrama,
-         COALESCE(k.nama_kelas, s.kelas_sekolah) AS santri_kelas,
-         fwl.movement_type,
-         fwl.direction,
-         fwl.amount,
-         fwl.balance_before,
-         fwl.balance_after,
-         u.full_name AS operator_name,
-         fcs.session_code AS cash_session_code,
-         fwl.notes
-       FROM finance_wallet_ledger fwl
-       JOIN santri s ON s.id = fwl.santri_id
-       LEFT JOIN users u ON u.id = fwl.operator_id
-       LEFT JOIN finance_cash_sessions fcs ON fcs.id = fwl.cash_session_id
-       LEFT JOIN riwayat_pendidikan rp ON rp.santri_id = s.id AND rp.status_riwayat = 'aktif'
-       LEFT JOIN kelas k ON k.id = rp.kelas_id
-       WHERE ${whereSql}
-       ORDER BY fwl.created_at DESC
-       LIMIT ? OFFSET ?`,
-      [...params, pageSize, offset]
-    )
+    const totalRecords = kpiRow?.total_mutations || 0
+    const totalDepositIn = kpiRow?.total_in || 0
+    const totalWithdrawalOut = Math.max(0, kpiRow?.total_out || 0)
+    const totalCurrentBalance = balanceRow?.current_balance || 0
 
     const mutationItems: WalletMutationRow[] = rows.map((r) => ({
       id: r.id,
@@ -1879,7 +1912,7 @@ export async function getWalletReport(
         totalDepositIn,
         totalWithdrawalOut,
         totalCurrentBalance,
-        totalMutationsCount,
+        totalMutationsCount: totalRecords,
       },
       pagination: {
         currentPage: page,
@@ -2229,13 +2262,43 @@ export async function getCashSessionDetailReport(
     [sessionId]
   )
 
+  // 5. Mutasi Kas Bank ↔ Tunai (konsisten dengan getCashSessionsReport)
+  const cashTransfers = await query<{
+    id: string
+    transfer_number: string
+    direction: 'BANK_TO_CASH' | 'CASH_TO_BANK'
+    amount: number
+    handled_by_name: string
+    bank_transacted_at: string
+    notes: string | null
+  }>(
+    `SELECT
+       fct.id,
+       fct.transfer_number,
+       fct.direction,
+       fct.amount,
+       fct.handled_by_name,
+       fct.bank_transacted_at,
+       fct.notes
+     FROM finance_cash_transfers fct
+     WHERE fct.cash_session_id = ? AND fct.status = 'POSTED'
+     ORDER BY fct.bank_transacted_at ASC`,
+    [sessionId]
+  )
+
   const cashPaymentsIn = cashPayments.reduce((acc, curr) => acc + curr.gross_amount, 0)
   const cashTopupsIn = cashTopups.reduce((acc, curr) => acc + curr.amount, 0)
-  const totalCashIn = cashPaymentsIn + cashTopupsIn
+  const bankToCashIn = cashTransfers
+    .filter((t) => t.direction === 'BANK_TO_CASH')
+    .reduce((acc, curr) => acc + curr.amount, 0)
+  const totalCashIn = cashPaymentsIn + cashTopupsIn + bankToCashIn
 
   const cashWithdrawalsOut = cashWithdrawals.reduce((acc, curr) => acc + curr.amount, 0)
   const cashRefundsOut = cashRefunds.reduce((acc, curr) => acc + curr.amount, 0)
-  const totalCashOut = cashWithdrawalsOut + cashRefundsOut
+  const cashToBankOut = cashTransfers
+    .filter((t) => t.direction === 'CASH_TO_BANK')
+    .reduce((acc, curr) => acc + curr.amount, 0)
+  const totalCashOut = cashWithdrawalsOut + cashRefundsOut + cashToBankOut
 
   const expectedClosingBalance = sessionRes.opening_balance + totalCashIn - totalCashOut
   const difference = sessionRes.actual_closing_balance !== null
@@ -2301,13 +2364,24 @@ export async function getCashSessionDetailReport(
       amount: r.amount,
       reason: r.reason,
     })),
+    cashTransfers: cashTransfers.map((ct) => ({
+      id: ct.id,
+      transferNumber: ct.transfer_number,
+      direction: ct.direction,
+      amount: ct.amount,
+      handledByName: ct.handled_by_name,
+      bankTransactedAt: ct.bank_transacted_at,
+      notes: ct.notes,
+    })),
     authoritativeSummary: {
       openingBalance: sessionRes.opening_balance,
       cashPaymentsIn,
       cashTopupsIn,
+      bankToCashIn,
       totalCashIn,
       cashWithdrawalsOut,
       cashRefundsOut,
+      cashToBankOut,
       totalCashOut,
       expectedClosingBalance,
       actualClosingBalance: sessionRes.actual_closing_balance,

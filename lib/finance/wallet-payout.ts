@@ -47,13 +47,30 @@ export async function getPayoutCandidates(filter: { asrama: string; kamar?: stri
   if (filter.kamar) { extra += ' AND s.kamar = ?'; params.push(filter.kamar) }
   if (filter.blok) { extra += ' AND kc.blok = ?'; params.push(filter.blok) }
   const today = wibDate()
-  const rows = await query<Omit<PayoutCandidate, 'remaining_quota' | 'blocked_reason'> & { daily_used: number; parent_daily: number | null }>(
+  const rows = await query<
+    Omit<PayoutCandidate, 'remaining_quota' | 'blocked_reason'> & {
+      daily_used: number
+      weekly_used: number
+      monthly_used: number
+      parent_daily: number | null
+      parent_weekly: number | null
+      parent_monthly: number | null
+    }
+  >(
     `SELECT s.id, s.nis, s.nama_lengkap, s.asrama, s.kamar, kc.blok,
             COALESCE((SELECT SUM(CASE direction WHEN 'IN' THEN amount ELSE -amount END) FROM finance_wallet_ledger WHERE santri_id = s.id), 0) AS balance,
             COALESCE((SELECT SUM(CASE WHEN movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN' THEN -amount ELSE amount END) FROM finance_wallet_ledger
               WHERE santri_id = s.id AND movement_type IN ('WITHDRAWAL_LOKET','WITHDRAWAL_KOLEKTIF','WITHDRAWAL_KOLEKTIF_RETURN')
                 AND date(created_at, '+7 hours') = ?), 0) AS daily_used,
+            COALESCE((SELECT SUM(CASE WHEN movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN' THEN -amount ELSE amount END) FROM finance_wallet_ledger
+              WHERE santri_id = s.id AND movement_type IN ('WITHDRAWAL_LOKET','WITHDRAWAL_KOLEKTIF','WITHDRAWAL_KOLEKTIF_RETURN')
+                AND strftime('%Y-%W', created_at, '+7 hours') = strftime('%Y-%W', 'now', '+7 hours')), 0) AS weekly_used,
+            COALESCE((SELECT SUM(CASE WHEN movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN' THEN -amount ELSE amount END) FROM finance_wallet_ledger
+              WHERE santri_id = s.id AND movement_type IN ('WITHDRAWAL_LOKET','WITHDRAWAL_KOLEKTIF','WITHDRAWAL_KOLEKTIF_RETURN')
+                AND strftime('%Y-%m', created_at, '+7 hours') = strftime('%Y-%m', 'now', '+7 hours')), 0) AS monthly_used,
             (SELECT parent_daily_limit FROM finance_wallet_limits WHERE santri_id = s.id) AS parent_daily,
+            (SELECT parent_weekly_limit FROM finance_wallet_limits WHERE santri_id = s.id) AS parent_weekly,
+            (SELECT parent_monthly_limit FROM finance_wallet_limits WHERE santri_id = s.id) AS parent_monthly,
             COALESCE((SELECT SUM(i.amount) FROM finance_wallet_payout_items i WHERE i.santri_id = s.id AND i.payout_date = ?
               AND i.status IN ('DIBAWA','DITERIMA')), 0) AS taken_today
      FROM santri s
@@ -67,12 +84,17 @@ export async function getPayoutCandidates(filter: { asrama: string; kamar?: stri
   const globalLimit = global && /^\d+$/.test(global.value) ? Number(global.value) : 100000
   return rows.map(row => {
     const daily = row.parent_daily === null ? globalLimit : Math.min(globalLimit, row.parent_daily)
-    const remaining = Math.max(0, daily - row.daily_used)
+    const dailyRem = Math.max(0, daily - row.daily_used)
+    const weeklyRem = row.parent_weekly === null ? Number.MAX_SAFE_INTEGER : Math.max(0, row.parent_weekly - row.weekly_used)
+    const monthlyRem = row.parent_monthly === null ? Number.MAX_SAFE_INTEGER : Math.max(0, row.parent_monthly - row.monthly_used)
+    const remaining = Math.min(dailyRem, weeklyRem, monthlyRem)
     let blocked: string | null = null
     if (isAsramaBebasTagihan(row.asrama)) blocked = 'Asrama tanpa layanan keuangan'
     else if (row.taken_today > 0) blocked = 'Sudah dicairkan hari ini'
     else if (row.balance <= 0) blocked = 'Saldo kosong'
-    else if (remaining <= 0) blocked = 'Limit harian habis'
+    else if (dailyRem <= 0) blocked = 'Limit harian habis'
+    else if (weeklyRem <= 0) blocked = 'Limit mingguan habis'
+    else if (monthlyRem <= 0) blocked = 'Limit bulanan habis'
     return { id: row.id, nis: row.nis, nama_lengkap: row.nama_lengkap, asrama: row.asrama, kamar: row.kamar, blok: row.blok,
       balance: row.balance, remaining_quota: remaining, taken_today: row.taken_today, blocked_reason: blocked }
   })

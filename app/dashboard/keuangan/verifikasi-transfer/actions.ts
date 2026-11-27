@@ -1,7 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { query } from '@/lib/db'
 import { authorizeFinanceFeature } from '@/lib/finance/authorization'
+import { nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import { sweepExpiredTransferOrders } from '@/lib/finance/orders'
 import {
   TRANSFER_FEATURE_PATH,
@@ -37,16 +39,45 @@ export interface TransferQueueData {
   scope: VerifierScope
   pendingCount: number
   viewerName: string
+  asramaOptions: string[]
 }
 
 export async function getTransferQueueAction(filter: TransferQueueFilter = {}): Promise<TransferQueueData> {
   const { session, scope } = await actor(false)
   await sweepExpiredTransferOrders('verifikasi-transfer')
-  const [items, pendingCount] = await Promise.all([
+  const [items, pendingCount, masterAsramaRows] = await Promise.all([
     listTransferQueue(scope, filter),
     countPendingTransfersForScope(scope),
+    scope.all
+      ? query<{ asrama: string }>(
+          `SELECT DISTINCT TRIM(asrama) AS asrama
+           FROM santri
+           WHERE status_global = 'aktif'
+             AND asrama IS NOT NULL
+             AND TRIM(asrama) != ''
+             AND ${nonBillableSantriSqlPredicate('asrama')}
+           ORDER BY asrama ASC`,
+          []
+        )
+      : Promise.resolve([]),
   ])
-  return { items, scope, pendingCount, viewerName: session.full_name || 'Petugas' }
+
+  const asramaOptions = scope.all
+    ? Array.from(
+        new Set([
+          ...masterAsramaRows.map((r) => r.asrama).filter(Boolean),
+          ...items.map((i) => i.asrama).filter((a): a is string => Boolean(a)),
+        ])
+      ).sort((a, b) => a.localeCompare(b, 'id-ID'))
+    : [...scope.asrama].sort((a, b) => a.localeCompare(b, 'id-ID'))
+
+  return {
+    items,
+    scope,
+    pendingCount,
+    viewerName: session.full_name || 'Petugas',
+    asramaOptions,
+  }
 }
 
 export async function getTransferReviewDetailAction(id: string) {

@@ -15,7 +15,7 @@ import {
   getTotalPelanggaranAnak,
 } from '@/lib/portal/data'
 import { getPortalStudentBilling } from '@/lib/portal/finance'
-import { formatRupiah } from '@/lib/portal/format'
+import { formatPortalTimeWib, formatRupiah } from '@/lib/portal/format'
 import { toWibDateInputValue } from '@/lib/date/wib'
 import { BerandaWalletCard } from './_beranda-wallet-card'
 import { VaCopyButton } from './_va-copy-button'
@@ -62,6 +62,7 @@ export default async function PortalBerandaPage() {
 
 
 
+  const isNonBillable = Boolean(billing?.isNonBillable)
   const pendingOrders = billing?.pendingOrders ?? []
   const hasPendingOrder = pendingOrders.length > 0
   const currentPeriodLabel =
@@ -69,7 +70,11 @@ export default async function PortalBerandaPage() {
       ? billing.obligations.current[0].periodLabel.replace(/^Bulan\s+/i, '').trim()
       : 'Bulan Ini'
 
-  const hasRoutineBills = (billing?.obligations.current.length ?? 0) > 0 || (billing?.obligations.past.length ?? 0) > 0
+  const activeAnnualBills = (billing?.obligations.annual ?? []).filter(o => o.periodType !== 'UPCOMING')
+  const hasRoutineBills =
+    (billing?.obligations.current.length ?? 0) > 0 ||
+    (billing?.obligations.past.length ?? 0) > 0 ||
+    activeAnnualBills.length > 0
   const hasUsppBills = (billing?.obligations.uspp?.remaining ?? 0) > 0
   const tagihanRemaining = billing?.obligations.totalRemaining ?? 0
   const usppRemaining = billing?.obligations.uspp?.remaining ?? 0
@@ -78,7 +83,7 @@ export default async function PortalBerandaPage() {
   const unpaidCount =
     (billing?.obligations.past.length ?? 0) +
     (billing?.obligations.current.length ?? 0) +
-    (billing?.obligations.annual.length ?? 0)
+    activeAnnualBills.length
 
   const greeting = getGreeting()
 
@@ -118,26 +123,28 @@ export default async function PortalBerandaPage() {
 
       <PushPromptBanner audience="portal" ownerKey={session.santri_id} />
 
-      {/* 2. HERO UTAMA: SALDO UANG JAJAN SANTRI */}
-      <BerandaWalletCard
-        santriId={session.santri_id}
-        balance={billing?.wallet.balance ?? 0}
-        effectiveDailyLimit={billing?.wallet.effectiveDailyLimit ?? 0}
-        parentLimits={{
-          parentDailyLimit: billing?.wallet.parentDailyLimit ?? null,
-          parentWeeklyLimit: billing?.wallet.parentWeeklyLimit ?? null,
-          parentMonthlyLimit: billing?.wallet.parentMonthlyLimit ?? null,
-          globalDailyLimit: billing?.wallet.globalDailyLimit ?? 100000,
-        }}
-        gatewayInfo={billing?.gatewayInfo ?? null}
-        fixedVa={billing?.fixedVa ?? null}
-        paymentChannels={billing?.paymentChannels ?? null}
-        transferInReview={(billing?.transfers ?? []).some(t => t.status === 'MENUNGGU_VERIFIKASI' || t.status === 'PERLU_PERBAIKAN')}
-      />
+      {/* 2. HERO UTAMA: SALDO UANG JAJAN SANTRI (Khusus santri bermukim/billable) */}
+      {!isNonBillable && (
+        <BerandaWalletCard
+          santriId={session.santri_id}
+          balance={billing?.wallet.balance ?? 0}
+          effectiveDailyLimit={billing?.wallet.effectiveDailyLimit ?? 0}
+          parentLimits={{
+            parentDailyLimit: billing?.wallet.parentDailyLimit ?? null,
+            parentWeeklyLimit: billing?.wallet.parentWeeklyLimit ?? null,
+            parentMonthlyLimit: billing?.wallet.parentMonthlyLimit ?? null,
+            globalDailyLimit: billing?.wallet.globalDailyLimit ?? 100000,
+          }}
+          gatewayInfo={billing?.gatewayInfo ?? null}
+          fixedVa={billing?.fixedVa ?? null}
+          paymentChannels={billing?.paymentChannels ?? null}
+          transferInReview={(billing?.transfers ?? []).some(t => t.status === 'MENUNGGU_VERIFIKASI' || t.status === 'PERLU_PERBAIKAN')}
+        />
+      )}
 
       {/* 3. TOMBOL SHORTCUT DI BAWAH HERO */}
       <div>
-        <div className="grid grid-cols-4 gap-2.5">
+        <div className={`grid gap-2.5 ${isNonBillable ? 'grid-cols-2' : 'grid-cols-4'}`}>
           {[
             { href: '/portal-ortu/absensi', label: 'Presensi', Icon: CalendarCheck,
               card: 'bg-emerald-50/90 dark:bg-emerald-950/40 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/50',
@@ -147,14 +154,16 @@ export default async function PortalBerandaPage() {
               card: 'bg-blue-50/90 dark:bg-blue-950/40 hover:bg-blue-100/70 dark:hover:bg-blue-900/50',
               chip: 'bg-blue-200/60 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300',
               text: 'text-blue-950 dark:text-blue-200' },
-            { href: '/portal-ortu/tagihan', label: 'Cicil USPP', Icon: CreditCard,
-              card: 'bg-amber-50/90 dark:bg-amber-950/40 hover:bg-amber-100/70 dark:hover:bg-amber-900/50',
-              chip: 'bg-amber-200/60 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300',
-              text: 'text-amber-950 dark:text-amber-200' },
-            { href: '/portal-ortu/riwayat', label: 'Kuitansi', Icon: ClockCounterClockwise,
-              card: 'bg-teal-50/90 dark:bg-teal-950/40 hover:bg-teal-100/70 dark:hover:bg-teal-900/50',
-              chip: 'bg-teal-200/60 dark:bg-teal-900/60 text-teal-800 dark:text-teal-300',
-              text: 'text-teal-950 dark:text-teal-200' },
+            ...(!isNonBillable ? [
+              { href: '/portal-ortu/tagihan', label: hasUsppBills ? 'Cicil USPP' : 'Tagihan', Icon: CreditCard,
+                card: 'bg-amber-50/90 dark:bg-amber-950/40 hover:bg-amber-100/70 dark:hover:bg-amber-900/50',
+                chip: 'bg-amber-200/60 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300',
+                text: 'text-amber-950 dark:text-amber-200' },
+              { href: '/portal-ortu/riwayat', label: 'Kuitansi', Icon: ClockCounterClockwise,
+                card: 'bg-teal-50/90 dark:bg-teal-950/40 hover:bg-teal-100/70 dark:hover:bg-teal-900/50',
+                chip: 'bg-teal-200/60 dark:bg-teal-900/60 text-teal-800 dark:text-teal-300',
+                text: 'text-teal-950 dark:text-teal-200' },
+            ] : []),
           ].map(({ href, label, Icon, card, chip, text }) => (
             <Link
               key={href}
@@ -173,6 +182,14 @@ export default async function PortalBerandaPage() {
       </div>
 
       {/* 4. STATUS TAGIHAN PESANTREN */}
+      {isNonBillable ? (
+        <div className="rounded-[18px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-4 space-y-1">
+          <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Bebas Tagihan Pesantren</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            Santri asrama {session.asrama} tidak memiliki kewajiban tagihan pesantren maupun layanan uang jajan koperasi.
+          </p>
+        </div>
+      ) : (
       <div className="space-y-2 pt-1">
         <div className="flex items-center justify-between pb-0.5">
           <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
@@ -228,9 +245,9 @@ export default async function PortalBerandaPage() {
                       <div className="flex items-center gap-1.5 text-xs text-amber-900 dark:text-amber-300 font-bold">
                         <span>{bankLabel}</span>
                         <span>·</span>
-                        <span className="text-slate-500 dark:text-slate-400 font-normal">Batas aktif</span>
+                        <span className="text-slate-500 dark:text-slate-400 font-normal">Batas {formatPortalTimeWib(po.expiresAt)}</span>
                       </div>
-                      <p className="text-xl sm:text-2xl font-black font-mono tracking-wider text-slate-950 dark:text-white mt-0.5 whitespace-nowrap overflow-x-auto no-scrollbar py-0.5">
+                      <p className="text-xl sm:text-2xl font-black font-mono tracking-wider text-slate-950 dark:text-white mt-0.5 whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-0.5">
                         {vaNumber}
                       </p>
                     </div>
@@ -258,9 +275,9 @@ export default async function PortalBerandaPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {hasRoutineBills ? 'Total belum dibayar' : 'Sisa uang bangunan'}
+                  {hasRoutineBills ? 'Total belum dibayar' : 'Sisa uang bangunan (USPP)'}
                 </p>
-                <p className="text-3xl font-black font-mono tracking-tight text-slate-950 dark:text-white mt-1">
+                <p className="text-3xl font-black font-mono tracking-tight text-slate-950 dark:text-white mt-1 tabular-nums">
                   {formatRupiah(hasRoutineBills ? tagihanRemaining : usppRemaining)}
                 </p>
               </div>
@@ -276,7 +293,7 @@ export default async function PortalBerandaPage() {
                 : 'Dapat dicicil berkala'}
               {hasRoutineBills && hasUsppBills && (
                 <>
-                  {' · '}Sisa USPP{' '}
+                  {' · '}termasuk sisa USPP{' '}
                   <strong className="font-mono font-semibold text-slate-800 dark:text-slate-200">{formatRupiah(usppRemaining)}</strong>
                 </>
               )}
@@ -305,17 +322,13 @@ export default async function PortalBerandaPage() {
                 </p>
               </div>
               <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                Seluruh tagihan rutin bulan ini telah diselesaikan
+                Seluruh tagihan pesantren saat ini telah diselesaikan
               </p>
             </div>
 
             <div className="bg-white dark:bg-slate-900 border-t border-emerald-200/80 dark:border-emerald-800/60 px-4 py-3 flex items-center justify-between gap-2">
               <span className="text-xs text-slate-600 dark:text-slate-400">
-                {hasUsppBills ? (
-                  <>Sisa USPP: <strong className="font-mono text-slate-900 dark:text-slate-200">{formatRupiah(usppRemaining)}</strong></>
-                ) : (
-                  <span>Semua kewajiban beres</span>
-                )}
+                Semua kewajiban beres
               </span>
               <Link
                 href="/portal-ortu/riwayat"
@@ -327,6 +340,7 @@ export default async function PortalBerandaPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* 5. KONDISI ANAK */}
       <div className="space-y-2 pt-1">

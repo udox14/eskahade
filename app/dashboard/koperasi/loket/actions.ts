@@ -60,7 +60,7 @@ import { financeWritePlan } from '@/lib/finance/write-plan'
 import { walletMutationStatements } from '@/lib/finance/wallet-statements'
 import { operationIdentity, operationReplay, operationStatement, hashPinAuthorization } from '@/lib/finance/operation'
 import { rupiah, sumRupiah } from '@/lib/finance/money'
-import { assertSantriBillable } from '@/lib/finance/non-billable-santri'
+import { assertSantriBillable, nonBillableSantriSqlPredicate } from '@/lib/finance/non-billable-santri'
 import { createPaymentOrder } from '@/lib/finance/orders'
 import { recordOrderPayment } from '@/lib/finance/payments'
 import { financeNotices, kickNotificationDispatch } from '@/lib/notifications/runtime'
@@ -330,9 +330,59 @@ export async function closeLoketCashSession(
 
 // â”€â”€â”€ PENCARIAN SANTRI & IDENTIFIKASI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+export interface LoketStudentSearchOption {
+  id: string
+  nis: string
+  namaLengkap: string
+  asrama: string | null
+  kamar: string | null
+  fotoUrl: string | null
+}
+
+/**
+ * Pencarian cepat santri aktif (billable) di Loket berdasarkan nama atau NIS.
+ */
+export async function searchStudentsForLoket(
+  queryStr: string
+): Promise<LoketStudentSearchOption[]> {
+  await authorizeLoketOperator()
+  const clean = queryStr.trim()
+  if (clean.length < 2) return []
+
+  const term = `%${clean}%`
+  const rows = await query<{
+    id: string
+    nis: string
+    nama_lengkap: string
+    asrama: string | null
+    kamar: string | null
+    foto_url: string | null
+  }>(
+    `SELECT id, nis, nama_lengkap, asrama, kamar, foto_url
+     FROM santri
+     WHERE status_global = 'aktif'
+       AND ${nonBillableSantriSqlPredicate('asrama')}
+       AND (nama_lengkap LIKE ? OR nis LIKE ?)
+     ORDER BY
+       CASE WHEN nis = ? THEN 0 WHEN nis LIKE ? THEN 1 ELSE 2 END,
+       nama_lengkap ASC
+     LIMIT 10`,
+    [term, term, clean, `${clean}%`]
+  )
+
+  return rows.map((r) => ({
+    id: r.id,
+    nis: r.nis,
+    namaLengkap: r.nama_lengkap,
+    asrama: r.asrama,
+    kamar: r.kamar,
+    fotoUrl: r.foto_url,
+  }))
+}
+
 /**
  * Mencari santri untuk loket:
- * Mendukung input token QR (`crd_...`) atau NIS santri.
+ * Mendukung input NIS, ID, atau token kartu lama.
  * Mengembalikan foto besar, profil, status keaktifan kartu, dan status PIN.
  */
 export async function lookupStudentForLoket(

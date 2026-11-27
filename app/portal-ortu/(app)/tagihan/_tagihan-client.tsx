@@ -20,6 +20,14 @@ import type {
   PortalCheckoutResponse,
 } from '@/lib/portal/finance'
 import { createPortalCheckoutAction, selectPortalAdvancePeriodAction } from './actions'
+import { SelectPicker } from '@/components/ui/select-picker'
+import {
+  formatPortalMonthYearWib,
+  formatPortalPeriodYm,
+  formatPortalTimeWib,
+  formatThousands,
+  parseRupiahDigits,
+} from '@/lib/portal/format'
 import { BottomSheet } from '../../_components/bottom-sheet'
 import { TransferSheet, TransferStatusCard, visibleTransfers, isTransferOpen } from './_transfer-panel'
 import type { PortalTransferSummary } from '@/lib/portal/finance'
@@ -30,13 +38,8 @@ function formatRupiah(amount: number): string {
 }
 
 function formatExpiryShort(isoString: string): string {
-  try {
-    const d = new Date(isoString)
-    const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-    return `Batas ${timeStr} WIB`
-  } catch {
-    return 'Batas pembayaran aktif'
-  }
+  const t = formatPortalTimeWib(isoString)
+  return t !== '-' ? `Batas ${t}` : 'Batas pembayaran aktif'
 }
 
 function formatPaymentMethodLabel(method: string | null): string {
@@ -57,9 +60,10 @@ interface TagihanClientProps {
 }
 
 export function TagihanClient({ billingData: initialBillingData }: TagihanClientProps) {
-  const [billingOverride,setBillingOverride] = useState<PortalStudentBillingData | null>(null)
+  const [billingOverride, setBillingOverride] = useState<PortalStudentBillingData | null>(null)
   const billingData = billingOverride ?? initialBillingData
-  const [loadingAdvance,setLoadingAdvance] = useState(false)
+  const [selectedAdvancePeriod, setSelectedAdvancePeriod] = useState('')
+  const [loadingAdvance, setLoadingAdvance] = useState(false)
   const router = useRouter()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
     // Default kosong agar orang tua secara sadar memilih tagihan yang ingin dibayar,
@@ -196,7 +200,6 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
   }, [
     activeObligations,
     billingData.obligations.upcoming,
-    billingData.obligations.annual,
     selectedIds,
     isUsppSelected,
     usppAmount,
@@ -211,10 +214,13 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
   ])
 
   const handleCopyVa = (vaText: string) => {
-    navigator.clipboard.writeText(vaText)
-    setCopied(true)
-    toast.success('Nomor Virtual Account disalin!')
-    setTimeout(() => setCopied(false), 2000)
+    navigator.clipboard.writeText(vaText).then(() => {
+      setCopied(true)
+      toast.success('Nomor Virtual Account disalin!')
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(() => {
+      toast.error('Gagal menyalin. Silakan salin manual.')
+    })
   }
 
   const handleProceedCheckout = async () => {
@@ -278,13 +284,39 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
     if (currentObligations.length > 0 && currentObligations[0].periodLabel) {
       return cleanPeriodLabel(currentObligations[0].periodLabel)
     }
-    return new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(new Date())
+    return formatPortalMonthYearWib(new Date().toISOString())
   }, [currentObligations])
+
+  const advancePeriodOptions = useMemo(
+    () => [
+      { value: '', label: 'Bayar sampai bulan…' },
+      ...(billingData.advancePeriods ?? []).map(p => ({
+        value: p,
+        label: formatPortalPeriodYm(p),
+      })),
+    ],
+    [billingData.advancePeriods]
+  )
+
+  const uniqueCodeMax = channels.transfer.uniqueCodeMax ?? 999
 
   const allActiveSelected =
     activeObligations.length > 0 && activeObligations.every(it => selectedIds.has(it.id))
 
   const isSelectionActive = selectedItemsSummary.count > 0
+
+  if (billingData.isNonBillable) {
+    return (
+      <div className="rounded-[22px] border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-center space-y-2 shadow-2xs">
+        <p className="text-base font-bold text-slate-900 dark:text-slate-100">
+          Bebas Tagihan Pesantren
+        </p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+          Santri asrama {billingData.santri.asrama} merupakan penduduk setempat sehingga tidak dikenai kewajiban tagihan pesantren maupun layanan uang jajan koperasi.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -325,7 +357,7 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
                   {isSelectionActive ? (
                     <>
                       <span className="text-emerald-100/80">
-                        {selectedItemsSummary.count} dari {activeObligations.length} tagihan dipilih
+                        {selectedItemsSummary.count} item dipilih untuk dibayar
                       </span>
                       <span className="font-mono font-bold text-[#bef264]">
                         {formatRupiah(selectedItemsSummary.grossAmount)}
@@ -405,7 +437,7 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
               </div>
 
               <div>
-                <p className="text-xl sm:text-2xl font-black font-mono tracking-wider text-slate-950 dark:text-slate-100 whitespace-nowrap overflow-x-auto no-scrollbar py-0.5">
+                <p className="text-xl sm:text-2xl font-black font-mono tracking-wider text-slate-950 dark:text-slate-100 whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-0.5">
                   {vaNumber}
                 </p>
                 <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1">
@@ -639,24 +671,28 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
         </summary>
 
         <div className="space-y-3 pt-2">
-          <select
-            aria-label="Pilih periode pembayaran di muka"
-            defaultValue=""
+          <SelectPicker
+            value={selectedAdvancePeriod}
+            options={advancePeriodOptions}
             disabled={loadingAdvance}
-            className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3.5 py-3 text-sm font-medium text-slate-900 dark:text-slate-100 shadow-2xs focus:border-emerald-600 focus:outline-hidden disabled:opacity-60"
-            onChange={async e=>{
-              const period=e.target.value;if(!period)return
+            align="left"
+            className="w-full"
+            menuClassName="w-full"
+            ariaLabel="Pilih periode pembayaran di muka"
+            onChange={async period => {
+              setSelectedAdvancePeriod(period)
+              if (!period) return
               setLoadingAdvance(true)
               try {
-                const result=await selectPortalAdvancePeriodAction(period)
-                setBillingOverride(result.data);setSelectedIds(new Set())
-              } catch {toast.error('Tagihan periode mendatang belum dapat dimuat. Hubungi bagian keuangan.')}
-              finally {setLoadingAdvance(false)}
+                const result = await selectPortalAdvancePeriodAction(period)
+                setBillingOverride(result.data)
+              } catch {
+                toast.error('Tagihan periode mendatang belum dapat dimuat. Hubungi bagian keuangan.')
+              } finally {
+                setLoadingAdvance(false)
+              }
             }}
-          >
-            <option value="">Bayar sampai bulan…</option>
-            {billingData.advancePeriods?.map(p=><option key={p} value={p}>{p}</option>)}
-          </select>
+          />
           {loadingAdvance && <p className="text-xs text-slate-500">Memuat tagihan…</p>}
 
           {billingData.obligations.upcoming.length > 0 && (
@@ -756,16 +792,17 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
                 </div>
 
                 <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400 dark:text-slate-500 font-mono">Rp</span>
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 dark:text-slate-500 font-mono">Rp</span>
                   <input
-                    type="number"
-                    min={10000}
-                    max={billingData.obligations.uspp.remaining}
-                    step={50000}
-                    value={usppAmount || ''}
-                    onChange={e => setUsppAmount(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                    className="w-full pl-9 pr-3 py-2 text-sm font-mono font-bold border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-hidden focus:border-emerald-600 dark:focus:border-emerald-500 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900"
-                    placeholder="Nominal custom cicilan"
+                    type="text"
+                    inputMode="numeric"
+                    value={formatThousands(usppAmount)}
+                    onChange={e => {
+                      const val = parseRupiahDigits(e.target.value)
+                      setUsppAmount(Math.min(val, billingData.obligations.uspp!.remaining))
+                    }}
+                    className="w-full pl-9 pr-3 py-2 text-sm font-mono font-bold tabular-nums border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-hidden focus:border-emerald-600 dark:focus:border-emerald-500 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900"
+                    placeholder="Nominal cicilan"
                   />
                 </div>
               </div>
@@ -821,22 +858,20 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
         </div>
 
         <div className="relative">
-          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-slate-500 font-mono">
+          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-slate-500 font-mono">
             Rp
           </span>
           <input
-            type="number"
+            type="text"
             inputMode="numeric"
-            min={0}
-            step={10000}
-            value={topUpAmount > 0 ? topUpAmount : ''}
+            value={formatThousands(topUpAmount)}
             onChange={e => {
-              const val = Math.max(0, parseInt(e.target.value, 10) || 0)
+              const val = parseRupiahDigits(e.target.value)
               setTopUpAmount(val)
               setIsTopUpSelected(val > 0)
             }}
             placeholder="Nominal lainnya"
-            className="w-full pl-10 pr-4 py-2.5 text-sm font-mono font-bold border border-slate-300 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs focus:border-emerald-600 dark:focus:border-emerald-500 focus:outline-hidden placeholder:font-sans placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500"
+            className="w-full pl-10 pr-4 py-2.5 text-sm font-mono font-bold tabular-nums border border-slate-300 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs focus:border-emerald-600 dark:focus:border-emerald-500 focus:outline-hidden placeholder:font-sans placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
         </div>
       </div>
@@ -1010,7 +1045,7 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
               <span className="font-mono">{selectedItemsSummary.deducting ? '−' : ''}{formatRupiah(selectedItemsSummary.cooperativeFee)}</span>
             </div>
             {selectedItemsSummary.isTransfer && (
-              <div className="flex justify-between text-slate-700 dark:text-slate-300"><span>Kode unik</span><span className="text-xs">ditambahkan sistem (Rp1–Rp999)</span></div>
+              <div className="flex justify-between text-slate-700 dark:text-slate-300"><span>Kode unik</span><span className="text-xs">ditambahkan sistem (Rp1–Rp{uniqueCodeMax.toLocaleString('id-ID')})</span></div>
             )}
             <div className="flex justify-between border-t border-slate-200 dark:border-slate-800 pt-2 font-bold text-slate-950 dark:text-slate-100">
               <span>{selectedItemsSummary.isTransfer ? 'Perkiraan transfer' : 'Total dibayar'}</span>
@@ -1079,7 +1114,7 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
               <div className="rounded-2xl border border-emerald-200/80 dark:border-emerald-800/60 bg-emerald-50/60 dark:bg-emerald-950/40 p-4 text-center space-y-2">
                 <span className="text-xs font-bold text-emerald-950 dark:text-emerald-200">Nomor Virtual Account BRI (BRIVA)</span>
                 <div className="flex items-center justify-center gap-2">
-                  <span className="font-mono text-xl sm:text-2xl font-black text-emerald-950 dark:text-emerald-100 tracking-wider whitespace-nowrap overflow-x-auto no-scrollbar py-0.5">
+                  <span className="font-mono text-xl sm:text-2xl font-black text-emerald-950 dark:text-emerald-100 tracking-wider whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-0.5">
                     {checkoutResult.checkout.vaNumber}
                   </span>
                   <button
@@ -1094,7 +1129,7 @@ export function TagihanClient({ billingData: initialBillingData }: TagihanClient
                 <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-800 dark:text-emerald-300 font-medium">
                   <Clock className="w-3.5 h-3.5 shrink-0" />
                   <span>
-                    Berlaku 24 jam (sampai {new Date(checkoutResult.order.expiresAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB)
+                    Berlaku 24 jam (sampai {formatPortalTimeWib(checkoutResult.order.expiresAt)})
                   </span>
                 </div>
               </div>

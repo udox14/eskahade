@@ -24,7 +24,6 @@ import {
 } from '@/lib/finance/wallet'
 import { isAsramaBebasTagihan } from '@/lib/finance/non-billable-santri'
 import { FINANCE_ITEM_LABELS, type FinanceItemType } from '@/lib/finance/types'
-import { toWibDateInputValue } from '@/lib/date/wib'
 
 export interface PortalObligationItem {
   id: string
@@ -45,6 +44,7 @@ export interface PortalObligationItem {
 }
 
 export interface PortalStudentBillingData {
+  isNonBillable: boolean
   billingWarnings: string[]
   advancePeriods: string[]
   santri: {
@@ -119,6 +119,7 @@ export interface PortalPaymentChannels {
     fee: number
     feeDeductEnabled: boolean
     proofDeadlineHours: number
+    uniqueCodeMax: number
     accounts: PortalTransferAccount[]
   }
 }
@@ -190,9 +191,12 @@ export interface PortalTransactionHistoryItem {
   amount: number
   grossAmount?: number
   cooperativeAdminFee?: number
+  uniqueCodeAmount?: number
   gatewayFee?: number
   channel?: string | null
   method?: string | null
+  movementType?: string | null
+  isReceiptable?: boolean
   status: 'PAID' | 'PENDING' | 'EXPIRED' | 'CANCELLED' | 'COMPLETED'
   createdAt: string
   items?: Array<{
@@ -257,7 +261,9 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
   const santriBebasTagihan = isAsramaBebasTagihan(santri.asrama)
 
   // Only issue the current period here. Future obligations are materialized on explicit selection.
-  const issuance = await ensureStudentBilling(santriId)
+  const issuance = santriBebasTagihan
+    ? { warnings: [] as string[] }
+    : await ensureStudentBilling(santriId)
 
   // 3. Query seluruh kewajiban aktif santri yang belum lunas
   const rawObligations = await query<{
@@ -425,6 +431,7 @@ export const getPortalStudentBilling = cache(async function getPortalStudentBill
     const transfers = await getPortalTransferSummaries(santriId)
 
     return {
+      isNonBillable: santriBebasTagihan,
       billingWarnings: issuance.warnings.length ? ['Sebagian tagihan perlu diperiksa petugas. Hubungi bagian keuangan untuk memastikan jumlah yang harus dibayar.'] : [],
       advancePeriods: advanceBillingPeriods(),
       santri: {
@@ -515,6 +522,7 @@ export async function getPortalPaymentChannels(
       fee: transferFee,
       feeDeductEnabled: settings.feeDeductEnabled,
       proofDeadlineHours: settings.proofDeadlineHours,
+      uniqueCodeMax: settings.uniqueCodeMax,
       accounts: accounts.map(account => ({
         id: account.id, bankName: account.bank_name, accountNumber: account.account_number,
         accountHolder: account.account_holder, notes: account.notes,
@@ -868,18 +876,25 @@ export async function getPortalFinancialHistory(
       payment_number: string
       gross_amount: number
       cooperative_admin_fee: number
+      unique_code_amount: number | null
       net_amount: number
+      order_total_charged: number | null
       channel: string
       method: string
       status: string
+      correction_status: string | null
+      allocation_status: string | null
       paid_at: string
       created_at: string
     }>(
-      `SELECT id, payment_number, gross_amount, cooperative_admin_fee, net_amount,
-              channel, method, status, paid_at, created_at
-       FROM finance_payments
-       WHERE santri_id = ?
-       ORDER BY paid_at DESC, id DESC LIMIT 50`,
+      `SELECT p.id, p.payment_number, p.gross_amount, p.cooperative_admin_fee,
+              p.unique_code_amount, p.net_amount, o.total_charged AS order_total_charged,
+              p.channel, p.method, p.status, p.correction_status, p.allocation_status,
+              p.paid_at, p.created_at
+       FROM finance_payments p
+       LEFT JOIN finance_payment_orders o ON o.id = p.order_id
+       WHERE p.santri_id = ?
+       ORDER BY p.paid_at DESC, p.id DESC LIMIT 50`,
       [santriId]
     )
 
@@ -917,22 +932,43 @@ export async function getPortalFinancialHistory(
 
     for (const p of payments) {
       const allocations = allocationsMap.get(p.id) || []
+      const rawStatus = String(p.status || '').toUpperCase()
+      const corrStatus = String(p.correction_status || 'NONE').toUpperCase()
+      const isCancelledOrCorrected =
+        ['VOIDED', 'REVERSED', 'REFUNDED', 'CANCELLED', 'FAILED'].includes(rawStatus) ||
+        ['FULLY_CORRECTED', 'VOIDED', 'REVERSED', 'REFUNDED'].includes(corrStatus)
+      const isActivePaid = !isCancelledOrCorrected && (rawStatus === 'PAID' || rawStatus === 'SETTLED')
+      const coopFee = p.cooperative_admin_fee ?? 0
+      const uniqueCode = p.unique_code_amount ?? 0
+      const totalPaid =
+        p.order_total_charged && p.order_total_charged > 0
+          ? p.order_total_charged
+          : p.gross_amount + coopFee + uniqueCode
+
+      const title =
+        allocations.length === 1
+          ? `Pembayaran ${FINANCE_ITEM_LABELS[allocations[0].item_type as keyof typeof FINANCE_ITEM_LABELS] || allocations[0].item_type}`
+          : allocations.length > 1
+            ? `Pembayaran ${allocations.length} Pos Tagihan`
+            : p.allocation_status === 'UNALLOCATED'
+              ? 'Dana Diterima (Menunggu Alokasi)'
+              : 'Pembayaran Pesantren'
 
       history.push({
         id: p.id,
         type: 'PAYMENT',
         category: 'TAGIHAN',
-        title: allocations.length === 1
-          ? `Pembayaran ${FINANCE_ITEM_LABELS[allocations[0].item_type as keyof typeof FINANCE_ITEM_LABELS] || allocations[0].item_type}`
-          : `Pembayaran ${allocations.length} Pos Tagihan`,
+        title,
         referenceNumber: p.payment_number,
-        amount: p.gross_amount,
+        amount: totalPaid,
         grossAmount: p.gross_amount,
-        cooperativeAdminFee: p.cooperative_admin_fee,
-        gatewayFee: p.cooperative_admin_fee,
+        cooperativeAdminFee: coopFee,
+        uniqueCodeAmount: uniqueCode,
+        gatewayFee: coopFee,
         channel: p.channel,
         method: p.method,
-        status: p.status === 'PAID' || p.status === 'SETTLED' ? 'PAID' : 'COMPLETED',
+        isReceiptable: isActivePaid && p.allocation_status !== 'UNALLOCATED',
+        status: isCancelledOrCorrected ? 'CANCELLED' : isActivePaid ? 'PAID' : 'COMPLETED',
         createdAt: p.paid_at || p.created_at,
         items: allocations.map(a => ({
           itemType: a.item_type,
@@ -975,6 +1011,10 @@ export async function getPortalFinancialHistory(
       else if (m.movement_type === 'WITHDRAWAL_KOLEKTIF') title = 'Pencairan Uang Jajan (via Perwakilan)'
       else if (m.movement_type === 'WITHDRAWAL_KOLEKTIF_RETURN') title = 'Pencairan Dibatalkan — Saldo Dikembalikan'
 
+      const isReceiptableTopUp =
+        m.direction === 'IN' &&
+        (m.movement_type === 'TOPUP_ONLINE' || m.movement_type === 'TOPUP_CASH' || m.movement_type === 'TOPUP_TRANSFER')
+
       history.push({
         id: m.id,
         type: m.direction === 'IN' ? 'TOPUP' : 'WITHDRAWAL',
@@ -982,6 +1022,9 @@ export async function getPortalFinancialHistory(
         title,
         referenceNumber: m.reference_id || `WLT-${m.id.slice(0, 8).toUpperCase()}`,
         amount: m.amount,
+        grossAmount: m.amount,
+        movementType: m.movement_type,
+        isReceiptable: isReceiptableTopUp,
         status: 'COMPLETED',
         createdAt: m.created_at,
         items: [{
@@ -1033,13 +1076,22 @@ export async function getPortalFinancialHistory(
       cooperativeAdminFee: po.cooperative_admin_fee,
       gatewayFee: po.cooperative_admin_fee,
       method: po.payment_method,
+      isReceiptable: false,
       status: 'PENDING',
       createdAt: po.created_at,
     })
   }
 
-  // Sort descending by createdAt
-  history.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1))
+  // Sort descending secara numerik (normalisasi format SQLite 'YYYY-MM-DD HH:MM:SS' vs ISO 'T...Z')
+  const toMs = (iso: string) => {
+    const trimmed = String(iso || '').trim()
+    const normalized = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(trimmed)
+      ? `${trimmed.replace(' ', 'T')}Z`
+      : trimmed
+    const ms = Date.parse(normalized)
+    return Number.isFinite(ms) ? ms : 0
+  }
+  history.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
 
   return history
 }
@@ -1055,5 +1107,12 @@ export async function updatePortalWalletLimits(
     monthly?: number | null
   }
 ): Promise<void> {
+  const santri = await queryOne<{ asrama: string | null }>(
+    `SELECT asrama FROM santri WHERE id = ?`,
+    [santriId]
+  )
+  if (!santri || isAsramaBebasTagihan(santri.asrama)) {
+    throw new Error('Santri ini tidak memiliki layanan uang jajan koperasi.')
+  }
   await setParentWalletLimits(santriId, limits, null)
 }

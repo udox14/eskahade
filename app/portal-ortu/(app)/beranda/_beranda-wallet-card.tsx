@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Wallet, Plus, Copy, Check, CheckCircle2, Clock, Loader2 } from 'lucide-react'
-import { formatRupiah } from '@/lib/portal/format'
+import { formatPortalTimeWib, formatRupiah, formatThousands, parseRupiahDigits } from '@/lib/portal/format'
 import { BottomSheet } from '../../_components/bottom-sheet'
 import { WalletLimitCard } from '../akun/_wallet-limit-card'
 import { createPortalCheckoutAction } from '../tagihan/actions'
@@ -69,11 +69,16 @@ export function BerandaWalletCard({
   const deducting = canDeduct && deductFee
   const totalCharged = topUpAmount > 0 ? (deducting ? topUpAmount : topUpAmount + cooperativeFee) : 0
 
+  const uniqueCodeMax = paymentChannels?.transfer.uniqueCodeMax ?? 999
+
   const handleCopyVa = (vaText: string) => {
-    navigator.clipboard.writeText(vaText)
-    setCopied(true)
-    toast.success('Nomor Virtual Account disalin!')
-    setTimeout(() => setCopied(false), 2000)
+    navigator.clipboard.writeText(vaText).then(() => {
+      setCopied(true)
+      toast.success('Nomor Virtual Account disalin!')
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(() => {
+      toast.error('Gagal menyalin. Silakan salin manual.')
+    })
   }
 
   const handleProceedTopUp = async () => {
@@ -182,7 +187,7 @@ export function BerandaWalletCard({
         open={isLimitOpen}
         onClose={() => setIsLimitOpen(false)}
         title="Batas Limit Uang Jajan"
-        subtitle="Atur batas belanja & penarikan di koperasi"
+        subtitle="Atur batas pencairan uang jajan harian, mingguan, atau bulanan"
         icon={<Wallet className="h-5 w-5 text-emerald-600" />}
       >
         <WalletLimitCard
@@ -285,17 +290,12 @@ export function BerandaWalletCard({
                 </span>
                 <input
                   id="topup-amount"
-                  type="number"
+                  type="text"
                   inputMode="numeric"
-                  min={10000}
-                  step={10000}
-                  value={topUpAmount > 0 ? topUpAmount : ''}
-                  onChange={e => {
-                    const parsed = parseInt(e.target.value, 10) || 0
-                    setTopUpAmount(Math.max(0, parsed))
-                  }}
+                  value={formatThousands(topUpAmount)}
+                  onChange={e => setTopUpAmount(parseRupiahDigits(e.target.value))}
                   placeholder="0"
-                  className="w-full pl-12 pr-4 py-3.5 text-2xl font-mono font-black border border-slate-300 dark:border-slate-700 rounded-2xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs focus:border-emerald-600 dark:focus:border-emerald-500 focus:outline-hidden placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                  className="w-full pl-12 pr-4 py-3.5 text-2xl font-mono font-black tabular-nums border border-slate-300 dark:border-slate-700 rounded-2xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs focus:border-emerald-600 dark:focus:border-emerald-500 focus:outline-hidden placeholder:text-slate-300 dark:placeholder:text-slate-600"
                 />
               </div>
               <div className="grid grid-cols-4 gap-1.5">
@@ -342,13 +342,40 @@ export function BerandaWalletCard({
                 )
               })}
               {isTransfer && accounts.length > 1 && (
-                <label className="block space-y-1">
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Rekening tujuan</span>
-                  <select value={destinationAccountId ?? ''} onChange={e => setAccountId(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm">
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.bankName} · {a.accountNumber}</option>)}
-                  </select>
-                </label>
+                <div className="space-y-1.5">
+                  <span className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Rekening tujuan</span>
+                  <div className="grid gap-2" role="radiogroup" aria-label="Rekening tujuan">
+                    {accounts.map(a => {
+                      const active = destinationAccountId === a.id
+                      return (
+                        <label
+                          key={a.id}
+                          className={`flex items-start gap-2.5 rounded-xl border p-2.5 cursor-pointer ${
+                            active
+                              ? 'border-emerald-700 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/60'
+                              : 'border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="topup-destination-account"
+                            className="mt-0.5 accent-emerald-700"
+                            checked={active}
+                            onChange={() => setAccountId(a.id)}
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-xs font-bold text-slate-900 dark:text-slate-100">
+                              {a.bankName} · <span className="font-mono">{a.accountNumber}</span>
+                            </span>
+                            <span className="block text-[11px] text-slate-600 dark:text-slate-400">
+                              a.n. {a.accountHolder}
+                            </span>
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
               )}
               {isTransfer && canDeduct && (
                 <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300">
@@ -373,7 +400,7 @@ export function BerandaWalletCard({
               {isTransfer && (
                 <div className="flex justify-between">
                   <span>Kode unik</span>
-                  <span className="text-slate-500">ditambahkan sistem (Rp1–Rp999)</span>
+                  <span className="text-slate-500">ditambahkan sistem (Rp1–Rp{uniqueCodeMax.toLocaleString('id-ID')})</span>
                 </div>
               )}
               <div className="flex justify-between border-t border-slate-100 dark:border-slate-800 pt-3 mt-1 font-bold text-slate-950 dark:text-slate-100 text-sm">
@@ -404,7 +431,7 @@ export function BerandaWalletCard({
               <div className="rounded-2xl border border-emerald-200/80 dark:border-emerald-800/60 bg-emerald-50/60 dark:bg-emerald-950/40 p-4 text-center space-y-2">
                 <span className="text-xs font-bold text-emerald-950 dark:text-emerald-200">Nomor Virtual Account BRI (BRIVA)</span>
                 <div className="flex items-center justify-center gap-2">
-                  <span className="font-mono text-xl sm:text-2xl font-black text-emerald-950 dark:text-emerald-100 tracking-wider whitespace-nowrap overflow-x-auto no-scrollbar py-0.5">
+                  <span className="font-mono text-xl sm:text-2xl font-black text-emerald-950 dark:text-emerald-100 tracking-wider whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-0.5">
                     {checkoutResult.checkout.vaNumber}
                   </span>
                   <button
@@ -419,12 +446,7 @@ export function BerandaWalletCard({
                 <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-800 dark:text-emerald-300 font-medium">
                   <Clock className="w-3.5 h-3.5 shrink-0" />
                   <span>
-                    Berlaku 24 jam (sampai{' '}
-                    {new Date(checkoutResult.order.expiresAt).toLocaleTimeString('id-ID', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}{' '}
-                    WIB)
+                    Berlaku 24 jam (sampai {formatPortalTimeWib(checkoutResult.order.expiresAt)})
                   </span>
                 </div>
               </div>

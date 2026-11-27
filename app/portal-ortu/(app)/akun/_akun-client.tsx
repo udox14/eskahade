@@ -28,6 +28,7 @@ import { gantiPasswordPortal } from './actions'
 
 interface AkunClientProps {
   mustChangePassword?: boolean
+  isNonBillable?: boolean
   nis: string
   session?: {
     nama: string
@@ -53,6 +54,7 @@ interface AkunClientProps {
 
 export function AkunClient({
   mustChangePassword = false,
+  isNonBillable = false,
   nis,
   session,
   namaKelas,
@@ -271,8 +273,9 @@ export function AkunClient({
       </section>
 
       {/* =============================================================== */}
-      {/* 3. SECTION: UANG JAJAN                                         */}
+      {/* 3. SECTION: UANG JAJAN (Disembunyikan untuk AL-BAGHORY)        */}
       {/* =============================================================== */}
+      {!isNonBillable && (
       <section className="space-y-1.5">
         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1">
           Uang Jajan
@@ -288,9 +291,11 @@ export function AkunClient({
                 <Wallet className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">Limit Uang Jajan Harian</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">Batas Limit Uang Jajan</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                  Maksimal <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">{formatRupiah(effectiveDaily)}</span> / hari
+                  Harian <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">{formatRupiah(effectiveDaily)}</span>
+                  {parentLimits?.parent_weekly_limit ? ` · Mingguan ${formatRupiah(parentLimits.parent_weekly_limit)}` : ''}
+                  {parentLimits?.parent_monthly_limit ? ` · Bulanan ${formatRupiah(parentLimits.parent_monthly_limit)}` : ''}
                 </p>
               </div>
             </div>
@@ -301,6 +306,7 @@ export function AkunClient({
           </button>
         </div>
       </section>
+      )}
 
       {/* =============================================================== */}
       {/* 4. SECTION: KEAMANAN & AKSES                                   */}
@@ -464,8 +470,8 @@ export function AkunClient({
       <BottomSheet
         open={activeSheet === 'LIMIT'}
         onClose={() => setActiveSheet(null)}
-        title="Limit Uang Jajan Harian"
-        subtitle="Batasi penarikan & belanja di kantin/koperasi"
+        title="Batas Limit Uang Jajan"
+        subtitle="Atur batas pencairan uang jajan harian, mingguan, atau bulanan"
         icon={<Wallet className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
       >
         <WalletLimitCard

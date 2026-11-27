@@ -23,6 +23,8 @@ interface PosHeaderProps {
   onCashTransferClick: () => void
 }
 
+const formatRupiah = (val: number) => `Rp${Math.max(0, Math.round(val)).toLocaleString('id-ID')}`
+
 export default function PosHeader({
   activeSession,
   summary,
@@ -33,148 +35,168 @@ export default function PosHeader({
   onOpenHistoryClick,
   onCashTransferClick,
 }: PosHeaderProps) {
-  const formatRupiah = (val: number) => `Rp${Math.max(0, val).toLocaleString('id-ID')}`
+  const roleLabel = operator.roles.includes('admin_koperasi')
+    ? 'Admin Koperasi'
+    : operator.roles.includes('petugas_koperasi')
+      ? 'Petugas Koperasi'
+      : operator.roles.includes('bendahara')
+        ? 'Bendahara'
+        : operator.roles.includes('admin')
+          ? 'Administrator'
+          : operator.roles[0]
+
+  const reservedBalance = activeSession?.reserved_cash_out ?? 0
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-        {/* Sisi Kiri: Judul Loket & Status Operator */}
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-tight">
+    <div className="space-y-4">
+      {/* Baris 1: Judul Halaman + Cluster Tombol Aksi */}
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold leading-tight text-slate-900 sm:text-[1.75rem] text-balance">
               Loket Kasir Koperasi
             </h1>
-              {isViewOnly && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
-                  <ShieldCheck className="w-3 h-3" />
-                  View Only
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
-              <span className="inline-flex items-center gap-1 font-medium text-slate-700">
-                <User className="w-3.5 h-3.5 text-slate-400" />
-                {operator.name}
+            {isViewOnly && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+                Lihat Saja
               </span>
-              <span className="text-slate-300">•</span>
-              <span>
-                {operator.roles.includes('admin_koperasi')
-                  ? 'Admin Koperasi'
-                  : operator.roles.includes('petugas_koperasi')
-                  ? 'Petugas Koperasi'
-                  : operator.roles.includes('bendahara')
-                  ? 'Bendahara'
-                  : operator.roles.includes('admin')
-                  ? 'Administrator'
-                  : operator.roles[0]}
-              </span>
-            </div>
+            )}
           </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-slate-500">
+            <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
+              <User className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+              {operator.name}
+            </span>
+            <span className="text-slate-300">·</span>
+            <span>{roleLabel}</span>
+          </div>
+        </div>
 
-        {/* Sisi Kanan: Status Sesi Kas & Aksi */}
-        <div className="flex items-center flex-wrap gap-2 sm:gap-3">
+        {/* Cluster Aksi Sejajar & Rapi */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={onOpenHistoryClick}
+            className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+            title="Lihat transaksi sesi ini dan sesi sebelumnya"
+          >
+            <Receipt className="h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
+            <span>Riwayat</span>
+          </button>
+
           {activeSession ? (
             <>
-              {/* Badge Sesi Kas Aktif & Saldo Kas Fisik */}
-              <div className="flex items-center gap-2 sm:gap-3 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
-                  </span>
-                  <div className="text-left">
-                    <p className="text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
-                      Sesi: {activeSession.session_code}
-                    </p>
-                    <p className="text-xs font-bold text-emerald-700">
-                      Kas Laci: {formatRupiah(activeSession.expected_closing_balance)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Sub-metrik cepat */}
-                <div className="hidden md:flex items-center gap-2 pl-3 border-l border-slate-200 text-[11px] text-slate-600">
-                  <span title="Penerimaan tunai masuk">
-                    Masuk: <strong className="text-slate-900">+{formatRupiah(activeSession.total_cash_in)}</strong>
-                    {summary?.paymentsCount ? ` (${summary.paymentsCount} tx)` : ''}
-                  </span>
-                  <span className="text-slate-300">•</span>
-                  <span title="Pencairan uang jajan tunai">
-                    Keluar: <strong className="text-slate-900">-{formatRupiah(activeSession.total_cash_out)}</strong>
-                    {summary?.withdrawalsCount ? ` (${summary.withdrawalsCount} tx)` : ''}
-                  </span>
-                </div>
-              </div>
-
-              {/* Tombol Riwayat Sesi */}
-              <button
-                type="button"
-                onClick={onOpenHistoryClick}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors shadow-2xs"
-                title="Lihat transaksi sesi ini dan sesi sebelumnya"
-              >
-                <Receipt className="w-3.5 h-3.5 text-slate-500" />
-                <span className="hidden sm:inline">Riwayat Sesi</span>
-              </button>
-
-              {/* Tombol Mutasi Kas Bank ↔ Tunai */}
               {!isViewOnly && (
                 <button
                   type="button"
                   onClick={onCashTransferClick}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-sky-800 bg-sky-50 border border-sky-200 rounded-xl hover:bg-sky-100 transition-colors shadow-2xs"
-                  title="Catat uang yang diambil dari / disetor ke rekening Koperasi"
+                  className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-800 shadow-2xs hover:bg-sky-100 transition-colors cursor-pointer"
+                  title="Catat uang diambil dari atau disetor ke rekening Koperasi"
                 >
-                  <Landmark className="w-3.5 h-3.5" />
+                  <Landmark className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>Kas Bank</span>
                 </button>
               )}
-              {/* Tombol Tutup Sesi */}
+
               {!isViewOnly && (
                 <button
                   type="button"
                   onClick={onCloseSessionClick}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-xl hover:bg-rose-100 transition-colors shadow-2xs"
-                  title="Tutup sesi kas dan laporkan saldo kas fisik"
+                  className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-2xs hover:bg-rose-100 transition-colors cursor-pointer"
+                  title="Tutup sesi kas dan hitung kas fisik"
                 >
-                  <Lock className="w-3.5 h-3.5" />
+                  <Lock className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>Tutup Sesi</span>
                 </button>
               )}
             </>
           ) : (
-            <>
-              {/* Status Belum Buka Sesi */}
-              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-1.5 text-xs text-amber-800">
-                <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Belum ada sesi kas aktif</span>
-              </div>
-
-              {/* Tombol Riwayat Sesi */}
+            !isViewOnly && (
               <button
                 type="button"
-                onClick={onOpenHistoryClick}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors shadow-2xs"
+                onClick={onOpenSessionClick}
+                className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700 transition-colors cursor-pointer"
               >
-                <Receipt className="w-3.5 h-3.5 text-slate-500" />
-                <span>Riwayat Sesi</span>
+                <PlusCircle className="h-4 w-4" aria-hidden="true" />
+                <span>Buka Sesi Kas</span>
               </button>
-
-              {/* Tombol Buka Sesi Kas */}
-              {!isViewOnly && (
-                <button
-                  type="button"
-                  onClick={onOpenSessionClick}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 transition-colors shadow-xs"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Buka Sesi Kas</span>
-                </button>
-              )}
-            </>
+            )
           )}
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* Baris 2: Kartu Status Sesi Kas Aktif (Hierarki Jelas) */}
+      {activeSession ? (
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3.5 shadow-2xs">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {/* Kiri: Sesi & Kas Laci */}
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-600" />
+              </span>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-slate-500">Kas Laci</span>
+                  <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-600">
+                    {activeSession.session_code}
+                  </span>
+                </div>
+                <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+                  <span className="text-xl font-bold tracking-tight text-slate-900 tabular-nums">
+                    {formatRupiah(activeSession.expected_closing_balance)}
+                  </span>
+                  {reservedBalance > 0 && (
+                    <span className="text-[11px] font-medium text-amber-700 tabular-nums">
+                      (Dicadangkan kolektif {formatRupiah(reservedBalance)})
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Kanan: Ringkasan Masuk / Keluar */}
+            <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-2.5 sm:flex sm:items-center sm:gap-5 sm:border-t-0 sm:border-l sm:pl-5 sm:pt-0 text-xs tabular-nums">
+              <div>
+                <span className="block text-[11px] text-slate-500">
+                  Kas Masuk{summary?.paymentsCount ? ` (${summary.paymentsCount} tx)` : ''}
+                </span>
+                <strong className="text-sm font-bold text-emerald-700">
+                  +{formatRupiah(activeSession.total_cash_in)}
+                </strong>
+              </div>
+              <div>
+                <span className="block text-[11px] text-slate-500">
+                  Kas Keluar{summary?.withdrawalsCount ? ` (${summary.withdrawalsCount} tx)` : ''}
+                </span>
+                <strong className="text-sm font-bold text-slate-900">
+                  -{formatRupiah(activeSession.total_cash_out)}
+                </strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs text-amber-900">
+          <div className="flex items-center gap-2.5">
+            <Clock className="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+            <span>
+              <strong className="font-semibold">Belum ada sesi kas aktif.</strong> Buka sesi kas dengan saldo fisik
+              awal sebelum melayani transaksi.
+            </span>
+          </div>
+          {!isViewOnly && (
+            <button
+              type="button"
+              onClick={onOpenSessionClick}
+              className="shrink-0 rounded-lg bg-amber-900 px-3 py-1.5 text-xs font-semibold text-amber-50 hover:bg-amber-950 cursor-pointer"
+            >
+              Buka Sesi
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   )
 }

@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { KeyRound, Clock } from 'lucide-react'
+import { AlertTriangle, Loader2 } from 'lucide-react'
+import { formatFinanceDate } from '@/lib/finance/date-format'
 import PosHeader from './pos-header'
 import PosCardScanner from './pos-card-scanner'
 import PosStudentCard from './pos-student-card'
@@ -12,7 +13,6 @@ import PosReceiptModal from './pos-receipt-modal'
 import PosPinModal from './pos-pin-modal'
 import CashSessionModal from './cash-session-modal'
 import CashTransferModal from './cash-transfer-modal'
-
 import SessionHistoryDrawer from './session-history-drawer'
 import {
   openLoketCashSession,
@@ -20,7 +20,6 @@ import {
   lookupStudentForLoket,
   verifyStudentLoketPin,
   getStudentLoketAccountData,
-  executeLoketWithdrawal,
   executeLoketDepositOrPayment,
   getLoketInitialData,
   type StudentLoketProfile,
@@ -43,41 +42,55 @@ interface LoketContentProps {
   }
 }
 
+const formatRupiah = (val: number) => `Rp${Math.max(0, Math.round(val)).toLocaleString('id-ID')}`
+
+function toWibYmd(raw: string): string {
+  const trimmed = raw.trim()
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(trimmed)
+    ? `${trimmed.replace(' ', 'T')}Z`
+    : trimmed
+  const dt = new Date(normalized)
+  if (Number.isNaN(dt.getTime())) return trimmed.slice(0, 10)
+  return new Date(dt.getTime() + 7 * 3600 * 1000).toISOString().slice(0, 10)
+}
+
+function todayWibYmd(): string {
+  return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10)
+}
+
 export default function LoketContent({ initialData }: LoketContentProps) {
   const [activeSession, setActiveSession] = useState<FinanceCashSession | null>(
     initialData.activeSession
   )
-  const [summary, setSummary] = useState<CashSessionTransactionSummary | null>(
-    initialData.summary
-  )
+  const [summary, setSummary] = useState<CashSessionTransactionSummary | null>(initialData.summary)
   const isViewOnly = initialData.isViewOnly
   const operator = initialData.operator
 
-  // Modal Sesi Kas
   const [sessionModalMode, setSessionModalMode] = useState<'OPEN' | 'CLOSE' | null>(null)
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false)
   const [isCashTransferOpen, setIsCashTransferOpen] = useState(false)
   const [lastClosedSession, setLastClosedSession] = useState(initialData.lastClosedSession)
   const [cashAccounts, setCashAccounts] = useState<LoketCashAccountOption[]>(initialData.cashAccounts)
 
-  // State Santri & Transaksi Kasir
   const [isSearchingStudent, setIsSearchingStudent] = useState(false)
   const [currentStudent, setCurrentStudent] = useState<StudentLoketProfile | null>(null)
   const [financials, setFinancials] = useState<StudentLoketFinancials | null>(null)
+  const [txSeq, setTxSeq] = useState(0)
+  const [draftIdempotencyKey, setDraftIdempotencyKey] = useState<string>(() => crypto.randomUUID())
 
-  // PIN Pad & Pin Management state
   const [isPinPadOpen, setIsPinPadOpen] = useState(false)
   const [isPinModalOpen, setIsPinModalOpen] = useState(false)
   const [isPinVerified, setIsPinVerified] = useState(false)
-  const [verificationToken, setVerificationToken] = useState<string | null>(null)
 
-
-  // Receipt Modal state
   const [receipt, setReceipt] = useState<LoketWithdrawalReceipt | LoketPaymentReceipt | null>(null)
   const [isReceiptOpen, setIsReceiptOpen] = useState(false)
   const [isSubmittingTx, setIsSubmittingTx] = useState(false)
 
-  // Refresh Sesi Kas
+  const isStaleSession = useMemo(() => {
+    if (!activeSession?.opened_at) return false
+    return toWibYmd(activeSession.opened_at) < todayWibYmd()
+  }, [activeSession])
+
   const refreshSessionData = async () => {
     try {
       const fresh = await getLoketInitialData()
@@ -86,31 +99,28 @@ export default function LoketContent({ initialData }: LoketContentProps) {
       setLastClosedSession(fresh.lastClosedSession)
       setCashAccounts(fresh.cashAccounts)
     } catch (err) {
-      console.error('Gagal merefresh sesi kas:', err)
+      console.error('Gagal menyegarkan sesi kas:', err)
     }
   }
 
-  // 1. Handler Pemindaian / Pencarian Santri
   const handleScanOrSearch = async (identifier: string) => {
     setIsSearchingStudent(true)
     try {
       const profile = await lookupStudentForLoket(identifier)
       if (!profile) {
-        toast.error(`Santri dengan token atau NIS "${identifier}" tidak ditemukan.`)
+        toast.error(`Santri "${identifier}" tidak ditemukan. Pilih dari daftar saran nama atau NIS.`)
         return
       }
 
       setCurrentStudent(profile)
       setIsPinVerified(false)
-      setVerificationToken(null)
       setFinancials(null)
+      setDraftIdempotencyKey(crypto.randomUUID())
 
-      // Cek status keaktifan santri dan kartu
       if (profile.statusGlobal !== 'aktif') {
         toast.warning(`Santri ${profile.namaLengkap} berstatus "${profile.statusGlobal}".`)
       }
 
-      // Kartu & PIN tidak lagi dipakai: petugas mencocokkan foto/identitas, lalu menu setor/bayar terbuka.
       try {
         setFinancials(await getStudentLoketAccountData(profile.id))
       } catch {
@@ -123,83 +133,31 @@ export default function LoketContent({ initialData }: LoketContentProps) {
     }
   }
 
-  // 2. Handler Verifikasi PIN
   const handleVerifyPin = async (inputPin: string) => {
-    if (!currentStudent) {
-      return { verified: false, attemptsLeft: 0, locked: false }
-    }
-
+    if (!currentStudent) return { verified: false, attemptsLeft: 0, locked: false }
     const res = await verifyStudentLoketPin(currentStudent.id, inputPin)
-
     if (res.verified && res.verificationToken) {
       setIsPinVerified(true)
-      setVerificationToken(res.verificationToken)
       toast.success('PIN santri terverifikasi.')
-
-      // Ambil data finansial santri
       try {
-        const fin = await getStudentLoketAccountData(currentStudent.id)
-        setFinancials(fin)
+        setFinancials(await getStudentLoketAccountData(currentStudent.id))
       } catch {
         toast.error('Gagal memuat saldo dan tagihan santri.')
       }
     }
-
     return res
   }
 
-  // 2.1 Handler Callback Sukses Ubah / Reset PIN Santri
   const handlePinModalSuccess = async () => {
     if (!currentStudent) return
     try {
       const refreshed = await lookupStudentForLoket(currentStudent.nis || currentStudent.id)
-      if (refreshed) {
-        setCurrentStudent(refreshed)
-      }
+      if (refreshed) setCurrentStudent(refreshed)
     } catch (err) {
-      console.error('Gagal merefresh status santri:', err)
+      console.error('Gagal menyegarkan status santri:', err)
     }
   }
 
-  // 3. Handler Eksekusi Penarikan Uang Jajan
-
-  const handleWithdrawal = async (amount: number, notes?: string) => {
-    if (!currentStudent || !verificationToken) {
-      toast.error('Verifikasi PIN santri terlebih dahulu.')
-      return
-    }
-    if (!activeSession) {
-      toast.error('Buka sesi kas terlebih dahulu.')
-      return
-    }
-
-    setIsSubmittingTx(true)
-    try {
-      const idempotencyKey = `WD-${currentStudent.id}-${Date.now()}`
-      const rec = await executeLoketWithdrawal({
-        santriId: currentStudent.id,
-        amount,
-        verificationToken,
-        idempotencyKey,
-        notes,
-      })
-
-      setReceipt(rec)
-      setIsReceiptOpen(true)
-      toast.success(`Penarikan Rp${amount.toLocaleString('id-ID')} berhasil.`)
-
-      // Refresh data sesi kas & saldo santri
-      await refreshSessionData()
-      const fin = await getStudentLoketAccountData(currentStudent.id)
-      setFinancials(fin)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err))
-    } finally {
-      setIsSubmittingTx(false)
-    }
-  }
-
-  // 4. Handler Eksekusi Setor / Bayar Tagihan
   const handleDepositOrPay = async (items: LoketPaymentItemInput[], notes?: string) => {
     if (!currentStudent) return
     if (!activeSession) {
@@ -209,19 +167,20 @@ export default function LoketContent({ initialData }: LoketContentProps) {
 
     setIsSubmittingTx(true)
     try {
-      const idempotencyKey = `PAY-${currentStudent.id}-${Date.now()}`
       const rec = await executeLoketDepositOrPayment({
         santriId: currentStudent.id,
         items,
-        idempotencyKey,
+        idempotencyKey: `PAY-${currentStudent.id}-${draftIdempotencyKey}`,
         notes,
       })
 
       setReceipt(rec)
       setIsReceiptOpen(true)
-      toast.success(`Penerimaan pembayaran Rp${rec.grossAmount.toLocaleString('id-ID')} berhasil.`)
+      toast.success(`Penerimaan pembayaran ${formatRupiah(rec.grossAmount)} berhasil.`)
 
-      // Refresh data sesi kas & saldo santri
+      setTxSeq((n) => n + 1)
+      setDraftIdempotencyKey(crypto.randomUUID())
+
       await refreshSessionData()
       const fin = await getStudentLoketAccountData(currentStudent.id)
       setFinancials(fin)
@@ -232,17 +191,15 @@ export default function LoketContent({ initialData }: LoketContentProps) {
     }
   }
 
-  // 5. Reset Transaksi (Kembali ke Scanner Cepat)
   const handleResetForNewTransaction = () => {
     setCurrentStudent(null)
     setFinancials(null)
     setIsPinVerified(false)
-    setVerificationToken(null)
     setReceipt(null)
     setIsReceiptOpen(false)
+    setDraftIdempotencyKey(crypto.randomUUID())
   }
 
-  // 6. Handler Buka Sesi Kas
   const handleOpenSessionSubmit = async (openingBalance: number, notes?: string) => {
     const session = await openLoketCashSession(openingBalance, notes)
     setActiveSession(session)
@@ -250,7 +207,6 @@ export default function LoketContent({ initialData }: LoketContentProps) {
     toast.success(`Sesi kas ${session.session_code} berhasil dibuka.`)
   }
 
-  // 7. Handler Tutup Sesi Kas
   const handleCloseSessionSubmit = async (
     sessionId: string,
     actualClosingBalance: number,
@@ -261,17 +217,17 @@ export default function LoketContent({ initialData }: LoketContentProps) {
     await refreshSessionData()
     const diff = closed.difference ?? 0
     if (diff === 0) {
-      toast.success(`Sesi kas ${closed.session_code} berhasil ditutup (Kas Fisik Impas).`)
+      toast.success(`Sesi kas ${closed.session_code} ditutup (Kas Fisik Seimbang).`)
     } else {
       toast.warning(
-        `Sesi kas ${closed.session_code} ditutup dengan selisih Rp${Math.abs(diff).toLocaleString('id-ID')}.`
+        `Sesi kas ${closed.session_code} ditutup dengan selisih ${formatRupiah(Math.abs(diff))}.`
       )
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-100/60 pb-16 flex flex-col">
-      {/* 1. Header POS Sticky */}
+    <div className="space-y-5 pb-24 lg:pb-12">
+      {/* 1. Header & Kartu Status Sesi Kas (selaras lebar konten) */}
       <PosHeader
         activeSession={activeSession}
         summary={summary}
@@ -283,82 +239,74 @@ export default function LoketContent({ initialData }: LoketContentProps) {
         onCashTransferClick={() => setIsCashTransferOpen(true)}
       />
 
-      {/* 2. Banner Perhatian jika belum ada Sesi Kas Aktif */}
-      {!activeSession && (
-        <div className="bg-amber-500 text-amber-950 px-4 py-2.5 shadow-xs border-b border-amber-600/20">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 text-xs sm:text-sm font-semibold">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 shrink-0" />
-              <span>
-                Operasional loket kasir membutuhkan Sesi Kas aktif. Harap buka sesi kas dengan memasukkan saldo kas fisik awal terlebih dahulu.
-              </span>
-            </div>
-            {!isViewOnly && (
-              <button
-                type="button"
-                onClick={() => setSessionModalMode('OPEN')}
-                className="px-3 py-1 bg-amber-950 text-amber-100 rounded-lg hover:bg-black font-bold text-xs transition-colors shrink-0"
-              >
-                Buka Sesi
-              </button>
-            )}
+      {/* 2. Peringatan Sesi Kasir Usang (sejajar rapi dengan kartu konten) */}
+      {activeSession && isStaleSession && (
+        <div
+          role="status"
+          className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-xs text-amber-950 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-start gap-2.5 sm:items-center">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 sm:mt-0" aria-hidden="true" />
+            <p className="leading-relaxed">
+              Sesi <strong className="font-mono">{activeSession.session_code}</strong> masih terbuka sejak{' '}
+              <strong>{formatFinanceDate(activeSession.opened_at, true)} WIB</strong>. Tutup sesi dan hitung kas fisik
+              sebelum melanjutkan transaksi hari ini.
+            </p>
           </div>
+          {!isViewOnly && (
+            <button
+              type="button"
+              onClick={() => setSessionModalMode('CLOSE')}
+              className="w-full sm:w-auto shrink-0 rounded-lg border border-amber-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-amber-900 shadow-2xs hover:bg-amber-100/70 transition-colors cursor-pointer"
+            >
+              Tutup Sesi
+            </button>
+          )}
         </div>
       )}
 
-      {/* 3. Area Operasional Utama Loket POS */}
-      <main className="max-w-5xl mx-auto w-full px-4 sm:px-6 py-6 space-y-6 flex-1">
-        {/* Step 1: Scanner Input Kartu Santri */}
-        <PosCardScanner
-          onScan={handleScanOrSearch}
-          isSearching={isSearchingStudent}
-          disabled={!activeSession && !isViewOnly}
-        />
+      {/* 3. Pencarian Santri */}
+      <PosCardScanner
+        onScan={handleScanOrSearch}
+        isSearching={isSearchingStudent}
+        disabled={!activeSession && !isViewOnly}
+      />
 
-        {/* Step 2: Profil & Verifikasi Wajah Santri */}
-        {currentStudent && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-200">
-            <PosStudentCard
-              student={currentStudent}
-              onReset={handleResetForNewTransaction}
-              onPromptPin={() => setIsPinPadOpen(true)}
-              isPinVerified={isPinVerified}
-              showCredentials={false}
+      {/* 4. Profil & Panel Transaksi Santri Terpilih */}
+      {currentStudent && (
+        <div className="space-y-5">
+          <PosStudentCard
+            student={currentStudent}
+            onReset={handleResetForNewTransaction}
+            onPromptPin={() => setIsPinPadOpen(true)}
+            isPinVerified={isPinVerified}
+            showCredentials={false}
+          />
+
+          {financials ? (
+            <PosActionPanel
+              key={`${currentStudent.id}-${txSeq}`}
+              financials={financials}
+              onSelectBillingPeriod={async (period) => {
+                if (!currentStudent) return
+                setFinancials(await getStudentLoketAccountData(currentStudent.id, period || undefined))
+              }}
+              isSubmitting={isSubmittingTx}
+              onDepositOrPay={handleDepositOrPay}
             />
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-2xs space-y-2.5">
+              <Loader2 className="mx-auto h-6 w-6 animate-spin text-emerald-700" aria-hidden="true" />
+              <h3 className="text-sm font-bold text-slate-800">Memuat saldo &amp; tagihan santri…</h3>
+              <p className="mx-auto max-w-sm text-xs text-slate-500">
+                Cocokkan foto santri di atas sebelum menerima setoran atau pembayaran tunai.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
-            {/* Step 3: Action Panel POS (Tampil setelah PIN Terverifikasi) */}
-            {financials ? (
-              <div className="animate-in fade-in duration-200">
-                <PosActionPanel
-                  financials={financials}
-                  onSelectBillingPeriod={async period=>{
-                    if (!currentStudent) return
-                    setFinancials(await getStudentLoketAccountData(currentStudent.id,period || undefined))
-                  }}
-                  isSubmitting={isSubmittingTx}
-                  onDepositOrPay={handleDepositOrPay}
-                />
-              </div>
-            ) : (
-              /* State Menunggu Verifikasi PIN */
-              <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center space-y-3 shadow-2xs">
-                <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-                  <KeyRound className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-800">Memuat data santri…</h3>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-                    Cocokkan foto wajah santri di atas sebelum menerima setoran atau pembayaran.
-                  </p>
-                </div>
-
-              </div>
-            )}
-          </div>
-        )}
-      </main>
-
-      {/* 4. Modal PIN Pad Santri */}
+      {/* Modals & Drawers */}
       {currentStudent && (
         <PosPinPad
           isOpen={isPinPadOpen}
@@ -370,7 +318,6 @@ export default function LoketContent({ initialData }: LoketContentProps) {
         />
       )}
 
-      {/* 4.1 Modal Kelola / Ubah / Reset PIN Santri */}
       {currentStudent && (
         <PosPinModal
           isOpen={isPinModalOpen}
@@ -381,10 +328,8 @@ export default function LoketContent({ initialData }: LoketContentProps) {
         />
       )}
 
-      {/* 5. Modal Buka / Tutup Sesi Kas */}
-
       <CashSessionModal
-        key={`${sessionModalMode}-${lastClosedSession?.sessionCode ?? 'none'}`}
+        key={`${sessionModalMode}-${activeSession?.id ?? 'none'}-${activeSession?.expected_closing_balance ?? 0}-${lastClosedSession?.sessionCode ?? 'none'}`}
         lastClosedSession={lastClosedSession}
         mode={sessionModalMode || 'OPEN'}
         isOpen={sessionModalMode !== null}
@@ -394,18 +339,18 @@ export default function LoketContent({ initialData }: LoketContentProps) {
         onCloseSessionSubmit={handleCloseSessionSubmit}
       />
 
-      {/* 5b. Mutasi Kas Bank ↔ Tunai */}
       <CashTransferModal
         isOpen={isCashTransferOpen}
         sessionId={activeSession?.id ?? null}
-        drawerBalance={activeSession ? (activeSession.available_balance ?? activeSession.expected_closing_balance) : 0}
+        drawerBalance={
+          activeSession ? (activeSession.available_balance ?? activeSession.expected_closing_balance) : 0
+        }
         operatorName={operator.name}
         accounts={cashAccounts}
         onClose={() => setIsCashTransferOpen(false)}
         onChanged={refreshSessionData}
       />
 
-      {/* 6. Modal Struk Transaksi */}
       <PosReceiptModal
         receipt={receipt}
         isOpen={isReceiptOpen}
@@ -413,7 +358,6 @@ export default function LoketContent({ initialData }: LoketContentProps) {
         onNewTransaction={handleResetForNewTransaction}
       />
 
-      {/* 7. Drawer Riwayat Sesi Kas */}
       <SessionHistoryDrawer
         isOpen={isHistoryDrawerOpen}
         activeSessionId={activeSession?.id}

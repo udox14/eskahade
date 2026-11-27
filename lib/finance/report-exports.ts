@@ -9,6 +9,7 @@
 
 'use client'
 
+import { formatFinanceDate } from '@/lib/finance/date-format'
 import type {
   ReceiptItemRow,
   DistributionItemRow,
@@ -167,7 +168,7 @@ export async function exportReceiptsExcel(
     'Metode',
     'Alokasi Pos Tagihan',
     'Nominal Bruto',
-    'Biaya Gateway',
+    'Admin Koperasi',
     'Nominal Bersih',
     'Status',
     'Petugas / Kasir',
@@ -183,7 +184,7 @@ export async function exportReceiptsExcel(
   items.forEach((item, index) => {
     setCell(rowIdx, 0, index + 1, tdCenter)
     setCell(rowIdx, 1, item.paymentNumber, tdCenter)
-    setCell(rowIdx, 2, item.paidAt ? item.paidAt.slice(0, 16) : '-', tdCenter)
+    setCell(rowIdx, 2, item.paidAt ? formatFinanceDate(item.paidAt, true) : '-', tdCenter)
     setCell(rowIdx, 3, item.santriNis, tdCenter)
     setCell(rowIdx, 4, item.santriName, tdText)
     setCell(rowIdx, 5, item.santriAsrama || '-', tdCenter)
@@ -301,7 +302,7 @@ export async function exportDistributionsExcel(
   items.forEach((item, index) => {
     setCell(rowIdx, 0, index + 1, tdCenter)
     setCell(rowIdx, 1, item.distributionNumber, tdCenter)
-    setCell(rowIdx, 2, item.reportDate.slice(0, 16), tdCenter)
+    setCell(rowIdx, 2, formatFinanceDate(item.reportDate, true), tdCenter)
     setCell(rowIdx, 3, item.recipientType, tdCenter)
     setCell(rowIdx, 4, item.recipientName, tdText)
     setCell(rowIdx, 5, item.method === 'BRI_QLOLA' ? 'BRI / QLola' : item.method === 'CASH' ? 'Tunai' : 'Transfer Manual', tdCenter)
@@ -658,7 +659,7 @@ export async function exportStudentDetailExcel(report: StudentDetailReportRespon
   report.payments.forEach((p, idx) => {
     setCell(ws2 as Record<string, unknown>, rIdx2, 0, idx + 1, tdCenter)
     setCell(ws2 as Record<string, unknown>, rIdx2, 1, p.paymentNumber, tdCenter)
-    setCell(ws2 as Record<string, unknown>, rIdx2, 2, p.paidAt.slice(0, 16), tdCenter)
+    setCell(ws2 as Record<string, unknown>, rIdx2, 2, formatFinanceDate(p.paidAt, true), tdCenter)
     setCell(ws2 as Record<string, unknown>, rIdx2, 3, p.method, tdCenter)
     setCell(ws2 as Record<string, unknown>, rIdx2, 4, p.grossAmount, tdNum)
     setCell(ws2 as Record<string, unknown>, rIdx2, 5, p.netAmount, tdNum)
@@ -679,7 +680,7 @@ export async function exportStudentDetailExcel(report: StudentDetailReportRespon
   let rIdx3 = 4
   report.walletMutations.forEach((m, idx) => {
     setCell(ws3 as Record<string, unknown>, rIdx3, 0, idx + 1, tdCenter)
-    setCell(ws3 as Record<string, unknown>, rIdx3, 1, m.createdAt.slice(0, 16), tdCenter)
+    setCell(ws3 as Record<string, unknown>, rIdx3, 1, formatFinanceDate(m.createdAt, true), tdCenter)
     setCell(ws3 as Record<string, unknown>, rIdx3, 2, m.movementType, tdCenter)
     setCell(ws3 as Record<string, unknown>, rIdx3, 3, m.direction, tdCenter)
     setCell(ws3 as Record<string, unknown>, rIdx3, 4, m.amount, tdNum)
@@ -742,12 +743,10 @@ export async function exportWalletExcel(
       'Nama Santri',
       'Asrama',
       'Kelas',
-      'Total Setoran (IN)',
-      'Total Penarikan (OUT)',
+      'Total Setoran',
+      'Total Pencairan Bersih',
       'Saldo Saat Ini',
       'Limit Harian Efektif',
-      'Kartu QR Aktif',
-      'Status Kartu',
     ]
     headers.forEach((h, idx) => setCell(5, idx, h, thStyle))
 
@@ -766,8 +765,6 @@ export async function exportWalletExcel(
       setCell(rowIdx, 6, item.totalOut, tdNum)
       setCell(rowIdx, 7, item.currentBalance, tdNum)
       setCell(rowIdx, 8, item.effectiveDailyLimit, tdNum)
-      setCell(rowIdx, 9, item.activeCardCode || '-', tdCenter)
-      setCell(rowIdx, 10, item.activeCardStatus || 'NONE', tdCenter)
 
       sumIn += item.totalIn
       sumOut += item.totalOut
@@ -781,8 +778,6 @@ export async function exportWalletExcel(
     setCell(rowIdx, 6, sumOut, totalStyle)
     setCell(rowIdx, 7, sumBal, totalStyle)
     setCell(rowIdx, 8, '', totalStyle)
-    setCell(rowIdx, 9, '', totalStyle)
-    setCell(rowIdx, 10, '', totalStyle)
 
     ws['!cols'] = [
       { wch: 6 },
@@ -826,7 +821,7 @@ export async function exportWalletExcel(
 
     ;(report.mutationItems || []).forEach((item, idx) => {
       setCell(rowIdx, 0, idx + 1, tdCenter)
-      setCell(rowIdx, 1, item.createdAt.slice(0, 16), tdCenter)
+      setCell(rowIdx, 1, formatFinanceDate(item.createdAt, true), tdCenter)
       setCell(rowIdx, 2, item.santriNis, tdCenter)
       setCell(rowIdx, 3, item.santriName, tdText)
       setCell(rowIdx, 4, item.santriAsrama || '-', tdCenter)
@@ -939,8 +934,8 @@ export async function exportCashSessionsExcel(
     setCell(rowIdx, 0, idx + 1, tdCenter)
     setCell(rowIdx, 1, item.sessionCode, tdCenter)
     setCell(rowIdx, 2, item.operatorName, tdText)
-    setCell(rowIdx, 3, item.openedAt.slice(0, 16), tdCenter)
-    setCell(rowIdx, 4, item.closedAt ? item.closedAt.slice(0, 16) : 'AKTIF', tdCenter)
+    setCell(rowIdx, 3, formatFinanceDate(item.openedAt, true), tdCenter)
+    setCell(rowIdx, 4, item.closedAt ? formatFinanceDate(item.closedAt, true) : 'Terbuka', tdCenter)
     setCell(rowIdx, 5, item.openingBalance, tdNum)
     setCell(rowIdx, 6, item.totalCashIn, tdNum)
     setCell(rowIdx, 7, item.totalCashOut, tdNum)
@@ -1023,8 +1018,8 @@ export async function exportSettlementsExcel(
     numFmt: CURRENCY_FORMAT,
   }
 
-  setCell(1, 0, 'LAPORAN SETTLEMENT (HISTORIS / LEGACY)', titleStyle)
-  setCell(2, 0, 'Pondok Pesantren Eskahade — Pencairan Dana Gateway ke Rekening Bank', metaStyle)
+  setCell(1, 0, 'LAPORAN SETTLEMENT BANK (BRI)', titleStyle)
+  setCell(2, 0, 'Pondok Pesantren Eskahade — Rekonsiliasi Penerimaan Rekening Koperasi', metaStyle)
   setCell(3, 0, `Filter: ${filterInfo} | Diunduh: ${getFormattedTimestamp()} WIB`, metaStyle)
 
   const headers = [
@@ -1130,8 +1125,8 @@ export async function exportReconciliationsExcel(
     numFmt: CURRENCY_FORMAT,
   }
 
-  setCell(1, 0, 'LAPORAN AUDIT REKONSILIASI & RESOLUSI DISKREPANSI', titleStyle)
-  setCell(2, 0, 'Pondok Pesantren Eskahade — Audit Internal vs Gateway vs Bank', metaStyle)
+  setCell(1, 0, 'LAPORAN AUDIT REKONSILIASI & RESOLUSI SELISIH', titleStyle)
+  setCell(2, 0, 'Pondok Pesantren Eskahade — Pencocokan Pembayaran vs Rekening Bank', metaStyle)
   setCell(3, 0, `Filter: ${filterInfo} | Diunduh: ${getFormattedTimestamp()} WIB`, metaStyle)
 
   const headers = [
@@ -1154,7 +1149,7 @@ export async function exportReconciliationsExcel(
   let rowIdx = 6
   items.forEach((item, idx) => {
     setCell(rowIdx, 0, idx + 1, tdCenter)
-    setCell(rowIdx, 1, item.createdAt.slice(0, 16), tdCenter)
+    setCell(rowIdx, 1, formatFinanceDate(item.createdAt, true), tdCenter)
     setCell(rowIdx, 2, item.matchStatus, tdCenter)
     setCell(rowIdx, 3, item.externalReference || '-', tdCenter)
     setCell(rowIdx, 4, item.paymentNumber || '-', tdCenter)
@@ -1164,7 +1159,7 @@ export async function exportReconciliationsExcel(
     setCell(rowIdx, 8, item.discrepancyAmount, tdNum)
     setCell(rowIdx, 9, item.resolutionAction, tdCenter)
     setCell(rowIdx, 10, item.resolvedByName || '-', tdCenter)
-    setCell(rowIdx, 11, item.resolvedAt ? item.resolvedAt.slice(0, 16) : '-', tdCenter)
+    setCell(rowIdx, 11, item.resolvedAt ? formatFinanceDate(item.resolvedAt, true) : '-', tdCenter)
     setCell(rowIdx, 12, item.resolutionNotes || '-', tdText)
     rowIdx++
   })

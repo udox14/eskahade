@@ -23,7 +23,12 @@ import {
   TShirt,
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
-import { formatRupiah, formatTanggalId } from '@/lib/portal/format'
+import {
+  formatPortalDateShortWib,
+  formatPortalMonthYearWib,
+  formatRupiah,
+  formatTanggalId,
+} from '@/lib/portal/format'
 import type { PortalTransactionHistoryItem } from '@/lib/portal/finance'
 import type { LetterheadProfile } from '@/lib/print/letterhead'
 import { cancelSubmission } from '../tagihan/actions'
@@ -111,18 +116,11 @@ function formatPortalStatus(status: string, method?: string | null): string {
 }
 
 function formatTanggalDmy(dateStr: string): string {
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return dateStr
-  const day = String(d.getDate()).padStart(2, '0')
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const year = d.getFullYear()
-  return `${day}/${month}/${year}`
+  return formatPortalDateShortWib(dateStr)
 }
 
 function getMonthYearHeader(dateStr: string): string {
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return 'Lainnya'
-  return d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+  return formatPortalMonthYearWib(dateStr)
 }
 
 interface RiwayatClientProps {
@@ -149,11 +147,11 @@ export function RiwayatClient({
   const [filter, setFilter] = useState<'ALL' | 'TAGIHAN' | 'UANG_JAJAN' | 'LEGACY'>('ALL')
   const [selectedReceipt, setSelectedReceipt] = useState<PortalTransactionHistoryItem | null>(null)
   const [uploadFor, setUploadFor] = useState<string | null>(null)
+  const [confirmCancelLegacyId, setConfirmCancelLegacyId] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState<string | null>(null)
 
   async function handleCancelLegacy(id: string) {
     if (cancelling) return
-    if (!window.confirm('Batalkan pengajuan ini? Anda bisa membuat pengajuan baru setelahnya.')) return
     setCancelling(id)
     const res = await cancelSubmission(id)
     setCancelling(null)
@@ -162,6 +160,7 @@ export function RiwayatClient({
       return
     }
     toast.success('Pengajuan dibatalkan.')
+    setConfirmCancelLegacyId(null)
     router.refresh()
   }
 
@@ -283,21 +282,28 @@ export function RiwayatClient({
                   <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden">
                     {items.map((item) => {
                       const isPaid = item.status === 'PAID' || item.status === 'COMPLETED'
+                      const isCancelled = item.status === 'CANCELLED' || item.status === 'EXPIRED'
                       const isPending = item.status === 'PENDING'
                       const isTopUp = item.type === 'TOPUP'
                       const isWithdrawal = item.type === 'WITHDRAWAL'
+                      const canOpenReceipt =
+                        item.isReceiptable !== undefined
+                          ? item.isReceiptable
+                          : isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP')
                       const dateStr = formatTanggalDmy(item.createdAt)
 
                       return (
                         <div
                           key={item.id}
                           onClick={() => {
-                            if (isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP')) {
+                            if (canOpenReceipt) {
                               setSelectedReceipt(item)
                             }
                           }}
                           className={`px-4 py-3.5 flex items-center justify-between gap-3 transition ${
-                            isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP')
+                            isCancelled ? 'opacity-65' : ''
+                          } ${
+                            canOpenReceipt
                               ? 'cursor-pointer hover:bg-slate-50/70 dark:hover:bg-slate-800/50 active:bg-slate-50 dark:active:bg-slate-800/70'
                               : ''
                           }`}
@@ -306,7 +312,9 @@ export function RiwayatClient({
                           <div className="flex items-center gap-3 min-w-0 pr-1">
                             <div
                               className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center ring-1 ring-inset ${
-                                isTopUp
+                                isCancelled
+                                  ? 'bg-rose-50 text-rose-600 ring-rose-100 dark:bg-rose-950/50 dark:text-rose-300 dark:ring-rose-900/60'
+                                  : isTopUp
                                   ? 'bg-cyan-50 text-cyan-600 ring-cyan-100 dark:bg-cyan-950/50 dark:text-cyan-300 dark:ring-cyan-900/60'
                                   : isWithdrawal
                                   ? 'bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700'
@@ -315,7 +323,9 @@ export function RiwayatClient({
                                   : paymentStyle(item).badge
                               }`}
                             >
-                              {isTopUp ? (
+                              {isCancelled ? (
+                                <XCircle className="h-5 w-5" weight="duotone" />
+                              ) : isTopUp ? (
                                 <ArrowDownLeft className="h-5 w-5" weight="duotone" />
                               ) : isWithdrawal ? (
                                 <ArrowUpRight className="h-5 w-5" weight="duotone" />
@@ -343,8 +353,12 @@ export function RiwayatClient({
                           {/* Sisi Kanan: Nominal & Kuitansi / Status */}
                           <div className="text-right shrink-0 flex flex-col items-end gap-1">
                             <p
-                              className={`text-sm font-bold font-mono leading-none ${
-                                isTopUp ? 'text-cyan-800 dark:text-cyan-300' : 'text-slate-950 dark:text-slate-100'
+                              className={`text-sm font-bold font-mono leading-none tabular-nums ${
+                                isCancelled
+                                  ? 'line-through text-slate-400 dark:text-slate-500'
+                                  : isTopUp
+                                  ? 'text-cyan-800 dark:text-cyan-300'
+                                  : 'text-slate-950 dark:text-slate-100'
                               }`}
                             >
                               {isTopUp
@@ -355,7 +369,7 @@ export function RiwayatClient({
                             </p>
 
                             <div className="flex items-center gap-1.5">
-                              {isPaid && (item.type === 'PAYMENT' || item.type === 'TOPUP') ? (
+                              {canOpenReceipt ? (
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -376,9 +390,19 @@ export function RiwayatClient({
                                   <span>Bayar</span>
                                   <CaretRight className="w-3 h-3" weight="bold" />
                                 </Link>
+                              ) : isCancelled ? (
+                                <span className="inline-flex items-center rounded-full bg-rose-50 dark:bg-rose-950/50 border border-rose-200/80 dark:border-rose-900/60 px-2 py-0.5 text-[10px] font-bold text-rose-700 dark:text-rose-300 whitespace-nowrap">
+                                  {formatPortalStatus(item.status, item.method)}
+                                </span>
                               ) : (
                                 <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap shrink-0">
-                                  {formatPortalStatus(item.status, item.method)}
+                                  {item.movementType === 'WITHDRAWAL_KOLEKTIF_RETURN'
+                                    ? 'Dikembalikan'
+                                    : item.movementType === 'REVERSAL'
+                                    ? 'Koreksi'
+                                    : isWithdrawal
+                                    ? 'Tercairkan'
+                                    : formatPortalStatus(item.status, item.method)}
                                 </span>
                               )}
                             </div>
@@ -470,6 +494,31 @@ export function RiwayatClient({
                             router.refresh()
                           }}
                         />
+                      ) : confirmCancelLegacyId === item.id ? (
+                        <div className="rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/40 p-2.5 space-y-2 text-xs">
+                          <p className="text-rose-900 dark:text-rose-200 font-medium">
+                            Batalkan pengajuan ini? Anda bisa membuat pembayaran baru setelahnya.
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={cancelling === item.id}
+                              onClick={() => setConfirmCancelLegacyId(null)}
+                              className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-1.5 font-semibold text-slate-700 dark:text-slate-200"
+                            >
+                              Kembali
+                            </button>
+                            <button
+                              type="button"
+                              disabled={cancelling === item.id}
+                              onClick={() => handleCancelLegacy(item.id)}
+                              className="flex-1 rounded-lg bg-rose-600 hover:bg-rose-700 py-1.5 font-bold text-white flex items-center justify-center gap-1.5 disabled:opacity-60"
+                            >
+                              {cancelling === item.id && <Spinner className="w-3.5 h-3.5 animate-spin" />}
+                              Ya, Batalkan
+                            </button>
+                          </div>
+                        </div>
                       ) : (
                         <div className="flex gap-2">
                           {bisaUpload && (
@@ -484,11 +533,10 @@ export function RiwayatClient({
                           {bisaBatal && (
                             <button
                               type="button"
-                              onClick={() => handleCancelLegacy(item.id)}
+                              onClick={() => setConfirmCancelLegacyId(item.id)}
                               disabled={cancelling === item.id}
                               className="flex-1 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 py-2 text-xs font-bold text-rose-700 dark:text-rose-300 disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition min-h-[38px] border border-rose-200 dark:border-rose-900/50"
                             >
-                              {cancelling === item.id && <Spinner className="w-3.5 h-3.5 animate-spin" />}
                               Batalkan
                             </button>
                           )}

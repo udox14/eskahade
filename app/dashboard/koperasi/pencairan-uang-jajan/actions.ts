@@ -9,6 +9,7 @@ import {
   getPayoutBatchDetail,
   getPayoutCandidates,
   listPayoutBatches,
+  MAX_PAYOUT_ITEMS,
   settlePayoutBatch,
   wibDate,
   type CreatePayoutInput,
@@ -34,7 +35,16 @@ export async function getPencairanInitialData() {
     operatorName,
     isViewOnly,
     today: wibDate(),
-    cashSession: cash ? { id: cash.id, code: cash.session_code, available: cash.available_balance ?? cash.expected_closing_balance } : null,
+    maxPayoutItems: MAX_PAYOUT_ITEMS,
+    cashSession: cash
+      ? {
+          id: cash.id,
+          code: cash.session_code,
+          available: cash.available_balance ?? cash.expected_closing_balance,
+          expectedBalance: cash.expected_closing_balance,
+          reservedCashOut: cash.reserved_cash_out ?? 0,
+        }
+      : null,
     asramaOptions: ALL_ASRAMA_LIST.filter(a => !isAsramaBebasTagihan(a)) as string[],
     openBatches,
     todayBatches: todayBatches.filter(b => b.status === 'SELESAI'),

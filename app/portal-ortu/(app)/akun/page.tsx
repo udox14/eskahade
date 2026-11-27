@@ -1,5 +1,6 @@
 import { requirePortalSession } from '@/lib/portal/session'
 import { getParentWalletLimits, getGlobalDailyLimit } from '@/lib/finance/wallet'
+import { isAsramaBebasTagihan } from '@/lib/finance/non-billable-santri'
 import { getStudentPinStatus } from '@/lib/finance/pins'
 import { queryOne } from '@/lib/db'
 import { AkunClient } from './_akun-client'
@@ -10,11 +11,12 @@ export const dynamic = 'force-dynamic'
 
 export default async function AkunPage() {
   const session = await requirePortalSession()
+  const isNonBillable = isAsramaBebasTagihan(session.asrama)
 
   const [parentLimits, globalDailyLimit, pinStatus, riwayatKelas, showPin] = await Promise.all([
-    getParentWalletLimits(session.santri_id).catch(() => null),
-    getGlobalDailyLimit().catch(() => 100000),
-    getStudentPinStatus(session.santri_id).catch(() => null),
+    isNonBillable ? Promise.resolve(null) : getParentWalletLimits(session.santri_id).catch(() => null),
+    isNonBillable ? Promise.resolve(100000) : getGlobalDailyLimit().catch(() => 100000),
+    isNonBillable ? Promise.resolve(null) : getStudentPinStatus(session.santri_id).catch(() => null),
     queryOne<{ nama_kelas: string | null }>(`
       SELECT k.nama_kelas
       FROM riwayat_pendidikan rp
@@ -22,7 +24,7 @@ export default async function AkunPage() {
       WHERE rp.santri_id = ? AND rp.status_riwayat = 'aktif'
       LIMIT 1
     `, [session.santri_id]).catch(() => null),
-    isCredentialsModuleEnabled(),
+    isNonBillable ? Promise.resolve(false) : isCredentialsModuleEnabled(),
   ])
 
   return (
@@ -33,6 +35,7 @@ export default async function AkunPage() {
 
       <AkunClient
         mustChangePassword={session.must_change_password}
+        isNonBillable={isNonBillable}
         nis={session.nis}
         session={session}
         namaKelas={riwayatKelas?.nama_kelas || null}

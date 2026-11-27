@@ -1,9 +1,9 @@
 'use client'
 
 import { useRef } from 'react'
-import { Download, X } from 'lucide-react'
+import { Download } from 'lucide-react'
 import type { PortalTransactionHistoryItem } from '@/lib/portal/finance'
-import { formatRupiah } from '@/lib/portal/format'
+import { formatRupiah, formatTanggalId } from '@/lib/portal/format'
 import type { LetterheadProfile } from '@/lib/print/letterhead'
 import { BottomSheet } from '../../_components/bottom-sheet'
 
@@ -19,24 +19,34 @@ interface ReceiptModalProps {
   onClose: () => void
 }
 
-function formatTanggalDmy(dateStr: string): string {
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return dateStr
-  return d.toLocaleDateString('id-ID', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
+function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, ch => {
+    switch (ch) {
+      case '&': return '&amp;'
+      case '<': return '&lt;'
+      case '>': return '&gt;'
+      case '"': return '&quot;'
+      case "'": return '&#39;'
+      default: return ch
+    }
   })
 }
 
 export function ReceiptModal({ item, santri, letterheadProfile, onClose }: ReceiptModalProps) {
   const printRef = useRef<HTMLDivElement>(null)
 
-  const dateFormatted = formatTanggalDmy(item.createdAt)
+  const dateFormatted = formatTanggalId(item.createdAt)
   const paymentNumber = item.referenceNumber || '-'
   const receiptNumber = `KW-${item.referenceNumber.replace(/[^a-zA-Z0-9]/g, '').slice(-8) || '001'}`
   const methodLabels: Record<string, string> = { BRI: 'BRIVA', BRI_VA: 'BRIVA', TRANSFER: 'Transfer bank', MANUAL_TRANSFER: 'Transfer bank', CASH: 'Tunai loket' }
   const paymentMethod = methodLabels[item.channel || item.method || ''] || item.channel || item.method || 'Online'
+
+  // Rincian nominal kuitansi yang akurat secara akuntansi
+  const grossAmount = item.grossAmount ?? item.amount
+  const coopFee = item.cooperativeAdminFee ?? item.gatewayFee ?? 0
+  const uniqueCode = item.uniqueCodeAmount ?? 0
+  const totalPaid = item.amount
+  const isFeeDeducted = coopFee > 0 && totalPaid < grossAmount + coopFee + uniqueCode
 
   // Identitas Lembaga (Dinamis dari Pengaturan Kop Keuangan)
   const instansiName = letterheadProfile?.institutionName || 'Pondok Pesantren Sukahideng'
@@ -60,13 +70,13 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
           {
             label: item.title,
             qty: 1,
-            unitPrice: item.amount,
+            unitPrice: grossAmount,
             tax: '0%',
-            amount: item.amount,
+            amount: grossAmount,
           },
         ]
 
-  // Eksekusi Cetak / Simpan PDF lewat Iframe Terisolasi (Anti Bocor Halaman Riwayat)
+  // Eksekusi Cetak / Simpan PDF lewat Iframe Terisolasi (Anti Bocor Halaman Riwayat & Anti XSS)
   const handleIsolatedPrint = () => {
     const oldIframe = document.getElementById('isolated-receipt-print-frame')
     if (oldIframe) oldIframe.remove()
@@ -75,11 +85,11 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
     detailList.forEach((it) => {
       rowsHtml += `
         <tr>
-          <td style="padding: 12px 8px 12px 0; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #0f172a;">${it.label}</td>
+          <td style="padding: 12px 8px 12px 0; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #0f172a;">${escapeHtml(it.label)}</td>
           <td style="padding: 12px 8px; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 13px; font-family: monospace;">${it.qty}</td>
-          <td style="padding: 12px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 13px; font-family: monospace;">${formatRupiah(it.unitPrice)}</td>
-          <td style="padding: 12px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 13px; font-family: monospace; color: #64748b;">${it.tax}</td>
-          <td style="padding: 12px 0 12px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 13px; font-family: monospace; font-weight: bold; color: #0f172a;">${formatRupiah(it.amount)}</td>
+          <td style="padding: 12px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 13px; font-family: monospace;">${escapeHtml(formatRupiah(it.unitPrice))}</td>
+          <td style="padding: 12px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 13px; font-family: monospace; color: #64748b;">${escapeHtml(it.tax)}</td>
+          <td style="padding: 12px 0 12px 8px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 13px; font-family: monospace; font-weight: bold; color: #0f172a;">${escapeHtml(formatRupiah(it.amount))}</td>
         </tr>
       `
     })
@@ -89,7 +99,7 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
       <html lang="id">
       <head>
         <meta charset="UTF-8">
-        <title>Kuitansi-${receiptNumber}</title>
+        <title>Kuitansi-${escapeHtml(receiptNumber)}</title>
         <style>
           @page {
             size: A4 portrait;
@@ -243,10 +253,10 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
             <h1 class="receipt-title">Kuitansi Pembayaran</h1>
           </div>
           <div class="brand-box">
-            <img class="brand-logo" src="${window.location.origin}/logo.png" alt="Logo" />
+            <img class="brand-logo" src="${escapeHtml(window.location.origin)}/logo.png" alt="Logo" />
             <div>
               <span class="brand-sub">Pondok Pesantren</span>
-              <span class="brand-name">${brandShort}</span>
+              <span class="brand-name">${escapeHtml(brandShort)}</span>
             </div>
           </div>
         </div>
@@ -254,39 +264,39 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
         <div class="meta-list">
           <div class="meta-row">
             <span class="meta-label">Nomor Transaksi</span>
-            <span class="meta-val" style="font-family: monospace;">${paymentNumber}</span>
+            <span class="meta-val" style="font-family: monospace;">${escapeHtml(paymentNumber)}</span>
           </div>
           <div class="meta-row">
             <span class="meta-label">Nomor Kuitansi</span>
-            <span class="meta-val" style="font-family: monospace;">${receiptNumber}</span>
+            <span class="meta-val" style="font-family: monospace;">${escapeHtml(receiptNumber)}</span>
           </div>
           <div class="meta-row">
             <span class="meta-label">Tanggal Bayar</span>
-            <span class="meta-val">${dateFormatted}</span>
+            <span class="meta-val">${escapeHtml(dateFormatted)}</span>
           </div>
           <div class="meta-row">
             <span class="meta-label">Metode Pembayaran</span>
-            <span class="meta-val">${paymentMethod}</span>
+            <span class="meta-val">${escapeHtml(paymentMethod)}</span>
           </div>
         </div>
 
         <div class="address-grid">
           <div class="address-col">
-            <p class="address-title">${issuerName}</p>
-            <p class="address-line">${instansiAddr}</p>
-            <p class="address-line" style="font-size: 11px; color: #64748b; margin-top: 4px;">${instansiContact}</p>
+            <p class="address-title">${escapeHtml(issuerName)}</p>
+            <p class="address-line">${escapeHtml(instansiAddr)}</p>
+            <p class="address-line" style="font-size: 11px; color: #64748b; margin-top: 4px;">${escapeHtml(instansiContact)}</p>
           </div>
 
           <div class="address-col">
             <p class="address-title">Ditagihkan Kepada</p>
-            <p class="address-line" style="font-weight: 600; color: #0f172a;">${santri.nama}</p>
-            <p class="address-line">NIS: ${santri.nis}</p>
-            ${santri.asrama ? `<p class="address-line">Asrama: ${santri.asrama}${santri.kamar ? ` (Kamar ${santri.kamar})` : ''}</p>` : ''}
+            <p class="address-line" style="font-weight: 600; color: #0f172a;">${escapeHtml(santri.nama)}</p>
+            <p class="address-line">NIS: ${escapeHtml(santri.nis)}</p>
+            ${santri.asrama ? `<p class="address-line">Asrama: ${escapeHtml(santri.asrama)}${santri.kamar ? ` (Kamar ${escapeHtml(santri.kamar)})` : ''}</p>` : ''}
           </div>
         </div>
 
         <div class="hero-line">
-          ${formatRupiah(item.amount)} dibayar pada ${dateFormatted}
+          ${escapeHtml(formatRupiah(totalPaid))} dibayar pada ${escapeHtml(dateFormatted)}
         </div>
 
         <table class="table-items">
@@ -307,24 +317,22 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
         <div class="summary-container">
           <div class="summary-box">
             <div class="summary-row">
-              <span>Subtotal Tagihan</span>
-              <span style="font-family: monospace; color: #0f172a;">${formatRupiah(item.grossAmount ?? item.amount)}</span>
+              <span>Subtotal Pokok</span>
+              <span style="font-family: monospace; color: #0f172a;">${escapeHtml(formatRupiah(grossAmount))}</span>
             </div>
+            ${coopFee > 0 ? `
             <div class="summary-row">
-              <span>Total Pokok Tagihan</span>
-              <span style="font-family: monospace; color: #0f172a;">${formatRupiah(item.grossAmount ?? item.amount)}</span>
-            </div>
+              <span>Biaya Admin Koperasi${isFeeDeducted ? ' (dipotong)' : ''}</span>
+              <span style="font-family: monospace; color: #0f172a;">${escapeHtml(formatRupiah(coopFee))}</span>
+            </div>` : ''}
+            ${uniqueCode > 0 ? `
             <div class="summary-row">
-              <span>Biaya Transaksi / Layanan</span>
-              <span style="font-family: monospace; color: #0f172a;">${formatRupiah(item.gatewayFee ?? 0)}</span>
-            </div>
-            <div class="summary-row" style="font-weight: bold; color: #0f172a;">
-              <span>Total Pembayaran</span>
-              <span style="font-family: monospace; color: #0f172a;">${formatRupiah(item.amount)}</span>
-            </div>
+              <span>Kode Unik Transfer</span>
+              <span style="font-family: monospace; color: #0f172a;">${escapeHtml(formatRupiah(uniqueCode))}</span>
+            </div>` : ''}
             <div class="summary-row total-row">
               <span>Total Dibayar</span>
-              <span style="font-family: monospace;">${formatRupiah(item.amount)}</span>
+              <span style="font-family: monospace;">${escapeHtml(formatRupiah(totalPaid))}</span>
             </div>
           </div>
         </div>
@@ -459,7 +467,7 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
         {/* 4. Highlight Hero Line */}
         <div className="py-2">
           <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-950">
-            {formatRupiah(item.amount)} dibayar pada {dateFormatted}
+            {formatRupiah(totalPaid)} dibayar pada {dateFormatted}
           </h3>
         </div>
 
@@ -497,30 +505,30 @@ export function ReceiptModal({ item, santri, letterheadProfile, onClose }: Recei
         <div className="flex justify-end pt-2">
           <div className="w-full sm:w-72 space-y-2 text-xs">
             <div className="flex justify-between text-slate-600 pt-1.5 border-t border-slate-200">
-              <span>Subtotal Tagihan</span>
-              <span className="font-mono text-slate-900">
-                {formatRupiah(item.grossAmount ?? item.amount)}
+              <span>Subtotal Pokok</span>
+              <span className="font-mono text-slate-900 tabular-nums">
+                {formatRupiah(grossAmount)}
               </span>
             </div>
-            <div className="flex justify-between text-slate-600 pt-1.5 border-t border-slate-200">
-              <span>Total Pokok Tagihan</span>
-              <span className="font-mono text-slate-900">
-                {formatRupiah(item.grossAmount ?? item.amount)}
-              </span>
-            </div>
-            <div className="flex justify-between text-slate-600 pt-1.5 border-t border-slate-200">
-              <span>Biaya Transaksi / Layanan</span>
-              <span className="font-mono text-slate-900">
-                {formatRupiah(item.gatewayFee ?? 0)}
-              </span>
-            </div>
-            <div className="flex justify-between text-slate-900 font-bold pt-1.5 border-t border-slate-200">
-              <span>Total Pembayaran</span>
-              <span className="font-mono text-slate-950">{formatRupiah(item.amount)}</span>
-            </div>
+            {coopFee > 0 && (
+              <div className="flex justify-between text-slate-600 pt-1.5 border-t border-slate-200">
+                <span>Biaya Admin Koperasi{isFeeDeducted ? ' (dipotong)' : ''}</span>
+                <span className="font-mono text-slate-900 tabular-nums">
+                  {formatRupiah(coopFee)}
+                </span>
+              </div>
+            )}
+            {uniqueCode > 0 && (
+              <div className="flex justify-between text-slate-600 pt-1.5 border-t border-slate-200">
+                <span>Kode Unik Transfer</span>
+                <span className="font-mono text-slate-900 tabular-nums">
+                  {formatRupiah(uniqueCode)}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between text-slate-950 font-extrabold pt-2 pb-1 border-t-2 border-slate-900 text-sm">
               <span>Total Dibayar</span>
-              <span className="font-mono text-slate-950">{formatRupiah(item.amount)}</span>
+              <span className="font-mono text-slate-950 tabular-nums">{formatRupiah(totalPaid)}</span>
             </div>
           </div>
         </div>

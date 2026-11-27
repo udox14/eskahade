@@ -3,16 +3,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { saveGatewaySettingsAction, type MaskedGatewaySettings } from './actions'
-import {
-  CreditCard,
-  Lock,
-  Check,
-  ShieldCheck,
-  Bank,
-  CheckCircle,
-  Buildings,
-  Info,
-} from '@phosphor-icons/react'
+import { CreditCard, Lock, ShieldCheck, Bank, Info } from '@phosphor-icons/react'
 
 interface GatewayTabProps {
   gatewayConfig: MaskedGatewaySettings
@@ -27,18 +18,13 @@ export default function GatewayTab({
 }: GatewayTabProps) {
   const [isSaving, setIsSaving] = useState(false)
 
-  // Form State
-  const [environment, setEnvironment] = useState<'sandbox' | 'production'>(
-    gatewayConfig.environment
-  )
-  const [partnerServiceId, setPartnerServiceId] = useState(
-    gatewayConfig.partnerServiceId
-  )
-  const [cooperativeAdminFee, setCooperativeAdminFee] = useState<number>(
-    gatewayConfig.cooperativeAdminFee || 2000
+  const environment = gatewayConfig.environment
+  const [partnerServiceId, setPartnerServiceId] = useState(gatewayConfig.partnerServiceId)
+  // Fix bug: pakai ?? 0 agar biaya Rp0 (gratis) tidak tertimpa menjadi 2000
+  const [adminFeeInput, setAdminFeeInput] = useState<string>(
+    String(gatewayConfig.cooperativeAdminFee ?? 0)
   )
 
-  // Settlement / Collection Account
   const [settlementBank, setSettlementBank] = useState(
     gatewayConfig.settlementDestinationBank || 'Bank BRI'
   )
@@ -51,12 +37,14 @@ export default function GatewayTab({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const cooperativeAdminFee = Math.max(0, parseInt(adminFeeInput.replace(/\D/g, ''), 10) || 0)
+
     setIsSaving(true)
-    const toastId = toast.loading('Menyimpan pengaturan BRI & Koperasi...')
+    const toastId = toast.loading('Menyimpan pengaturan BRI & Koperasi…')
 
     const res = await saveGatewaySettingsAction({
       partnerServiceId: partnerServiceId.trim(),
-      cooperativeAdminFee: Number(cooperativeAdminFee),
+      cooperativeAdminFee,
       settlementDestinationBank: settlementBank.trim(),
       settlementDestinationAccount: settlementAccount.trim(),
       settlementAccountHolder: settlementHolder.trim(),
@@ -76,51 +64,54 @@ export default function GatewayTab({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Strict Security & Cloudflare Secrets Banner */}
-      <div className="p-4 bg-slate-900 text-white rounded-xl shadow-xs flex items-start gap-3">
-        <Lock className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" weight="bold" />
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Banner Keamanan Kredensial */}
+      <div className="flex items-start gap-3 rounded-xl bg-slate-900 p-4 text-white shadow-2xs">
+        <Lock className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" weight="bold" aria-hidden="true" />
         <div className="text-xs space-y-1">
-          <div className="font-bold text-slate-100 flex items-center gap-2">
-            Isolasi Kredensial & Keamanan Protokol Bank BRI
-          </div>
-          <p className="text-slate-300 leading-relaxed">
-            Kredensial resmi BRI (<code className="font-mono text-emerald-300">Client ID</code>, <code className="font-mono text-emerald-300">Client Secret</code>, dan <code className="font-mono text-emerald-300">Private Key RSA</code>) dikelola ketat melalui <span className="font-semibold text-white">Cloudflare Secrets</span> di server dan tidak pernah disimpan dalam database D1 maupun dibocorkan ke client browser.
+          <div className="font-bold text-slate-100">Keamanan Kredensial Bank BRI</div>
+          <p className="leading-relaxed text-slate-300">
+            Kredensial resmi BRI (Client ID, Client Secret, dan kunci privat) tersimpan terisolasi di server
+            Cloudflare Secrets dan tidak pernah disimpan di database maupun ditampilkan ke browser.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Card 1: Konfigurasi BRIVA Institusi */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-emerald-600" weight="bold" />
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                Virtual Account BRI (BRIVA) Institusi
+              <CreditCard className="h-4 w-4 text-emerald-700" weight="bold" aria-hidden="true" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Virtual Account BRI (BRIVA)
               </h3>
             </div>
-            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-              Provider Aktif: BRI
+            <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+              Bank Aktif: BRI
             </span>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Mode Lingkungan (Environment)
-            </label>
-            <div className="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700">
-              <span className={`w-2.5 h-2.5 rounded-full ${environment === 'production' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-              <span className="font-semibold">{environment === 'production' ? 'Production (Live)' : 'Sandbox (Testing)'}</span>
-              <span className="text-[11px] text-slate-400 ml-auto">Terkontrol oleh Deployment</span>
+            <span className="mb-1 block text-xs font-semibold text-slate-700">Mode Integrasi</span>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-700">
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${
+                  environment === 'production' ? 'bg-emerald-500' : 'bg-amber-500'
+                }`}
+              />
+              <span className="font-semibold">
+                {environment === 'production' ? 'Production (Aktif)' : 'Sandbox (Uji Coba)'}
+              </span>
+              <span className="ml-auto text-[11px] text-slate-400">Diatur di server</span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
-              Environment BRI ditentukan melalui konfigurasi runtime Cloudflare (fail-closed) dan tidak dapat dialihkan ke production dari antarmuka ini.
+            <p className="mt-1 text-[11px] text-slate-500">
+              Peralihan ke mode Production dikunci di konfigurasi server dan tidak dapat diubah dari layar ini.
             </p>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="mb-1 block text-xs font-semibold text-slate-700">
               Partner Service ID Institusi BRI
             </label>
             <input
@@ -129,134 +120,133 @@ export default function GatewayTab({
               value={partnerServiceId}
               onChange={(e) => setPartnerServiceId(e.target.value)}
               placeholder="Contoh: 8888 (Kode institusi Koperasi dari BRI)"
-              className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden font-mono disabled:bg-slate-50"
+              className="min-h-[38px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs font-medium text-slate-800 focus:border-emerald-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
             />
-            <p className="text-[11px] text-slate-500 mt-1">
-              Partner Service ID adalah identitas partner institusi Koperasi di BRI. Nomor BRIVA santri dibentuk dari kombinasi konfigurasi ini dan customer number santri di boundary adapter BRI.
+            <p className="mt-1 text-[11px] text-slate-500">
+              Kode institusi resmi dari BRI yang menjadi awalan nomor Fixed BRIVA tiap santri.
             </p>
           </div>
 
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 space-y-1.5 text-xs">
-            <div className="font-semibold text-slate-800 flex items-center justify-between">
-              <span>Status Fixed BRIVA Santri:</span>
-              <span className="font-mono font-bold text-emerald-700">
-                {gatewayConfig.totalFixedVaRegistered} Santri Aktif
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 text-xs space-y-1">
+            <div className="flex items-center justify-between font-semibold text-slate-800">
+              <span>Fixed BRIVA Terdaftar</span>
+              <span className="font-bold text-emerald-700 tabular-nums">
+                {gatewayConfig.totalFixedVaRegistered} santri aktif
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              Setiap santri billable memiliki tepat 1 nomor Fixed BRIVA permanen unik. Santri AL-BAGHORY (bebas tagihan penduduk setempat) tidak memiliki VA secara sistematis.
+            <p className="text-[11px] leading-relaxed text-slate-500">
+              Setiap santri wajib tagihan memiliki 1 nomor Fixed BRIVA permanen. Santri asrama bebas tagihan
+              (AL-BAGHORY) tidak diterbitkan nomor VA.
             </p>
           </div>
-        </div>
+        </section>
 
-        {/* Card 2: Biaya Administrasi Koperasi */}
-        <div className="space-y-6">
-          <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" weight="bold" />
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Biaya Administrasi Koperasi (Hak Koperasi)
-                </h3>
-              </div>
+        {/* Card 2 & 3 */}
+        <div className="space-y-5">
+          {/* Biaya Admin Koperasi BRIVA */}
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+              <ShieldCheck className="h-4 w-4 text-emerald-700" weight="bold" aria-hidden="true" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Biaya Admin Koperasi (BRIVA)
+              </h3>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Nominal Biaya Admin Koperasi per Checkout (Rp)
+              <label className="mb-1 block text-xs font-semibold text-slate-700">
+                Nominal Biaya Admin per Transaksi BRIVA (Rp)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-2 text-xs font-mono font-bold text-slate-400">Rp</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
+                  Rp
+                </span>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   disabled={!canMutate}
-                  min={0}
-                  step={500}
-                  value={cooperativeAdminFee}
-                  onChange={(e) => setCooperativeAdminFee(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden font-mono disabled:bg-slate-50"
+                  value={adminFeeInput}
+                  onChange={(e) => setAdminFeeInput(e.target.value.replace(/\D/g, ''))}
+                  placeholder="0"
+                  className="min-h-[38px] w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-bold text-slate-900 tabular-nums focus:border-emerald-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
                 />
               </div>
-            </div>
-
-            <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-lg text-xs space-y-1">
-              <div className="font-bold text-emerald-950 flex items-center gap-1.5">
-                <Info className="w-4 h-4 text-emerald-700 shrink-0" weight="bold" />
-                Pemisahan Hak Dana Tegas
-              </div>
-              <p className="text-[11px] text-emerald-800 leading-relaxed">
-                Biaya administrasi koperasi merupakan <span className="font-semibold">pendapatan operasional Koperasi Eskahade</span>, bukan fee bank BRI dan <span className="font-semibold">tidak disalurkan</span> ke Pesantren, Katering, atau Laundry. Dicatat secara append-only pada buku besar pendapatan koperasi (<code className="font-mono text-emerald-900">finance_cooperative_income</code>).
+              <p className="mt-1 text-[11px] text-slate-500">
+                Isi 0 jika tanpa biaya admin Koperasi. Biaya layanan bank BRI mengikuti ketentuan bank dan terpisah dari
+                biaya ini.
               </p>
             </div>
-          </div>
 
-          {/* Card 3: Rekening Penampungan Koperasi BRI */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Bank className="w-4 h-4 text-emerald-600" weight="bold" />
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Rekening Penampungan Koperasi BRI (Collection)
-                </h3>
+            <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/70 p-3 text-xs space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold text-emerald-950">
+                <Info className="h-4 w-4 shrink-0 text-emerald-700" weight="bold" aria-hidden="true" />
+                <span>Pemisahan Hak Dana</span>
               </div>
+              <p className="text-[11px] leading-relaxed text-emerald-800">
+                Biaya admin Koperasi merupakan <strong>pendapatan operasional Koperasi</strong>, bukan biaya bank BRI,
+                dan <strong>tidak disalurkan</strong> ke Pesantren, Katering, maupun Laundry.
+              </p>
+            </div>
+          </section>
+
+          {/* Rekening Penampungan */}
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+              <Bank className="h-4 w-4 text-emerald-700" weight="bold" aria-hidden="true" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Rekening Penampungan Koperasi BRI
+              </h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Bank Penampungan
-                </label>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">Nama Bank</label>
                 <input
                   type="text"
                   disabled={!canMutate}
                   value={settlementBank}
                   onChange={(e) => setSettlementBank(e.target.value)}
                   placeholder="Bank BRI"
-                  className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden font-mono disabled:bg-slate-50"
+                  className="min-h-[38px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-emerald-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nomor Rekening Koperasi
-                </label>
+                <label className="mb-1 block text-xs font-semibold text-slate-700">Nomor Rekening Koperasi</label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   disabled={!canMutate}
                   value={settlementAccount}
                   onChange={(e) => setSettlementAccount(e.target.value)}
-                  placeholder="Nomor rekening penampungan Koperasi"
-                  className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden font-mono disabled:bg-slate-50"
+                  placeholder="Nomor rekening penampungan"
+                  className="min-h-[38px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-800 focus:border-emerald-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Atas Nama Pemilik Rekening
-              </label>
+              <label className="mb-1 block text-xs font-semibold text-slate-700">Atas Nama Pemilik Rekening</label>
               <input
                 type="text"
                 disabled={!canMutate}
                 value={settlementHolder}
                 onChange={(e) => setSettlementHolder(e.target.value)}
                 placeholder="Koperasi Eskahade"
-                className="w-full text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2 focus:ring-1 focus:ring-emerald-500 focus:outline-hidden font-mono disabled:bg-slate-50"
+                className="min-h-[38px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-emerald-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
               />
             </div>
-          </div>
+          </section>
         </div>
       </div>
 
-      {/* Tombol Simpan */}
       {canMutate && (
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end pt-1">
           <button
             type="submit"
             disabled={isSaving}
-            className="px-5 py-2.5 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 active:scale-95 transition rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
+            className="min-h-[40px] rounded-lg bg-emerald-600 px-5 py-2 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700 transition-colors disabled:opacity-50 cursor-pointer"
           >
-            {isSaving ? 'Menyimpan...' : 'Simpan Pengaturan BRI & Koperasi'}
+            {isSaving ? 'Menyimpan…' : 'Simpan Pengaturan BRI & Koperasi'}
           </button>
         </div>
       )}

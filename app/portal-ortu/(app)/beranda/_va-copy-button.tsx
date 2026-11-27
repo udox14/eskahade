@@ -10,10 +10,13 @@ export function VaCopyButton({ vaNumber }: { vaNumber: string }) {
   const handleCopy = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    navigator.clipboard.writeText(vaNumber)
-    setCopied(true)
-    toast.success('Nomor Virtual Account disalin!')
-    setTimeout(() => setCopied(false), 2000)
+    navigator.clipboard.writeText(vaNumber).then(() => {
+      setCopied(true)
+      toast.success('Nomor Virtual Account disalin!')
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(() => {
+      toast.error('Gagal menyalin. Silakan salin manual.')
+    })
   }
 
   return (

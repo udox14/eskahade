@@ -1,14 +1,13 @@
 'use client'
 
 // app/dashboard/keuangan/_page-content.tsx
-// Antarmuka Dashboard Keuangan & KPI Eksekutif (Fase 9)
-// Memenuhi PRD Bab 33 & UI/UX Guidelines:
+// Antarmuka Dashboard Keuangan & KPI Eksekutif
+// Memenuhi PRD Bab 33, BRI PRD, & UI/UX Guidelines:
 // 1. Pemisahan mutlak Kas Pesantren vs Dana Titipan Santri (Uang Jajan)
 // 2. Pemisahan Payment PAID vs SETTLED
-// 3. Status Penyaluran (Siap / Sudah / Belum Disalurkan)
-// 4. Breakdown Online vs Tunai
-// 5. Mismatch Alert & Quick Actions
-// 6. Visual Charts Informatif & Transaksi Terbaru
+// 3. Indikator Perlu Perhatian (Verifikasi Transfer, Pencairan Kolektif, Rekonsiliasi, Sesi Kasir)
+// 4. KPI Clickable untuk drill-down langsung & Aksi Cepat sesuai alur operasional terbaru
+// 5. Grafik Tren sinkron periode & Transaksi Terbaru ramah operasional dengan Detail Drawer
 
 import React, { useState, useTransition, useId } from 'react'
 import Link from 'next/link'
@@ -18,18 +17,26 @@ import {
   CreditCard,
   AlertTriangle,
   CheckCircle2,
-  Clock,
   ArrowRight,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ChevronRight,
   RefreshCw,
+  Calendar,
   Coins,
   Send,
   Scale,
   Store,
+  FileCheck2,
+  Users,
 } from 'lucide-react'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
+import { SelectPicker } from '@/components/ui/select-picker'
+import { TransactionDetailDrawer } from './riwayat/transaction-detail-drawer'
 import { getDashboardData, type UserDashboardPermissions } from './actions'
-import type { FinanceDashboardData } from '@/lib/finance/dashboard'
+import type { FinanceDashboardData, RecentTransactionItem } from '@/lib/finance/dashboard'
 import type { FinanceCashSession } from '@/lib/finance/cash-session'
+import type { GlobalTransactionRow } from '@/lib/finance/history'
 import { formatFinanceDate } from '@/lib/finance/date-format'
 
 interface DashboardKeuanganContentProps {
@@ -51,6 +58,21 @@ function formatDateIndo(dateStr: string): string {
   return formatFinanceDate(dateStr, true)
 }
 
+function toWibDateKey(value: string | null | undefined): string | null {
+  if (!value) return null
+  const normalized = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(value.trim())
+    ? `${value.trim().replace(' ', 'T')}Z`
+    : value
+  const d = new Date(normalized)
+  if (!Number.isFinite(d.getTime())) return null
+  return new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'Asia/Jakarta',
+  }).format(d)
+}
+
 const BULAN_NAMES = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
@@ -68,6 +90,122 @@ function formatPeriodLabel(period: string): string {
   return period
 }
 
+function formatMethodLabel(method: string): string {
+  switch (method) {
+    case 'CASH':
+      return 'Tunai'
+    case 'MANUAL_TRANSFER':
+      return 'Transfer Manual'
+    case 'BRI_VA':
+    case 'BRI':
+      return 'BRIVA'
+    case 'BRI_QLOLA':
+      return 'BRI QLola'
+    case 'SYSTEM':
+      return 'Sistem'
+    default:
+      return method.replace(/_/g, ' ')
+  }
+}
+
+function formatStatusBadge(status: string): { label: string; className: string } {
+  switch (status) {
+    case 'SETTLED':
+      return {
+        label: 'Settled Bank',
+        className: 'bg-emerald-50 text-emerald-800 border border-emerald-200/80',
+      }
+    case 'PAID':
+      return {
+        label: 'Diterima',
+        className: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60',
+      }
+    case 'COMPLETED':
+      return {
+        label: 'Selesai',
+        className: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60',
+      }
+    case 'VOID':
+      return {
+        label: 'Dibatalkan',
+        className: 'bg-rose-50 text-rose-700 border border-rose-200/70',
+      }
+    case 'REVERSAL':
+      return {
+        label: 'Koreksi',
+        className: 'bg-rose-50 text-rose-700 border border-rose-200/70',
+      }
+    case 'REFUND':
+      return {
+        label: 'Pengembalian',
+        className: 'bg-amber-50 text-amber-800 border border-amber-200/70',
+      }
+    default:
+      return {
+        label: status.replace(/_/g, ' '),
+        className: 'bg-slate-100 text-slate-700 border border-slate-200',
+      }
+  }
+}
+
+/**
+ * Mengubah UUID mentah atau key internal (seperti LOKET_DEPOSIT:<uuid>:PAY-...)
+ * menjadi referensi pendek yang enak dipindai di tabel; nilai penuh tetap tersedia di tooltip & drawer.
+ */
+function formatReferenceDisplay(rawRef: string, category: RecentTransactionItem['category']): string {
+  if (!rawRef) return '-'
+  const trimmed = rawRef.trim()
+
+  if (trimmed.startsWith('LOKET_DEPOSIT:')) {
+    const parts = trimmed.split(':')
+    const shortId = (parts[1] || '').replace(/-/g, '').slice(0, 6).toUpperCase()
+    return shortId ? `LOKET-${shortId}` : 'LOKET-SETOR'
+  }
+
+  // UUID v4 atau string hex panjang
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+    const prefix = category === 'WITHDRAWAL' ? 'WDR' : category === 'TOPUP' ? 'TOP' : 'REF'
+    return `${prefix}-${trimmed.slice(0, 8).toUpperCase()}`
+  }
+
+  if (trimmed.length > 24) {
+    return `${trimmed.slice(0, 21)}…`
+  }
+
+  return trimmed
+}
+
+function toGlobalTransactionRow(tx: RecentTransactionItem): GlobalTransactionRow {
+  return {
+    id: tx.id,
+    sourceTable: tx.sourceTable,
+    transactionNumber: tx.transactionNumber,
+    category: tx.category,
+    categoryLabel: tx.categoryLabel,
+    fundType: tx.fundType,
+    direction: tx.direction,
+    amount: tx.amount,
+    grossAmount: tx.amount,
+    gatewayFee: 0,
+    netAmount: tx.amount,
+    channel: tx.channel,
+    method: tx.method,
+    status: tx.status,
+    itemType: tx.itemType,
+    itemLabel: tx.itemLabel,
+    santriId: null,
+    santriName: tx.santriName,
+    santriNis: tx.santriNis,
+    santriAsrama: tx.santriAsrama,
+    santriKamar: tx.santriKamar,
+    recipientInfo: tx.recipientInfo,
+    operatorName: tx.operatorName,
+    externalReference: tx.externalReference,
+    notes: tx.notes,
+    createdAt: tx.createdAt,
+  }
+}
+
 export default function DashboardKeuanganContent({
   initialData,
   initialCashSession,
@@ -75,10 +213,11 @@ export default function DashboardKeuanganContent({
   const [data, setData] = useState<FinanceDashboardData>(initialData)
   const [selectedPeriod, setSelectedPeriod] = useState<string>(initialData.selectedPeriod)
   const [cashSession, setCashSession] = useState<FinanceCashSession | null>(initialCashSession ?? null)
+  const [selectedTx, setSelectedTx] = useState<GlobalTransactionRow | null>(null)
   const [isPending, startTransition] = useTransition()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const periodSelectId = useId()
+  const recentTxHeadingId = useId()
 
   const handlePeriodChange = (newPeriod: string) => {
     setSelectedPeriod(newPeriod)
@@ -91,7 +230,7 @@ export default function DashboardKeuanganContent({
           setCashSession(res.activeCashSession)
         }
       } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : 'Gagal memuat data dashboard.')
+        setErrorMessage(err instanceof Error ? err.message : 'Data dashboard belum dapat dimuat. Coba lagi.')
       }
     })
   }
@@ -101,600 +240,923 @@ export default function DashboardKeuanganContent({
   }
 
   const { kpi, charts, recentTransactions } = data
-  const { pesantren, uangJajan, kasir, mismatch } = kpi
+  const { pesantren, uangJajan, kasir, mismatch, operations } = kpi
+
+  const todayWib = toWibDateKey(data.generatedAt)
+  const sessionOpenedWib = cashSession ? toWibDateKey(cashSession.opened_at) : null
+  const isCashSessionStale = Boolean(cashSession && todayWib && sessionOpenedWib && sessionOpenedWib < todayWib)
+
+  // Susun rincian penyebab selisih rekonsiliasi secara lengkap (termasuk amountMismatchCount)
+  const mismatchDetails: string[] = []
+  if (mismatch.unallocatedTransfersCount > 0) {
+    mismatchDetails.push(
+      `${mismatch.unallocatedTransfersCount} dana belum teralokasi (${formatRupiah(mismatch.unallocatedTransfersAmount)})`
+    )
+  }
+  if (mismatch.amountMismatchCount > 0) {
+    mismatchDetails.push(`${mismatch.amountMismatchCount} transaksi selisih nominal / belum cocok`)
+  }
+  if (mismatch.cashDiscrepanciesCount > 0) {
+    mismatchDetails.push(`${mismatch.cashDiscrepanciesCount} sesi kas dengan selisih fisik`)
+  }
+  if (mismatch.settlementDiscrepanciesCount > 0) {
+    mismatchDetails.push(`${mismatch.settlementDiscrepanciesCount} selisih settlement bank`)
+  }
+  if (mismatch.pendingRecoveryCasesCount > 0) {
+    mismatchDetails.push(`${mismatch.pendingRecoveryCasesCount} kasus pemulihan dana tersalurkan`)
+  }
 
   // Hitung nilai maksimum untuk scaling bar chart tren
   const maxTrendVal = Math.max(
     ...charts.trends.map((t) => Math.max(t.penerimaanPesantren, t.penyaluranDana)),
-    1000000
+    1
   )
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* 1. Header Halaman — hanya judul & deskripsi agar tidak bertabrakan
-          dengan kontrol periode/aksi cepat pada layar mobile. */}
+    <div className="space-y-6 pb-24 lg:pb-12">
+      {/* 1. Header Halaman + Kontrol Periode Ramping */}
       <DashboardPageHeader
         title="Dashboard Keuangan"
-        description="Ikhtisar eksekutif penerimaan kas pesantren, dana titipan santri, status penyaluran, dan rekonsiliasi."
+        description="Ikhtisar penerimaan kas pesantren, dana titipan santri, penyaluran, dan status rekonsiliasi."
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <SelectPicker
+              value={selectedPeriod}
+              options={data.periodList}
+              onChange={handlePeriodChange}
+              prefixLabel="Periode"
+              icon={<Calendar className="h-4 w-4" />}
+              ariaLabel="Pilih periode dashboard keuangan"
+              disabled={isPending}
+              align="left"
+              menuClassName="sm:right-0 sm:left-auto"
+            />
+
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isPending}
+              aria-label="Segarkan data dashboard keuangan"
+              className="inline-flex min-h-[44px] sm:min-h-[38px] items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-2xs hover:bg-slate-50 disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              <RefreshCw className={`h-4 w-4 ${isPending ? 'animate-spin' : ''}`} aria-hidden="true" />
+              <span>Segarkan</span>
+            </button>
+          </div>
+        }
       />
 
       {/* Pesan Kesalahan jika ada */}
       {errorMessage && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           {errorMessage}
         </div>
       )}
 
-      {/* Shortcut Status Sesi Kasir + Kontrol Periode & Aksi Cepat (satu baris sejajar) */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className={`p-2.5 rounded-xl ${cashSession ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
-              <Store className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-800">
-                  {cashSession ? 'Sesi Kasir Aktif' : 'Sesi Kasir Belum Dibuka'}
-                </h3>
-                {cashSession ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                    {cashSession.session_code}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                    Non-aktif
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {cashSession
-                  ? `Dibuka ${formatDateIndo(cashSession.opened_at)} • Saldo laci saat ini: ${formatRupiah(cashSession.expected_closing_balance)}`
-                  : 'Buka sesi kas di loket kasir untuk mulai melayani transaksi pembayaran tunai atau pencairan uang jajan.'}
-              </p>
-            </div>
-          </div>
-
-          {/* Kontrol periode, segarkan, riwayat, dan aksi sesi kas disatukan pada baris ini */}
-          <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-xs">
-              <label htmlFor={periodSelectId} className="text-xs font-medium text-slate-500">
-                Periode:
-              </label>
-              <select
-                id={periodSelectId}
-                value={selectedPeriod}
-                onChange={(e) => handlePeriodChange(e.target.value)}
-                disabled={isPending}
-                className="bg-transparent text-sm font-semibold text-slate-900 focus:outline-hidden"
+      <div
+        aria-busy={isPending}
+        className={`space-y-6 transition-opacity duration-200 ${isPending ? 'opacity-60 pointer-events-none' : ''}`}
+      >
+        {/* 2. Panel Ringkas: Status Sesi Kasir & Perlu Perhatian */}
+        <section
+          aria-label="Status operasional dan hal yang perlu perhatian"
+          className="rounded-xl border border-slate-200 bg-white divide-y divide-slate-100 shadow-2xs overflow-hidden"
+        >
+          {/* Baris A: Status Sesi Kasir */}
+          <div className={`flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between ${isCashSessionStale ? 'bg-amber-50/40' : ''}`}>
+            <div className="flex items-start gap-3 min-w-0">
+              <div
+                className={`mt-0.5 shrink-0 rounded-lg p-2 ${
+                  isCashSessionStale
+                    ? 'bg-amber-100 text-amber-800'
+                    : cashSession
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-slate-100 text-slate-500'
+                }`}
               >
-                {data.periodList.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+                <Store className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-sm font-semibold text-slate-900">
+                    {isCashSessionStale
+                      ? 'Sesi Kasir Belum Ditutup'
+                      : cashSession
+                        ? 'Sesi Kasir Aktif'
+                        : 'Sesi Kasir Belum Dibuka'}
+                  </h2>
+                  {cashSession ? (
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border ${
+                        isCashSessionStale
+                          ? 'bg-amber-100 text-amber-900 border-amber-200'
+                          : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                      }`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          isCashSessionStale ? 'bg-amber-600' : 'bg-emerald-600'
+                        }`}
+                      />
+                      {cashSession.session_code}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 border border-slate-200">
+                      Non-aktif
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-slate-600 text-pretty">
+                  {cashSession ? (
+                    <>
+                      Dibuka {formatDateIndo(cashSession.opened_at)}
+                      {' · '}Saldo laci:{' '}
+                      <span className="font-semibold text-slate-800 tabular-nums">
+                        {formatRupiah(cashSession.expected_closing_balance)}
+                      </span>
+                      {kasir.openSessionsCount > 1 && (
+                        <> · Total {kasir.openSessionsCount} sesi terbuka di sistem</>
+                      )}
+                      {isCashSessionStale && ' — sebaiknya segera diperiksa dan ditutup.'}
+                    </>
+                  ) : (
+                    <>
+                      Buka sesi kas di loket sebelum melayani setoran tunai atau pencairan uang jajan.
+                      {kasir.openSessionsCount > 0 && ` (${kasir.openSessionsCount} sesi petugas lain sedang aktif)`}
+                    </>
+                  )}
+                </p>
+              </div>
             </div>
-
-            <button
-              onClick={handleRefresh}
-              disabled={isPending}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 disabled:opacity-50"
-              title="Segarkan Data"
-            >
-              <RefreshCw className={`h-4 w-4 ${isPending ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Segarkan</span>
-            </button>
-
-            <Link
-              href="/dashboard/keuangan/riwayat"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 transition-colors"
-            >
-              <Clock className="h-4 w-4" />
-              <span>Riwayat Transaksi</span>
-            </Link>
 
             <Link
               href="/dashboard/koperasi/loket"
-              className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold shadow-2xs transition-colors ${
-                cashSession
-                  ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
-                  : 'bg-emerald-600 text-white hover:bg-emerald-700'
+              className={`inline-flex min-h-[40px] sm:min-h-[36px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
+                isCashSessionStale
+                  ? 'bg-amber-600 text-white hover:bg-amber-700'
+                  : cashSession
+                    ? 'border border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
               }`}
             >
-              <span>{cashSession ? 'Buka Loket Kasir' : 'Buka Sesi Kas'}</span>
-              <ArrowRight className="h-3.5 w-3.5" />
+              <span>
+                {isCashSessionStale
+                  ? 'Periksa / Tutup Sesi'
+                  : cashSession
+                    ? 'Buka Loket Kasir'
+                    : 'Buka Sesi Kas'}
+              </span>
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
             </Link>
           </div>
-        </div>
-      </div>
 
-      {/* 2. Banner Peringatan Rekonsiliasi (Mismatch Alert) */}
-      {mismatch.hasMismatch ? (
-        <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/80 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-full bg-amber-100 p-1.5 text-amber-700">
-              <AlertTriangle className="h-5 w-5" />
+          {/* Baris B: Antrean Verifikasi Transfer Manual (jika ada) */}
+          {operations.pendingTransferVerificationsCount > 0 && (
+            <div className="flex flex-col gap-3 bg-emerald-50/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="mt-0.5 shrink-0 rounded-lg bg-emerald-100 p-1.5 text-emerald-800">
+                  <FileCheck2 className="h-4 w-4" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {operations.pendingTransferVerificationsCount} Bukti Transfer Menunggu Verifikasi
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-600 tabular-nums">
+                    Total nominal pengajuan: {formatRupiah(operations.pendingTransferVerificationsAmount)}. Periksa mutasi rekening sebelum menyetujui.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/dashboard/keuangan/verifikasi-transfer"
+                className="inline-flex min-h-[40px] sm:min-h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+              >
+                <span>Verifikasi Transfer</span>
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
             </div>
-            <div>
-              <h2 className="text-sm font-semibold text-amber-900">
-                Peringatan: Ditemukan {mismatch.totalMismatchCount} Selisih / Kasus Rekonsiliasi
-              </h2>
-              <p className="mt-0.5 text-xs text-amber-700">
-                {mismatch.unallocatedTransfersCount > 0 &&
-                  `${mismatch.unallocatedTransfersCount} transfer unallocated (${formatRupiah(mismatch.unallocatedTransfersAmount)}). `}
-                {mismatch.cashDiscrepanciesCount > 0 &&
-                  `${mismatch.cashDiscrepanciesCount} sesi kas dengan selisih fisik. `}
-                {mismatch.settlementDiscrepanciesCount > 0 &&
-                  `${mismatch.settlementDiscrepanciesCount} settlement mismatch. `}
-                {mismatch.pendingRecoveryCasesCount > 0 &&
-                  `${mismatch.pendingRecoveryCasesCount} kasus recovery dana telanjur disalurkan. `}
-                Diperlukan audit sebelum penutupan pembukuan.
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/dashboard/keuangan/rekonsiliasi"
-            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 transition-colors"
-          >
-            <span>Buka Modul Rekonsiliasi</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-slate-50 px-4 py-2.5 text-xs text-slate-600">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            <span>
-              <strong>Rekonsiliasi Seimbang:</strong> Tidak ada selisih transfer unallocated atau ketidaksesuaian sesi kas.
-            </span>
-          </div>
-          <Link
-            href="/dashboard/keuangan/rekonsiliasi"
-            className="font-medium text-emerald-700 hover:text-emerald-800"
-          >
-            Lihat Rekonsiliasi &rarr;
-          </Link>
-        </div>
-      )}
+          )}
 
-      {/* 3. Section Kas & Operasional Pesantren (4 Summary Cards) */}
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">
-              Kas & Penerimaan Pesantren
-            </h2>
-            <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-              Dana Operasional
-            </span>
-          </div>
-          <span className="text-xs text-slate-500">Periode: {formatPeriodLabel(selectedPeriod)}</span>
-        </div>
+          {/* Baris C: Batch Pencairan Kolektif Berstatus DIBAWA (jika ada) */}
+          {operations.activeCollectiveBatchesCount > 0 && (
+            <div className="flex flex-col gap-3 bg-indigo-50/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="mt-0.5 shrink-0 rounded-lg bg-indigo-100 p-1.5 text-indigo-800">
+                  <Users className="h-4 w-4" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {operations.activeCollectiveBatchesCount} Batch Pencairan Kolektif Masih Dibawa Perwakilan
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-600 tabular-nums">
+                    Total dana beredar: {formatRupiah(operations.activeCollectiveBatchesAmount)}. Selesaikan laporan terima/batal sebelum menutup sesi kasir.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/dashboard/koperasi/pencairan-uang-jajan"
+                className="inline-flex min-h-[40px] sm:min-h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-indigo-800 hover:bg-indigo-50 transition-colors"
+              >
+                <span>Selesaikan Batch</span>
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </div>
+          )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Card 1: Total Penerimaan Pesantren */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-            <div className="flex items-center justify-between text-slate-500">
-              <span className="text-xs font-medium uppercase tracking-wide">Penerimaan Pesantren</span>
-              <Coins className="h-4 w-4 text-emerald-600" />
+          {/* Baris D: Status Rekonsiliasi & Selisih */}
+          {mismatch.hasMismatch ? (
+            <div className="flex flex-col gap-3 bg-amber-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="mt-0.5 shrink-0 rounded-lg bg-amber-100 p-1.5 text-amber-800">
+                  <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-amber-950">
+                    Ditemukan {mismatch.totalMismatchCount} Selisih / Kasus Rekonsiliasi
+                  </p>
+                  <p className="mt-0.5 text-xs text-amber-900/90 text-pretty">
+                    {mismatchDetails.length > 0
+                      ? `${mismatchDetails.join(' · ')}. Perlu diperiksa sebelum tutup buku.`
+                      : 'Diperlukan audit selisih sebelum penutupan pembukuan.'}
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/dashboard/keuangan/rekonsiliasi"
+                className="inline-flex min-h-[40px] sm:min-h-[34px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-colors"
+              >
+                <span>Buka Rekonsiliasi</span>
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
             </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              {formatRupiah(pesantren.totalPenerimaan)}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5 border-t border-slate-100 pt-3 text-xs">
-              <span className="inline-flex items-center rounded-sm bg-blue-50 px-2 py-0.5 font-medium text-blue-700">
-                Online: {formatRupiah(pesantren.onlinePenerimaan)}
-              </span>
-              <span className="inline-flex items-center rounded-sm bg-slate-100 px-2 py-0.5 font-medium text-slate-700">
-                Tunai: {formatRupiah(pesantren.cashPenerimaan)}
-              </span>
-            </div>
-          </div>
-
-          {/* Card 2: Settlement Payment Gateway */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-            <div className="flex items-center justify-between text-slate-500">
-              <span className="text-xs font-medium uppercase tracking-wide">Settlement Gateway</span>
-              <Landmark className="h-4 w-4 text-blue-600" />
-            </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              {formatRupiah(pesantren.settledAmount)}
-            </div>
-            <div className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-600">
-              {pesantren.pendingSettlementAmount > 0 ? (
-                <span className="font-medium text-amber-700">
-                  Belum Cair: {formatRupiah(pesantren.pendingSettlementAmount)} ({pesantren.pendingSettlementCount} trx)
+          ) : (
+            <div className="flex items-center justify-between gap-3 bg-slate-50/60 px-4 py-2.5 text-xs text-slate-600">
+              <div className="flex items-center gap-2 min-w-0">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+                <span>
+                  <strong className="text-slate-800">Rekonsiliasi seimbang</strong> — tidak ada selisih mutasi atau kas terbuka.
                 </span>
-              ) : (
-                <span className="font-medium text-emerald-700">Seluruh penerimaan online telah settled</span>
-              )}
+              </div>
+              <Link
+                href="/dashboard/keuangan/rekonsiliasi"
+                className="shrink-0 font-semibold text-emerald-700 hover:text-emerald-800"
+              >
+                Lihat &rarr;
+              </Link>
             </div>
-          </div>
+          )}
+        </section>
 
-          {/* Card 3: Penyaluran Dana (Vendor & Bendahara) */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-            <div className="flex items-center justify-between text-slate-500">
-              <span className="text-xs font-medium uppercase tracking-wide">Penyaluran Dana</span>
-              <Send className="h-4 w-4 text-purple-600" />
-            </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              {formatRupiah(pesantren.totalDisbursed)}
-            </div>
-            <div className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-600">
-              <span className="font-medium text-indigo-700">
-                Siap Disalurkan: {formatRupiah(pesantren.readyToDisburse)}
+        {/* 3. Kas & Penerimaan Pesantren (4 KPI Clickable) */}
+        <section aria-label="Kas dan penerimaan operasional pesantren">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800 text-balance">
+                Kas &amp; Penerimaan Pesantren
+              </h2>
+              <span className="rounded-md bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                Dana Operasional
               </span>
             </div>
+            <span className="text-xs font-medium text-slate-500">
+              Periode: {formatPeriodLabel(selectedPeriod)}
+            </span>
           </div>
 
-          {/* Card 4: Tunggakan Kewajiban */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-            <div className="flex items-center justify-between text-slate-500">
-              <span className="text-xs font-medium uppercase tracking-wide">Total Tunggakan</span>
-              <Scale className="h-4 w-4 text-rose-600" />
-            </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-              {formatRupiah(pesantren.totalTunggakan)}
-            </div>
-            <div className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-600">
-              <span className="font-medium text-rose-700">
-                {pesantren.santriMenunggakCount} Santri Belum Lunas
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Card 1: Penerimaan Pesantren */}
+            <Link
+              href="/dashboard/keuangan/riwayat"
+              className="group flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-2xs hover:border-emerald-300 hover:bg-emerald-50/20 transition-colors"
+            >
+              <div>
+                <div className="flex items-center justify-between text-slate-500">
+                  <span className="text-xs font-semibold uppercase tracking-wide">Penerimaan Pesantren</span>
+                  <Coins className="h-4 w-4 text-emerald-700" aria-hidden="true" />
+                </div>
+                <div className="mt-2.5 text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+                  {formatRupiah(pesantren.totalPenerimaan)}
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-600 tabular-nums">
+                <span className="truncate">
+                  Online {formatRupiah(pesantren.onlinePenerimaan)} · Tunai {formatRupiah(pesantren.cashPenerimaan)}
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400 group-hover:text-emerald-700 transition-colors" aria-hidden="true" />
+              </div>
+            </Link>
 
-      {/* 4. Section Khusus: Dana Titipan Santri (Uang Jajan) — PEMISAHAN MUTLAK */}
-      <div className="rounded-xl border-2 border-indigo-200/80 bg-linear-to-r from-indigo-50/50 via-white to-indigo-50/30 p-5 shadow-xs">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="rounded-lg bg-indigo-600 p-2 text-white">
-              <Wallet className="h-5 w-5" />
-            </div>
+            {/* Card 2: Settlement Bank (BRI) */}
+            <Link
+              href="/dashboard/keuangan/rekonsiliasi"
+              className="group flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-2xs hover:border-emerald-300 hover:bg-emerald-50/20 transition-colors"
+            >
+              <div>
+                <div className="flex items-center justify-between text-slate-500">
+                  <span className="text-xs font-semibold uppercase tracking-wide">Settlement Bank (BRI)</span>
+                  <Landmark className="h-4 w-4 text-slate-600" aria-hidden="true" />
+                </div>
+                <div className="mt-2.5 text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+                  {formatRupiah(pesantren.settledAmount)}
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs tabular-nums">
+                {pesantren.pendingSettlementAmount > 0 ? (
+                  <span className="font-medium text-amber-800 truncate">
+                    Menunggu rekonsiliasi: {formatRupiah(pesantren.pendingSettlementAmount)} ({pesantren.pendingSettlementCount} trx)
+                  </span>
+                ) : (
+                  <span className="font-medium text-emerald-700 truncate">
+                    Seluruh penerimaan bank sudah settled
+                  </span>
+                )}
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400 group-hover:text-emerald-700 transition-colors" aria-hidden="true" />
+              </div>
+            </Link>
+
+            {/* Card 3: Penyaluran Dana */}
+            <Link
+              href="/dashboard/keuangan/penyaluran"
+              className="group flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-2xs hover:border-emerald-300 hover:bg-emerald-50/20 transition-colors"
+            >
+              <div>
+                <div className="flex items-center justify-between text-slate-500">
+                  <span className="text-xs font-semibold uppercase tracking-wide">Penyaluran Dana</span>
+                  <Send className="h-4 w-4 text-slate-600" aria-hidden="true" />
+                </div>
+                <div className="mt-2.5 text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+                  {formatRupiah(pesantren.totalDisbursed)}
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs tabular-nums">
+                <span className="font-medium text-emerald-800 truncate">
+                  Siap disalurkan: {formatRupiah(pesantren.readyToDisburse)}
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400 group-hover:text-emerald-700 transition-colors" aria-hidden="true" />
+              </div>
+            </Link>
+
+            {/* Card 4: Total Tunggakan */}
+            <Link
+              href="/dashboard/keuangan/status-pembayaran?tab=TUNGGAKAN"
+              className="group flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-2xs hover:border-rose-300 hover:bg-rose-50/20 transition-colors"
+            >
+              <div>
+                <div className="flex items-center justify-between text-slate-500">
+                  <span className="text-xs font-semibold uppercase tracking-wide">Total Tunggakan</span>
+                  <Scale className="h-4 w-4 text-rose-600" aria-hidden="true" />
+                </div>
+                <div className="mt-2.5 text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+                  {formatRupiah(pesantren.totalTunggakan)}
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs tabular-nums">
+                <span className="font-medium text-rose-700 truncate">
+                  {pesantren.santriMenunggakCount} santri belum lunas
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400 group-hover:text-rose-700 transition-colors" aria-hidden="true" />
+              </div>
+            </Link>
+          </div>
+        </section>
+
+        {/* 4. Dana Titipan Santri (Uang Jajan) — Selaras dengan Section Atas, Tetap Terpisah Secara Konsep */}
+        <section aria-label="Dana titipan santri uang jajan">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-indigo-950">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800 text-balance">
                   Dana Titipan Santri (Uang Jajan)
                 </h2>
-                <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-[11px] font-bold text-indigo-800">
+                <span className="rounded-md bg-indigo-50 border border-indigo-200/70 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">
                   Liabilitas Santri
                 </span>
               </div>
-              <p className="text-xs text-indigo-700">
-                Bukan kas pesantren — saldo dipegang sebagai amanah titipan wali santri dan dapat dicairkan sewaktu-waktu.
+              <p className="mt-0.5 text-xs text-slate-500 text-pretty">
+                Terpisah dari kas pesantren — amanah titipan wali santri yang dapat dicairkan sewaktu-waktu.
               </p>
             </div>
+
+            <Link
+              href="/dashboard/keuangan/uang-jajan"
+              className="inline-flex min-h-[32px] shrink-0 items-center gap-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+            >
+              <span>Buku Besar Uang Jajan</span>
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
           </div>
 
-          <Link
-            href="/dashboard/keuangan/uang-jajan"
-            className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900"
-          >
-            <span>Buku Besar Uang Jajan</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-
-        <div className="mt-5 grid grid-cols-1 gap-4 border-t border-indigo-100/80 pt-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-lg border border-indigo-100 bg-white p-4">
-            <span className="text-xs font-medium text-slate-500">Total Saldo Titipan Santri</span>
-            <div className="mt-1 text-xl font-bold text-indigo-950">
-              {formatRupiah(uangJajan.totalTitipanBalance)}
-            </div>
-            <p className="mt-1 text-[11px] text-slate-500">
-              {uangJajan.activeStudentsWithBalance} santri memiliki saldo
-            </p>
-          </div>
-
-          <div className="rounded-lg border border-indigo-100 bg-white p-4">
-            <span className="text-xs font-medium text-slate-500">Top-Up Periode Ini</span>
-            <div className="mt-1 text-xl font-bold text-emerald-700">
-              {formatRupiah(uangJajan.topupPeriod)}
-            </div>
-            <p className="mt-1 text-[11px] text-slate-500">
-              Online: {formatRupiah(uangJajan.topupOnline)} · Tunai: {formatRupiah(uangJajan.topupCash)}
-            </p>
-          </div>
-
-          <div className="rounded-lg border border-indigo-100 bg-white p-4">
-            <span className="text-xs font-medium text-slate-500">Penarikan Loket Periode Ini</span>
-            <div className="mt-1 text-xl font-bold text-slate-800">
-              {formatRupiah(uangJajan.withdrawalPeriod)}
-            </div>
-            <p className="mt-1 text-[11px] text-slate-500">Pencairan tunai di loket koperasi</p>
-          </div>
-
-          <div className="rounded-lg border border-indigo-100 bg-white p-4">
-            <span className="text-xs font-medium text-slate-500">Aktivitas Loket Hari Ini</span>
-            <div className="mt-1 text-xl font-bold text-slate-900">
-              {kasir.openSessionsCount} Sesi Terbuka
-            </div>
-            <p className="mt-1 text-[11px] text-slate-500">
-              Kas Masuk: {formatRupiah(kasir.todayCashIn)} · Kas Keluar: {formatRupiah(kasir.todayCashOut)}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* 5. Charts & Visual Graphs */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Chart 1: Tren Bulanan (2 Cols) */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs lg:col-span-2">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Tren Penerimaan vs Penyaluran Bulanan</h3>
-              <p className="text-xs text-slate-500">Perbandingan arus kas masuk pesantren dan penyaluran ke vendor</p>
-            </div>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="flex items-center gap-1.5 font-medium text-emerald-700">
-                <span className="inline-block h-3 w-3 rounded-xs bg-emerald-600" />
-                Penerimaan
-              </span>
-              <span className="flex items-center gap-1.5 font-medium text-purple-700">
-                <span className="inline-block h-3 w-3 rounded-xs bg-purple-500" />
-                Penyaluran
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            {charts.trends.map((t) => {
-              const inWidth = Math.min(100, Math.round((t.penerimaanPesantren / maxTrendVal) * 100))
-              const outWidth = Math.min(100, Math.round((t.penyaluranDana / maxTrendVal) * 100))
-
-              return (
-                <div key={t.month} className="space-y-1">
-                  <div className="flex justify-between text-xs font-medium text-slate-700">
-                    <span>{t.monthLabel}</span>
-                    <span className="text-slate-500">
-                      Masuk: {formatRupiah(t.penerimaanPesantren)} · Salur: {formatRupiah(t.penyaluranDana)}
-                    </span>
-                  </div>
-
-                  {/* Dual Bar */}
-                  <div className="grid grid-cols-1 gap-1">
-                    <div className="h-2.5 w-full rounded-full bg-slate-100">
-                      <div
-                        className="h-2.5 rounded-full bg-emerald-600 transition-all duration-500"
-                        style={{ width: `${Math.max(4, inWidth)}%` }}
-                        title={`Penerimaan: ${formatRupiah(t.penerimaanPesantren)}`}
-                      />
-                    </div>
-                    <div className="h-2.5 w-full rounded-full bg-slate-100">
-                      <div
-                        className="h-2.5 rounded-full bg-purple-500 transition-all duration-500"
-                        style={{ width: `${Math.max(4, outWidth)}%` }}
-                        title={`Penyaluran: ${formatRupiah(t.penyaluranDana)}`}
-                      />
-                    </div>
-                  </div>
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+            {/* Card 1: Total Saldo Titipan */}
+            <Link
+              href="/dashboard/keuangan/uang-jajan"
+              className="group flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-2xs hover:border-indigo-300 hover:bg-indigo-50/20 transition-colors"
+            >
+              <div>
+                <div className="flex items-center justify-between text-slate-500">
+                  <span className="text-xs font-semibold uppercase tracking-wide">Total Saldo Titipan</span>
+                  <Wallet className="h-4 w-4 text-indigo-600" aria-hidden="true" />
                 </div>
-              )
-            })}
+                <div className="mt-2.5 text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+                  {formatRupiah(uangJajan.totalTitipanBalance)}
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-600 tabular-nums">
+                <span className="truncate">
+                  {uangJajan.activeStudentsWithBalance} santri memiliki saldo
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400 group-hover:text-indigo-700 transition-colors" aria-hidden="true" />
+              </div>
+            </Link>
+
+            {/* Card 2: Top-Up Periode Ini */}
+            <Link
+              href="/dashboard/keuangan/uang-jajan"
+              className="group flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-2xs hover:border-indigo-300 hover:bg-indigo-50/20 transition-colors"
+            >
+              <div>
+                <div className="flex items-center justify-between text-slate-500">
+                  <span className="text-xs font-semibold uppercase tracking-wide">Top-Up Periode Ini</span>
+                  <ArrowDownLeft className="h-4 w-4 text-indigo-600" aria-hidden="true" />
+                </div>
+                <div className="mt-2.5 text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+                  {formatRupiah(uangJajan.topupPeriod)}
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-600 tabular-nums">
+                <span className="truncate">
+                  Online {formatRupiah(uangJajan.topupOnline)} · Tunai {formatRupiah(uangJajan.topupCash)}
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400 group-hover:text-indigo-700 transition-colors" aria-hidden="true" />
+              </div>
+            </Link>
+
+            {/* Card 3: Pencairan Periode Ini */}
+            <Link
+              href="/dashboard/koperasi/pencairan-uang-jajan"
+              className="group flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-2xs hover:border-indigo-300 hover:bg-indigo-50/20 transition-colors"
+            >
+              <div>
+                <div className="flex items-center justify-between text-slate-500">
+                  <span className="text-xs font-semibold uppercase tracking-wide">Pencairan Periode Ini</span>
+                  <ArrowUpRight className="h-4 w-4 text-indigo-600" aria-hidden="true" />
+                </div>
+                <div className="mt-2.5 text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
+                  {formatRupiah(uangJajan.withdrawalPeriod)}
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-600">
+                <span className="truncate">
+                  Pencairan kolektif asrama &amp; loket
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400 group-hover:text-indigo-700 transition-colors" aria-hidden="true" />
+              </div>
+            </Link>
           </div>
-        </div>
+        </section>
 
-        {/* Chart 2: Komposisi Kanal & Pos Pembayaran (1 Col) */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-          <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3">
-            Komposisi Penerimaan Periode Ini
-          </h3>
-
-          {/* Kanal Breakdown */}
-          <div className="mt-4">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Kanal Pembayaran
-            </span>
-            <div className="mt-2 flex h-3 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="bg-blue-600"
-                style={{ width: `${charts.channelComposition.onlinePercentage}%` }}
-                title={`Online: ${charts.channelComposition.onlinePercentage}%`}
-              />
-              <div
-                className="bg-emerald-600"
-                style={{ width: `${charts.channelComposition.cashPercentage}%` }}
-                title={`Tunai: ${charts.channelComposition.cashPercentage}%`}
-              />
-            </div>
-            <div className="mt-2 flex justify-between text-xs text-slate-600">
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-blue-600" />
-                Online: {charts.channelComposition.onlinePercentage}% ({formatRupiah(charts.channelComposition.onlineAmount)})
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-600" />
-                Tunai: {charts.channelComposition.cashPercentage}% ({formatRupiah(charts.channelComposition.cashAmount)})
-              </span>
-            </div>
+        {/* 5. Aksi Cepat Operasional (Dipromosikan ke atas grafik & diperbarui sesuai alur terbaru) */}
+        <section aria-label="Aksi cepat operasional">
+          <div className="mb-2.5 flex items-center justify-between">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+              Aksi Cepat Operasional
+            </h2>
           </div>
 
-          {/* Pos Biaya Breakdown */}
-          <div className="mt-6">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Distribusi Pos Tagihan
-            </span>
-            <div className="mt-3 space-y-2">
-              {charts.itemComposition.length > 0 ? (
-                charts.itemComposition.map((it) => (
-                  <div key={it.itemType} className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="font-medium text-slate-700">{it.itemLabel}</span>
-                      <span className="text-slate-500">
-                        {it.percentage}% ({formatRupiah(it.amount)})
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+            <Link
+              href="/dashboard/keuangan/status-pembayaran"
+              className="group flex min-h-[68px] items-center gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-emerald-300 hover:bg-emerald-50/30 transition-colors"
+            >
+              <div className="shrink-0 rounded-lg bg-emerald-50 p-2 text-emerald-700">
+                <CreditCard className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-slate-900">Catat Pembayaran</div>
+                <div className="text-[11px] text-slate-500 truncate">Status &amp; bayar tunai</div>
+              </div>
+            </Link>
+
+            <Link
+              href="/dashboard/keuangan/verifikasi-transfer"
+              className="group flex min-h-[68px] items-center gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-emerald-300 hover:bg-emerald-50/30 transition-colors"
+            >
+              <div className="shrink-0 rounded-lg bg-emerald-50 p-2 text-emerald-700">
+                <FileCheck2 className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-slate-900 truncate">Verifikasi Transfer</span>
+                  {operations.pendingTransferVerificationsCount > 0 && (
+                    <span className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold text-white tabular-nums">
+                      {operations.pendingTransferVerificationsCount}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-500 truncate">Bukti transfer wali</div>
+              </div>
+            </Link>
+
+            <Link
+              href="/dashboard/koperasi/pencairan-uang-jajan"
+              className="group flex min-h-[68px] items-center gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-emerald-300 hover:bg-emerald-50/30 transition-colors"
+            >
+              <div className="shrink-0 rounded-lg bg-indigo-50 p-2 text-indigo-700">
+                <Users className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-slate-900 truncate">Pencairan Kolektif</span>
+                  {operations.activeCollectiveBatchesCount > 0 && (
+                    <span className="rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold text-white tabular-nums">
+                      {operations.activeCollectiveBatchesCount}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-500 truncate">Uang jajan per asrama</div>
+              </div>
+            </Link>
+
+            <Link
+              href="/dashboard/keuangan/penyaluran"
+              className="group flex min-h-[68px] items-center gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-emerald-300 hover:bg-emerald-50/30 transition-colors"
+            >
+              <div className="shrink-0 rounded-lg bg-slate-100 p-2 text-slate-700">
+                <Send className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-slate-900">Salurkan Dana</div>
+                <div className="text-[11px] text-slate-500 truncate">Pesantren, Katering, Laundry</div>
+              </div>
+            </Link>
+
+            <Link
+              href="/dashboard/keuangan/rekonsiliasi"
+              className="group col-span-2 sm:col-span-1 flex min-h-[68px] items-center gap-3 rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-amber-300 hover:bg-amber-50/30 transition-colors"
+            >
+              <div className="shrink-0 rounded-lg bg-amber-50 p-2 text-amber-800">
+                <Scale className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-slate-900 truncate">Rekonsiliasi Bank</span>
+                  {mismatch.totalMismatchCount > 0 && (
+                    <span className="rounded-full bg-amber-600 px-1.5 py-0.5 text-[10px] font-bold text-white tabular-nums">
+                      {mismatch.totalMismatchCount}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-500 truncate">Settlement &amp; selisih</div>
+              </div>
+            </Link>
+          </div>
+        </section>
+
+        {/* 6. Insight & Tren Bulanan */}
+        <section aria-label="Tren dan komposisi penerimaan" className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          {/* Chart 1: Tren Bulanan (2 Cols) */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs lg:col-span-2">
+            <div className="flex flex-col gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 text-balance">
+                  Tren Penerimaan vs Penyaluran
+                </h3>
+                <p className="text-xs text-slate-500">
+                  6 bulan berakhir pada {formatPeriodLabel(selectedPeriod)}
+                </p>
+              </div>
+              <div className="flex items-center gap-4 text-xs">
+                <span className="flex items-center gap-1.5 font-medium text-slate-700">
+                  <span className="inline-block h-2.5 w-2.5 rounded-xs bg-emerald-600" />
+                  Penerimaan
+                </span>
+                <span className="flex items-center gap-1.5 font-medium text-slate-700">
+                  <span className="inline-block h-2.5 w-2.5 rounded-xs bg-slate-500" />
+                  Penyaluran
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3.5">
+              {charts.trends.map((t) => {
+                const inWidth =
+                  t.penerimaanPesantren > 0
+                    ? Math.max(3, Math.min(100, Math.round((t.penerimaanPesantren / maxTrendVal) * 100)))
+                    : 0
+                const outWidth =
+                  t.penyaluranDana > 0
+                    ? Math.max(3, Math.min(100, Math.round((t.penyaluranDana / maxTrendVal) * 100)))
+                    : 0
+                const isSelectedMonth = t.month === selectedPeriod
+
+                return (
+                  <div
+                    key={t.month}
+                    className={`rounded-lg px-2.5 py-2 transition-colors ${
+                      isSelectedMonth ? 'bg-slate-50/90' : ''
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs">
+                      <span className={isSelectedMonth ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}>
+                        {t.monthLabel}
+                      </span>
+                      <span className="text-slate-500 tabular-nums">
+                        Masuk: <strong className="font-semibold text-slate-800">{formatRupiah(t.penerimaanPesantren)}</strong>
+                        {' · '}
+                        Salur: <strong className="font-semibold text-slate-700">{formatRupiah(t.penyaluranDana)}</strong>
                       </span>
                     </div>
-                    <div className="h-1.5 w-full rounded-full bg-slate-100">
-                      <div
-                        className="h-1.5 rounded-full bg-slate-700"
-                        style={{ width: `${Math.max(2, it.percentage)}%` }}
-                      />
+
+                    <div className="mt-1.5 space-y-1">
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        {inWidth > 0 && (
+                          <div
+                            className="h-2 rounded-full bg-emerald-600 transition-all duration-300"
+                            style={{ width: `${inWidth}%` }}
+                            title={`Penerimaan ${t.monthLabel}: ${formatRupiah(t.penerimaanPesantren)}`}
+                          />
+                        )}
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        {outWidth > 0 && (
+                          <div
+                            className="h-2 rounded-full bg-slate-500 transition-all duration-300"
+                            style={{ width: `${outWidth}%` }}
+                            title={`Penyaluran ${t.monthLabel}: ${formatRupiah(t.penyaluranDana)}`}
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
-                ))
-              ) : (
-                <p className="text-xs text-slate-400">Belum ada rincian pos tagihan terbayar pada periode ini.</p>
-              )}
+                )
+              })}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* 6. Quick Actions (Aksi Cepat) */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">
-          Aksi Cepat Operasional
-        </h3>
-        <p className="mt-0.5 text-xs text-slate-500">
-          Pintasan langsung ke modul pencatatan, kasir loket, penyaluran, dan rekonsiliasi.
-        </p>
+          {/* Chart 2: Komposisi Kanal & Pos Tagihan (1 Col) */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <h3 className="border-b border-slate-100 pb-3 text-sm font-bold text-slate-900 text-balance">
+              Komposisi Penerimaan Periode Ini
+            </h3>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Link
-            href="/dashboard/keuangan/status-pembayaran"
-            className="flex flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-50/70 p-3.5 text-center hover:bg-emerald-50/60 hover:border-emerald-200 transition-colors"
-          >
-            <CreditCard className="h-5 w-5 text-emerald-700" />
-            <span className="mt-2 text-xs font-semibold text-slate-800">Catat Bayar Tunai</span>
-            <span className="text-[11px] text-slate-500">Modul Status Santri</span>
-          </Link>
+            {/* Kanal Pembayaran */}
+            <div className="mt-4">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Kanal Pembayaran
+              </span>
+              {charts.channelComposition.total > 0 ? (
+                <>
+                  <div className="mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                    {charts.channelComposition.onlinePercentage > 0 && (
+                      <div
+                        className="bg-emerald-600"
+                        style={{ width: `${charts.channelComposition.onlinePercentage}%` }}
+                        title={`Online: ${charts.channelComposition.onlinePercentage}%`}
+                      />
+                    )}
+                    {charts.channelComposition.cashPercentage > 0 && (
+                      <div
+                        className="bg-slate-400"
+                        style={{ width: `${charts.channelComposition.cashPercentage}%` }}
+                        title={`Tunai: ${charts.channelComposition.cashPercentage}%`}
+                      />
+                    )}
+                  </div>
+                  <div className="mt-2.5 space-y-1 text-xs text-slate-600 tabular-nums">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                        Online (BRIVA / Transfer)
+                      </span>
+                      <span className="font-semibold text-slate-800">
+                        {charts.channelComposition.onlinePercentage}% ({formatRupiah(charts.channelComposition.onlineAmount)})
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-slate-400" />
+                        Tunai Loket
+                      </span>
+                      <span className="font-semibold text-slate-800">
+                        {charts.channelComposition.cashPercentage}% ({formatRupiah(charts.channelComposition.cashAmount)})
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="mt-2 text-xs text-slate-500">
+                  Belum ada penerimaan kas pesantren pada {formatPeriodLabel(selectedPeriod)}.
+                </p>
+              )}
+            </div>
 
-          <Link
-            href="/dashboard/koperasi/loket"
-            className="flex flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-50/70 p-3.5 text-center hover:bg-blue-50/60 hover:border-blue-200 transition-colors"
-          >
-            <Store className="h-5 w-5 text-blue-700" />
-            <span className="mt-2 text-xs font-semibold text-slate-800">Loket Kasir POS</span>
-            <span className="text-[11px] text-slate-500">Scan Kartu & Sesi Kas</span>
-          </Link>
+            {/* Pos Tagihan */}
+            <div className="mt-6 border-t border-slate-100 pt-4">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Distribusi Pos Tagihan
+              </span>
+              <div className="mt-3 space-y-2.5">
+                {charts.itemComposition.length > 0 ? (
+                  charts.itemComposition.map((it) => (
+                    <div key={it.itemType} className="space-y-1">
+                      <div className="flex items-baseline justify-between gap-2 text-xs">
+                        <span className="font-medium text-slate-800 truncate">{it.itemLabel}</span>
+                        <span className="shrink-0 text-slate-600 tabular-nums">
+                          {it.percentage}% · {formatRupiah(it.amount)}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-1.5 rounded-full bg-emerald-700/80"
+                          style={{ width: `${Math.max(2, it.percentage)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Belum ada rincian pos tagihan terbayar pada periode ini.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
 
-          <Link
-            href="/dashboard/keuangan/penyaluran"
-            className="flex flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-50/70 p-3.5 text-center hover:bg-purple-50/60 hover:border-purple-200 transition-colors"
-          >
-            <Send className="h-5 w-5 text-purple-700" />
-            <span className="mt-2 text-xs font-semibold text-slate-800">Salurkan Dana</span>
-            <span className="text-[11px] text-slate-500">Vendor Katering/Laundry</span>
-          </Link>
+        {/* 7. Transaksi Finansial Terbaru (Bersih, Interaktif Drawer, & Responsif Mobile) */}
+        <section className="rounded-xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-3.5">
+            <div>
+              <h3 id={recentTxHeadingId} className="text-sm font-bold text-slate-900">
+                Transaksi Finansial Terbaru
+              </h3>
+              <p className="text-xs text-slate-500">
+                8 mutasi terbaru lintas kategori — klik baris untuk melihat rincian
+              </p>
+            </div>
 
-          <Link
-            href="/dashboard/keuangan/rekonsiliasi"
-            className="flex flex-col items-center justify-center rounded-lg border border-slate-200 bg-slate-50/70 p-3.5 text-center hover:bg-amber-50/60 hover:border-amber-200 transition-colors"
-          >
-            <Scale className="h-5 w-5 text-amber-700" />
-            <span className="mt-2 text-xs font-semibold text-slate-800">Rekonsiliasi Bank</span>
-            <span className="text-[11px] text-slate-500">Settlement & Mismatch</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* 7. Transaksi Terbaru (Recent Transactions Table) */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">Transaksi Finansial Terbaru</h3>
-            <p className="text-xs text-slate-500">8 mutasi finansial paling mutakhir lintas seluruh kategori sistem</p>
+            <Link
+              href="/dashboard/keuangan/riwayat"
+              className="inline-flex min-h-[36px] items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+            >
+              <span>Buka Riwayat Lengkap</span>
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
           </div>
 
-          <Link
-            href="/dashboard/keuangan/riwayat"
-            className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
-          >
-            <span>Buka Riwayat Lengkap</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-600">
-            <thead className="border-b border-slate-100 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              <tr>
-                <th className="px-5 py-3">Waktu</th>
-                <th className="px-4 py-3">No. Transaksi</th>
-                <th className="px-4 py-3">Kategori</th>
-                <th className="px-4 py-3">Santri / Pihak Terkait</th>
-                <th className="px-4 py-3">Metode</th>
-                <th className="px-4 py-3 text-right">Nominal</th>
-                <th className="px-5 py-3 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {recentTransactions.length > 0 ? (
-                recentTransactions.map((tx) => {
+          {recentTransactions.length > 0 ? (
+            <>
+              {/* Tampilan Mobile: Stacked List (tanpa scroll horizontal) */}
+              <div className="divide-y divide-slate-100 md:hidden">
+                {recentTransactions.map((tx) => {
                   const isIncoming = tx.direction === 'IN'
-
-                  let badgeColor = 'bg-slate-100 text-slate-700'
-                  if (tx.status === 'PAID' || tx.status === 'SETTLED' || tx.status === 'COMPLETED') {
-                    badgeColor = 'bg-emerald-50 text-emerald-700'
-                  } else if (tx.status === 'VOID' || tx.status === 'REFUND' || tx.status === 'REVERSAL') {
-                    badgeColor = 'bg-rose-50 text-rose-700'
-                  }
-
-                  let catBadge = 'bg-slate-100 text-slate-700'
-                  if (tx.category === 'PAYMENT') catBadge = 'bg-blue-50 text-blue-700'
-                  if (tx.category === 'TOPUP') catBadge = 'bg-indigo-50 text-indigo-700'
-                  if (tx.category === 'WITHDRAWAL') catBadge = 'bg-amber-50 text-amber-800'
-                  if (tx.category === 'DISTRIBUTION') catBadge = 'bg-purple-50 text-purple-700'
-                  if (tx.category === 'CORRECTION') catBadge = 'bg-rose-50 text-rose-700'
+                  const statusInfo = formatStatusBadge(tx.status)
+                  const refDisplay = formatReferenceDisplay(tx.transactionNumber, tx.category)
+                  const partyName = tx.santriName || tx.recipientInfo || '-'
 
                   return (
-                    <tr key={`${tx.category}-${tx.id}`} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-5 py-3 text-slate-500 whitespace-nowrap">
-                        {formatDateIndo(tx.createdAt)}
-                      </td>
-                      <td className="px-4 py-3 font-mono font-medium text-slate-900 whitespace-nowrap">
-                        {tx.transactionNumber}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-[10px] font-bold ${catBadge}`}>
-                          {tx.categoryLabel}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {tx.santriName ? (
-                          <div>
-                            <span className="font-semibold text-slate-900">{tx.santriName}</span>
+                    <button
+                      key={`m-${tx.category}-${tx.id}`}
+                      type="button"
+                      onClick={() => setSelectedTx(toGlobalTransactionRow(tx))}
+                      className="w-full min-h-[44px] px-4 py-3.5 text-left hover:bg-slate-50/80 active:bg-slate-100/70 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-slate-900 truncate">
+                            {partyName}
                             {tx.santriNis && (
-                              <span className="ml-1 text-[11px] text-slate-400">({tx.santriNis})</span>
+                              <span className="ml-1 text-xs font-normal text-slate-500">
+                                ({tx.santriNis})
+                              </span>
                             )}
                           </div>
-                        ) : tx.recipientInfo ? (
-                          <span className="font-medium text-purple-900">{tx.recipientInfo}</span>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                        {tx.method}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-bold whitespace-nowrap">
-                        <span className={isIncoming ? 'text-emerald-700' : 'text-slate-800'}>
-                          {isIncoming ? '+ ' : '- '}
-                          {formatRupiah(tx.amount)}
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-slate-500">
+                            <span className="font-medium text-slate-700">{tx.categoryLabel}</span>
+                            <span>·</span>
+                            <span>{formatMethodLabel(tx.method)}</span>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 text-right">
+                          <div className={`text-sm font-bold tabular-nums ${isIncoming ? 'text-emerald-700' : 'text-slate-900'}`}>
+                            {isIncoming ? '+' : '-'} {formatRupiah(tx.amount)}
+                          </div>
+                          <span className={`mt-1 inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-semibold ${statusInfo.className}`}>
+                            {statusInfo.label}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+                        <span>{formatDateIndo(tx.createdAt)}</span>
+                        <span className="font-mono text-slate-600" title={tx.transactionNumber}>
+                          {refDisplay}
                         </span>
-                      </td>
-                      <td className="px-5 py-3 text-center whitespace-nowrap">
-                        <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-[10px] font-bold ${badgeColor}`}>
-                          {tx.status}
-                        </span>
-                      </td>
-                    </tr>
+                      </div>
+                    </button>
                   )
-                })
-              ) : (
-                <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-slate-400">
-                    Belum ada transaksi tercatat pada sistem.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                })}
+              </div>
+
+              {/* Tampilan Desktop/Tablet: Tabel Semantik dengan Keyboard Scroll Region & Sticky Header */}
+              <div
+                tabIndex={0}
+                role="region"
+                aria-labelledby={recentTxHeadingId}
+                className="hidden md:block overflow-x-auto focus-visible:outline-2 focus-visible:outline-emerald-600"
+              >
+                <table className="w-full border-collapse text-left text-xs text-slate-600">
+                  <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th scope="col" className="px-5 py-3">Waktu</th>
+                      <th scope="col" className="px-4 py-3">Referensi</th>
+                      <th scope="col" className="px-4 py-3">Santri / Pihak Terkait</th>
+                      <th scope="col" className="px-4 py-3">Jenis &amp; Metode</th>
+                      <th scope="col" className="px-4 py-3 text-right">Nominal</th>
+                      <th scope="col" className="px-5 py-3 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {recentTransactions.map((tx) => {
+                      const isIncoming = tx.direction === 'IN'
+                      const statusInfo = formatStatusBadge(tx.status)
+                      const refDisplay = formatReferenceDisplay(tx.transactionNumber, tx.category)
+
+                      return (
+                        <tr
+                          key={`${tx.category}-${tx.id}`}
+                          onClick={() => setSelectedTx(toGlobalTransactionRow(tx))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              setSelectedTx(toGlobalTransactionRow(tx))
+                            }
+                          }}
+                          tabIndex={0}
+                          className="cursor-pointer hover:bg-slate-50/90 focus-visible:bg-emerald-50/40 transition-colors"
+                        >
+                          <td className="px-5 py-3.5 text-slate-500 whitespace-nowrap tabular-nums">
+                            {formatDateIndo(tx.createdAt)}
+                          </td>
+                          <td className="px-4 py-3.5 whitespace-nowrap">
+                            <span
+                              className="font-mono text-xs font-medium text-slate-800"
+                              title={tx.transactionNumber}
+                            >
+                              {refDisplay}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 whitespace-nowrap">
+                            {tx.santriName ? (
+                              <div>
+                                <span className="font-semibold text-slate-900">{tx.santriName}</span>
+                                {tx.santriNis && (
+                                  <span className="ml-1.5 text-[11px] text-slate-500">({tx.santriNis})</span>
+                                )}
+                              </div>
+                            ) : tx.recipientInfo ? (
+                              <span className="font-semibold text-slate-900">{tx.recipientInfo}</span>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 whitespace-nowrap">
+                            <div className="font-medium text-slate-800">{tx.categoryLabel}</div>
+                            <div className="text-[11px] text-slate-500">{formatMethodLabel(tx.method)}</div>
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-semibold whitespace-nowrap tabular-nums">
+                            <span className={isIncoming ? 'text-emerald-700' : 'text-slate-900'}>
+                              {isIncoming ? '+' : '-'} {formatRupiah(tx.amount)}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                            <span className={`inline-flex items-center rounded-sm px-2 py-0.5 text-[11px] font-semibold ${statusInfo.className}`}>
+                              {statusInfo.label}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <div className="px-5 py-10 text-center">
+              <p className="text-sm font-medium text-slate-700">Belum ada transaksi tercatat.</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Pembayaran tagihan, top-up uang jajan, dan penyaluran terbaru akan muncul di sini.
+              </p>
+            </div>
+          )}
+        </section>
       </div>
+
+      {/* Drawer Rincian Transaksi (Reuse pola Riwayat Transaksi sesuai UI_UX_GUIDELINES Bab 4.4) */}
+      <TransactionDetailDrawer
+        transaction={selectedTx}
+        onClose={() => setSelectedTx(null)}
+      />
     </div>
   )
 }

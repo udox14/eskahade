@@ -2,11 +2,12 @@
 
 // Transfer manual di Portal Wali: kartu status, instruksi transfer, dan form unggah bukti.
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Copy, Check, Clock, Upload, AlertCircle, CheckCircle2, Landmark, XCircle } from 'lucide-react'
 import type { PortalTransferSummary } from '@/lib/portal/finance'
+import { formatPortalDateTimeWib, parsePortalTimestamp } from '@/lib/portal/format'
 import { BottomSheet } from '../../_components/bottom-sheet'
 import { uploadTransferProofAction, cancelTransferAction } from './actions'
 
@@ -16,10 +17,7 @@ export function formatRupiah(amount: number): string {
 }
 
 function formatWib(iso: string | null): string {
-  if (!iso) return '-'
-  try {
-    return new Date(iso).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' WIB'
-  } catch { return '-' }
+  return formatPortalDateTimeWib(iso)
 }
 
 /** Amount with the last three digits (unique code) emphasised: Rp505.<b>020</b>. */
@@ -45,14 +43,21 @@ export const TRANSFER_STATUS_LABEL: Record<PortalTransferSummary['status'], stri
 
 export function isTransferOpen(t: PortalTransferSummary): boolean {
   if (t.status === 'MENUNGGU_VERIFIKASI' || t.status === 'PERLU_PERBAIKAN') return true
-  return t.status === 'MENUNGGU_BUKTI' && new Date(t.expiresAt).getTime() > Date.now()
+  const exp = parsePortalTimestamp(t.expiresAt)
+  return t.status === 'MENUNGGU_BUKTI' && !!exp && exp.getTime() > Date.now()
 }
 
 /** Show open transfers, plus results from the last 3 days so parents see the outcome. */
 export function visibleTransfers(transfers: PortalTransferSummary[]): PortalTransferSummary[] {
   const recent = Date.now() - 3 * 24 * 3600 * 1000
-  return transfers.filter(t => isTransferOpen(t) ||
-    ((t.status === 'DITERIMA' || t.status === 'DITOLAK') && new Date(t.reviewedAt || t.createdAt).getTime() > recent)).slice(0, 2)
+  return transfers.filter(t => {
+    if (isTransferOpen(t)) return true
+    if (t.status === 'DITERIMA' || t.status === 'DITOLAK') {
+      const ts = parsePortalTimestamp(t.reviewedAt || t.createdAt)
+      return !!ts && ts.getTime() > recent
+    }
+    return false
+  }).slice(0, 2)
 }
 
 function useCopy() {
@@ -117,6 +122,11 @@ function nowLocalInput(): string {
 }
 
 export function TransferSheet({ transfer, open, onClose }: { transfer: PortalTransferSummary | null; open: boolean; onClose: () => void }) {
+  if (!transfer) return null
+  return <TransferSheetInner key={transfer.submissionId} transfer={transfer} open={open} onClose={onClose} />
+}
+
+function TransferSheetInner({ transfer, open, onClose }: { transfer: PortalTransferSummary; open: boolean; onClose: () => void }) {
   const router = useRouter()
   const { copied, copy } = useCopy()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -127,9 +137,17 @@ export function TransferSheet({ transfer, open, onClose }: { transfer: PortalTra
   const [transferredAt, setTransferredAt] = useState(nowLocalInput)
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  if (!transfer) return null
+  // Bersihkan objectURL saat unmount atau ganti preview (anti memory leak)
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview)
+    }
+  }, [preview])
+
   const canUpload = transfer.status === 'MENUNGGU_BUKTI' || transfer.status === 'PERLU_PERBAIKAN'
 
   const pick = async (selected: File | undefined) => {
@@ -138,7 +156,10 @@ export function TransferSheet({ transfer, open, onClose }: { transfer: PortalTra
     try {
       const compressed = await compressImage(selected)
       setFile(compressed)
-      setPreview(URL.createObjectURL(compressed))
+      setPreview(prev => {
+        if (prev) URL.revokeObjectURL(prev)
+        return URL.createObjectURL(compressed)
+      })
       setErrors(e => ({ ...e, file: '' }))
     } catch {
       setErrors(e => ({ ...e, file: 'Foto tidak bisa dibaca. Coba foto lain.' }))
@@ -165,16 +186,23 @@ export function TransferSheet({ transfer, open, onClose }: { transfer: PortalTra
     setSubmitting(false)
     if ('error' in res) { toast.error(res.error); return }
     toast.success('Bukti terkirim. Petugas akan memeriksa pembayaran Anda.')
-    setFile(null); setPreview(null)
+    setFile(null)
+    setPreview(prev => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
     onClose()
     router.refresh()
   }
 
   const cancel = async () => {
-    if (!window.confirm('Batalkan pembayaran ini? Jangan batalkan jika Anda sudah mentransfer.')) return
+    if (cancelling) return
+    setCancelling(true)
     const res = await cancelTransferAction(transfer.submissionId)
+    setCancelling(false)
     if ('error' in res) { toast.error(res.error); return }
     toast.success('Pembayaran dibatalkan.')
+    setConfirmingCancel(false)
     onClose(); router.refresh()
   }
 
@@ -280,7 +308,39 @@ export function TransferSheet({ transfer, open, onClose }: { transfer: PortalTra
               <input className={fieldClass} value={notes} maxLength={300} onChange={e => setNotes(e.target.value)} />
             </label>
             {transfer.status === 'MENUNGGU_BUKTI' && (
-              <button type="button" onClick={cancel} className="text-xs font-semibold text-red-700 dark:text-red-400">Batalkan pembayaran ini</button>
+              confirmingCancel ? (
+                <div className="rounded-xl border border-red-200 dark:border-red-900/60 bg-red-50/80 dark:bg-red-950/40 p-3 space-y-2.5 text-xs">
+                  <p className="text-red-900 dark:text-red-200 font-medium leading-relaxed">
+                    Batalkan pembayaran ini? <b>Jangan batalkan jika Anda sudah mentransfer uang.</b>
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={cancelling}
+                      onClick={() => setConfirmingCancel(false)}
+                      className="flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-2 font-semibold text-slate-700 dark:text-slate-200 disabled:opacity-50"
+                    >
+                      Kembali
+                    </button>
+                    <button
+                      type="button"
+                      disabled={cancelling}
+                      onClick={cancel}
+                      className="flex-1 rounded-lg bg-red-600 hover:bg-red-700 py-2 font-bold text-white disabled:opacity-50"
+                    >
+                      {cancelling ? 'Membatalkan…' : 'Ya, Batalkan'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingCancel(true)}
+                  className="text-xs font-semibold text-red-700 dark:text-red-400 hover:underline cursor-pointer"
+                >
+                  Batalkan pembayaran ini
+                </button>
+              )
             )}
           </div>
         )}

@@ -177,7 +177,6 @@ export async function getUangJajanData(
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-  const currentMonthPrefix = new Date().toISOString().slice(0, 7) // YYYY-MM
 
   // 2. Eksekusi KPI global, daftar asrama, total rows, dan setting limit secara paralel
   const [
@@ -197,11 +196,18 @@ export async function getUangJajanData(
     ),
     queryOne<{ total_in: number; total_out: number }>(
       `SELECT
-         COALESCE(SUM(CASE WHEN direction = 'IN' THEN amount ELSE 0 END), 0) AS total_in,
-         COALESCE(SUM(CASE WHEN direction = 'OUT' THEN amount ELSE 0 END), 0) AS total_out
-       FROM finance_wallet_ledger
-       WHERE strftime('%Y-%m', created_at) = ?`,
-      [currentMonthPrefix]
+         COALESCE(SUM(CASE
+           WHEN wl.direction = 'IN' AND wl.movement_type IN ('TOPUP_ONLINE', 'TOPUP_CASH', 'TOPUP_TRANSFER')
+           THEN wl.amount ELSE 0 END), 0) AS total_in,
+         COALESCE(SUM(CASE
+           WHEN wl.direction = 'OUT' AND wl.movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF')
+           THEN wl.amount
+           WHEN wl.movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN'
+           THEN -wl.amount ELSE 0 END), 0) AS total_out
+       FROM finance_wallet_ledger wl
+       JOIN santri s ON s.id = wl.santri_id
+       WHERE strftime('%Y-%m', wl.created_at, '+7 hours') = strftime('%Y-%m', 'now', '+7 hours')
+         AND ${nonBillableSantriSqlPredicate('s.asrama')}`
     ),
     query<{ asrama: string }>(
       `SELECT DISTINCT asrama FROM santri
@@ -221,8 +227,8 @@ export async function getUangJajanData(
   const kpi: UangJajanKpi = {
     totalSaldoTitipan: kpiTotalSaldoRow?.total ?? 0,
     santriBersaldoCount: kpiTotalSaldoRow?.count_bersaldo ?? 0,
-    mutasiInBulanIniNominal: kpiMutasiBulanIniRow?.total_in ?? 0,
-    mutasiOutBulanIniNominal: kpiMutasiBulanIniRow?.total_out ?? 0,
+    mutasiInBulanIniNominal: Math.max(0, kpiMutasiBulanIniRow?.total_in ?? 0),
+    mutasiOutBulanIniNominal: Math.max(0, kpiMutasiBulanIniRow?.total_out ?? 0),
   }
 
   const asramaList = asramaRows.map(r => r.asrama)
@@ -401,7 +407,7 @@ export async function getStudentWalletDetail(
 export async function recalculateStudentWalletAction(
   santriId: string
 ): Promise<{ success: boolean; newBalance: number }> {
-  await authorizeFinanceFeature('/dashboard/keuangan/uang-jajan', false)
+  await authorizeFinanceFeature('/dashboard/keuangan/uang-jajan', true)
 
   const auth = await authorizeUser()
   if (!auth.canMutate) {

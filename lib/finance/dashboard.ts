@@ -54,11 +54,19 @@ export interface ReconciliationMismatchKpi {
   hasMismatch: boolean
 }
 
+export interface OperationalQueueKpi {
+  pendingTransferVerificationsCount: number
+  pendingTransferVerificationsAmount: number
+  activeCollectiveBatchesCount: number
+  activeCollectiveBatchesAmount: number
+}
+
 export interface FinanceDashboardKpi {
   pesantren: PesantrenKpi
   uangJajan: UangJajanKpi
   kasir: KasirActivityKpi
   mismatch: ReconciliationMismatchKpi
+  operations: OperationalQueueKpi
 }
 
 export interface MonthlyTrendItem {
@@ -86,6 +94,7 @@ export interface ItemComposition {
 
 export interface RecentTransactionItem {
   id: string
+  sourceTable: 'PAYMENT' | 'WALLET' | 'DISTRIBUTION' | 'CORRECTION'
   transactionNumber: string
   category: 'PAYMENT' | 'TOPUP' | 'WITHDRAWAL' | 'DISTRIBUTION' | 'CORRECTION'
   categoryLabel: string
@@ -99,8 +108,12 @@ export interface RecentTransactionItem {
   itemLabel: string | null
   santriName: string | null
   santriNis: string | null
+  santriAsrama: string | null
+  santriKamar: string | null
   recipientInfo: string | null
   operatorName: string | null
+  externalReference: string | null
+  notes: string | null
   createdAt: string
 }
 
@@ -180,6 +193,8 @@ export async function getExecutiveFinanceKpi(periodInput?: string): Promise<Fina
     openSessionsRow,
     todayCashRow,
     mismatchRow,
+    pendingTransferRow,
+    activeCollectiveRow,
   ] = await Promise.all([
     // 1. KAS PESANTREN: Penerimaan (Online vs Tunai, Settled vs Pending Settlement)
     queryOne<{
@@ -350,6 +365,25 @@ export async function getExecutiveFinanceKpi(periodInput?: string): Promise<Fina
          (SELECT COUNT(*) FROM finance_corrections WHERE is_recovery_case = 1 AND recovery_status = 'PENDING_RECOVERY') AS pending_recovery_cases`,
       []
     ),
+
+    // 7. ANTREAN OPERASIONAL HARIAN (Verifikasi Transfer Manual & Pencairan Kolektif Aktif)
+    queryOne<{ pending_count: number; pending_amount: number }>(
+      `SELECT
+         COUNT(*) AS pending_count,
+         COALESCE(SUM(expected_amount), 0) AS pending_amount
+       FROM finance_transfer_submissions
+       WHERE status = 'MENUNGGU_VERIFIKASI'`,
+      []
+    ).catch(() => null),
+
+    queryOne<{ active_count: number; active_amount: number }>(
+      `SELECT
+         COUNT(*) AS active_count,
+         COALESCE(SUM(total_amount), 0) AS active_amount
+       FROM finance_wallet_payout_batches
+       WHERE status = 'DIBAWA'`,
+      []
+    ).catch(() => null),
   ])
 
   const unallocatedCount = mismatchRow?.unallocated_count ?? 0
@@ -403,6 +437,12 @@ export async function getExecutiveFinanceKpi(periodInput?: string): Promise<Fina
       pendingRecoveryCasesCount: pendingRecoveryCases,
       hasMismatch: totalMismatchCount > 0,
     },
+    operations: {
+      pendingTransferVerificationsCount: pendingTransferRow?.pending_count ?? 0,
+      pendingTransferVerificationsAmount: pendingTransferRow?.pending_amount ?? 0,
+      activeCollectiveBatchesCount: activeCollectiveRow?.active_count ?? 0,
+      activeCollectiveBatchesAmount: activeCollectiveRow?.active_amount ?? 0,
+    },
   }
 }
 
@@ -418,10 +458,11 @@ export async function getDashboardChartsData(periodInput?: string): Promise<{
   const period = periodInput || currentMonth
   const periodPrefix = `${period}%`
 
-  // 1. Tren Bulanan (6 bulan terakhir)
+  // 1. Tren Bulanan (6 bulan berakhir pada periode yang dipilih)
   const now = new Date()
-  const baseYear = now.getFullYear()
-  const baseMonth = now.getMonth()
+  const periodMatch = /^(\d{4})-(\d{2})$/.exec(period)
+  const baseYear = periodMatch ? parseInt(periodMatch[1], 10) : now.getFullYear()
+  const baseMonth = periodMatch ? parseInt(periodMatch[2], 10) - 1 : now.getMonth()
   const monthList: string[] = []
 
   for (let i = 5; i >= 0; i--) {
@@ -539,8 +580,10 @@ export async function getDashboardChartsData(periodInput?: string): Promise<{
 export async function getRecentTransactions(limit = 8): Promise<RecentTransactionItem[]> {
   const rows = await query<{
     id: string
+    source_table: 'PAYMENT' | 'WALLET' | 'DISTRIBUTION' | 'CORRECTION'
     transaction_number: string
     category: string
+    category_label_override: string | null
     fund_type: string
     direction: string
     amount: number
@@ -550,19 +593,25 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
     item_type: string | null
     santri_name: string | null
     santri_nis: string | null
+    santri_asrama: string | null
+    santri_kamar: string | null
     recipient_info: string | null
     operator_name: string | null
+    external_reference: string | null
+    notes: string | null
     created_at: string
   }>(
     `
     -- 1. Payments (Obligations & Top-Ups)
     SELECT
       p.id,
+      'PAYMENT' AS source_table,
       p.payment_number AS transaction_number,
       CASE
         WHEN EXISTS (SELECT 1 FROM finance_allocations a WHERE a.payment_id = p.id AND a.target_type = 'UANG_JAJAN') THEN 'TOPUP'
         ELSE 'PAYMENT'
       END AS category,
+      NULL AS category_label_override,
       CASE
         WHEN EXISTS (SELECT 1 FROM finance_allocations a WHERE a.payment_id = p.id AND a.target_type = 'UANG_JAJAN') THEN 'TITIPAN_SANTRI'
         ELSE 'PESANTREN'
@@ -578,8 +627,12 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
       (SELECT GROUP_CONCAT(DISTINCT a.item_type) FROM finance_allocations a WHERE a.payment_id = p.id) AS item_type,
       s.nama_lengkap AS santri_name,
       s.nis AS santri_nis,
+      s.asrama AS santri_asrama,
+      s.kamar AS santri_kamar,
       NULL AS recipient_info,
       u.full_name AS operator_name,
+      COALESCE(p.bri_trx_id, p.bri_payment_request_id, p.external_reference) AS external_reference,
+      NULL AS notes,
       p.paid_at AS created_at
     FROM finance_payments p
     LEFT JOIN santri s ON s.id = p.santri_id
@@ -590,12 +643,18 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
     -- 2. Wallet Ledger Movements (Withdrawals, Standalone Top-Up, & Wallet Reversals)
     SELECT
       wl.id,
+      'WALLET' AS source_table,
       COALESCE(wl.reference_id, 'WLT-' || SUBSTR(wl.id, 1, 8)) AS transaction_number,
       CASE
         WHEN wl.movement_type IN ('WITHDRAWAL_LOKET', 'WITHDRAWAL_KOLEKTIF') THEN 'WITHDRAWAL'
         WHEN wl.movement_type IN ('REVERSAL', 'WITHDRAWAL_KOLEKTIF_RETURN') THEN 'CORRECTION'
         ELSE 'TOPUP'
       END AS category,
+      CASE
+        WHEN wl.movement_type = 'WITHDRAWAL_KOLEKTIF' THEN 'Pencairan Kolektif'
+        WHEN wl.movement_type = 'WITHDRAWAL_KOLEKTIF_RETURN' THEN 'Pengembalian Kolektif'
+        ELSE NULL
+      END AS category_label_override,
       'TITIPAN_SANTRI' AS fund_type,
       wl.direction,
       wl.amount,
@@ -608,8 +667,12 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
       'UANG_JAJAN' AS item_type,
       s.nama_lengkap AS santri_name,
       s.nis AS santri_nis,
+      s.asrama AS santri_asrama,
+      s.kamar AS santri_kamar,
       NULL AS recipient_info,
       u.full_name AS operator_name,
+      wl.reference_id AS external_reference,
+      wl.notes AS notes,
       wl.created_at
     FROM finance_wallet_ledger wl
     LEFT JOIN santri s ON s.id = wl.santri_id
@@ -632,8 +695,10 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
     -- 3. Distributions to Vendors / Bendahara
     SELECT
       d.id,
+      'DISTRIBUTION' AS source_table,
       d.distribution_number AS transaction_number,
       'DISTRIBUTION' AS category,
+      NULL AS category_label_override,
       'PESANTREN' AS fund_type,
       'OUT' AS direction,
       d.total_amount AS amount,
@@ -643,8 +708,12 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
       d.item_type,
       NULL AS santri_name,
       NULL AS santri_nis,
+      NULL AS santri_asrama,
+      NULL AS santri_kamar,
       COALESCE(j.nama_jasa, d.recipient_type) AS recipient_info,
       u.full_name AS operator_name,
+      d.destination_account AS external_reference,
+      d.notes AS notes,
       d.transferred_at AS created_at
     FROM finance_distributions d
     LEFT JOIN master_jasa j ON j.id = d.recipient_id
@@ -655,8 +724,10 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
     -- 4. Financial Corrections (Void, Reversal, Refund)
     SELECT
       c.id,
+      'CORRECTION' AS source_table,
       c.correction_number AS transaction_number,
       'CORRECTION' AS category,
+      NULL AS category_label_override,
       'PESANTREN' AS fund_type,
       'OUT' AS direction,
       c.total_amount AS amount,
@@ -666,8 +737,12 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
       'KOREKSI' AS item_type,
       s.nama_lengkap AS santri_name,
       s.nis AS santri_nis,
+      s.asrama AS santri_asrama,
+      s.kamar AS santri_kamar,
       NULL AS recipient_info,
       u.full_name AS operator_name,
+      p.payment_number AS external_reference,
+      c.reason AS notes,
       c.created_at
     FROM finance_corrections c
     JOIN finance_payments p ON p.id = c.target_payment_id
@@ -690,9 +765,10 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
 
   return rows.map((r) => ({
     id: r.id,
+    sourceTable: r.source_table,
     transactionNumber: r.transaction_number,
     category: r.category as RecentTransactionItem['category'],
-    categoryLabel: CATEGORY_LABELS[r.category] || r.category,
+    categoryLabel: r.category_label_override || CATEGORY_LABELS[r.category] || r.category,
     fundType: r.fund_type as RecentTransactionItem['fundType'],
     direction: r.direction as RecentTransactionItem['direction'],
     amount: r.amount,
@@ -703,8 +779,12 @@ export async function getRecentTransactions(limit = 8): Promise<RecentTransactio
     itemLabel: r.item_type ? (FINANCE_ITEM_LABELS[r.item_type as FinanceItemType] || r.item_type) : null,
     santriName: r.santri_name,
     santriNis: r.santri_nis,
+    santriAsrama: r.santri_asrama,
+    santriKamar: r.santri_kamar,
     recipientInfo: r.recipient_info,
     operatorName: r.operator_name,
+    externalReference: r.external_reference,
+    notes: r.notes,
     createdAt: r.created_at,
   }))
 }

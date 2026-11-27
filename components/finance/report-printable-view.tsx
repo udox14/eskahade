@@ -14,7 +14,7 @@
 
 'use client'
 
-import React, { useRef, useState, useSyncExternalStore } from 'react'
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { AlertCircle, Printer, X } from 'lucide-react'
 import { PrintDocumentShell } from '@/components/print/print-document-shell'
@@ -76,6 +76,15 @@ export default function ReportPrintableView<T>({
   // Portal hanya boleh dibuat di browser (bukan saat SSR): false di server, true setelah hidrasi.
   const isBrowser = useSyncExternalStore(subscribeNoop, getClientSnapshot, getServerSnapshot)
 
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+
   if (!isOpen || !isBrowser) return null
 
   // Fallback to Sukahideng default if not provided
@@ -97,7 +106,15 @@ export default function ReportPrintableView<T>({
   }
 
   const overlay = (
-    <div className="report-print-portal fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs animate-in fade-in duration-150">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Preview cetak ${title}`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+      className="report-print-portal fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs animate-in fade-in duration-150"
+    >
       {/* CSS khusus cetak: hanya lembar laporan yang tampil di kertas */}
       <style
         dangerouslySetInnerHTML={{
@@ -207,9 +224,9 @@ export default function ReportPrintableView<T>({
             orientation={orientation}
             showSignatureBlock={true}
             signatoryTitleLeft={'Mengetahui,\nBendahara Pesantren'}
-            signatoryNameLeft={'( Ust. Bendahara, M.Pd. )'}
+            signatoryNameLeft={'( ...................................... )'}
             signatoryTitleRight={'Petugas Pembuat Laporan'}
-            signatoryNameRight={'( Petugas Administrasi Keuangan )'}
+            signatoryNameRight={'( ...................................... )'}
             signatoryLocation="Tasikmalaya"
             footerNote="Dicetak resmi oleh Sistem Informasi Keuangan Pesantren Sukahideng"
           >

@@ -44,6 +44,21 @@ interface CatatPenyaluranModalProps {
   canTransfer: boolean
 }
 
+function getNowWibDateTimeInput(): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Jakarta',
+  }).formatToParts(new Date())
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00'
+  const hour = get('hour') === '24' ? '00' : get('hour')
+  return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}`
+}
+
 function CatatPenyaluranForm({
   onClose,
   onSuccess,
@@ -66,12 +81,10 @@ function CatatPenyaluranForm({
   const [destinationBank, setDestinationBank] = useState<string>('')
   const [destinationAccount, setDestinationAccount] = useState<string>('')
   const [accountHolderName, setAccountHolderName] = useState<string>('')
-  const [receivingPersonName,setReceivingPersonName]=useState('')
-  const [referenceNumber,setReferenceNumber]=useState('')
-  const [idempotencyKey]=useState(()=>crypto.randomUUID())
-  const [transferredAt, setTransferredAt] = useState<string>(() =>
-    new Date().toISOString().slice(0, 16)
-  )
+  const [receivingPersonName, setReceivingPersonName] = useState('')
+  const [referenceNumber, setReferenceNumber] = useState('')
+  const [idempotencyKey] = useState(() => crypto.randomUUID())
+  const [transferredAt, setTransferredAt] = useState<string>(() => getNowWibDateTimeInput())
   const [notes, setNotes] = useState<string>('')
   const [proofAttachmentUrl, setProofAttachmentUrl] = useState<string>('')
   const [uploadingProof, setUploadingProof] = useState<boolean>(false)
@@ -127,7 +140,7 @@ function CatatPenyaluranForm({
     return () => {
       active = false
     }
-  }, [target.recipientId])
+  }, [target.recipientType, target.recipientId])
 
   const parsedAmount = parseInt(amountStr.replace(/\D/g, ''), 10) || 0
   const maxAvailable = target.availableAmount
@@ -183,7 +196,7 @@ function CatatPenyaluranForm({
         })
 
         toast.success(
-          `Penyaluran dana Rp ${parsedAmount.toLocaleString('id-ID')} ke ${target.recipientName} berhasil dicatat!`
+          `Penyaluran dana Rp${parsedAmount.toLocaleString('id-ID')} ke ${target.recipientName} berhasil dicatat!`
         )
         onSuccess(res?.data?.id)
         onClose()
@@ -222,8 +235,8 @@ function CatatPenyaluranForm({
               <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-between">
                 <div>
                   <div className="text-xs font-medium text-emerald-800">Dana Siap Salur</div>
-                  <div className="text-xl font-bold text-emerald-950 mt-0.5">
-                    Rp {maxAvailable.toLocaleString('id-ID')}
+                  <div className="text-xl font-bold text-emerald-950 mt-0.5 tabular-nums">
+                    Rp{maxAvailable.toLocaleString('id-ID')}
                   </div>
                   <div className="text-[11px] text-emerald-700 mt-0.5">
                     Periode: <span className="font-semibold">{target.periodLabel}</span>
@@ -232,16 +245,12 @@ function CatatPenyaluranForm({
                 <button
                   type="button"
                   onClick={() => setAmountStr(String(maxAvailable))}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-xs"
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-xs cursor-pointer"
                 >
                   Salur Seluruhnya
                 </button>
               </div>
 
-              <label className="block text-sm">{method==='CASH'?'Nama penerima kas':'Nomor referensi bank'}
-                <input required value={method==='CASH'?receivingPersonName:referenceNumber}
-                  onChange={e=>method==='CASH'?setReceivingPersonName(e.target.value):setReferenceNumber(e.target.value)} className="w-full border rounded-lg p-2" />
-              </label>
               {/* Input Nominal */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -259,7 +268,7 @@ function CatatPenyaluranForm({
                       setAmountStr(raw)
                     }}
                     placeholder="0"
-                    className={`w-full pl-11 pr-4 py-2.5 rounded-xl border text-slate-800 text-base font-bold focus:outline-none focus:ring-2 transition ${
+                    className={`w-full pl-11 pr-4 py-2.5 rounded-xl border text-slate-800 text-base font-bold tabular-nums focus:outline-none focus:ring-2 transition ${
                       !isAmountValid && parsedAmount > 0
                         ? 'border-rose-300 focus:ring-rose-200 bg-rose-50/20'
                         : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-100'
@@ -269,12 +278,12 @@ function CatatPenyaluranForm({
                 {!isAmountValid && parsedAmount > maxAvailable && (
                   <p className="text-xs text-rose-600 mt-1 flex items-center gap-1 font-medium">
                     <WarningCircle size={14} weight="fill" />
-                    Nominal melebihi dana siap salur (Maks. Rp {maxAvailable.toLocaleString('id-ID')}).
+                    Nominal melebihi dana siap salur (Maks. Rp{maxAvailable.toLocaleString('id-ID')}).
                   </p>
                 )}
                 {parsedAmount > 0 && parsedAmount < maxAvailable && (
-                  <p className="text-xs text-amber-700 mt-1">
-                    Penyaluran parsial: Sisa Rp {(maxAvailable - parsedAmount).toLocaleString('id-ID')} akan tetap berstatus siap salur.
+                  <p className="text-xs text-amber-700 mt-1 tabular-nums">
+                    Penyaluran parsial: Sisa Rp{(maxAvailable - parsedAmount).toLocaleString('id-ID')} akan tetap berstatus siap salur.
                   </p>
                 )}
               </div>
@@ -289,20 +298,20 @@ function CatatPenyaluranForm({
                     type="button"
                     onClick={() => setMethod('TRANSFER')}
                     disabled={!canTransfer}
-                    title={canTransfer ? undefined : 'Transfer Bank manual hanya dapat dicatat oleh Admin atau Bendahara.'}
-                    className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border font-semibold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                    title={canTransfer ? undefined : 'Transfer Manual hanya dapat dicatat oleh Admin atau Bendahara.'}
+                    className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border font-semibold text-sm transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                       method === 'TRANSFER'
                         ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 shadow-xs'
                         : 'border-slate-200 hover:bg-slate-50 text-slate-600'
                     }`}
                   >
                     <Bank size={18} weight={method === 'TRANSFER' ? 'fill' : 'regular'} />
-                    Transfer Bank
+                    Transfer Manual
                   </button>
                   <button
                     type="button"
                     onClick={() => setMethod('CASH')}
-                    className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border font-semibold text-sm transition ${
+                    className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border font-semibold text-sm transition cursor-pointer ${
                       method === 'CASH'
                         ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 shadow-xs'
                         : 'border-slate-200 hover:bg-slate-50 text-slate-600'
@@ -312,6 +321,30 @@ function CatatPenyaluranForm({
                     Tunai (Cash)
                   </button>
                 </div>
+              </div>
+
+              {/* Nama Penerima Kas / Nomor Referensi Transfer Manual */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                  {method === 'CASH' ? 'Nama Penerima Kas' : 'Nomor Referensi Transfer Bank'}{' '}
+                  <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  required
+                  type="text"
+                  value={method === 'CASH' ? receivingPersonName : referenceNumber}
+                  onChange={(e) =>
+                    method === 'CASH'
+                      ? setReceivingPersonName(e.target.value)
+                      : setReferenceNumber(e.target.value)
+                  }
+                  placeholder={
+                    method === 'CASH'
+                      ? 'Nama lengkap pihak penerima uang tunai'
+                      : 'Nomor referensi / resi mutasi bank'
+                  }
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-800 focus:outline-none focus:border-emerald-500"
+                />
               </div>
 
               {/* Form Rekening jika TRANSFER */}
@@ -420,7 +453,7 @@ function CatatPenyaluranForm({
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span>Bukti Penyaluran</span>
                   {method === 'TRANSFER' && (
-                    <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-amber-700">Disarankan untuk transfer</span>
+                    <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-amber-800">Wajib untuk transfer manual</span>
                   )}
                 </label>
                 {proofAttachmentUrl ? (
@@ -503,7 +536,7 @@ function CatatPenyaluranForm({
                 <div className="flex justify-between items-center text-xs py-1 border-b border-slate-100">
                   <span className="text-slate-500">Metode Penyaluran</span>
                   <span className="font-bold text-slate-800">
-                    {method === 'TRANSFER' ? 'Transfer Bank' : 'Tunai (Cash)'}
+                    {method === 'TRANSFER' ? 'Transfer Manual' : 'Tunai (Cash)'}
                   </span>
                 </div>
 
@@ -530,8 +563,8 @@ function CatatPenyaluranForm({
 
                 <div className="flex justify-between items-center text-sm pt-2">
                   <span className="font-bold text-slate-700">Total Nominal Disalurkan</span>
-                  <span className="font-extrabold text-emerald-600 text-base">
-                    Rp {parsedAmount.toLocaleString('id-ID')}
+                  <span className="font-extrabold text-emerald-700 text-base tabular-nums">
+                    Rp{parsedAmount.toLocaleString('id-ID')}
                   </span>
                 </div>
               </div>

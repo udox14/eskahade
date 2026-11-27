@@ -85,6 +85,8 @@ export interface CashTransferListFilter {
   /** Tanggal WIB (YYYY-MM-DD), berdasarkan waktu transaksi di bank. */
   fromDate?: string | null
   toDate?: string | null
+  /** Pencarian bebas: nomor mutasi, kode sesi, petugas, referensi bank, atau catatan. */
+  search?: string | null
   limit?: number
   offset?: number
 }
@@ -107,6 +109,12 @@ export async function listCashTransfers(filter: CashTransferListFilter = {}) {
     where.push('t.bank_transacted_at < ?')
     params.push(new Date(new Date(filter.toDate + 'T00:00:00+07:00').getTime() + 24 * 3600 * 1000).toISOString())
   }
+  const search = cleanText(filter.search, 80)
+  if (search) {
+    const like = `%${search.toLowerCase()}%`
+    where.push(`(LOWER(t.transfer_number) LIKE ? OR LOWER(s.session_code) LIKE ? OR LOWER(t.handled_by_name) LIKE ? OR LOWER(COALESCE(u.full_name, '')) LIKE ? OR LOWER(COALESCE(t.bank_reference, '')) LIKE ? OR LOWER(COALESCE(t.notes, '')) LIKE ?)`)
+    params.push(like, like, like, like, like, like)
+  }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
   const limit = Math.min(Math.max(filter.limit ?? 50, 1), 200)
   const offset = Math.max(filter.offset ?? 0, 0)
@@ -119,7 +127,10 @@ export async function listCashTransfers(filter: CashTransferListFilter = {}) {
               COALESCE(SUM(CASE WHEN t.status = 'POSTED' AND t.direction = 'CASH_TO_BANK' THEN t.amount ELSE 0 END), 0) AS bank_out,
               COALESCE(SUM(CASE WHEN t.status = 'POSTED' AND t.statement_transaction_id IS NULL THEN 1 ELSE 0 END), 0) AS unmatched,
               COALESCE(SUM(CASE WHEN t.status = 'VOIDED' THEN 1 ELSE 0 END), 0) AS voided
-       FROM finance_cash_transfers t ${whereSql}`, params),
+       FROM finance_cash_transfers t
+       JOIN finance_cash_sessions s ON s.id = t.cash_session_id
+       LEFT JOIN users u ON u.id = t.operator_id
+       ${whereSql}`, params),
   ])
   return {
     items,
