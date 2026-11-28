@@ -167,10 +167,10 @@ export async function processBroadcasts(
   const result: BroadcastRunResult = { claimed: 0, inserted: 0, completed: 0 }
   if (!(await readNotifSetting(store, 'notifications_enabled'))) return result
   const pushActive = !!(push && (push.webpush || push.fcm)) && await readNotifSetting(store, 'notifications_push_enabled')
-  const at = options.at ?? new Date()
+  const baseAt = options.at
 
   for (let chunk = 0; chunk < (options.maxChunks ?? 10); chunk++) {
-    const now = new Date(Math.max(at.getTime(), Date.now())).toISOString()
+    const now = (baseAt ? new Date(baseAt.getTime() + chunk) : new Date()).toISOString()
     const stale = new Date(Date.parse(now) - LEASE_MS).toISOString()
     // Klaim satu broadcast: jatuh tempo, atau SENDING yang lease-nya habis. updated_at = token lease.
     const [claimed] = await store.query<ClaimedBroadcast>(
